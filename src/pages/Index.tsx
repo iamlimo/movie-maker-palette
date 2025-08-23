@@ -1,10 +1,23 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import BrandStrip from "@/components/BrandStrip";
 import MovieSection from "@/components/MovieSection";
 import { newReleases, popularMovies, actionMovies } from "@/data/movies";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Redirect authenticated users away from auth page
+  useEffect(() => {
+    if (user && window.location.pathname === '/auth') {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
   return (
     <div className="min-h-screen">
       <Header />
