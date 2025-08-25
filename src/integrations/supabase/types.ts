@@ -487,6 +487,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_user_role_by_email: {
+        Args: { _email: string; _role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "user" | "admin" | "super_admin"
