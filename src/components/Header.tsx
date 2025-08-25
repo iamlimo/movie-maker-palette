@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, User, Menu, LogOut } from "lucide-react";
+import { Search, User, Menu, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRole } from "@/hooks/useRole";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const Header = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile } = useAuth();
+  const { isSuperAdmin } = useRole();
 
   const handleSignOut = async () => {
     await signOut();
@@ -56,7 +58,7 @@ const Header = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="hidden md:flex items-center space-x-2 text-foreground hover:bg-secondary">
                   <User className="h-5 w-5" />
-                  <span className="hidden lg:inline">Account</span>
+                  <span className="hidden lg:inline">{profile?.name || user?.email || 'Account'}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-card border-border">
@@ -64,6 +66,17 @@ const Header = () => {
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
+                {isSuperAdmin() && (
+                  <>
+                    <DropdownMenuSeparator className="bg-border" />
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="flex items-center text-foreground">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Admin Panel
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator className="bg-border" />
                 <DropdownMenuItem onClick={handleSignOut} className="text-foreground hover:bg-destructive/10">
                   <LogOut className="mr-2 h-4 w-4" />
