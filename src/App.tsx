@@ -7,6 +7,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
 import Dashboard from "@/pages/admin/Dashboard";
+import Movies from "@/pages/admin/Movies";
+import AddMovie from "@/pages/admin/AddMovie";
+import Submissions from "@/pages/admin/Submissions";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -31,7 +34,9 @@ const App = () => (
               </SuperAdminRoute>
             }>
               <Route index element={<Dashboard />} />
-              {/* More admin routes will be added here */}
+              <Route path="movies" element={<Movies />} />
+              <Route path="movies/add" element={<AddMovie />} />
+              <Route path="submissions" element={<Submissions />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -7,6 +7,7 @@ import {
   Users, 
   UserCheck, 
   DollarSign,
+  FileText,
   Menu,
   X
 } from 'lucide-react';
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils';
 const sidebarItems = [
   { title: 'Dashboard', url: '/admin', icon: BarChart3, end: true },
   { title: 'Movies', url: '/admin/movies', icon: Film },
+  { title: 'Submissions', url: '/admin/submissions', icon: FileText },
   { title: 'TV Shows', url: '/admin/tv-shows', icon: Tv },
   { title: 'Users', url: '/admin/users', icon: Users },
   { title: 'Producers', url: '/admin/producers', icon: UserCheck },
