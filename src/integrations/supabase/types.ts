@@ -90,6 +90,7 @@ export type Database = {
           price: number
           rating: string | null
           release_date: string | null
+          rental_expiry_duration: number | null
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
@@ -107,6 +108,7 @@ export type Database = {
           price?: number
           rating?: string | null
           release_date?: string | null
+          rental_expiry_duration?: number | null
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
@@ -124,6 +126,7 @@ export type Database = {
           price?: number
           rating?: string | null
           release_date?: string | null
+          rental_expiry_duration?: number | null
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string
