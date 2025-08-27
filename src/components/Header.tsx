@@ -85,19 +85,11 @@ const Header = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <>
-              <Link to="/auth" className="hidden md:block">
-                <Button variant="outline" className="text-foreground border-border hover:bg-secondary">
-                  Sign In
-                </Button>
-              </Link>
-              
-              <Link to="/auth" className="hidden md:block">
-                <Button variant="premium" className="gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce">
-                  Sign Up
-                </Button>
-              </Link>
-            </>
+            <Link to="/auth">
+              <Button variant="premium" className="hidden md:flex gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce">
+                Get Started
+              </Button>
+            </Link>
           )}
           
           <Button variant="ghost" size="icon" className="md:hidden">
