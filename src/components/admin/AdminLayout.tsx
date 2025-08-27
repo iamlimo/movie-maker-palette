@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { NavLink, useLocation, Outlet } from 'react-router-dom';
 import { 
   BarChart3, 
   Film, 
@@ -8,12 +7,31 @@ import {
   UserCheck, 
   DollarSign,
   FileText,
-  Menu,
-  X
+  ChevronUp,
+  User2
 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
 
 const sidebarItems = [
   { title: 'Dashboard', url: '/admin', icon: BarChart3, end: true },
@@ -25,84 +43,107 @@ const sidebarItems = [
   { title: 'Finance', url: '/admin/finance', icon: DollarSign },
 ];
 
-export default function AdminLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+function AppSidebar() {
+  const location = useLocation();
+  const { profile, signOut } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside className={cn(
-        "fixed top-0 left-0 z-50 h-full w-64 bg-card border-r border-border transition-transform duration-300",
-        "lg:translate-x-0 lg:relative lg:z-auto",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-bold text-primary">Admin Panel</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-        
-        <nav className="p-4 space-y-2">
-          {sidebarItems.map((item) => (
-            <NavLink
-              key={item.title}
-              to={item.url}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors",
-                  "hover:bg-muted/50",
-                  isActive 
-                    ? "bg-primary text-primary-foreground font-medium" 
-                    : "text-muted-foreground"
-                )
-              }
-              onClick={() => setSidebarOpen(false)}
-            >
-              <item.icon className="h-5 w-5" />
-              <span>{item.title}</span>
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-
-      {/* Main content */}
-      <div className="lg:pl-64">
-        {/* Top bar */}
-        <header className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <h1 className="text-2xl font-bold text-foreground">Super Admin Dashboard</h1>
-            <div className="w-10 lg:hidden" /> {/* Spacer for mobile layout */}
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <div className="flex items-center gap-2 px-2 py-4">
+          <div className="w-8 h-8 gradient-accent rounded-lg flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-lg">S</span>
           </div>
-        </header>
+          <div className="group-data-[collapsible=icon]:hidden">
+            <span className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Admin Panel
+            </span>
+          </div>
+        </div>
+      </SidebarHeader>
+      
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Administration</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {sidebarItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={item.end ? location.pathname === item.url : location.pathname.startsWith(item.url)}
+                    tooltip={item.title}
+                  >
+                    <NavLink to={item.url} end={item.end}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                    <User2 className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">
+                      {profile?.name || 'Admin'}
+                    </span>
+                    <span className="truncate text-xs">
+                      {profile?.email || 'admin@example.com'}
+                    </span>
+                  </div>
+                  <ChevronUp className="ml-auto size-4" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="bottom"
+                align="end"
+                sideOffset={4}
+              >
+                <DropdownMenuItem onClick={signOut}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
 
-        {/* Page content */}
-        <main className="p-6">
-          <Outlet />
-        </main>
+export default function AdminLayout() {
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+            <div className="flex items-center gap-2 px-4">
+              <SidebarTrigger className="-ml-1" />
+              <span className="text-xl font-semibold">Super Admin Dashboard</span>
+            </div>
+          </header>
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+            <Outlet />
+          </div>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }
