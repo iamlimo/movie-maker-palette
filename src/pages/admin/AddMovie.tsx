@@ -82,29 +82,37 @@ const AddMovie = () => {
   };
 
   const uploadToB2 = async (file: File, fileName: string): Promise<string> => {
+    console.log('Frontend Upload - Starting upload for:', fileName, 'Size:', file.size, 'Type:', file.type);
+    
     const formData = new FormData();
     formData.append('file', file);
     formData.append('fileName', fileName);
     formData.append('bucketType', 'movies');
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('No session');
+    try {
+      const { data, error } = await supabase.functions.invoke('b2-upload', {
+        body: formData
+      });
 
-    const response = await fetch(`https://tsfwlereofjlxhjsarap.supabase.co/functions/v1/b2-upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: formData
-    });
+      if (error) {
+        console.error('Frontend Upload - Supabase function error:', error);
+        throw new Error(error.message || 'Upload failed');
+      }
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Upload failed');
+      if (!data?.success) {
+        console.error('Frontend Upload - Upload unsuccessful:', data);
+        throw new Error(data?.error || 'Upload failed');
+      }
+
+      console.log('Frontend Upload - Upload successful:', data.downloadUrl);
+      return data.downloadUrl;
+    } catch (error) {
+      console.error('Frontend Upload - Error occurred:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Upload failed: Unknown error');
     }
-
-    const result = await response.json();
-    return result.downloadUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

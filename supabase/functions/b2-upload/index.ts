@@ -71,11 +71,27 @@ serve(async (req) => {
     const applicationKey = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY')
     const bucketName = Deno.env.get('BACKBLAZE_B2_BUCKET_NAME')
 
+    console.log('B2 Upload - Starting upload process', {
+      applicationKeyId: applicationKeyId ? 'present' : 'missing',
+      applicationKey: applicationKey ? 'present' : 'missing',
+      bucketName: bucketName ? 'present' : 'missing',
+      fileName: fileName || file.name,
+      fileSize: file.size,
+      fileType: file.type
+    })
+
     if (!applicationKeyId || !applicationKey || !bucketName) {
-      throw new Error('B2 credentials not configured')
+      const missingCreds = []
+      if (!applicationKeyId) missingCreds.push('APPLICATION_KEY_ID')
+      if (!applicationKey) missingCreds.push('APPLICATION_KEY')  
+      if (!bucketName) missingCreds.push('BUCKET_NAME')
+      
+      console.error('B2 Upload - Missing credentials:', missingCreds)
+      throw new Error(`B2 credentials not configured: ${missingCreds.join(', ')}`)
     }
 
     // Authenticate with B2
+    console.log('B2 Upload - Authenticating with B2...')
     const authResponse = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
       method: 'GET',
       headers: {
@@ -84,12 +100,46 @@ serve(async (req) => {
     })
 
     if (!authResponse.ok) {
-      throw new Error('B2 authentication failed')
+      const authError = await authResponse.text()
+      console.error('B2 Upload - Authentication failed:', authError)
+      throw new Error(`B2 authentication failed: ${authError}`)
     }
 
     const authData: B2AuthResponse = await authResponse.json()
+    console.log('B2 Upload - Authentication successful')
+
+    // Get list of buckets to find the correct bucket ID
+    console.log('B2 Upload - Getting bucket list...')
+    const bucketsResponse = await fetch(`${authData.apiUrl}/b2api/v2/b2_list_buckets`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authData.authorizationToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        accountId: authData.accountId || authData.apiUrl.split('/')[2].split('.')[0]
+      })
+    })
+
+    if (!bucketsResponse.ok) {
+      const bucketError = await bucketsResponse.text()
+      console.error('B2 Upload - Failed to get bucket list:', bucketError)
+      throw new Error(`Failed to get bucket list: ${bucketError}`)
+    }
+
+    const bucketsData = await bucketsResponse.json()
+    const bucket = bucketsData.buckets.find((b: any) => b.bucketName === bucketName)
+    
+    if (!bucket) {
+      console.error('B2 Upload - Bucket not found:', bucketName, 'Available buckets:', bucketsData.buckets.map((b: any) => b.bucketName))
+      throw new Error(`Bucket '${bucketName}' not found`)
+    }
+
+    const bucketId = bucket.bucketId
+    console.log('B2 Upload - Found bucket ID:', bucketId)
 
     // Get upload URL
+    console.log('B2 Upload - Getting upload URL...')
     const uploadUrlResponse = await fetch(`${authData.apiUrl}/b2api/v2/b2_get_upload_url`, {
       method: 'POST',
       headers: {
@@ -97,17 +147,21 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        bucketId: bucketName
+        bucketId: bucketId
       })
     })
 
     if (!uploadUrlResponse.ok) {
-      throw new Error('Failed to get upload URL')
+      const uploadUrlError = await uploadUrlResponse.text()
+      console.error('B2 Upload - Failed to get upload URL:', uploadUrlError)
+      throw new Error(`Failed to get upload URL: ${uploadUrlError}`)
     }
 
     const uploadUrlData = await uploadUrlResponse.json()
+    console.log('B2 Upload - Got upload URL successfully')
 
     // Upload file
+    console.log('B2 Upload - Starting file upload...')
     const fileBytes = new Uint8Array(await file.arrayBuffer())
     const uploadResponse = await fetch(uploadUrlData.uploadUrl, {
       method: 'POST',
@@ -121,10 +175,13 @@ serve(async (req) => {
     })
 
     if (!uploadResponse.ok) {
-      throw new Error('File upload failed')
+      const uploadError = await uploadResponse.text()
+      console.error('B2 Upload - File upload failed:', uploadError)
+      throw new Error(`File upload failed: ${uploadError}`)
     }
 
     const uploadData: B2UploadResponse = await uploadResponse.json()
+    console.log('B2 Upload - File uploaded successfully')
 
     // Generate download URL
     const downloadUrl = `${authData.downloadUrl}/file/${bucketName}/${uploadData.fileName}`
