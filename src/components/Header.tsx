@@ -54,42 +54,62 @@ const Header = () => {
           </Button>
           
           {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="hidden md:flex items-center space-x-2 text-foreground hover:bg-secondary">
-                  <User className="h-5 w-5" />
-                  <span className="hidden lg:inline">{profile?.name || user?.email || 'Account'}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-card border-border">
-                <DropdownMenuItem className="text-foreground">
-                  <User className="mr-2 h-4 w-4" />
-                  Profile
-                </DropdownMenuItem>
-                {isSuperAdmin() && (
-                  <>
-                    <DropdownMenuSeparator className="bg-border" />
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin" className="flex items-center text-foreground">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Admin Panel
-                      </Link>
-                    </DropdownMenuItem>
-                  </>
-                )}
-                <DropdownMenuSeparator className="bg-border" />
-                <DropdownMenuItem onClick={handleSignOut} className="text-foreground hover:bg-destructive/10">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Link to="/auth">
-              <Button variant="premium" className="hidden md:flex gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce">
-                Get Started
+            <div className="flex items-center space-x-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="hidden md:flex items-center space-x-2 text-foreground hover:bg-secondary">
+                    <User className="h-5 w-5" />
+                    <span className="hidden lg:inline">{profile?.name || user?.email || 'Account'}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-card border-border">
+                  <DropdownMenuItem className="text-foreground">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  {isSuperAdmin() && (
+                    <>
+                      <DropdownMenuSeparator className="bg-border" />
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin" className="flex items-center text-foreground">
+                          <Settings className="mr-2 h-4 w-4" />
+                          Admin Panel
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator className="bg-border" />
+                  <DropdownMenuItem onClick={handleSignOut} className="text-foreground hover:bg-destructive/10">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {/* Quick Sign Out Button */}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleSignOut}
+                className="hidden lg:flex text-muted-foreground hover:text-destructive"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
               </Button>
-            </Link>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-3">
+              <Link to="/auth?mode=login">
+                <Button variant="ghost" className="hidden md:flex text-foreground hover:text-primary">
+                  Log In
+                </Button>
+              </Link>
+              <Link to="/auth?mode=signup">
+                <Button variant="premium" className="hidden md:flex gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce">
+                  Create Account
+                </Button>
+              </Link>
+            </div>
           )}
           
           <Button variant="ghost" size="icon" className="md:hidden">
