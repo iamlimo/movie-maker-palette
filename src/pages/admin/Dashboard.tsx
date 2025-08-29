@@ -351,6 +351,22 @@ export default function Dashboard() {
                 </div>
               </NavLink>
             </Button>
+
+            <Button 
+              variant="outline" 
+              className="w-full justify-start h-auto p-4 border-0 bg-gradient-to-r from-primary/10 to-accent/10 hover:from-primary/20 hover:to-accent/20 transition-all duration-300" 
+              asChild
+            >
+              <NavLink to="/admin/users" className="flex items-center space-x-3">
+                <div className="p-2 rounded-lg bg-primary/20">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold text-foreground">Manage Users</div>
+                  <div className="text-sm text-muted-foreground">Handle roles & permissions</div>
+                </div>
+              </NavLink>
+            </Button>
           </CardContent>
         </Card>
       </div>

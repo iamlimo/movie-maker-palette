@@ -10,6 +10,7 @@ import Dashboard from "@/pages/admin/Dashboard";
 import Movies from "@/pages/admin/Movies";
 import AddMovie from "@/pages/admin/AddMovie";
 import Submissions from "@/pages/admin/Submissions";
+import Users from "@/pages/admin/Users";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="movies" element={<Movies />} />
               <Route path="movies/add" element={<AddMovie />} />
               <Route path="submissions" element={<Submissions />} />
+              <Route path="users" element={<Users />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
