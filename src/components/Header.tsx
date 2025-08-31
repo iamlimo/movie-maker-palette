@@ -10,16 +10,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 const Header = () => {
-  const { user, signOut, profile } = useAuth();
+  const { user, signOut, profile, loading } = useAuth();
   const { isSuperAdmin } = useRole();
+  const { toast } = useToast();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
+    if (isSigningOut) return; // Prevent multiple clicks
+    
+    setIsSigningOut(true);
     try {
       await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account."
+      });
     } catch (error) {
       console.error('Sign out failed:', error);
+      toast({
+        title: "Sign out failed",
+        description: "There was an error signing you out. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSigningOut(false);
     }
   };
   return (
@@ -83,9 +101,13 @@ const Header = () => {
                     </>
                   )}
                   <DropdownMenuSeparator className="bg-border" />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-foreground hover:bg-destructive/10">
+                  <DropdownMenuItem 
+                    onClick={handleSignOut} 
+                    className="text-foreground hover:bg-destructive/10"
+                    disabled={isSigningOut}
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
+                    {isSigningOut ? 'Signing Out...' : 'Sign Out'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -95,10 +117,11 @@ const Header = () => {
                 variant="ghost" 
                 size="sm" 
                 onClick={handleSignOut}
+                disabled={isSigningOut}
                 className="hidden lg:flex text-muted-foreground hover:text-destructive"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+                {isSigningOut ? 'Signing Out...' : 'Sign Out'}
               </Button>
             </div>
           ) : (

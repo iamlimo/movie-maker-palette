@@ -50,6 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log('Fetching user profile for:', userId);
+      
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -62,22 +64,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('user_id', userId)
         .single();
 
-      if (profileError) {
+      if (profileError && profileError.code !== 'PGRST116') {
         console.error('Profile fetch error:', profileError);
+        // Don't throw error, just log it - profile might not exist yet
       }
-      if (roleError) {
+      
+      if (roleError && roleError.code !== 'PGRST116') {
         console.error('Role fetch error:', roleError);
+        // Don't throw error, just log it - role might not exist yet
       }
 
-      if (profileData) setProfile(profileData);
-      if (roleData) setUserRole(roleData);
+      if (profileData) {
+        console.log('Profile fetched successfully:', profileData.name);
+        setProfile(profileData);
+      }
+      
+      if (roleData) {
+        console.log('Role fetched successfully:', roleData.role);
+        setUserRole(roleData);
+      }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // Don't throw error to prevent blocking authentication
     }
   };
 
   const refreshProfile = async () => {
     if (user) {
+      console.log('Refreshing profile for user:', user.id);
       await fetchUserProfile(user.id);
     }
   };

@@ -15,7 +15,8 @@ const SuperAdminRoute: React.FC<SuperAdminRouteProps> = ({ children }) => {
       <div className="min-h-screen gradient-hero flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 gradient-accent rounded-full animate-pulse mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground mb-2">Verifying admin access...</p>
+          <p className="text-sm text-muted-foreground/70">Checking your permissions</p>
         </div>
       </div>
     );
