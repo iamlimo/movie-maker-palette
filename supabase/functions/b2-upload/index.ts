@@ -11,6 +11,7 @@ interface B2AuthResponse {
   authorizationToken: string;
   apiUrl: string;
   downloadUrl: string;
+  accountId: string;
 }
 
 interface B2UploadResponse {
@@ -118,7 +119,7 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        accountId: authData.accountId || authData.apiUrl.split('/')[2].split('.')[0]
+        accountId: authData.accountId
       })
     })
 
