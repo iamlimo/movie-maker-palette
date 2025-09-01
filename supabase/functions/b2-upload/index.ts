@@ -28,6 +28,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Set timeout for the entire request
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -68,6 +72,12 @@ serve(async (req) => {
       throw new Error('No file provided')
     }
 
+    // Validate file size (100MB limit)
+    const maxFileSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxFileSize) {
+      throw new Error(`File too large. Maximum size is ${maxFileSize / (1024 * 1024)}MB`)
+    }
+
     // Get B2 credentials
     const applicationKeyId = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY_ID')
     const applicationKey = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY')
@@ -98,7 +108,8 @@ serve(async (req) => {
       method: 'GET',
       headers: {
         'Authorization': `Basic ${btoa(`${applicationKeyId}:${applicationKey}`)}`
-      }
+      },
+      signal: controller.signal
     })
 
     if (!authResponse.ok) {
@@ -120,7 +131,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         accountId: authData.accountId
-      })
+      }),
+      signal: controller.signal
     })
 
     if (!bucketsResponse.ok) {
@@ -150,7 +162,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         bucketId: bucketId
-      })
+      }),
+      signal: controller.signal
     })
 
     if (!uploadUrlResponse.ok) {
@@ -173,7 +186,8 @@ serve(async (req) => {
         'Content-Type': file.type || 'application/octet-stream',
         'X-Bz-Content-Sha1': 'unverified'
       },
-      body: fileBytes
+      body: fileBytes,
+      signal: controller.signal
     })
 
     if (!uploadResponse.ok) {
@@ -194,6 +208,9 @@ serve(async (req) => {
       downloadUrl
     })
 
+    // Clear timeout on success
+    clearTimeout(timeoutId)
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -211,14 +228,35 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    // Clear timeout on error
+    clearTimeout(timeoutId)
+    
     console.error('Upload error:', error)
+    
+    // Handle timeout errors specifically
+    if (error.name === 'AbortError') {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Upload timeout - file too large or network issues'
+        }),
+        { 
+          status: 408,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      )
+    }
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message || 'Upload failed'
       }),
       { 
-        status: 400,
+        status: 500,
         headers: { 
           ...corsHeaders, 
           'Content-Type': 'application/json' 

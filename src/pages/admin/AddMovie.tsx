@@ -81,38 +81,63 @@ const AddMovie = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const uploadToB2 = async (file: File, fileName: string): Promise<string> => {
+  const uploadToB2 = async (file: File, fileName: string, retries = 3): Promise<string> => {
     console.log('Frontend Upload - Starting upload for:', fileName, 'Size:', file.size, 'Type:', file.type);
+    
+    // Validate file size on frontend (100MB limit)
+    const maxFileSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxFileSize) {
+      throw new Error(`File too large. Maximum size is ${maxFileSize / (1024 * 1024)}MB`);
+    }
     
     const formData = new FormData();
     formData.append('file', file);
     formData.append('fileName', fileName);
     formData.append('bucketType', 'movies');
 
-    try {
-      const { data, error } = await supabase.functions.invoke('b2-upload', {
-        body: formData
-      });
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`Frontend Upload - Attempt ${attempt}/${retries}`);
+        
+        const { data, error } = await supabase.functions.invoke('b2-upload', {
+          body: formData
+        });
 
-      if (error) {
-        console.error('Frontend Upload - Supabase function error:', error);
-        throw new Error(error.message || 'Upload failed');
-      }
+        if (error) {
+          console.error('Frontend Upload - Supabase function error:', error);
+          
+          // If it's a timeout error and we have retries left, try again
+          if (error.message?.includes('timeout') && attempt < retries) {
+            console.log(`Frontend Upload - Retrying after timeout (attempt ${attempt}/${retries})`);
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
+            continue;
+          }
+          
+          throw new Error(error.message || 'Upload failed');
+        }
 
-      if (!data?.success) {
-        console.error('Frontend Upload - Upload unsuccessful:', data);
-        throw new Error(data?.error || 'Upload failed');
-      }
+        if (!data?.success) {
+          console.error('Frontend Upload - Upload unsuccessful:', data);
+          throw new Error(data?.error || 'Upload failed');
+        }
 
-      console.log('Frontend Upload - Upload successful:', data.downloadUrl);
-      return data.downloadUrl;
-    } catch (error) {
-      console.error('Frontend Upload - Error occurred:', error);
-      if (error instanceof Error) {
-        throw error;
+        console.log('Frontend Upload - Upload successful:', data.downloadUrl);
+        return data.downloadUrl;
+      } catch (error) {
+        console.error(`Frontend Upload - Attempt ${attempt} failed:`, error);
+        
+        // If it's the last attempt or not a network error, throw immediately
+        if (attempt === retries || !(error instanceof Error) || 
+            (!error.message.includes('timeout') && !error.message.includes('network') && !error.message.includes('Failed to send'))) {
+          throw error instanceof Error ? error : new Error('Upload failed: Unknown error');
+        }
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
       }
-      throw new Error('Upload failed: Unknown error');
     }
+    
+    throw new Error('Upload failed after all retries');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
