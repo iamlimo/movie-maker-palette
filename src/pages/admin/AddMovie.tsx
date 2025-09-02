@@ -81,136 +81,65 @@ const AddMovie = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const uploadToB2 = async (file: File, fileName: string): Promise<string> => {
+  const uploadToSupabaseStorage = async (file: File, fileName: string): Promise<string> => {
     console.log('Frontend Upload - Starting upload for:', fileName, 'Size:', file.size, 'Type:', file.type);
     
-    // Step 1: Get upload info (determine if direct or chunked upload)
-    const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('b2-upload', {
-      body: {
-        action: 'get_upload_info',
-        fileName,
-        fileSize: file.size,
-        fileType: file.type
-      }
-    });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
 
-    if (infoError || !uploadInfo?.success) {
-      throw new Error(infoError?.message || uploadInfo?.error || 'Failed to get upload info');
-    }
-
-    console.log('Upload strategy:', uploadInfo.uploadType);
-
-    if (uploadInfo.uploadType === 'direct') {
-      // Direct upload for small files
-      return await uploadDirectToB2(file, fileName, uploadInfo);
-    } else {
-      // Chunked upload for large files
-      return await uploadChunkedToB2(file, fileName, uploadInfo);
-    }
-  };
-
-  const uploadDirectToB2 = async (file: File, fileName: string, uploadInfo: any): Promise<string> => {
-    console.log('Direct upload to B2...');
-    
-    const fileBytes = new Uint8Array(await file.arrayBuffer());
-    
-    const uploadResponse = await fetch(uploadInfo.uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': uploadInfo.authorizationToken,
-        'X-Bz-File-Name': fileName,
-        'Content-Type': file.type || 'application/octet-stream',
-        'X-Bz-Content-Sha1': 'unverified'
-      },
-      body: fileBytes
-    });
-
-    if (!uploadResponse.ok) {
-      const error = await uploadResponse.text();
-      throw new Error(`Direct upload failed: ${error}`);
-    }
-
-    const uploadData = await uploadResponse.json();
-    const bucketName = 'your-bucket-name'; // This should come from the backend
-    return `https://f002.backblazeb2.com/file/${bucketName}/${uploadData.fileName}`;
-  };
-
-  const uploadChunkedToB2 = async (file: File, fileName: string, uploadInfo: any): Promise<string> => {
-    console.log('Chunked upload to B2...');
-    
-    const chunkSize = uploadInfo.chunkSize; // 10MB chunks
-    const totalChunks = Math.ceil(file.size / chunkSize);
-    const partSha1Array: string[] = [];
-    
-    console.log(`Uploading ${totalChunks} chunks of ${chunkSize / (1024 * 1024)}MB each`);
-
-    // Upload each chunk
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, file.size);
-      const chunk = file.slice(start, end);
-      const partNumber = i + 1;
-      
-      console.log(`Uploading chunk ${partNumber}/${totalChunks} (${start}-${end})`);
-      
-      // Get upload URL for this part
-      const { data: partInfo, error: partError } = await supabase.functions.invoke('b2-upload', {
+      // Get upload info from our edge function
+      const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('upload-video', {
         body: {
-          action: 'get_upload_part_url',
-          fileId: uploadInfo.fileId,
-          partNumber
+          action: 'get_upload_info',
+          fileName: fileName,
+          fileSize: file.size,
+          fileType: file.type
         }
       });
 
-      if (partError || !partInfo?.success) {
-        throw new Error(`Failed to get part URL for chunk ${partNumber}: ${partError?.message || partInfo?.error}`);
+      if (infoError || !uploadInfo.success) {
+        throw new Error(uploadInfo?.error || 'Failed to get upload info');
       }
 
-      // Upload the chunk
-      const chunkBytes = new Uint8Array(await chunk.arrayBuffer());
-      
-      const chunkResponse = await fetch(partInfo.uploadUrl, {
-        method: 'POST',
+      console.log('Upload info received:', uploadInfo);
+
+      // Upload file using the signed URL
+      const uploadResponse = await fetch(uploadInfo.uploadUrl, {
+        method: 'PUT',
+        body: file,
         headers: {
-          'Authorization': partInfo.authorizationToken,
-          'X-Bz-Part-Number': partNumber.toString(),
-          'Content-Length': chunkBytes.length.toString(),
-          'X-Bz-Content-Sha1': 'unverified'
-        },
-        body: chunkBytes
+          'Content-Type': file.type,
+          'x-upsert': 'true'
+        }
       });
 
-      if (!chunkResponse.ok) {
-        const error = await chunkResponse.text();
-        throw new Error(`Failed to upload chunk ${partNumber}: ${error}`);
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('Upload failed:', errorText);
+        throw new Error(`Upload failed: ${uploadResponse.status} ${errorText}`);
       }
 
-      const chunkData = await chunkResponse.json();
-      partSha1Array.push(chunkData.contentSha1);
-      
-      // Update progress
-      const progress = Math.round((partNumber / totalChunks) * 100);
-      setUploadProgress(progress);
-      
-      console.log(`Chunk ${partNumber}/${totalChunks} uploaded successfully`);
-    }
+      // Confirm upload with our edge function
+      const { data: confirmData, error: confirmError } = await supabase.functions.invoke('upload-video', {
+        body: {
+          action: 'confirm_upload',
+          filePath: uploadInfo.filePath,
+          bucket: uploadInfo.bucket
+        }
+      });
 
-    // Finalize the large file
-    console.log('Finalizing large file upload...');
-    const { data: finishData, error: finishError } = await supabase.functions.invoke('b2-upload', {
-      body: {
-        action: 'finish_large_file',
-        fileId: uploadInfo.fileId,
-        partSha1Array
+      if (confirmError || !confirmData.success) {
+        throw new Error('Failed to confirm upload');
       }
-    });
 
-    if (finishError || !finishData?.success) {
-      throw new Error(`Failed to finalize upload: ${finishError?.message || finishData?.error}`);
+      console.log('Upload successful:', confirmData.filePath);
+      
+      return confirmData.filePath;
+    } catch (error) {
+      console.error(`Upload failed:`, error);
+      throw error;
     }
-
-    console.log('Large file upload completed successfully');
-    return finishData.downloadUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -236,14 +165,14 @@ const AddMovie = () => {
       if (thumbnailFile) {
         setUploadProgress(25);
         const thumbnailFileName = `thumbnails/${Date.now()}_${thumbnailFile.name}`;
-        thumbnailUrl = await uploadToB2(thumbnailFile, thumbnailFileName);
+        thumbnailUrl = await uploadToSupabaseStorage(thumbnailFile, thumbnailFileName);
       }
 
       // Upload video if provided
       if (videoFile) {
         setUploadProgress(50);
         const videoFileName = `videos/${Date.now()}_${videoFile.name}`;
-        videoUrl = await uploadToB2(videoFile, videoFileName);
+        videoUrl = await uploadToSupabaseStorage(videoFile, videoFileName);
       }
 
       setUploadProgress(75);

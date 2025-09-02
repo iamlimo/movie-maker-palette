@@ -45,6 +45,15 @@ enable_confirmations = false
 enabled = true
 inspector_port = 8083
 
+[functions.upload-video]
+verify_jwt = true
+
+[functions.get-video-url]
+verify_jwt = true
+
+[functions.delete-video]
+verify_jwt = true
+
 [functions.b2-upload]
 verify_jwt = true
 
