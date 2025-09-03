@@ -163,16 +163,18 @@ const AddMovie = () => {
 
       // Upload thumbnail if provided
       if (thumbnailFile) {
+        console.log('Starting thumbnail upload...');
         setUploadProgress(25);
-        const thumbnailFileName = `thumbnails/${Date.now()}_${thumbnailFile.name}`;
-        thumbnailUrl = await uploadToSupabaseStorage(thumbnailFile, thumbnailFileName);
+        thumbnailUrl = await uploadToSupabaseStorage(thumbnailFile, thumbnailFile.name);
+        console.log('Thumbnail uploaded:', thumbnailUrl);
       }
 
       // Upload video if provided
       if (videoFile) {
+        console.log('Starting video upload...');
         setUploadProgress(50);
-        const videoFileName = `videos/${Date.now()}_${videoFile.name}`;
-        videoUrl = await uploadToSupabaseStorage(videoFile, videoFileName);
+        videoUrl = await uploadToSupabaseStorage(videoFile, videoFile.name);
+        console.log('Video uploaded:', videoUrl);
       }
 
       setUploadProgress(75);

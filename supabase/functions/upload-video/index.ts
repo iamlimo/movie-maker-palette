@@ -50,10 +50,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { action, fileName, fileSize, fileType } = await req.json();
+    // Parse request body once
+    const requestBody = await req.json();
+    console.log('Request body:', requestBody);
+    const { action, fileName, fileSize, fileType, filePath, bucket } = requestBody;
 
     switch (action) {
       case 'get_upload_info': {
+        console.log('Processing get_upload_info for:', fileName, fileType, fileSize);
         // Validate file type
         const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'application/vnd.apple.mpegurl'];
         const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -108,18 +112,27 @@ Deno.serve(async (req) => {
       }
 
       case 'confirm_upload': {
-        const { filePath, bucket } = await req.json();
+        console.log('Processing confirm_upload for:', filePath, 'in bucket:', bucket);
         
         // Verify the file was uploaded successfully
         const { data: fileData, error: fileError } = await supabase.storage
           .from(bucket)
           .list('', {
-            search: filePath.split('_').slice(1).join('_') // Remove timestamp prefix for search
+            limit: 1000
           });
 
-        if (fileError || !fileData?.find(file => file.name === filePath)) {
+        console.log('Files in bucket:', fileData?.map(f => f.name));
+        
+        const fileExists = fileData?.find(file => file.name === filePath);
+        console.log('File exists check:', fileExists ? 'YES' : 'NO');
+
+        if (fileError || !fileExists) {
+          console.error('File verification failed:', { fileError, filePath, foundFiles: fileData?.length });
           return new Response(
-            JSON.stringify({ error: 'File upload verification failed' }),
+            JSON.stringify({ 
+              error: 'File upload verification failed',
+              details: fileError?.message || 'File not found in storage'
+            }),
             { status: 400, headers: corsHeaders }
           );
         }
