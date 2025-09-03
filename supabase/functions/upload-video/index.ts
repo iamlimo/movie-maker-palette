@@ -55,106 +55,160 @@ Deno.serve(async (req) => {
     console.log('Request body:', requestBody);
     const { action, fileName, fileSize, fileType, filePath, bucket } = requestBody;
 
+    console.log('Processing action:', action);
+
     switch (action) {
       case 'get_upload_info': {
         console.log('Processing get_upload_info for:', fileName, fileType, fileSize);
-        // Validate file type
-        const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'application/vnd.apple.mpegurl'];
-        const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
         
-        const bucket = allowedVideoTypes.includes(fileType) ? 'videos' : 'thumbnails';
-        const maxSize = bucket === 'videos' ? 1073741824 : 10485760; // 1GB for videos, 10MB for thumbnails
-        
-        if (!allowedVideoTypes.includes(fileType) && !allowedImageTypes.includes(fileType)) {
+        try {
+          // Validate file type
+          const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'application/vnd.apple.mpegurl'];
+          const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+          
+          const bucket = allowedVideoTypes.includes(fileType) ? 'videos' : 'thumbnails';
+          const maxSize = bucket === 'videos' ? 1073741824 : 10485760; // 1GB for videos, 10MB for thumbnails
+          
+          console.log('Determined bucket:', bucket, 'Max size:', maxSize);
+          
+          if (!allowedVideoTypes.includes(fileType) && !allowedImageTypes.includes(fileType)) {
+            console.error('Invalid file type:', fileType);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'Invalid file type',
+                details: `Allowed types: ${[...allowedVideoTypes, ...allowedImageTypes].join(', ')}`
+              }),
+              { status: 400, headers: corsHeaders }
+            );
+          }
+
+          if (fileSize > maxSize) {
+            console.error('File too large:', fileSize, 'Max:', maxSize);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: `File too large. Maximum size: ${maxSize / 1024 / 1024}MB`,
+                details: `File size: ${fileSize}, Max: ${maxSize}`
+              }),
+              { status: 400, headers: corsHeaders }
+            );
+          }
+
+          // Generate unique file path
+          const timestamp = Date.now();
+          const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const filePath = `${timestamp}_${sanitizedFileName}`;
+          
+          console.log('Generated file path:', filePath);
+
+          // Create signed upload URL
+          console.log('Creating signed upload URL for bucket:', bucket);
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from(bucket)
+            .createSignedUploadUrl(filePath, {
+              expiresIn: 3600, // 1 hour
+            });
+
+          if (uploadError) {
+            console.error('Upload URL creation error:', uploadError);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'Failed to create upload URL',
+                details: uploadError.message
+              }),
+              { status: 500, headers: corsHeaders }
+            );
+          }
+
+          console.log('Successfully created upload URL');
           return new Response(
-            JSON.stringify({ error: 'Invalid file type' }),
-            { status: 400, headers: corsHeaders }
+            JSON.stringify({
+              success: true,
+              uploadUrl: uploadData.signedUrl,
+              filePath: filePath,
+              bucket: bucket,
+              token: uploadData.token
+            }),
+            { headers: corsHeaders }
           );
-        }
-
-        if (fileSize > maxSize) {
+        } catch (error) {
+          console.error('Error in get_upload_info:', error);
           return new Response(
-            JSON.stringify({ error: `File too large. Maximum size: ${maxSize / 1024 / 1024}MB` }),
-            { status: 400, headers: corsHeaders }
-          );
-        }
-
-        // Generate unique file path
-        const timestamp = Date.now();
-        const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const filePath = `${timestamp}_${sanitizedFileName}`;
-
-        // Create signed upload URL
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from(bucket)
-          .createSignedUploadUrl(filePath, {
-            expiresIn: 3600, // 1 hour
-          });
-
-        if (uploadError) {
-          console.error('Upload URL creation error:', uploadError);
-          return new Response(
-            JSON.stringify({ error: 'Failed to create upload URL' }),
+            JSON.stringify({ 
+              success: false, 
+              error: 'Internal server error in get_upload_info',
+              details: error.message
+            }),
             { status: 500, headers: corsHeaders }
           );
         }
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            uploadUrl: uploadData.signedUrl,
-            filePath: filePath,
-            bucket: bucket,
-            token: uploadData.token
-          }),
-          { headers: corsHeaders }
-        );
       }
 
       case 'confirm_upload': {
         console.log('Processing confirm_upload for:', filePath, 'in bucket:', bucket);
         
-        // Verify the file was uploaded successfully
-        const { data: fileData, error: fileError } = await supabase.storage
-          .from(bucket)
-          .list('', {
-            limit: 1000
-          });
+        try {
+          // Verify the file was uploaded successfully
+          const { data: fileData, error: fileError } = await supabase.storage
+            .from(bucket)
+            .list('', {
+              limit: 1000
+            });
 
-        console.log('Files in bucket:', fileData?.map(f => f.name));
-        
-        const fileExists = fileData?.find(file => file.name === filePath);
-        console.log('File exists check:', fileExists ? 'YES' : 'NO');
+          console.log('Files in bucket:', fileData?.map(f => f.name));
+          
+          const fileExists = fileData?.find(file => file.name === filePath);
+          console.log('File exists check:', fileExists ? 'YES' : 'NO');
 
-        if (fileError || !fileExists) {
-          console.error('File verification failed:', { fileError, filePath, foundFiles: fileData?.length });
+          if (fileError || !fileExists) {
+            console.error('File verification failed:', { fileError, filePath, foundFiles: fileData?.length });
+            return new Response(
+              JSON.stringify({ 
+                success: false,
+                error: 'File upload verification failed',
+                details: fileError?.message || 'File not found in storage'
+              }),
+              { status: 400, headers: corsHeaders }
+            );
+          }
+
+          // Get the public URL (for internal reference)
+          const { data: urlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(filePath);
+
+          console.log('File verification successful, returning URLs');
+          return new Response(
+            JSON.stringify({
+              success: true,
+              filePath: filePath,
+              publicUrl: urlData.publicUrl
+            }),
+            { headers: corsHeaders }
+          );
+        } catch (error) {
+          console.error('Error in confirm_upload:', error);
           return new Response(
             JSON.stringify({ 
-              error: 'File upload verification failed',
-              details: fileError?.message || 'File not found in storage'
+              success: false, 
+              error: 'Internal server error in confirm_upload',
+              details: error.message
             }),
-            { status: 400, headers: corsHeaders }
+            { status: 500, headers: corsHeaders }
           );
         }
-
-        // Get the public URL (for internal reference)
-        const { data: urlData } = supabase.storage
-          .from(bucket)
-          .getPublicUrl(filePath);
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            filePath: filePath,
-            publicUrl: urlData.publicUrl
-          }),
-          { headers: corsHeaders }
-        );
       }
 
       default:
+        console.error('Invalid action received:', action);
         return new Response(
-          JSON.stringify({ error: 'Invalid action' }),
+          JSON.stringify({ 
+            success: false, 
+            error: 'Invalid action',
+            details: `Action '${action}' is not supported. Valid actions: get_upload_info, confirm_upload`
+          }),
           { status: 400, headers: corsHeaders }
         );
     }

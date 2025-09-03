@@ -88,6 +88,8 @@ const AddMovie = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
 
+      console.log('Session found, calling upload-video function...');
+
       // Get upload info from our edge function
       const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('upload-video', {
         body: {
@@ -98,11 +100,24 @@ const AddMovie = () => {
         }
       });
 
-      if (infoError || !uploadInfo.success) {
+      console.log('Edge function response:', { uploadInfo, infoError });
+
+      if (infoError) {
+        console.error('Edge function error:', infoError);
+        throw new Error(`Edge function error: ${infoError.message}`);
+      }
+
+      if (!uploadInfo?.success) {
+        console.error('Upload info failed:', uploadInfo);
         throw new Error(uploadInfo?.error || 'Failed to get upload info');
       }
 
-      console.log('Upload info received:', uploadInfo);
+      if (!uploadInfo.uploadUrl) {
+        console.error('No upload URL received:', uploadInfo);
+        throw new Error('No upload URL received from server');
+      }
+
+      console.log('Upload info received successfully, starting file upload...');
 
       // Upload file using the signed URL
       const uploadResponse = await fetch(uploadInfo.uploadUrl, {
@@ -114,11 +129,15 @@ const AddMovie = () => {
         }
       });
 
+      console.log('Upload response:', uploadResponse.status, uploadResponse.statusText);
+
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
         console.error('Upload failed:', errorText);
         throw new Error(`Upload failed: ${uploadResponse.status} ${errorText}`);
       }
+
+      console.log('File uploaded successfully, confirming...');
 
       // Confirm upload with our edge function
       const { data: confirmData, error: confirmError } = await supabase.functions.invoke('upload-video', {
@@ -129,8 +148,16 @@ const AddMovie = () => {
         }
       });
 
-      if (confirmError || !confirmData.success) {
-        throw new Error('Failed to confirm upload');
+      console.log('Confirm response:', { confirmData, confirmError });
+
+      if (confirmError) {
+        console.error('Confirm edge function error:', confirmError);
+        throw new Error(`Confirm error: ${confirmError.message}`);
+      }
+
+      if (!confirmData?.success) {
+        console.error('Upload confirmation failed:', confirmData);
+        throw new Error(confirmData?.error || 'Failed to confirm upload');
       }
 
       console.log('Upload successful:', confirmData.filePath);
