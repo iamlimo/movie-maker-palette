@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      cast_crew: {
+        Row: {
+          bio: string | null
+          created_at: string
+          id: string
+          name: string
+          photo_url: string | null
+          role: string
+          social_links: Json | null
+          updated_at: string
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          photo_url?: string | null
+          role: string
+          social_links?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          photo_url?: string | null
+          role?: string
+          social_links?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      episode_cast: {
+        Row: {
+          cast_crew_id: string
+          character_name: string | null
+          created_at: string
+          credit_order: number | null
+          episode_id: string
+          id: string
+          role_type: string
+        }
+        Insert: {
+          cast_crew_id: string
+          character_name?: string | null
+          created_at?: string
+          credit_order?: number | null
+          episode_id: string
+          id?: string
+          role_type: string
+        }
+        Update: {
+          cast_crew_id?: string
+          character_name?: string | null
+          created_at?: string
+          credit_order?: number | null
+          episode_id?: string
+          id?: string
+          role_type?: string
+        }
+        Relationships: []
+      }
       episodes: {
         Row: {
           created_at: string
@@ -22,6 +85,7 @@ export type Database = {
           id: string
           price: number
           release_date: string | null
+          rental_expiry_duration: number
           season_id: string
           status: Database["public"]["Enums"]["content_status"]
           title: string
@@ -34,6 +98,7 @@ export type Database = {
           id?: string
           price?: number
           release_date?: string | null
+          rental_expiry_duration?: number
           season_id: string
           status?: Database["public"]["Enums"]["content_status"]
           title: string
@@ -46,6 +111,7 @@ export type Database = {
           id?: string
           price?: number
           release_date?: string | null
+          rental_expiry_duration?: number
           season_id?: string
           status?: Database["public"]["Enums"]["content_status"]
           title?: string
@@ -79,6 +145,36 @@ export type Database = {
         }
         Relationships: []
       }
+      movie_cast: {
+        Row: {
+          cast_crew_id: string
+          character_name: string | null
+          created_at: string
+          credit_order: number | null
+          id: string
+          movie_id: string
+          role_type: string
+        }
+        Insert: {
+          cast_crew_id: string
+          character_name?: string | null
+          created_at?: string
+          credit_order?: number | null
+          id?: string
+          movie_id: string
+          role_type: string
+        }
+        Update: {
+          cast_crew_id?: string
+          character_name?: string | null
+          created_at?: string
+          credit_order?: number | null
+          id?: string
+          movie_id?: string
+          role_type?: string
+        }
+        Relationships: []
+      }
       movies: {
         Row: {
           created_at: string
@@ -94,6 +190,7 @@ export type Database = {
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
+          trailer_url: string | null
           updated_at: string
           uploaded_by: string | null
           video_url: string | null
@@ -112,6 +209,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
+          trailer_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
           video_url?: string | null
@@ -130,6 +228,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string
+          trailer_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
           video_url?: string | null
@@ -320,6 +419,8 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          price: number
+          rental_expiry_duration: number
           season_number: number
           tv_show_id: string
         }
@@ -327,6 +428,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          price?: number
+          rental_expiry_duration?: number
           season_number: number
           tv_show_id: string
         }
@@ -334,6 +437,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          price?: number
+          rental_expiry_duration?: number
           season_number?: number
           tv_show_id?: string
         }
@@ -396,6 +501,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tv_show_cast: {
+        Row: {
+          cast_crew_id: string
+          character_name: string | null
+          created_at: string
+          credit_order: number | null
+          id: string
+          role_type: string
+          tv_show_id: string
+        }
+        Insert: {
+          cast_crew_id: string
+          character_name?: string | null
+          created_at?: string
+          credit_order?: number | null
+          id?: string
+          role_type: string
+          tv_show_id: string
+        }
+        Update: {
+          cast_crew_id?: string
+          character_name?: string | null
+          created_at?: string
+          credit_order?: number | null
+          id?: string
+          role_type?: string
+          tv_show_id?: string
+        }
+        Relationships: []
       }
       tv_shows: {
         Row: {
@@ -479,7 +614,38 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      movie_details: {
+        Row: {
+          cast_crew: Json | null
+          created_at: string | null
+          description: string | null
+          duration: number | null
+          genre_id: string | null
+          genre_name: string | null
+          id: string | null
+          language: string | null
+          price: number | null
+          rating: string | null
+          release_date: string | null
+          rental_expiry_duration: number | null
+          status: Database["public"]["Enums"]["content_status"] | null
+          thumbnail_url: string | null
+          title: string | null
+          trailer_url: string | null
+          updated_at: string | null
+          uploaded_by: string | null
+          video_url: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movies_genre_id_fkey"
+            columns: ["genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_current_user_profile: {
