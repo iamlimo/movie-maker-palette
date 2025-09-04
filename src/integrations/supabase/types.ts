@@ -127,6 +127,30 @@ export type Database = {
           },
         ]
       }
+      favorites: {
+        Row: {
+          added_at: string
+          content_id: string
+          content_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          content_id: string
+          content_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          content_id?: string
+          content_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       genres: {
         Row: {
           created_at: string
@@ -315,9 +339,13 @@ export type Database = {
           created_at: string
           date_of_birth: string | null
           email: string
+          first_name: string | null
           id: string
+          last_name: string | null
           name: string
           phone_number: string | null
+          profile_image_url: string | null
+          status: string | null
           updated_at: string
           user_id: string
           wallet_balance: number
@@ -327,9 +355,13 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           email: string
+          first_name?: string | null
           id?: string
+          last_name?: string | null
           name: string
           phone_number?: string | null
+          profile_image_url?: string | null
+          status?: string | null
           updated_at?: string
           user_id: string
           wallet_balance?: number
@@ -339,9 +371,13 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           email?: string
+          first_name?: string | null
           id?: string
+          last_name?: string | null
           name?: string
           phone_number?: string | null
+          profile_image_url?: string | null
+          status?: string | null
           updated_at?: string
           user_id?: string
           wallet_balance?: number
@@ -588,6 +624,42 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          auto_play: boolean | null
+          created_at: string
+          email_notifications: boolean | null
+          id: string
+          preferred_genres: string[] | null
+          preferred_language: string | null
+          push_notifications: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_play?: boolean | null
+          created_at?: string
+          email_notifications?: boolean | null
+          id?: string
+          preferred_genres?: string[] | null
+          preferred_language?: string | null
+          push_notifications?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_play?: boolean | null
+          created_at?: string
+          email_notifications?: boolean | null
+          id?: string
+          preferred_genres?: string[] | null
+          preferred_language?: string | null
+          push_notifications?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -608,6 +680,42 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      watch_history: {
+        Row: {
+          completed: boolean | null
+          content_id: string
+          content_type: string
+          created_at: string
+          id: string
+          last_watched_at: string
+          progress: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          content_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          last_watched_at?: string
+          progress?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          last_watched_at?: string
+          progress?: number | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
