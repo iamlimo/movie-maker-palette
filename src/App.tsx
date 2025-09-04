@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
-import Dashboard from "@/pages/admin/Dashboard";
+import AdminDashboard from "@/pages/admin/Dashboard";
 import Movies from "@/pages/admin/Movies";
 import AddMovie from "@/pages/admin/AddMovie";
 import TVShows from "@/pages/admin/TVShows";
@@ -17,6 +17,8 @@ import Users from "@/pages/admin/Users";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
+import Dashboard from "./pages/Dashboard";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             
             {/* Super Admin Routes */}
             <Route path="/admin" element={
@@ -37,7 +41,7 @@ const App = () => (
                 <AdminLayout />
               </SuperAdminRoute>
             }>
-              <Route index element={<Dashboard />} />
+              <Route index element={<AdminDashboard />} />
               <Route path="movies" element={<Movies />} />
               <Route path="movies/add" element={<AddMovie />} />
               <Route path="tv-shows" element={<TVShows />} />
