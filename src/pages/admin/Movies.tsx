@@ -39,6 +39,7 @@ interface Movie {
   title: string;
   description?: string;
   genre_id?: string;
+  genre_name?: string;
   release_date?: string;
   duration?: number;
   language?: string;
@@ -46,10 +47,12 @@ interface Movie {
   price: number;
   thumbnail_url?: string;
   video_url?: string;
+  trailer_url?: string;
   status: 'pending' | 'approved' | 'rejected';
   rental_expiry_duration: number;
   created_at: string;
   updated_at: string;
+  cast_crew?: any[];
 }
 
 interface Genre {
@@ -75,12 +78,15 @@ const Movies = () => {
   const fetchMovies = async () => {
     try {
       const { data, error } = await supabase
-        .from('movies')
+        .from('movie_details')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setMovies(data || []);
+      setMovies((data || []).map((item: any) => ({
+        ...item,
+        cast_crew: Array.isArray(item.cast_crew) ? item.cast_crew : []
+      })));
     } catch (error) {
       console.error('Error fetching movies:', error);
       toast({
@@ -282,10 +288,11 @@ const Movies = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
+                <TableHead>Cast & Crew</TableHead>
                 <TableHead>Genre</TableHead>
                 <TableHead>Release Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Price</TableHead>
+                <TableHead>Price (₦)</TableHead>
                 <TableHead>Rental Expiry</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -307,10 +314,30 @@ const Movies = () => {
                         <div className="text-sm text-muted-foreground">
                           {movie.duration ? `${movie.duration} min` : 'No duration'}
                         </div>
+                        {movie.trailer_url && (
+                          <div className="text-xs text-primary">Has trailer</div>
+                        )}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{getGenreName(movie.genre_id)}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {movie.cast_crew && movie.cast_crew.length > 0 ? (
+                        movie.cast_crew.slice(0, 3).map((cast: any, index: number) => (
+                          <div key={index} className="text-xs">
+                            <span className="font-medium">{cast.name}</span>
+                            <span className="text-muted-foreground"> ({cast.role_type})</span>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-xs">No cast assigned</span>
+                      )}
+                      {movie.cast_crew && movie.cast_crew.length > 3 && (
+                        <div className="text-xs text-primary">+{movie.cast_crew.length - 3} more</div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{getGenreName(movie.genre_id) || movie.genre_name}</TableCell>
                   <TableCell>
                     {movie.release_date 
                       ? new Date(movie.release_date).toLocaleDateString()
@@ -318,7 +345,7 @@ const Movies = () => {
                     }
                   </TableCell>
                   <TableCell>{getStatusBadge(movie.status)}</TableCell>
-                  <TableCell>${movie.price}</TableCell>
+                  <TableCell>₦{movie.price}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span>{movie.rental_expiry_duration}h</span>

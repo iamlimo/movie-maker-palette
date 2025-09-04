@@ -9,6 +9,9 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import Dashboard from "@/pages/admin/Dashboard";
 import Movies from "@/pages/admin/Movies";
 import AddMovie from "@/pages/admin/AddMovie";
+import TVShows from "@/pages/admin/TVShows";
+import AddTVShow from "@/pages/admin/AddTVShow";
+import AddSeason from "@/pages/admin/AddSeason";
 import Submissions from "@/pages/admin/Submissions";
 import Users from "@/pages/admin/Users";
 import Index from "./pages/Index";
@@ -37,6 +40,9 @@ const App = () => (
               <Route index element={<Dashboard />} />
               <Route path="movies" element={<Movies />} />
               <Route path="movies/add" element={<AddMovie />} />
+              <Route path="tv-shows" element={<TVShows />} />
+              <Route path="tv-shows/add" element={<AddTVShow />} />
+              <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
               <Route path="submissions" element={<Submissions />} />
               <Route path="users" element={<Users />} />
             </Route>
