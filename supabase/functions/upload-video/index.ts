@@ -62,26 +62,50 @@ Deno.serve(async (req) => {
         console.log('Processing get_upload_info for:', fileName, fileType, fileSize);
         
         try {
-          // Validate file type
-          const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'application/vnd.apple.mpegurl'];
-          const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+          // Validate file type with expanded support and fallback to extension
+          const allowedVideoTypes = [
+            'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 
+            'video/x-msvideo', 'video/mpeg', 'video/3gpp', 'video/mov',
+            'application/vnd.apple.mpegurl'
+          ];
+          const allowedImageTypes = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 
+            'image/gif', 'image/bmp', 'image/svg+xml'
+          ];
           
-          const bucket = allowedVideoTypes.includes(fileType) ? 'videos' : 'thumbnails';
-          const maxSize = bucket === 'videos' ? 1073741824 : 10485760; // 1GB for videos, 10MB for thumbnails
+          // Extract file extension for fallback validation
+          const fileExtension = fileName.toLowerCase().split('.').pop() || '';
+          const allowedVideoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mpeg', '3gp', 'm3u8'];
+          const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
           
-          console.log('Determined bucket:', bucket, 'Max size:', maxSize);
+          console.log('File validation - Type:', fileType, 'Extension:', fileExtension, 'FileName:', fileName);
           
-          if (!allowedVideoTypes.includes(fileType) && !allowedImageTypes.includes(fileType)) {
-            console.error('Invalid file type:', fileType);
+          // Determine if it's a video or image file
+          const isVideoByType = allowedVideoTypes.includes(fileType);
+          const isImageByType = allowedImageTypes.includes(fileType);
+          const isVideoByExtension = allowedVideoExtensions.includes(fileExtension);
+          const isImageByExtension = allowedImageExtensions.includes(fileExtension);
+          
+          // Use type first, fallback to extension if type is unknown
+          const isVideo = isVideoByType || (!fileType && isVideoByExtension);
+          const isImage = isImageByType || (!fileType && isImageByExtension);
+          
+          if (!isVideo && !isImage) {
+            console.error('Invalid file type and extension:', { fileType, fileExtension, fileName });
             return new Response(
               JSON.stringify({ 
                 success: false, 
                 error: 'Invalid file type',
-                details: `Allowed types: ${[...allowedVideoTypes, ...allowedImageTypes].join(', ')}`
+                details: `File "${fileName}" with type "${fileType}" and extension "${fileExtension}" is not supported. Supported video types: ${allowedVideoTypes.join(', ')}. Supported image types: ${allowedImageTypes.join(', ')}`
               }),
               { status: 400, headers: corsHeaders }
             );
           }
+          
+          const bucket = isVideo ? 'videos' : 'thumbnails';
+          const maxSize = bucket === 'videos' ? 1073741824 : 10485760; // 1GB for videos, 10MB for thumbnails
+          
+          console.log('Determined bucket:', bucket, 'Max size:', maxSize, 'File validation:', { isVideo, isImage, fileType, fileExtension });
 
           if (fileSize > maxSize) {
             console.error('File too large:', fileSize, 'Max:', maxSize);
