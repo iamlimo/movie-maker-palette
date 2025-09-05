@@ -113,7 +113,7 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
         throw new Error(uploadInfoResponse.data?.error || 'Failed to get upload info');
       }
 
-      const { signedUrl, filePath, bucket } = uploadInfoResponse.data;
+      const { uploadUrl: signedUrl, filePath, bucket } = uploadInfoResponse.data;
 
       // Upload the file with progress tracking
       const xhr = new XMLHttpRequest();
