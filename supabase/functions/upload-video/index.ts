@@ -52,14 +52,14 @@ Deno.serve(async (req) => {
 
     // Parse request body once
     const requestBody = await req.json();
-    console.log('Request body:', requestBody);
+    console.log('[UPLOAD-VIDEO] Request received:', { action: requestBody.action, fileName: requestBody.fileName, fileSize: requestBody.fileSize, fileType: requestBody.fileType });
     const { action, fileName, fileSize, fileType, filePath, bucket } = requestBody;
 
-    console.log('Processing action:', action);
+    console.log('[UPLOAD-VIDEO] Processing action:', action);
 
     switch (action) {
       case 'get_upload_info': {
-        console.log('Processing get_upload_info for:', fileName, fileType, fileSize);
+        console.log('[UPLOAD-VIDEO] Processing get_upload_info for:', fileName, fileType, fileSize);
         
         try {
           // Validate file type with expanded support and fallback to extension
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
           const allowedVideoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mpeg', '3gp', 'm3u8'];
           const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'];
           
-          console.log('File validation - Type:', fileType, 'Extension:', fileExtension, 'FileName:', fileName);
+          console.log('[UPLOAD-VIDEO] File validation - Type:', fileType, 'Extension:', fileExtension, 'FileName:', fileName);
           
           // Determine if it's a video or image file
           const isVideoByType = allowedVideoTypes.includes(fileType);
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
           const bucket = isVideo ? 'videos' : 'thumbnails';
           const maxSize = bucket === 'videos' ? 1073741824 : 10485760; // 1GB for videos, 10MB for thumbnails
           
-          console.log('Determined bucket:', bucket, 'Max size:', maxSize, 'File validation:', { isVideo, isImage, fileType, fileExtension });
+          console.log('[UPLOAD-VIDEO] Determined bucket:', bucket, 'Max size:', maxSize, 'File validation:', { isVideo, isImage, fileType, fileExtension });
 
           if (fileSize > maxSize) {
             console.error('File too large:', fileSize, 'Max:', maxSize);
@@ -124,10 +124,10 @@ Deno.serve(async (req) => {
           const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
           const filePath = `${timestamp}_${sanitizedFileName}`;
           
-          console.log('Generated file path:', filePath);
+          console.log('[UPLOAD-VIDEO] Generated file path:', filePath);
 
           // Create signed upload URL
-          console.log('Creating signed upload URL for bucket:', bucket);
+          console.log('[UPLOAD-VIDEO] Creating signed upload URL for bucket:', bucket);
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from(bucket)
             .createSignedUploadUrl(filePath, {
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
             );
           }
 
-          console.log('Successfully created upload URL');
+          console.log('[UPLOAD-VIDEO] Successfully created upload URL');
           return new Response(
             JSON.stringify({
               success: true,
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
       }
 
       case 'confirm_upload': {
-        console.log('Processing confirm_upload for:', filePath, 'in bucket:', bucket);
+        console.log('[UPLOAD-VIDEO] Processing confirm_upload for:', filePath, 'in bucket:', bucket);
         
         try {
           // Verify the file was uploaded successfully
@@ -181,10 +181,10 @@ Deno.serve(async (req) => {
               limit: 1000
             });
 
-          console.log('Files in bucket:', fileData?.map(f => f.name));
+          console.log('[UPLOAD-VIDEO] Files in bucket:', fileData?.length, 'files');
           
           const fileExists = fileData?.find(file => file.name === filePath);
-          console.log('File exists check:', fileExists ? 'YES' : 'NO');
+          console.log('[UPLOAD-VIDEO] File exists check for', filePath, ':', fileExists ? 'YES' : 'NO');
 
           if (fileError || !fileExists) {
             console.error('File verification failed:', { fileError, filePath, foundFiles: fileData?.length });
@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
             .from(bucket)
             .getPublicUrl(filePath);
 
-          console.log('File verification successful, returning URLs');
+          console.log('[UPLOAD-VIDEO] File verification successful, returning URLs');
           return new Response(
             JSON.stringify({
               success: true,

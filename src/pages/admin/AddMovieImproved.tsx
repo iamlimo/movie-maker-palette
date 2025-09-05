@@ -34,7 +34,7 @@ interface CastCrew {
   social_links: Record<string, string>;
 }
 
-interface TVShowCastAssignment {
+interface MovieCastAssignment {
   cast_crew_id: string;
   role_type: string;
   character_name?: string;
@@ -46,27 +46,31 @@ interface FormData {
   description: string;
   genre_id: string;
   release_date: string;
+  duration: number;
   language: string;
   rating: string;
   price: number;
+  rental_expiry_duration: number;
 }
 
-const AddTVShow = () => {
+const AddMovieImproved = () => {
   const [formData, setFormData] = useState<FormData>({
     title: "",
     description: "",
     genre_id: "",
     release_date: "",
+    duration: 0,
     language: "",
     rating: "",
-    price: 0
+    price: 0,
+    rental_expiry_duration: 48
   });
 
   const [genres, setGenres] = useState<Genre[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
-  const [trailerUrl, setTrailerUrl] = useState<string>("");
+  const [videoUrl, setVideoUrl] = useState<string>("");
   const [selectedCastCrew, setSelectedCastCrew] = useState<CastCrew[]>([]);
-  const [castAssignments, setCastAssignments] = useState<TVShowCastAssignment[]>([]);
+  const [castAssignments, setCastAssignments] = useState<MovieCastAssignment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -112,7 +116,7 @@ const AddTVShow = () => {
     setCastAssignments(newAssignments);
   };
 
-  const updateCastAssignment = (castCrewId: string, field: keyof TVShowCastAssignment, value: string | number) => {
+  const updateCastAssignment = (castCrewId: string, field: keyof MovieCastAssignment, value: string | number) => {
     setCastAssignments(prev => 
       prev.map(assignment => 
         assignment.cast_crew_id === castCrewId 
@@ -122,21 +126,21 @@ const AddTVShow = () => {
     );
   };
 
-  const saveCastAssignments = async (tvShowId: string) => {
+  const saveCastAssignments = async (movieId: string) => {
     if (castAssignments.length === 0) return;
 
     try {
       const { error } = await supabase
-        .from('tv_show_cast')
+        .from('movie_cast')
         .insert(
           castAssignments.map(assignment => ({
-            tv_show_id: tvShowId,
+            movie_id: movieId,
             ...assignment
           }))
         );
 
       if (error) throw error;
-      console.log('TV show cast assignments saved successfully');
+      console.log('Movie cast assignments saved successfully');
     } catch (error) {
       console.error('Error saving cast assignments:', error);
       throw error;
@@ -146,10 +150,10 @@ const AddTVShow = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('[AddTVShow] Form submission started. Thumbnail URL:', thumbnailUrl);
+    console.log('[AddMovieImproved] Form submission started. Thumbnail URL:', thumbnailUrl, 'Video URL:', videoUrl);
     
     if (!thumbnailUrl) {
-      console.error('[AddTVShow] No thumbnail URL provided');
+      console.error('[AddMovieImproved] No thumbnail URL provided');
       toast({
         title: "Error",
         description: "Please upload a thumbnail",
@@ -170,34 +174,36 @@ const AddTVShow = () => {
     setIsSubmitting(true);
 
     try {
-      console.log('Starting TV show creation process...');
+      console.log('[AddMovieImproved] Starting movie creation process...');
 
-      // Save TV show data to database
+      // Save movie data to database
       const { data, error } = await supabase
-        .from('tv_shows')
+        .from('movies')
         .insert([
           {
             title: formData.title,
             description: formData.description || null,
             genre_id: formData.genre_id || null,
             release_date: formData.release_date || null,
+            duration: formData.duration || null,
             language: formData.language || null,
             rating: formData.rating || null,
             price: formData.price || 0,
             thumbnail_url: thumbnailUrl,
-            trailer_url: trailerUrl || null,
-            status: 'pending'
+            video_url: videoUrl || null,
+            rental_expiry_duration: formData.rental_expiry_duration || 48,
+            status: 'approved'
           }
         ])
         .select()
         .single();
 
       if (error) {
-        console.error('Database error:', error);
+        console.error('[AddMovieImproved] Database error:', error);
         throw error;
       }
 
-      console.log('TV show saved successfully:', data);
+      console.log('[AddMovieImproved] Movie saved successfully:', data);
 
       // Save cast assignments
       if (castAssignments.length > 0) {
@@ -206,17 +212,17 @@ const AddTVShow = () => {
 
       toast({
         title: "Success",
-        description: "TV show created successfully! You can now add seasons.",
+        description: "Movie created successfully!",
       });
 
-      // Navigate to add season for this show
-      navigate(`/admin/tv-shows/${data.id}/add-season`);
+      // Navigate back to movies list
+      navigate('/admin/movies');
 
     } catch (error) {
-      console.error('Error adding TV show:', error);
+      console.error('[AddMovieImproved] Error adding movie:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create TV show",
+        description: error instanceof Error ? error.message : "Failed to create movie",
         variant: "destructive",
       });
     } finally {
@@ -230,15 +236,15 @@ const AddTVShow = () => {
         <div className="flex items-center gap-4 mb-8">
           <Button 
             variant="ghost" 
-            onClick={() => navigate('/admin/tv-shows')}
+            onClick={() => navigate('/admin/movies')}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to TV Shows
+            Back to Movies
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Create New TV Show</h1>
-            <p className="text-muted-foreground">Step 1: Basic TV show information</p>
+            <h1 className="text-3xl font-bold">Add New Movie</h1>
+            <p className="text-muted-foreground">Upload a new movie to the platform</p>
           </div>
         </div>
 
@@ -300,6 +306,15 @@ const AddTVShow = () => {
                   />
                 </div>
                 <div>
+                  <Label htmlFor="duration">Duration (minutes)</Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    value={formData.duration || ''}
+                    onChange={(e) => handleInputChange('duration', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div>
                   <Label htmlFor="language">Language</Label>
                   <Input
                     id="language"
@@ -307,6 +322,9 @@ const AddTVShow = () => {
                     onChange={(e) => handleInputChange('language', e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="rating">Rating</Label>
                   <Select 
@@ -325,12 +343,30 @@ const AddTVShow = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label htmlFor="rental_expiry">Rental Expiry (hours)</Label>
+                  <Select 
+                    value={formData.rental_expiry_duration.toString()}
+                    onValueChange={(value) => handleInputChange('rental_expiry_duration', parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="24">24 hours</SelectItem>
+                      <SelectItem value="48">48 hours (default)</SelectItem>
+                      <SelectItem value="72">72 hours</SelectItem>
+                      <SelectItem value="168">7 days</SelectItem>
+                      <SelectItem value="720">30 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <NairaInput
                 value={formData.price}
                 onChange={(value) => handleInputChange('price', value)}
-                label="Season Price (Base Price)"
+                label="Movie Price"
                 placeholder="0.00"
               />
             </CardContent>
@@ -345,11 +381,11 @@ const AddTVShow = () => {
               <ChunkedUpload
                 accept="image/*"
                 onUploadComplete={(url, filePath) => {
-                  console.log('[AddTVShow] Thumbnail upload completed:', { url, filePath });
+                  console.log('[AddMovieImproved] Thumbnail upload completed:', { url, filePath });
                   setThumbnailUrl(url);
                 }}
-                label="TV Show Poster"
-                description="Upload the main poster for the TV show"
+                label="Movie Thumbnail"
+                description="Upload the movie poster/thumbnail"
                 fileType="thumbnail"
                 currentUrl={thumbnailUrl}
                 maxSize={10}
@@ -360,14 +396,14 @@ const AddTVShow = () => {
               <ChunkedUpload
                 accept="video/*"
                 onUploadComplete={(url, filePath) => {
-                  console.log('[AddTVShow] Trailer upload completed:', { url, filePath });
-                  setTrailerUrl(url);
+                  console.log('[AddMovieImproved] Video upload completed:', { url, filePath });
+                  setVideoUrl(url);
                 }}
-                label="TV Show Trailer (Optional)"
-                description="Upload a trailer or preview video for the show"
-                fileType="trailer"
-                currentUrl={trailerUrl}
-                maxSize={100}
+                label="Movie Video (Optional)"
+                description="Upload the movie video file"
+                fileType="video"
+                currentUrl={videoUrl}
+                maxSize={1024}
               />
             </CardContent>
           </Card>
@@ -375,7 +411,7 @@ const AddTVShow = () => {
           {/* Cast & Crew Assignment */}
           <Card>
             <CardHeader>
-              <CardTitle>Main Cast & Crew</CardTitle>
+              <CardTitle>Cast & Crew</CardTitle>
             </CardHeader>
             <CardContent>
               <CastCrewManager
@@ -386,7 +422,7 @@ const AddTVShow = () => {
 
               {selectedCastCrew.length > 0 && (
                 <div className="mt-6 space-y-4">
-                  <h4 className="font-semibold">Configure Main Cast & Crew Roles</h4>
+                  <h4 className="font-semibold">Configure Cast & Crew Roles</h4>
                   {selectedCastCrew.map((member) => {
                     const assignment = castAssignments.find(a => a.cast_crew_id === member.id);
                     if (!assignment) return null;
@@ -399,7 +435,7 @@ const AddTVShow = () => {
                             <p className="text-sm text-muted-foreground">{member.role}</p>
                           </div>
                           <div className="flex-1">
-                            <Label>Role in Show</Label>
+                            <Label>Role in Movie</Label>
                             <Select
                               value={assignment.role_type}
                               onValueChange={(value) => updateCastAssignment(member.id, 'role_type', value)}
@@ -409,7 +445,7 @@ const AddTVShow = () => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="main_cast">Main Cast</SelectItem>
-                                <SelectItem value="recurring_cast">Recurring Cast</SelectItem>
+                                <SelectItem value="supporting_cast">Supporting Cast</SelectItem>
                                 <SelectItem value="director">Director</SelectItem>
                                 <SelectItem value="producer">Producer</SelectItem>
                                 <SelectItem value="writer">Writer</SelectItem>
@@ -452,7 +488,7 @@ const AddTVShow = () => {
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => navigate('/admin/tv-shows')}
+              onClick={() => navigate('/admin/movies')}
               disabled={isSubmitting}
             >
               Cancel
@@ -461,7 +497,7 @@ const AddTVShow = () => {
               type="submit" 
               disabled={isSubmitting || !thumbnailUrl}
             >
-              {isSubmitting ? 'Creating TV Show...' : 'Create TV Show & Add Seasons'}
+              {isSubmitting ? 'Creating Movie...' : 'Create Movie'}
             </Button>
           </div>
         </form>
@@ -470,4 +506,4 @@ const AddTVShow = () => {
   );
 };
 
-export default AddTVShow;
+export default AddMovieImproved;

@@ -99,6 +99,8 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
     setProgress(0);
 
     try {
+      console.log(`[${fileType}] Starting upload for:`, file.name, 'Size:', file.size, 'Type:', file.type);
+      
       // Get upload info from edge function
       const uploadInfoResponse = await supabase.functions.invoke('upload-video', {
         body: {
@@ -109,11 +111,26 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
         }
       });
 
+      console.log(`[${fileType}] Upload info response:`, uploadInfoResponse);
+
+      if (uploadInfoResponse.error) {
+        console.error(`[${fileType}] Edge function error:`, uploadInfoResponse.error);
+        throw new Error(`Upload service error: ${uploadInfoResponse.error.message || 'Unknown error'}`);
+      }
+
       if (!uploadInfoResponse.data?.success) {
+        console.error(`[${fileType}] Upload info failed:`, uploadInfoResponse.data);
         throw new Error(uploadInfoResponse.data?.error || 'Failed to get upload info');
       }
 
       const { uploadUrl: signedUrl, filePath, bucket } = uploadInfoResponse.data;
+      
+      if (!signedUrl) {
+        console.error(`[${fileType}] No upload URL received:`, uploadInfoResponse.data);
+        throw new Error('No upload URL received from server');
+      }
+
+      console.log(`[${fileType}] Upload info received successfully, bucket:`, bucket, 'path:', filePath);
 
       // Upload the file with progress tracking
       const xhr = new XMLHttpRequest();
@@ -126,11 +143,15 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
       };
 
       xhr.onload = async () => {
+        console.log(`[${fileType}] Upload completed with status:`, xhr.status);
+        
         if (xhr.status === 200) {
           setProgress(95);
           
           // Confirm upload
           try {
+            console.log(`[${fileType}] Confirming upload for path:`, filePath, 'bucket:', bucket);
+            
             const confirmResponse = await supabase.functions.invoke('upload-video', {
               body: {
                 action: 'confirm_upload',
@@ -139,8 +160,16 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
               }
             });
 
+            console.log(`[${fileType}] Confirm response:`, confirmResponse);
+
+            if (confirmResponse.error) {
+              console.error(`[${fileType}] Confirmation edge function error:`, confirmResponse.error);
+              throw new Error(`Confirmation error: ${confirmResponse.error.message}`);
+            }
+
             if (confirmResponse.data?.success) {
               setProgress(100);
+              console.log(`[${fileType}] Upload successful, calling onUploadComplete with:`, confirmResponse.data.publicUrl);
               onUploadComplete(confirmResponse.data.publicUrl, filePath);
               toast({
                 title: "Upload successful",
@@ -148,29 +177,34 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
               });
               setFile(null);
             } else {
-              throw new Error('Failed to confirm upload');
+              console.error(`[${fileType}] Upload confirmation failed:`, confirmResponse.data);
+              throw new Error(confirmResponse.data?.error || 'Failed to confirm upload');
             }
           } catch (confirmError) {
-            console.error('Confirmation error:', confirmError);
-            throw new Error('Upload completed but confirmation failed');
+            console.error(`[${fileType}] Confirmation error:`, confirmError);
+            throw new Error('Upload completed but confirmation failed: ' + (confirmError instanceof Error ? confirmError.message : 'Unknown error'));
           }
         } else {
-          throw new Error(`Upload failed with status ${xhr.status}`);
+          const responseText = await xhr.responseText;
+          console.error(`[${fileType}] Upload failed with status ${xhr.status}:`, responseText);
+          throw new Error(`Upload failed with status ${xhr.status}: ${responseText}`);
         }
         setUploading(false);
       };
 
       xhr.onerror = () => {
+        console.error(`[${fileType}] Network error during upload`);
         setUploading(false);
         throw new Error('Upload failed due to network error');
       };
 
+      console.log(`[${fileType}] Starting file upload to:`, signedUrl);
       xhr.open('PUT', signedUrl);
       xhr.setRequestHeader('Content-Type', file.type);
       xhr.send(file);
 
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error(`[${fileType}] Upload error:`, error);
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Failed to upload file",
