@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import ChunkedUpload from "@/components/admin/ChunkedUpload";
+import { MediaUploadManager } from "@/components/admin/MediaUploadManager";
 import CastCrewManager from "@/components/admin/CastCrewManager";
 import NairaInput from "@/components/admin/NairaInput";
 
@@ -342,26 +342,26 @@ const AddTVShow = () => {
               <CardTitle>Media Files</CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">
-              <ChunkedUpload
+              <MediaUploadManager
                 accept="image/*"
                 onUploadComplete={(url, filePath) => {
                   console.log('[AddTVShow] Thumbnail upload completed:', { url, filePath });
-                  setThumbnailUrl(url);
+                  setThumbnailUrl(filePath);
                 }}
                 label="TV Show Poster"
                 description="Upload the main poster for the TV show"
                 fileType="thumbnail"
                 currentUrl={thumbnailUrl}
-                maxSize={10}
+                maxSize={10 * 1024 * 1024} // 10MB
               />
 
               <Separator />
 
-              <ChunkedUpload
+              <MediaUploadManager
                 accept="video/*"
                 onUploadComplete={(url, filePath) => {
                   console.log('[AddTVShow] Trailer upload completed:', { url, filePath });
-                  setTrailerUrl(url);
+                  setTrailerUrl(filePath);
                 }}
                 label="TV Show Trailer (Optional)"
                 description="Upload a trailer or preview video for the show"

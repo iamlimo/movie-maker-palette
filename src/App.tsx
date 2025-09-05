@@ -8,7 +8,7 @@ import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Movies from "@/pages/admin/Movies";
-import AddMovie from "@/pages/admin/AddMovie";
+import AddMovieNew from "@/pages/admin/AddMovieNew";
 import TVShows from "@/pages/admin/TVShows";
 import AddTVShow from "@/pages/admin/AddTVShow";
 import AddSeason from "@/pages/admin/AddSeason";
@@ -42,7 +42,7 @@ const App = () => (
             }>
               <Route index element={<AdminDashboard />} />
               <Route path="movies" element={<Movies />} />
-              <Route path="movies/add" element={<AddMovie />} />
+              <Route path="movies/add" element={<AddMovieNew />} />
               <Route path="tv-shows" element={<TVShows />} />
               <Route path="tv-shows/add" element={<AddTVShow />} />
               <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
