@@ -367,7 +367,7 @@ const AddTVShow = () => {
                 description="Upload a trailer or preview video for the show"
                 fileType="trailer"
                 currentUrl={trailerUrl}
-                maxSize={100}
+                maxSize={500 * 1024 * 1024} // 500MB limit for trailers
               />
             </CardContent>
           </Card>

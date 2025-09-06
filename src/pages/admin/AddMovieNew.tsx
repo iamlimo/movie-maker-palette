@@ -418,6 +418,17 @@ const AddMovieNew = () => {
                   currentUrl={videoUrl}
                 />
               </div>
+
+              {/* Trailer Upload */}
+              <MediaUploadManager
+                onUploadComplete={(url, filePath) => setTrailerUrl(filePath)}
+                accept="video/*"
+                maxSize={500 * 1024 * 1024} // 500MB for trailers
+                label="Movie Trailer (Optional)"
+                description="Upload a trailer or preview video for the movie"
+                fileType="trailer"
+                currentUrl={trailerUrl}
+              />
             </CardContent>
           </Card>
 
