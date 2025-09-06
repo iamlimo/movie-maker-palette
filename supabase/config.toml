@@ -80,3 +80,6 @@ verify_jwt = true
 
 [functions.tv-show-upload]
 verify_jwt = true
+
+[functions.createSignedUploadUrl]
+verify_jwt = true

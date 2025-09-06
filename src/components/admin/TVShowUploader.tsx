@@ -112,8 +112,8 @@ export const TVShowUploader = ({
     return null;
   };
 
-  const uploadFile = useCallback(async (file: File) => {
-    console.log('[TVShowUploader] Starting upload for:', file.name, 'Content type:', contentType);
+  const uploadFile = useCallback(async (file: File, retryCount = 0) => {
+    console.log('[TVShowUploader] Starting upload for:', file.name, 'MIME type:', file.type, 'Content type:', contentType);
     
     setUploadState(prev => ({ ...prev, uploading: true, progress: 10, error: null }));
 
@@ -126,38 +126,39 @@ export const TVShowUploader = ({
 
       setUploadState(prev => ({ ...prev, progress: 20 }));
 
-      // Get upload info from TV show upload function
-      console.log('[TVShowUploader] Getting upload info from tv-show-upload function...');
-      const { data: uploadInfo, error: uploadInfoError } = await supabase.functions.invoke('tv-show-upload', {
+      // Determine the correct bucket based on file type
+      const bucket = file.type.startsWith('image/') ? 'thumbnails' : 'videos';
+
+      // Get fresh signed upload URL from new streamlined function
+      console.log('[TVShowUploader] Getting signed upload URL...');
+      const { data: uploadInfo, error: uploadInfoError } = await supabase.functions.invoke('createSignedUploadUrl', {
         body: {
-          action: 'get_upload_info',
           fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          contentType: contentType
+          bucket: bucket,
+          contentType: file.type // Use actual MIME type
         }
       });
 
       if (uploadInfoError) {
         console.error('[TVShowUploader] Upload info error:', uploadInfoError);
-        throw new Error(`Failed to get upload info: ${uploadInfoError.message}`);
+        throw new Error(`Failed to get upload URL: ${uploadInfoError.message}`);
       }
 
-      if (!uploadInfo?.uploadUrl) {
+      if (!uploadInfo?.signedUrl) {
         console.error('[TVShowUploader] Invalid upload info:', uploadInfo);
-        throw new Error(uploadInfo?.error || 'Failed to get upload URL from server');
+        throw new Error(uploadInfo?.error || 'Failed to get signed URL from server');
       }
 
       console.log('[TVShowUploader] Upload info received:', {
-        hasUploadUrl: !!uploadInfo.uploadUrl,
+        hasSignedUrl: !!uploadInfo.signedUrl,
         filePath: uploadInfo.filePath,
         bucket: uploadInfo.bucket,
-        contentType: uploadInfo.contentType
+        expiresAt: uploadInfo.expiresAt
       });
 
       setUploadState(prev => ({ ...prev, progress: 30 }));
 
-      // Upload file to the signed URL with progress tracking
+      // Upload file directly to the signed URL with progress tracking
       console.log('[TVShowUploader] Starting file upload to signed URL...');
       
       await new Promise<void>((resolve, reject) => {
@@ -165,7 +166,7 @@ export const TVShowUploader = ({
 
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 70 + 30; // 30-100%
+            const percentComplete = (event.loaded / event.total) * 60 + 30; // 30-90%
             setUploadState(prev => ({ ...prev, progress: Math.round(percentComplete) }));
           }
         });
@@ -185,36 +186,25 @@ export const TVShowUploader = ({
           reject(new Error('Upload failed due to network error'));
         });
 
-        xhr.open('PUT', uploadInfo.uploadUrl);
+        xhr.open('PUT', uploadInfo.signedUrl);
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
       });
 
       setUploadState(prev => ({ ...prev, progress: 90 }));
 
-      // Confirm upload
-      console.log('[TVShowUploader] Confirming upload...');
-      const { data: confirmData, error: confirmError } = await supabase.functions.invoke('tv-show-upload', {
-        body: {
-          action: 'confirm_upload',
-          filePath: uploadInfo.filePath,
-          bucket: uploadInfo.bucket
-        }
-      });
+      // Get public URL directly from Supabase storage
+      const { data: urlData } = supabase.storage
+        .from(uploadInfo.bucket)
+        .getPublicUrl(uploadInfo.filePath);
 
-      if (confirmError) {
-        console.error('[TVShowUploader] Confirm error:', confirmError);
-        throw new Error(`Failed to confirm upload: ${confirmError.message}`);
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL after upload');
       }
 
-      if (!confirmData?.publicUrl) {
-        console.error('[TVShowUploader] Invalid confirm data:', confirmData);
-        throw new Error(confirmData?.error || 'Failed to get public URL from server');
-      }
-
-      console.log('[TVShowUploader] Upload confirmed successfully:', {
-        filePath: confirmData.filePath,
-        hasPublicUrl: !!confirmData.publicUrl
+      console.log('[TVShowUploader] Upload completed successfully:', {
+        filePath: uploadInfo.filePath,
+        hasPublicUrl: !!urlData.publicUrl
       });
 
       setUploadState(prev => ({ 
@@ -222,12 +212,12 @@ export const TVShowUploader = ({
         uploading: false,
         progress: 100,
         completed: true,
-        filePath: confirmData.filePath,
-        publicUrl: confirmData.publicUrl
+        filePath: uploadInfo.filePath,
+        publicUrl: urlData.publicUrl
       }));
 
       // Call completion callback
-      onUploadComplete(confirmData.filePath, confirmData.publicUrl);
+      onUploadComplete(uploadInfo.filePath, urlData.publicUrl);
 
       toast({
         title: "Success",
@@ -237,6 +227,17 @@ export const TVShowUploader = ({
     } catch (error) {
       console.error('[TVShowUploader] Upload failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      
+      // Retry on token expiry (up to 2 times)
+      if (errorMessage.includes('expired') && retryCount < 2) {
+        console.log('[TVShowUploader] Token expired, retrying...', retryCount + 1);
+        toast({
+          title: "Retrying Upload",
+          description: "Token expired, getting fresh upload URL...",
+        });
+        setTimeout(() => uploadFile(file, retryCount + 1), 1000);
+        return;
+      }
       
       setUploadState(prev => ({ 
         ...prev, 
