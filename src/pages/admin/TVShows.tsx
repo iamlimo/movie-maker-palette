@@ -166,7 +166,7 @@ const TVShows = () => {
         </div>
         <Button onClick={() => navigate('/admin/tv-shows/add')}>
           <Plus className="h-4 w-4 mr-2" />
-          Add TV Show
+          Create TV Show
         </Button>
       </div>
 
