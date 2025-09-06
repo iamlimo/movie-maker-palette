@@ -10,9 +10,12 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Movies from "@/pages/admin/Movies";
 import AddMovieNew from "@/pages/admin/AddMovieNew";
+import ViewMovie from "@/pages/admin/ViewMovie";
+import EditMovie from "@/pages/admin/EditMovie";
 import TVShows from "@/pages/admin/TVShows";
 import AddTVShow from "@/pages/admin/AddTVShow";
 import AddSeason from "@/pages/admin/AddSeason";
+import ViewTVShow from "@/pages/admin/ViewTVShow";
 import Submissions from "@/pages/admin/Submissions";
 import Users from "@/pages/admin/Users";
 import Finance from "@/pages/admin/Finance";
@@ -46,9 +49,12 @@ const App: React.FC = () => (
               <Route index element={<AdminDashboard />} />
               <Route path="movies" element={<Movies />} />
               <Route path="movies/add" element={<AddMovieNew />} />
+              <Route path="movies/view/:id" element={<ViewMovie />} />
+              <Route path="movies/edit/:id" element={<EditMovie />} />
               <Route path="tv-shows" element={<TVShows />} />
               <Route path="tv-shows/add" element={<AddTVShow />} />
               <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
+              <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
               <Route path="submissions" element={<Submissions />} />
               <Route path="users" element={<Users />} />
               <Route path="finance" element={<Finance />} />

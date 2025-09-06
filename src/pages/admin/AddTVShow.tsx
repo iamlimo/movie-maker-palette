@@ -17,28 +17,11 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MediaUploadManager } from "@/components/admin/MediaUploadManager";
-import CastCrewManager from "@/components/admin/CastCrewManager";
 import NairaInput from "@/components/admin/NairaInput";
 
 interface Genre {
   id: string;
   name: string;
-}
-
-interface CastCrew {
-  id: string;
-  name: string;
-  role: string;
-  bio?: string;
-  photo_url?: string;
-  social_links: Record<string, string>;
-}
-
-interface TVShowCastAssignment {
-  cast_crew_id: string;
-  role_type: string;
-  character_name?: string;
-  credit_order: number;
 }
 
 interface FormData {
@@ -65,8 +48,6 @@ const AddTVShow = () => {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [trailerUrl, setTrailerUrl] = useState<string>("");
-  const [selectedCastCrew, setSelectedCastCrew] = useState<CastCrew[]>([]);
-  const [castAssignments, setCastAssignments] = useState<TVShowCastAssignment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -96,52 +77,6 @@ const AddTVShow = () => {
     }));
   };
 
-  const handleCastCrewSelection = (selected: CastCrew[]) => {
-    setSelectedCastCrew(selected);
-    
-    const newAssignments = selected.map((member, index) => {
-      const existing = castAssignments.find(a => a.cast_crew_id === member.id);
-      return existing || {
-        cast_crew_id: member.id,
-        role_type: member.role === 'actor' ? 'main_cast' : member.role,
-        character_name: member.role === 'actor' ? '' : undefined,
-        credit_order: index + 1
-      };
-    });
-    
-    setCastAssignments(newAssignments);
-  };
-
-  const updateCastAssignment = (castCrewId: string, field: keyof TVShowCastAssignment, value: string | number) => {
-    setCastAssignments(prev => 
-      prev.map(assignment => 
-        assignment.cast_crew_id === castCrewId 
-          ? { ...assignment, [field]: value }
-          : assignment
-      )
-    );
-  };
-
-  const saveCastAssignments = async (tvShowId: string) => {
-    if (castAssignments.length === 0) return;
-
-    try {
-      const { error } = await supabase
-        .from('tv_show_cast')
-        .insert(
-          castAssignments.map(assignment => ({
-            tv_show_id: tvShowId,
-            ...assignment
-          }))
-        );
-
-      if (error) throw error;
-      console.log('TV show cast assignments saved successfully');
-    } catch (error) {
-      console.error('Error saving cast assignments:', error);
-      throw error;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,11 +133,6 @@ const AddTVShow = () => {
       }
 
       console.log('TV show saved successfully:', data);
-
-      // Save cast assignments
-      if (castAssignments.length > 0) {
-        await saveCastAssignments(data.id);
-      }
 
       toast({
         title: "Success",
@@ -372,80 +302,6 @@ const AddTVShow = () => {
             </CardContent>
           </Card>
 
-          {/* Cast & Crew Assignment */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Main Cast & Crew</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CastCrewManager
-                mode="select"
-                onSelectionChange={handleCastCrewSelection}
-                selectedIds={selectedCastCrew.map(c => c.id)}
-              />
-
-              {selectedCastCrew.length > 0 && (
-                <div className="mt-6 space-y-4">
-                  <h4 className="font-semibold">Configure Main Cast & Crew Roles</h4>
-                  {selectedCastCrew.map((member) => {
-                    const assignment = castAssignments.find(a => a.cast_crew_id === member.id);
-                    if (!assignment) return null;
-
-                    return (
-                      <Card key={member.id} className="p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="flex-1">
-                            <p className="font-medium">{member.name}</p>
-                            <p className="text-sm text-muted-foreground">{member.role}</p>
-                          </div>
-                          <div className="flex-1">
-                            <Label>Role in Show</Label>
-                            <Select
-                              value={assignment.role_type}
-                              onValueChange={(value) => updateCastAssignment(member.id, 'role_type', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="main_cast">Main Cast</SelectItem>
-                                <SelectItem value="recurring_cast">Recurring Cast</SelectItem>
-                                <SelectItem value="director">Director</SelectItem>
-                                <SelectItem value="producer">Producer</SelectItem>
-                                <SelectItem value="writer">Writer</SelectItem>
-                                <SelectItem value="cinematographer">Cinematographer</SelectItem>
-                                <SelectItem value="editor">Editor</SelectItem>
-                                <SelectItem value="composer">Composer</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {assignment.role_type.includes('cast') && (
-                            <div className="flex-1">
-                              <Label>Character Name</Label>
-                              <Input
-                                value={assignment.character_name || ''}
-                                onChange={(e) => updateCastAssignment(member.id, 'character_name', e.target.value)}
-                                placeholder="Character name"
-                              />
-                            </div>
-                          )}
-                          <div className="w-20">
-                            <Label>Order</Label>
-                            <Input
-                              type="number"
-                              value={assignment.credit_order}
-                              onChange={(e) => updateCastAssignment(member.id, 'credit_order', parseInt(e.target.value) || 1)}
-                              min={1}
-                            />
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Submit Button */}
           <div className="flex justify-end gap-4">
