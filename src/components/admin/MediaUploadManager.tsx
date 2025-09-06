@@ -142,9 +142,10 @@ export const MediaUploadManager = ({
         throw new Error('No response from upload server');
       }
 
-      if (!uploadInfo.success) {
-        console.error(`[MediaUploadManager] Upload info failed:`, uploadInfo);
-        throw new Error(uploadInfo.error || 'Failed to get upload info from server');
+      // The uploadInfo should contain uploadUrl, filePath, and bucket directly
+      if (!uploadInfo.uploadUrl) {
+        console.error(`[MediaUploadManager] Invalid upload info structure:`, uploadInfo);
+        throw new Error(uploadInfo.error || 'Failed to get upload URL from server');
       }
 
       setUploadState(prev => ({ ...prev, progress: 25 }));
@@ -193,8 +194,8 @@ export const MediaUploadManager = ({
         throw new Error(`Failed to confirm upload: ${confirmError.message}`);
       }
 
-      if (!confirmData?.success) {
-        throw new Error(confirmData?.error || 'Failed to confirm upload');
+      if (!confirmData?.publicUrl) {
+        throw new Error(confirmData?.error || 'Failed to get public URL from server');
       }
 
       setUploadState(prev => ({ 
