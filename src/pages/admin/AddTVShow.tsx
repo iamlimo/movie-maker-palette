@@ -181,21 +181,29 @@ const AddTVShow = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="title">Title *</Label>
+                  <Label htmlFor="title">
+                    Title <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="title"
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
                     required
+                    className={!formData.title ? "border-destructive/50" : ""}
                   />
+                  {!formData.title && (
+                    <p className="text-xs text-destructive mt-1">Title is required</p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="genre">Genre *</Label>
+                  <Label htmlFor="genre">
+                    Genre <span className="text-destructive">*</span>
+                  </Label>
                   <Select 
                     value={formData.genre_id} 
                     onValueChange={(value) => handleInputChange('genre_id', value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={!formData.genre_id ? "border-destructive/50" : ""}>
                       <SelectValue placeholder="Select a genre" />
                     </SelectTrigger>
                     <SelectContent>
@@ -206,6 +214,9 @@ const AddTVShow = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {!formData.genre_id && (
+                    <p className="text-xs text-destructive mt-1">Genre is required</p>
+                  )}
                 </div>
               </div>
 
@@ -283,6 +294,8 @@ const AddTVShow = () => {
                 fileType="thumbnail"
                 currentUrl={thumbnailUrl}
                 maxSize={10 * 1024 * 1024} // 10MB
+                required={true}
+                autoUpload={true}
               />
 
               <Separator />
@@ -293,15 +306,45 @@ const AddTVShow = () => {
                   console.log('[AddTVShow] Trailer upload completed:', { url, filePath });
                   setTrailerUrl(filePath);
                 }}
-                label="TV Show Trailer (Optional)"
-                description="Upload a trailer or preview video for the show"
+                label="TV Show Trailer"
+                description="Upload a trailer or preview video for the show (optional)"
                 fileType="trailer"
                 currentUrl={trailerUrl}
                 maxSize={500 * 1024 * 1024} // 500MB limit for trailers
+                required={false}
+                autoUpload={true}
               />
             </CardContent>
           </Card>
 
+
+          {/* Form Status */}
+          <Card className="bg-muted/30">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-foreground">Form Status</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Complete required fields to proceed
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className={`flex items-center gap-2 ${formData.title ? 'text-green-600' : 'text-destructive'}`}>
+                    <div className={`w-2 h-2 rounded-full ${formData.title ? 'bg-green-500' : 'bg-destructive'}`} />
+                    Title
+                  </div>
+                  <div className={`flex items-center gap-2 ${formData.genre_id ? 'text-green-600' : 'text-destructive'}`}>
+                    <div className={`w-2 h-2 rounded-full ${formData.genre_id ? 'bg-green-500' : 'bg-destructive'}`} />
+                    Genre
+                  </div>
+                  <div className={`flex items-center gap-2 ${thumbnailUrl ? 'text-green-600' : 'text-destructive'}`}>
+                    <div className={`w-2 h-2 rounded-full ${thumbnailUrl ? 'bg-green-500' : 'bg-destructive'}`} />
+                    Poster
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Submit Button */}
           <div className="flex justify-end gap-4">
@@ -315,9 +358,18 @@ const AddTVShow = () => {
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || !thumbnailUrl}
+              disabled={isSubmitting || !thumbnailUrl || !formData.title || !formData.genre_id}
+              className="min-w-[200px]"
             >
-              {isSubmitting ? 'Creating TV Show...' : 'Create TV Show & Add Seasons'}
+              {isSubmitting ? (
+                'Creating TV Show...'
+              ) : !thumbnailUrl ? (
+                'Upload Poster Required'
+              ) : !formData.title || !formData.genre_id ? (
+                'Complete Required Fields'
+              ) : (
+                'Create TV Show & Add Seasons'
+              )}
             </Button>
           </div>
         </form>

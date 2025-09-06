@@ -14,6 +14,8 @@ interface MediaUploadManagerProps {
   description: string;
   fileType: 'video' | 'thumbnail' | 'trailer';
   currentUrl?: string;
+  required?: boolean;
+  autoUpload?: boolean;
 }
 
 interface UploadState {
@@ -31,7 +33,9 @@ export const MediaUploadManager = ({
   label,
   description,
   fileType,
-  currentUrl
+  currentUrl,
+  required = false,
+  autoUpload = false
 }: MediaUploadManagerProps) => {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
@@ -218,7 +222,12 @@ export const MediaUploadManager = ({
       completed: false,
       progress: 0 
     }));
-  }, [accept, maxSize, toast]);
+
+    // Auto-upload if enabled
+    if (autoUpload) {
+      uploadFile(file);
+    }
+  }, [accept, maxSize, toast, autoUpload]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -260,11 +269,21 @@ export const MediaUploadManager = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">{label}</h3>
+          <h3 className="text-lg font-semibold text-foreground">
+            {label}
+            {required && <span className="text-destructive ml-1">*</span>}
+          </h3>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        <div className="px-2 py-1 rounded-full bg-muted text-xs text-muted-foreground">
-          Max: {formatFileSize(maxSize)}
+        <div className="flex items-center gap-2">
+          {required && (
+            <span className="px-2 py-1 rounded-full bg-destructive/10 text-xs text-destructive border border-destructive/20">
+              Required
+            </span>
+          )}
+          <div className="px-2 py-1 rounded-full bg-muted text-xs text-muted-foreground">
+            Max: {formatFileSize(maxSize)}
+          </div>
         </div>
       </div>
 
