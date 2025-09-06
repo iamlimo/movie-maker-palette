@@ -77,3 +77,6 @@ verify_jwt = true
 
 [functions.verify-payment]
 verify_jwt = true
+
+[functions.tv-show-upload]
+verify_jwt = true
