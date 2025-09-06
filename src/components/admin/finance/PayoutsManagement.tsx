@@ -35,10 +35,8 @@ interface Payout {
   payout_date: string | null;
   created_at: string;
   metadata: any;
-  profiles?: {
-    name: string;
-    email: string;
-  };
+  producer_name?: string;
+  producer_email?: string;
 }
 
 export const PayoutsManagement = () => {
@@ -52,17 +50,14 @@ export const PayoutsManagement = () => {
     try {
       let query = supabase
         .from('payouts')
-        .select(`
-          *,
-          profiles:producer_id (name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
 
-      const { data, error } = await query;
+      const { data: payoutsData, error } = await query;
 
       if (error) {
         console.error('Error fetching payouts:', error);
@@ -74,7 +69,32 @@ export const PayoutsManagement = () => {
         return;
       }
 
-      setPayouts(data || []);
+      // Fetch producer profiles separately
+      const producerIds = payoutsData?.map(p => p.producer_id).filter(Boolean) || [];
+      let profilesMap: Record<string, { name: string; email: string }> = {};
+
+      if (producerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, name, email')
+          .in('user_id', producerIds);
+
+        if (profiles) {
+          profilesMap = profiles.reduce((acc, profile) => {
+            acc[profile.user_id] = { name: profile.name, email: profile.email };
+            return acc;
+          }, {} as Record<string, { name: string; email: string }>);
+        }
+      }
+
+      // Merge the data
+      const payoutsWithProfiles = payoutsData?.map(payout => ({
+        ...payout,
+        producer_name: profilesMap[payout.producer_id]?.name || 'Unknown',
+        producer_email: profilesMap[payout.producer_id]?.email || 'Unknown'
+      })) || [];
+
+      setPayouts(payoutsWithProfiles);
     } catch (error) {
       console.error('Error fetching payouts:', error);
     } finally {
@@ -163,7 +183,7 @@ export const PayoutsManagement = () => {
   const exportPayouts = () => {
     const csvData = payouts.map(payout => [
       payout.payout_id,
-      payout.profiles?.email || 'Unknown',
+      payout.producer_email,
       payout.amount,
       payout.status,
       payout.created_at,
@@ -378,8 +398,8 @@ export const PayoutsManagement = () => {
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <p className="font-medium">{payout.profiles?.name || 'Unknown'}</p>
-                          <p className="text-sm text-muted-foreground">{payout.profiles?.email}</p>
+                          <p className="font-medium">{payout.producer_name}</p>
+                          <p className="text-sm text-muted-foreground">{payout.producer_email}</p>
                         </div>
                       </div>
                     </TableCell>

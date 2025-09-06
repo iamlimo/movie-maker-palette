@@ -36,10 +36,8 @@ interface Payment {
   provider_reference: string;
   created_at: string;
   metadata: any;
-  profiles?: {
-    name: string;
-    email: string;
-  };
+  user_name?: string;
+  user_email?: string;
 }
 
 export const TransactionsTable = () => {
@@ -57,10 +55,7 @@ export const TransactionsTable = () => {
     try {
       let query = supabase
         .from('payments')
-        .select(`
-          *,
-          profiles:user_id (name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       // Apply filters
@@ -76,8 +71,7 @@ export const TransactionsTable = () => {
       if (searchTerm) {
         query = query.or(`
           provider_reference.ilike.%${searchTerm}%,
-          profiles.email.ilike.%${searchTerm}%,
-          profiles.name.ilike.%${searchTerm}%
+          id.ilike.%${searchTerm}%
         `);
       }
 
@@ -86,7 +80,7 @@ export const TransactionsTable = () => {
       const to = from + itemsPerPage - 1;
       query = query.range(from, to);
 
-      const { data, error, count } = await query;
+      const { data: paymentsData, error, count } = await query;
 
       if (error) {
         console.error('Error fetching payments:', error);
@@ -98,7 +92,42 @@ export const TransactionsTable = () => {
         return;
       }
 
-      setPayments(data || []);
+      // Fetch user profiles separately
+      const userIds = paymentsData?.map(p => p.user_id).filter(Boolean) || [];
+      let profilesMap: Record<string, { name: string; email: string }> = {};
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, name, email')
+          .in('user_id', userIds);
+
+        if (profiles) {
+          profilesMap = profiles.reduce((acc, profile) => {
+            acc[profile.user_id] = { name: profile.name, email: profile.email };
+            return acc;
+          }, {} as Record<string, { name: string; email: string }>);
+        }
+      }
+
+      // Additional search filtering for user data
+      let paymentsWithProfiles = paymentsData?.map(payment => ({
+        ...payment,
+        user_name: profilesMap[payment.user_id]?.name || 'Unknown',
+        user_email: profilesMap[payment.user_id]?.email || 'Unknown'
+      })) || [];
+
+      // Apply search filter on user data if needed
+      if (searchTerm) {
+        paymentsWithProfiles = paymentsWithProfiles.filter(payment => 
+          payment.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          payment.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          payment.provider_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          payment.id.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+
+      setPayments(paymentsWithProfiles);
       setTotalPages(Math.ceil((count || 0) / itemsPerPage));
     } catch (error) {
       console.error('Error fetching payments:', error);
@@ -145,7 +174,7 @@ export const TransactionsTable = () => {
   const exportTransactions = () => {
     const csvData = payments.map(payment => [
       payment.id,
-      payment.profiles?.email || 'Unknown',
+      payment.user_email,
       payment.amount,
       payment.currency,
       payment.purpose,
@@ -285,8 +314,8 @@ export const TransactionsTable = () => {
                     <TableRow key={payment.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{payment.profiles?.name || 'Unknown'}</p>
-                          <p className="text-sm text-muted-foreground">{payment.profiles?.email}</p>
+                          <p className="font-medium">{payment.user_name}</p>
+                          <p className="text-sm text-muted-foreground">{payment.user_email}</p>
                         </div>
                       </TableCell>
                       <TableCell>
