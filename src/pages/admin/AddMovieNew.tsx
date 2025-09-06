@@ -60,6 +60,7 @@ const AddMovieNew = () => {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
+  const [trailerUrl, setTrailerUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCastCrew, setSelectedCastCrew] = useState<CastCrew[]>([]);
   const [castAssignments, setCastAssignments] = useState<MovieCastAssignment[]>([]);
