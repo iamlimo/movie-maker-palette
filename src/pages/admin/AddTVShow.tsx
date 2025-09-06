@@ -16,8 +16,10 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthCheck } from "@/hooks/useAuthCheck";
 import { MediaUploadManager } from "@/components/admin/MediaUploadManager";
 import NairaInput from "@/components/admin/NairaInput";
+import { AlertCircle } from "lucide-react";
 
 interface Genre {
   id: string;
@@ -51,6 +53,7 @@ const AddTVShow = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { canUpload, isAuthenticated, isSuperAdmin } = useAuthCheck();
 
   useEffect(() => {
     fetchGenres();
@@ -173,6 +176,35 @@ const AddTVShow = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Authentication Check */}
+          {!isAuthenticated && (
+            <Card className="border-destructive">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-6 w-6 text-destructive" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-destructive">Authentication Required</h3>
+                    <p className="text-sm text-muted-foreground">Please log in to add TV shows.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {isAuthenticated && !isSuperAdmin && (
+            <Card className="border-destructive">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-6 w-6 text-destructive" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-destructive">Super Admin Access Required</h3>
+                    <p className="text-sm text-muted-foreground">You need super admin privileges to add TV shows and upload media files.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Basic Information */}
           <Card>
             <CardHeader>
@@ -189,6 +221,7 @@ const AddTVShow = () => {
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
                     required
+                    disabled={!canUpload}
                     className={!formData.title ? "border-destructive/50" : ""}
                   />
                   {!formData.title && (
@@ -358,10 +391,12 @@ const AddTVShow = () => {
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || !thumbnailUrl || !formData.title || !formData.genre_id}
+              disabled={isSubmitting || !thumbnailUrl || !formData.title || !formData.genre_id || !canUpload}
               className="min-w-[200px]"
             >
-              {isSubmitting ? (
+              {!canUpload ? (
+                'Authentication Required'
+              ) : isSubmitting ? (
                 'Creating TV Show...'
               ) : !thumbnailUrl ? (
                 'Upload Poster Required'

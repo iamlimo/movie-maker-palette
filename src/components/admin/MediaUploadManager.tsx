@@ -99,6 +99,27 @@ export const MediaUploadManager = ({
     try {
       setUploadState(prev => ({ ...prev, uploading: true, progress: 0, error: null }));
 
+      // Check authentication first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Please log in to upload files');
+      }
+
+      console.log(`[MediaUploadManager] User authenticated, checking role...`);
+
+      // Check user role
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (roleError || !roleData || roleData.role !== 'super_admin') {
+        throw new Error('You need super admin privileges to upload files');
+      }
+
+      console.log(`[MediaUploadManager] User has super admin role, proceeding with upload...`);
+
       // Get upload info from edge function
       const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('upload-video', {
         body: {
@@ -112,11 +133,18 @@ export const MediaUploadManager = ({
       console.log(`[MediaUploadManager] Upload info response:`, { uploadInfo, infoError });
 
       if (infoError) {
-        throw new Error(`Failed to get upload info: ${infoError.message}`);
+        console.error(`[MediaUploadManager] Function invoke error:`, infoError);
+        throw new Error(`Failed to get upload info: ${infoError.message || 'Unknown error'}`);
       }
 
-      if (!uploadInfo?.success) {
-        throw new Error(uploadInfo?.error || 'Failed to get upload info from server');
+      if (!uploadInfo) {
+        console.error(`[MediaUploadManager] No upload info received`);
+        throw new Error('No response from upload server');
+      }
+
+      if (!uploadInfo.success) {
+        console.error(`[MediaUploadManager] Upload info failed:`, uploadInfo);
+        throw new Error(uploadInfo.error || 'Failed to get upload info from server');
       }
 
       setUploadState(prev => ({ ...prev, progress: 25 }));
