@@ -62,3 +62,18 @@ verify_jwt = true
 
 [functions.b2-delete]
 verify_jwt = true
+
+[functions.create-payment-intent]
+verify_jwt = true
+
+[functions.paystack-webhook]
+verify_jwt = false
+
+[functions.wallet-topup]
+verify_jwt = true
+
+[functions.refund-payment]
+verify_jwt = true
+
+[functions.verify-payment]
+verify_jwt = true
