@@ -118,7 +118,7 @@ export const PaymentDialog = ({ open, onOpenChange, content }: PaymentDialogProp
 
             <TabsContent value="rent" className="space-y-3">
               <div className="bg-muted/50 p-4 rounded-lg">
-                <p className="font-semibold">₦{(content.rental_price || content.price * 0.3).toFixed(2)}</p>
+                <p className="font-semibold">₦{(content.rental_price || content.price * 0.3).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</p>
                 <p className="text-sm text-muted-foreground">
                   Watch for {content.rental_duration || 48} hours
                 </p>
@@ -127,7 +127,7 @@ export const PaymentDialog = ({ open, onOpenChange, content }: PaymentDialogProp
 
             <TabsContent value="buy" className="space-y-3">
               <div className="bg-muted/50 p-4 rounded-lg">
-                <p className="font-semibold">₦{content.price.toFixed(2)}</p>
+                <p className="font-semibold">₦{content.price.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</p>
                 <p className="text-sm text-muted-foreground">
                   Own forever - watch unlimited times
                 </p>
@@ -184,7 +184,7 @@ export const PaymentDialog = ({ open, onOpenChange, content }: PaymentDialogProp
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Amount:</span>
-              <span className="font-semibold">₦{currentPrice.toFixed(2)}</span>
+              <span className="font-semibold">₦{currentPrice.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Payment method:</span>

@@ -135,7 +135,7 @@ export default function Dashboard() {
     },
     {
       title: 'Total Revenue',
-      value: `$${stats.totalRevenue.toFixed(2)}`,
+      value: `₦${stats.totalRevenue.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
       description: 'All-time revenue',
       icon: DollarSign,
       gradient: 'gradient-accent',
@@ -143,7 +143,7 @@ export default function Dashboard() {
     },
     {
       title: 'Monthly Revenue',
-      value: `$${stats.monthlyRevenue.toFixed(2)}`,
+      value: `₦${stats.monthlyRevenue.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
       description: 'Current month',
       icon: TrendingUp,
       gradient: 'gradient-card',

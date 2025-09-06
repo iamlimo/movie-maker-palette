@@ -86,7 +86,7 @@ export const useWallet = () => {
   };
 
   const formatBalance = (): string => {
-    return wallet ? `₦${wallet.balance.toFixed(2)}` : '₦0.00';
+    return wallet ? `₦${wallet.balance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}` : '₦0.00';
   };
 
   return {

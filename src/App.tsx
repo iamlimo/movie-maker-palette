@@ -14,6 +14,8 @@ import AddTVShow from "@/pages/admin/AddTVShow";
 import AddSeason from "@/pages/admin/AddSeason";
 import Submissions from "@/pages/admin/Submissions";
 import Users from "@/pages/admin/Users";
+import Finance from "@/pages/admin/Finance";
+import Producers from "@/pages/admin/Producers";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -48,6 +50,8 @@ const App = () => (
               <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
               <Route path="submissions" element={<Submissions />} />
               <Route path="users" element={<Users />} />
+              <Route path="finance" element={<Finance />} />
+              <Route path="producers" element={<Producers />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

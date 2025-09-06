@@ -320,7 +320,7 @@ export const TransactionsTable = () => {
                       </TableCell>
                       <TableCell>
                         <span className="font-mono">
-                          {payment.currency} {payment.amount.toFixed(2)}
+                          ₦{Number(payment.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                         </span>
                       </TableCell>
                       <TableCell>
