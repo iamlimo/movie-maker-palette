@@ -151,6 +151,30 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          audit_id: string
+          created_at: string | null
+          details: Json | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          audit_id?: string
+          created_at?: string | null
+          details?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          audit_id?: string
+          created_at?: string | null
+          details?: Json | null
+        }
+        Relationships: []
+      }
       genres: {
         Row: {
           created_at: string
@@ -270,33 +294,102 @@ export type Database = {
       payments: {
         Row: {
           amount: number
+          created_at: string | null
+          currency: string
+          enhanced_status:
+            | Database["public"]["Enums"]["enhanced_payment_status"]
+            | null
+          error_message: string | null
           id: string
+          intent_id: string
+          metadata: Json | null
           method: string | null
+          provider: string | null
+          provider_reference: string | null
+          purpose: string
           reference_id: string | null
           status: Database["public"]["Enums"]["payment_status"]
           transaction_date: string
           transaction_type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string | null
           user_id: string
         }
         Insert: {
           amount: number
+          created_at?: string | null
+          currency?: string
+          enhanced_status?:
+            | Database["public"]["Enums"]["enhanced_payment_status"]
+            | null
+          error_message?: string | null
           id?: string
+          intent_id?: string
+          metadata?: Json | null
           method?: string | null
+          provider?: string | null
+          provider_reference?: string | null
+          purpose?: string
           reference_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_date?: string
           transaction_type: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string | null
           user_id: string
         }
         Update: {
           amount?: number
+          created_at?: string | null
+          currency?: string
+          enhanced_status?:
+            | Database["public"]["Enums"]["enhanced_payment_status"]
+            | null
+          error_message?: string | null
           id?: string
+          intent_id?: string
+          metadata?: Json | null
           method?: string | null
+          provider?: string | null
+          provider_reference?: string | null
+          purpose?: string
           reference_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_date?: string
           transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      payouts: {
+        Row: {
+          amount: number
+          created_at: string | null
+          metadata: Json | null
+          payout_date: string | null
+          payout_id: string
+          producer_id: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          metadata?: Json | null
+          payout_date?: string | null
+          payout_id?: string
+          producer_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          metadata?: Json | null
+          payout_date?: string | null
+          payout_id?: string
+          producer_id?: string | null
+          status?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -538,6 +631,47 @@ export type Database = {
           },
         ]
       }
+      transactions_ledger: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          ledger_id: string
+          party: string
+          party_id: string | null
+          payment_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          ledger_id?: string
+          party: string
+          party_id?: string | null
+          payment_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          ledger_id?: string
+          party?: string
+          party_id?: string | null
+          payment_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_ledger_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tv_show_cast: {
         Row: {
           cast_crew_id: string
@@ -684,6 +818,27 @@ export type Database = {
         }
         Relationships: []
       }
+      wallets: {
+        Row: {
+          balance: number
+          updated_at: string | null
+          user_id: string | null
+          wallet_id: string
+        }
+        Insert: {
+          balance?: number
+          updated_at?: string | null
+          user_id?: string | null
+          wallet_id?: string
+        }
+        Update: {
+          balance?: number
+          updated_at?: string | null
+          user_id?: string | null
+          wallet_id?: string
+        }
+        Relationships: []
+      }
       watch_history: {
         Row: {
           completed: boolean | null
@@ -717,6 +872,33 @@ export type Database = {
           progress?: number | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          payload: Json | null
+          processed_at: string | null
+          provider: string
+          provider_event_id: string
+        }
+        Insert: {
+          event_id?: string
+          event_type: string
+          payload?: Json | null
+          processed_at?: string | null
+          provider?: string
+          provider_event_id: string
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          payload?: Json | null
+          processed_at?: string | null
+          provider?: string
+          provider_event_id?: string
         }
         Relationships: []
       }
@@ -767,6 +949,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      log_finance_action: {
+        Args: { p_action: string; p_details?: Json }
+        Returns: string
+      }
       update_user_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -783,6 +969,13 @@ export type Database = {
       app_role: "user" | "admin" | "super_admin"
       content_status: "pending" | "approved" | "rejected"
       content_type: "movie" | "episode"
+      enhanced_payment_status:
+        | "initiated"
+        | "pending"
+        | "completed"
+        | "failed"
+        | "refunded"
+        | "success"
       payment_status: "pending" | "completed" | "failed" | "refunded"
       producer_status: "pending" | "approved" | "rejected"
       rental_status: "active" | "expired"
@@ -919,6 +1112,14 @@ export const Constants = {
       app_role: ["user", "admin", "super_admin"],
       content_status: ["pending", "approved", "rejected"],
       content_type: ["movie", "episode"],
+      enhanced_payment_status: [
+        "initiated",
+        "pending",
+        "completed",
+        "failed",
+        "refunded",
+        "success",
+      ],
       payment_status: ["pending", "completed", "failed", "refunded"],
       producer_status: ["pending", "approved", "rejected"],
       rental_status: ["active", "expired"],
