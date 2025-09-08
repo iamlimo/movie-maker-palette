@@ -83,3 +83,6 @@ verify_jwt = true
 
 [functions.createSignedUploadUrl]
 verify_jwt = true
+
+[functions.slider-items]
+verify_jwt = false

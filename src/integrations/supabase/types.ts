@@ -581,6 +581,60 @@ export type Database = {
           },
         ]
       }
+      slider_items: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string
+          description: string | null
+          genre: string | null
+          id: string
+          is_featured: boolean
+          is_rentable: boolean
+          poster_url: string | null
+          price: number
+          rating: string | null
+          sort_order: number
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          is_featured?: boolean
+          is_rentable?: boolean
+          poster_url?: string | null
+          price?: number
+          rating?: string | null
+          sort_order?: number
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          genre?: string | null
+          id?: string
+          is_featured?: boolean
+          is_rentable?: boolean
+          poster_url?: string | null
+          price?: number
+          rating?: string | null
+          sort_order?: number
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       submissions: {
         Row: {
           description: string | null

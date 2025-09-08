@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
-import HeroSection from "@/components/HeroSection";
+import CinematicHeroSlider from "@/components/CinematicHeroSlider";
 import BrandStrip from "@/components/BrandStrip";
 import MovieSection from "@/components/MovieSection";
 import { newReleases, popularMovies, actionMovies } from "@/data/movies";
@@ -21,7 +21,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      <HeroSection />
+      <CinematicHeroSlider />
       <BrandStrip />
       
       <MovieSection 
