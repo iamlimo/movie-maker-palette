@@ -1,0 +1,370 @@
+import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Heart, Star, Clock, Calendar, Globe, Play } from "lucide-react";
+import Header from "@/components/Header";
+import ContentHero from "@/components/ContentHero";
+import RecommendationsSection from "@/components/RecommendationsSection";
+import { useAuth } from "@/contexts/AuthContext";
+import { useFavorites } from "@/hooks/useFavorites";
+import { toast } from "@/hooks/use-toast";
+
+interface TVShow {
+  id: string;
+  title: string;
+  description: string;
+  genre_id: string;
+  genre?: { name: string };
+  release_date: string;
+  price: number;
+  rating: string;
+  language: string;
+  thumbnail_url: string;
+  status: string;
+}
+
+interface Season {
+  id: string;
+  season_number: number;
+  description: string;
+  price: number;
+  rental_expiry_duration: number;
+}
+
+interface Episode {
+  id: string;
+  season_id: string;
+  episode_number: number;
+  title: string;
+  duration: number;
+  price: number;
+  video_url: string;
+  status: string;
+}
+
+const TVShowPreview = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { favorites, toggleFavorite, loading: favoritesLoading } = useFavorites();
+  const [tvShow, setTVShow] = useState<TVShow | null>(null);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [episodes, setEpisodes] = useState<{ [seasonId: string]: Episode[] }>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedSeason, setSelectedSeason] = useState<number>(1);
+
+  const isFavorite = tvShow ? favorites.some(fav => fav.content_id === tvShow.id && fav.content_type === 'tv_show') : false;
+
+  useEffect(() => {
+    if (id) {
+      fetchTVShowData(id);
+    }
+  }, [id]);
+
+  const fetchTVShowData = async (showId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch TV show details
+      const { data: showData, error: showError } = await supabase
+        .from('tv_shows')
+        .select(`
+          *,
+          genre:genres(name)
+        `)
+        .eq('id', showId)
+        .eq('status', 'approved')
+        .single();
+
+      if (showError) throw showError;
+      if (!showData) throw new Error('TV show not found');
+
+      setTVShow(showData);
+
+      // Fetch seasons
+      const { data: seasonsData, error: seasonsError } = await supabase
+        .from('seasons')
+        .select('*')
+        .eq('tv_show_id', showId)
+        .order('season_number');
+
+      if (seasonsError) throw seasonsError;
+      setSeasons(seasonsData || []);
+
+      // Fetch episodes for all seasons
+      if (seasonsData && seasonsData.length > 0) {
+        const episodesPromises = seasonsData.map(season =>
+          supabase
+            .from('episodes')
+            .select('*')
+            .eq('season_id', season.id)
+            .eq('status', 'approved')
+            .order('episode_number')
+        );
+
+        const episodesResults = await Promise.all(episodesPromises);
+        const episodesMap: { [seasonId: string]: Episode[] } = {};
+
+        seasonsData.forEach((season, index) => {
+          episodesMap[season.id] = episodesResults[index].data || [];
+        });
+
+        setEpisodes(episodesMap);
+      }
+
+    } catch (error: any) {
+      console.error('Error fetching TV show:', error);
+      setError(error.message || 'Failed to load TV show');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!tvShow || !user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to add shows to your watchlist.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await toggleFavorite('tv_show', tvShow.id);
+      toast({
+        title: isFavorite ? "Removed from Watchlist" : "Added to Watchlist",
+        description: isFavorite 
+          ? `${tvShow.title} has been removed from your watchlist.`
+          : `${tvShow.title} has been added to your watchlist.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update watchlist. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="w-8 h-8 border-4 border-primary border-l-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !tvShow) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="container mx-auto px-4 py-12">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">TV Show Not Found</h1>
+            <p className="text-muted-foreground mb-6">
+              {error || "The TV show you're looking for doesn't exist or is not available."}
+            </p>
+            <Button onClick={() => navigate('/')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentSeason = seasons.find(s => s.season_number === selectedSeason);
+  const currentEpisodes = currentSeason ? episodes[currentSeason.id] || [] : [];
+
+  return (
+    <div className="min-h-screen">
+      <Header />
+      
+      {/* Content Hero Section */}
+      <ContentHero
+        title={tvShow.title}
+        description={tvShow.description}
+        imageUrl={tvShow.thumbnail_url}
+        rating={tvShow.rating}
+        year={tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : undefined}
+        genre={tvShow.genre?.name}
+        price={tvShow.price}
+        onBack={() => navigate('/')}
+        contentType="tv_show"
+      />
+
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Show Details */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">About This Show</h2>
+              <p className="text-muted-foreground leading-relaxed mb-6">
+                {tvShow.description}
+              </p>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">First Aired</p>
+                  <p className="font-semibold">
+                    {tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : 'Unknown'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Seasons</p>
+                  <p className="font-semibold">{seasons.length}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Rating</p>
+                  <div className="flex items-center gap-1">
+                    <Star className="h-4 w-4 fill-primary text-primary" />
+                    <span className="font-semibold">{tvShow.rating}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Seasons & Episodes */}
+            {seasons.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Seasons & Episodes</h2>
+                <Tabs value={selectedSeason.toString()} onValueChange={(value) => setSelectedSeason(parseInt(value))}>
+                  <TabsList className="grid w-full grid-cols-auto">
+                    {seasons.map((season) => (
+                      <TabsTrigger key={season.id} value={season.season_number.toString()}>
+                        Season {season.season_number}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  
+                  {seasons.map((season) => (
+                    <TabsContent key={season.id} value={season.season_number.toString()}>
+                      <div className="space-y-4">
+                        {season.description && (
+                          <p className="text-muted-foreground">{season.description}</p>
+                        )}
+                        
+                        <div className="space-y-3">
+                          {currentEpisodes.map((episode) => (
+                            <div key={episode.id} className="p-4 rounded-lg border border-border bg-card hover:bg-accent/50 transition-smooth">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold">
+                                    Episode {episode.episode_number}: {episode.title}
+                                  </h4>
+                                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      <span>{episode.duration} min</span>
+                                    </div>
+                                    <span>₦{episode.price}</span>
+                                  </div>
+                                </div>
+                                <Button variant="outline" size="sm">
+                                  <Play className="h-4 w-4 mr-1" />
+                                  Rent
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {currentEpisodes.length === 0 && (
+                            <p className="text-center text-muted-foreground py-8">
+                              No episodes available for this season.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Watchlist Action */}
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleToggleFavorite}
+                disabled={favoritesLoading}
+              >
+                <Heart className={`h-4 w-4 mr-2 ${isFavorite ? 'fill-primary text-primary' : ''}`} />
+                {isFavorite ? 'Remove from Watchlist' : 'Add to Watchlist'}
+              </Button>
+            </div>
+
+            {/* Show Info */}
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <h3 className="font-semibold mb-4">Show Information</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    First aired {tvShow.release_date ? new Date(tvShow.release_date).toLocaleDateString() : 'Unknown'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{tvShow.language || 'English'}</span>
+                </div>
+                {tvShow.genre?.name && (
+                  <div className="pt-2">
+                    <Badge variant="outline">{tvShow.genre.name}</Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Season Info */}
+            {currentSeason && (
+              <div className="p-6 rounded-xl border border-border bg-card">
+                <h3 className="font-semibold mb-4">Season {currentSeason.season_number}</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Episodes</p>
+                    <p className="font-semibold">{currentEpisodes.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Season Price</p>
+                    <p className="font-semibold">₦{currentSeason.price}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Rental Duration</p>
+                    <p className="font-semibold">{currentSeason.rental_expiry_duration} hours</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Recommendations */}
+      <div className="container mx-auto px-4 pb-12">
+        <RecommendationsSection
+          currentContentId={tvShow.id}
+          contentType="tv_show"
+          genreId={tvShow.genre_id}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default TVShowPreview;

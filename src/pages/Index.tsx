@@ -49,7 +49,8 @@ const Index = () => {
             duration: item.duration ? `${item.duration}min` : '120min',
             price: `₦${item.price}`,
             genre: item.genre || 'Unknown',
-            imageUrl: item.thumbnail_url || '/placeholder.svg'
+            imageUrl: item.thumbnail_url || '/placeholder.svg',
+            contentType: item.content_type as 'movie' | 'tv_show'
           }))}
         />
       ))}

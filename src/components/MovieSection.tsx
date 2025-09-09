@@ -14,6 +14,7 @@ interface MovieSectionProps {
     price: string;
     genre: string;
     imageUrl: string;
+    contentType?: 'movie' | 'tv_show';
   }>;
 }
 
@@ -45,6 +46,7 @@ const MovieSection = ({ title, subtitle, movies }: MovieSectionProps) => {
           {movies.map((movie) => (
             <MovieCard
               key={movie.id}
+              id={movie.id}
               title={movie.title}
               year={movie.year}
               rating={movie.rating}
@@ -52,6 +54,7 @@ const MovieSection = ({ title, subtitle, movies }: MovieSectionProps) => {
               price={movie.price}
               genre={movie.genre}
               imageUrl={movie.imageUrl}
+              contentType={movie.contentType || 'movie'}
             />
           ))}
         </div>

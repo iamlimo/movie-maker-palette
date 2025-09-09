@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, Play, Clock } from "lucide-react";
+import { Star, Play, Clock, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface MovieCardProps {
+  id: string;
   title: string;
   year: number;
   rating: number;
@@ -10,19 +12,28 @@ interface MovieCardProps {
   price: string;
   genre: string;
   imageUrl: string;
+  contentType?: 'movie' | 'tv_show';
   featured?: boolean;
 }
 
 const MovieCard = ({ 
+  id,
   title, 
   year, 
   rating, 
   duration, 
   price, 
   genre, 
-  imageUrl, 
+  imageUrl,
+  contentType = 'movie',
   featured = false 
 }: MovieCardProps) => {
+  const navigate = useNavigate();
+
+  const handlePreview = () => {
+    const route = contentType === 'movie' ? `/movie/${id}` : `/tvshow/${id}`;
+    navigate(route);
+  };
   return (
     <div className={`group relative overflow-hidden rounded-xl transition-smooth hover:scale-105 ${
       featured ? 'shadow-premium' : 'shadow-card'
@@ -39,11 +50,12 @@ const MovieCard = ({
         <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-smooth">
           <div className="absolute bottom-4 left-4 right-4">
             <div className="flex items-center gap-2 mb-2">
-              <Button variant="premium" size="sm">
+              <Button variant="premium" size="sm" onClick={handlePreview}>
                 <Play className="h-4 w-4 mr-1" />
-                Rent ${price}
+                Rent {price}
               </Button>
-              <Button variant="cinema" size="sm">
+              <Button variant="cinema" size="sm" onClick={handlePreview}>
+                <Eye className="h-4 w-4 mr-1" />
                 Preview
               </Button>
             </div>
@@ -58,7 +70,7 @@ const MovieCard = ({
             {title}
           </h3>
           <Badge variant="secondary" className="text-xs">
-            ${price}
+            {price}
           </Badge>
         </div>
         

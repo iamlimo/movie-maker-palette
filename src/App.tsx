@@ -28,6 +28,8 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
+import MoviePreview from "./pages/MoviePreview";
+import TVShowPreview from "./pages/TVShowPreview";
 
 
 const queryClient = new QueryClient();
@@ -43,6 +45,8 @@ const App: React.FC = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/movie/:id" element={<MoviePreview />} />
+            <Route path="/tvshow/:id" element={<TVShowPreview />} />
             
             {/* Super Admin Routes */}
             <Route path="/admin" element={
