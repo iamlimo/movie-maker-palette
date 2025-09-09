@@ -86,3 +86,12 @@ verify_jwt = true
 
 [functions.slider-items]
 verify_jwt = false
+
+[functions.sections]
+verify_jwt = true
+
+[functions.content-sections]
+verify_jwt = true
+
+[functions.banners]
+verify_jwt = true

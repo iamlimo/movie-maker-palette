@@ -1,4 +1,5 @@
 import { NavLink, useLocation, Outlet } from 'react-router-dom';
+import { useState } from 'react';
 import { 
   BarChart3, 
   Film, 
@@ -8,7 +9,13 @@ import {
   DollarSign,
   FileText,
   ChevronUp,
-  User2
+  ChevronDown,
+  User2,
+  Home,
+  Grid3X3,
+  Image,
+  Megaphone,
+  Settings
 } from 'lucide-react';
 import {
   Sidebar,
@@ -31,21 +38,49 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
 
 const sidebarItems = [
   { title: 'Dashboard', url: '/admin', icon: BarChart3, end: true },
-  { title: 'Movies', url: '/admin/movies', icon: Film },
-  { title: 'Submissions', url: '/admin/submissions', icon: FileText },
-  { title: 'TV Shows', url: '/admin/tv-shows', icon: Tv },
-  { title: 'Users', url: '/admin/users', icon: Users },
-  { title: 'Producers', url: '/admin/producers', icon: UserCheck },
+  { 
+    title: 'Content Management', 
+    icon: Film, 
+    submenu: [
+      { title: 'Movies', url: '/admin/movies', icon: Film },
+      { title: 'TV Shows', url: '/admin/tv-shows', icon: Tv },
+    ]
+  },
+  { 
+    title: 'Homepage Management', 
+    icon: Home, 
+    submenu: [
+      { title: 'Sections', url: '/admin/sections', icon: Grid3X3 },
+      { title: 'Hero Slider', url: '/admin/hero-slider', icon: Image },
+      { title: 'Banners & CTAs', url: '/admin/banners', icon: Megaphone },
+    ]
+  },
+  { 
+    title: 'User Management', 
+    icon: Users, 
+    submenu: [
+      { title: 'Users', url: '/admin/users', icon: Users },
+      { title: 'Producers', url: '/admin/producers', icon: UserCheck },
+      { title: 'Submissions', url: '/admin/submissions', icon: FileText },
+    ]
+  },
   { title: 'Finance', url: '/admin/finance', icon: DollarSign },
+  { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
 function AppSidebar() {
   const location = useLocation();
   const { profile, signOut } = useAuth();
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+
+  const isSubmenuActive = (submenu: any[]) => {
+    return submenu.some(item => location.pathname.startsWith(item.url));
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -69,16 +104,49 @@ function AppSidebar() {
             <SidebarMenu>
               {sidebarItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={item.end ? location.pathname === item.url : location.pathname.startsWith(item.url)}
-                    tooltip={item.title}
-                  >
-                    <NavLink to={item.url} end={item.end}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
+                  {item.submenu ? (
+                    <Collapsible 
+                      open={openSubmenu === item.title || isSubmenuActive(item.submenu)}
+                      onOpenChange={(open) => setOpenSubmenu(open ? item.title : null)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton tooltip={item.title}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenu className="ml-4 border-l border-border pl-4">
+                          {item.submenu.map((subItem) => (
+                            <SidebarMenuItem key={subItem.title}>
+                              <SidebarMenuButton
+                                asChild
+                                isActive={location.pathname.startsWith(subItem.url)}
+                                tooltip={subItem.title}
+                              >
+                                <NavLink to={subItem.url}>
+                                  <subItem.icon className="h-4 w-4" />
+                                  <span>{subItem.title}</span>
+                                </NavLink>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          ))}
+                        </SidebarMenu>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : (
+                    <SidebarMenuButton
+                      asChild
+                      isActive={item.end ? location.pathname === item.url : location.pathname.startsWith(item.url)}
+                      tooltip={item.title}
+                    >
+                      <NavLink to={item.url} end={item.end}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

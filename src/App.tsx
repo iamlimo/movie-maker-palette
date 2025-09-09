@@ -20,6 +20,10 @@ import Submissions from "@/pages/admin/Submissions";
 import Users from "@/pages/admin/Users";
 import Finance from "@/pages/admin/Finance";
 import Producers from "@/pages/admin/Producers";
+import Sections from "@/pages/admin/Sections";
+import HeroSlider from "@/pages/admin/HeroSlider";
+import Banners from "@/pages/admin/Banners";
+import Settings from "@/pages/admin/Settings";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -59,6 +63,10 @@ const App: React.FC = () => (
               <Route path="users" element={<Users />} />
               <Route path="finance" element={<Finance />} />
               <Route path="producers" element={<Producers />} />
+              <Route path="sections" element={<Sections />} />
+              <Route path="hero-slider" element={<HeroSlider />} />
+              <Route path="banners" element={<Banners />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

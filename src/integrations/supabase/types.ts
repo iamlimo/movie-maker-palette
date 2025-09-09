@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      banners: {
+        Row: {
+          created_at: string
+          cta_link: string | null
+          cta_text: string | null
+          display_order: number
+          id: string
+          image_url: string | null
+          is_visible: boolean
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cta_link?: string | null
+          cta_text?: string | null
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          is_visible?: boolean
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cta_link?: string | null
+          cta_text?: string | null
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          is_visible?: boolean
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cast_crew: {
         Row: {
           bio: string | null
@@ -46,6 +85,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      content_sections: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string
+          display_order: number
+          id: string
+          section_id: string
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          section_id: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_sections_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       episode_cast: {
         Row: {
@@ -580,6 +654,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sections: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_visible: boolean
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_visible?: boolean
+          subtitle?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_visible?: boolean
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       slider_items: {
         Row: {
