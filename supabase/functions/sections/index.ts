@@ -42,8 +42,15 @@ serve(async (req) => {
     }
 
     const method = req.method;
-    const url = new URL(req.url);
-    const sectionId = url.pathname.split('/').pop();
+    let sectionId: string | null = null;
+    let requestBody: any = null;
+    
+    if (['POST', 'PUT', 'DELETE'].includes(method)) {
+      requestBody = await req.json();
+      if (method === 'PUT' || method === 'DELETE') {
+        sectionId = requestBody.id;
+      }
+    }
 
     switch (method) {
       case 'GET':
@@ -90,10 +97,9 @@ serve(async (req) => {
         }
 
       case 'POST':
-        const createData = await req.json();
         const { data: newSection, error: createError } = await supabaseClient
           .from('sections')
-          .insert(createData)
+          .insert(requestBody)
           .select()
           .single();
 
@@ -104,7 +110,7 @@ serve(async (req) => {
 
       case 'PUT':
         if (!sectionId) throw new Error('Section ID required');
-        const updateData = await req.json();
+        const { id, ...updateData } = requestBody;
         const { data: updatedSection, error: updateError } = await supabaseClient
           .from('sections')
           .update(updateData)

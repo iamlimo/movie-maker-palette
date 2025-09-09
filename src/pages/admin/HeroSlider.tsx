@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, GripVertical, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,14 +9,135 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSliderItems } from '@/hooks/useSliderItems';
+import { useAllContent } from '@/hooks/useMovies';
 import CinematicHeroSlider from '@/components/CinematicHeroSlider';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function HeroSlider() {
   const { sliderItems, loading, refetch } = useSliderItems();
+  const { content, loading: contentLoading } = useAllContent();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedContent, setSelectedContent] = useState<Set<string>>(new Set());
 
-  if (loading) {
+  const filteredContent = useMemo(() => {
+    return content.filter(item => 
+      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [content, searchTerm]);
+
+  const handleAddToSlider = async () => {
+    if (selectedContent.size === 0) {
+      toast({
+        title: "No content selected",
+        description: "Please select at least one item to add to the slider",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const contentArray = Array.from(selectedContent);
+      const sliderData = contentArray.map((contentId, index) => {
+        const item = content.find(c => c.id === contentId);
+        if (!item) return null;
+        
+        return {
+          content_id: contentId,
+          content_type: item.content_type,
+          title: item.title,
+          description: item.description || '',
+          poster_url: item.thumbnail_url,
+          genre: item.genre?.name || null,
+          rating: item.rating,
+          price: item.price,
+          is_featured: true,
+          is_rentable: true,
+          sort_order: sliderItems.length + index + 1,
+          status: 'active'
+        };
+      }).filter(Boolean);
+
+      for (const item of sliderData) {
+        const { error } = await supabase
+          .from('slider_items')
+          .insert(item);
+        
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: `Added ${contentArray.length} item(s) to slider`,
+      });
+      
+      setSelectedContent(new Set());
+      setIsAddDialogOpen(false);
+      refetch();
+    } catch (error: any) {
+      console.error('Error adding to slider:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add content to slider",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleStatus = async (itemId: string, newStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('slider_items')
+        .update({ status: newStatus ? 'active' : 'inactive' })
+        .eq('id', itemId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Slider item status updated",
+      });
+      
+      refetch();
+    } catch (error: any) {
+      console.error('Error updating slider item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update slider item",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from('slider_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Slider item deleted",
+      });
+      
+      refetch();
+    } catch (error: any) {
+      console.error('Error deleting slider item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete slider item",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading || contentLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="w-8 h-8 border-4 border-primary border-l-transparent rounded-full animate-spin"></div>
@@ -57,20 +178,73 @@ export default function HeroSlider() {
               <div className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <Search className="h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search movies and TV shows..." />
+                  <Input 
+                    placeholder="Search movies and TV shows..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
                 
                 <div className="grid gap-3 max-h-[400px] overflow-y-auto">
-                  {/* This would be populated with movies/TV shows from the database */}
-                  <div className="text-center py-8 text-muted-foreground">
-                    Content selection functionality would be implemented here
-                  </div>
+                  {filteredContent.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      {searchTerm ? 'No content found matching your search' : 'No content available'}
+                    </div>
+                  ) : (
+                    filteredContent.map((item) => (
+                      <div key={item.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                        <input
+                          type="checkbox"
+                          checked={selectedContent.has(item.id)}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedContent);
+                            if (e.target.checked) {
+                              newSelected.add(item.id);
+                            } else {
+                              newSelected.delete(item.id);
+                            }
+                            setSelectedContent(newSelected);
+                          }}
+                          className="rounded"
+                        />
+                        
+                        <div className="flex-shrink-0">
+                          {item.thumbnail_url ? (
+                            <img 
+                              src={item.thumbnail_url} 
+                              alt={item.title}
+                              className="w-12 h-16 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-12 h-16 bg-muted rounded flex items-center justify-center">
+                              <span className="text-xs text-muted-foreground">No Image</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1">
+                          <h4 className="font-medium">{item.title}</h4>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {item.description}
+                          </p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge variant="outline" className="text-xs">{item.content_type}</Badge>
+                            {item.genre?.name && <Badge variant="secondary" className="text-xs">{item.genre.name}</Badge>}
+                            <Badge variant="outline" className="text-xs">₦{item.price}</Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
               
               <DialogFooter>
-                <Button onClick={() => setIsAddDialogOpen(false)}>
-                  Add Selected Content
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddToSlider} disabled={selectedContent.size === 0}>
+                  Add Selected Content ({selectedContent.size})
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -167,15 +341,16 @@ export default function HeroSlider() {
                   <div className="flex items-center space-x-2">
                     <Switch
                       checked={item.status === 'active'}
-                      onCheckedChange={(checked) => {
-                        // Handle status toggle
-                        console.log('Toggle status for:', item.id, checked);
-                      }}
+                      onCheckedChange={(checked) => handleToggleStatus(item.id, checked)}
                     />
                     <Button variant="outline" size="sm">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDeleteItem(item.id)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>

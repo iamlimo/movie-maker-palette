@@ -4,12 +4,13 @@ import Header from "@/components/Header";
 import CinematicHeroSlider from "@/components/CinematicHeroSlider";
 import BrandStrip from "@/components/BrandStrip";
 import MovieSection from "@/components/MovieSection";
-import { newReleases, popularMovies, actionMovies } from "@/data/movies";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSectionsWithContent } from "@/hooks/useContentSections";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { sectionsWithContent, loading } = useSectionsWithContent();
 
   // Redirect authenticated users away from auth page
   useEffect(() => {
@@ -18,29 +19,49 @@ const Index = () => {
     }
   }, [user, navigate]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Header />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="w-8 h-8 border-4 border-primary border-l-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <Header />
       <CinematicHeroSlider />
       <BrandStrip />
       
-      <MovieSection 
-        title="New Releases"
-        subtitle="Latest movies available for rental"
-        movies={newReleases}
-      />
-      
-      <MovieSection 
-        title="Popular This Week"
-        subtitle="Most rented movies by our customers"
-        movies={popularMovies}
-      />
-      
-      <MovieSection 
-        title="Action & Adventure"
-        subtitle="Heart-pounding excitement awaits"
-        movies={actionMovies}
-      />
+      {sectionsWithContent.map((section) => (
+        <MovieSection 
+          key={section.id}
+          title={section.title}
+          subtitle={section.subtitle || ''}
+          movies={section.content.map(item => ({
+            id: item.id,
+            title: item.title,
+            year: item.release_date ? new Date(item.release_date).getFullYear() : 2024,
+            rating: item.rating ? parseFloat(item.rating) : 0,
+            duration: item.duration ? `${item.duration}min` : '120min',
+            price: `₦${item.price}`,
+            genre: item.genre || 'Unknown',
+            imageUrl: item.thumbnail_url || '/placeholder.svg'
+          }))}
+        />
+      ))}
+
+      {sectionsWithContent.length === 0 && (
+        <div className="container mx-auto px-4 py-12 text-center">
+          <h2 className="text-2xl font-bold mb-4">No Content Available</h2>
+          <p className="text-muted-foreground">
+            Content will appear here once sections are created and movies are assigned to them.
+          </p>
+        </div>
+      )}
       
       {/* Footer */}
       <footer className="bg-secondary/20 border-t border-border py-12">

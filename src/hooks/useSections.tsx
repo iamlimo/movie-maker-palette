@@ -78,9 +78,9 @@ export const useSections = () => {
 
   const updateSection = async (id: string, updates: Partial<Section>) => {
     try {
-      const { data, error } = await supabase.functions.invoke(`sections/${id}`, {
+      const { data, error } = await supabase.functions.invoke('sections', {
         method: 'PUT',
-        body: updates
+        body: { id, ...updates }
       });
 
       if (error) throw error;
@@ -108,8 +108,9 @@ export const useSections = () => {
 
   const deleteSection = async (id: string) => {
     try {
-      const { error } = await supabase.functions.invoke(`sections/${id}`, {
-        method: 'DELETE'
+      const { error } = await supabase.functions.invoke('sections', {
+        method: 'DELETE',
+        body: { id }
       });
 
       if (error) throw error;
