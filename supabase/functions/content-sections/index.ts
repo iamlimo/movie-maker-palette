@@ -104,9 +104,9 @@ serve(async (req) => {
           return new Response(JSON.stringify({ success: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
+        } else {
+          throw new Error('Invalid PUT request data');
         }
-
-        break;
 
       case 'DELETE':
         const { content_id, content_type, section_id } = requestData;
