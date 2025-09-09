@@ -16,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import NairaInput from "@/components/admin/NairaInput";
+import { useSections } from "@/hooks/useSections";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Genre {
   id: string;
@@ -33,6 +35,7 @@ interface FormData {
   price: number;
   rental_expiry_duration: string;
   status: string;
+  selectedSections: string[];
 }
 
 const EditMovie = () => {
@@ -50,12 +53,14 @@ const EditMovie = () => {
     rating: "",
     price: 0,
     rental_expiry_duration: "48",
-    status: "pending"
+    status: "pending",
+    selectedSections: []
   });
   
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { sections } = useSections();
 
   useEffect(() => {
     if (id) {
@@ -84,8 +89,25 @@ const EditMovie = () => {
         rating: data.rating || "",
         price: data.price || 0,
         rental_expiry_duration: data.rental_expiry_duration?.toString() || "48",
-        status: data.status || "pending"
+        status: data.status || "pending",
+        selectedSections: []
       });
+
+      // Fetch current section assignments
+      const { data: contentSections } = await supabase.functions.invoke('content-sections', {
+        method: 'GET'
+      });
+
+      if (contentSections) {
+        const movieSections = contentSections
+          .filter((cs: any) => cs.content_id === movieId && cs.content_type === 'movie')
+          .map((cs: any) => cs.section_id);
+        
+        setFormData(prev => ({
+          ...prev,
+          selectedSections: movieSections
+        }));
+      }
     } catch (error) {
       console.error('Error fetching movie:', error);
       toast({
@@ -112,8 +134,17 @@ const EditMovie = () => {
     }
   };
 
-  const handleInputChange = (field: keyof FormData, value: string | number) => {
+  const handleInputChange = (field: keyof FormData, value: string | number | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSectionToggle = (sectionId: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedSections: checked 
+        ? [...prev.selectedSections, sectionId]
+        : prev.selectedSections.filter(id => id !== sectionId)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -151,6 +182,28 @@ const EditMovie = () => {
         .eq('id', id);
 
       if (error) throw error;
+
+      // Update section assignments
+      if (formData.selectedSections.length > 0) {
+        // First, remove existing assignments
+        await supabase.functions.invoke('content-sections', {
+          method: 'DELETE',
+          body: { content_id: id, content_type: 'movie' }
+        });
+
+        // Then add new assignments
+        const contentSectionData = formData.selectedSections.map((sectionId, index) => ({
+          content_id: id,
+          content_type: 'movie',
+          section_id: sectionId,
+          display_order: index
+        }));
+
+        await supabase.functions.invoke('content-sections', {
+          method: 'POST',
+          body: contentSectionData
+        });
+      }
 
       toast({
         title: "Success",
@@ -341,6 +394,44 @@ const EditMovie = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Section Assignment */}
+        {sections.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Section Assignment</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Choose which sections this movie should appear in
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sections.map((section) => (
+                  <div key={section.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`section-${section.id}`}
+                      checked={formData.selectedSections.includes(section.id)}
+                      onCheckedChange={(checked) => 
+                        handleSectionToggle(section.id, checked as boolean)
+                      }
+                    />
+                    <Label 
+                      htmlFor={`section-${section.id}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {section.title}
+                      {section.subtitle && (
+                        <span className="block text-xs text-muted-foreground">
+                          {section.subtitle}
+                        </span>
+                      )}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit Button */}
         <div className="flex justify-end gap-4">

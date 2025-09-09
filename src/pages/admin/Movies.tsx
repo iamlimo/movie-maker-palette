@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Filter, Edit, Trash2, Eye, Clock } from "lucide-react";
+import { Plus, Search, Filter, Edit, Trash2, Eye, Clock, FileVideo, FileImage, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -290,6 +290,7 @@ const Movies = () => {
                 <TableHead>Title</TableHead>
                 <TableHead>Cast & Crew</TableHead>
                 <TableHead>Genre</TableHead>
+                <TableHead>Media Files</TableHead>
                 <TableHead>Release Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Price (₦)</TableHead>
@@ -338,6 +339,23 @@ const Movies = () => {
                     </div>
                   </TableCell>
                   <TableCell>{getGenreName(movie.genre_id) || movie.genre_name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1" title="Media files status">
+                      {movie.thumbnail_url ? (
+                        <FileImage className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <FileImage className="h-4 w-4 text-red-400" />
+                      )}
+                      {movie.video_url ? (
+                        <FileVideo className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <FileVideo className="h-4 w-4 text-red-400" />
+                      )}
+                      {!movie.thumbnail_url && !movie.video_url && (
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {movie.release_date 
                       ? new Date(movie.release_date).toLocaleDateString()

@@ -14,17 +14,31 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Get authenticated user
     const authHeader = req.headers.get('Authorization')!;
     const token = authHeader.replace('Bearer ', '');
-    const { data } = await supabaseClient.auth.getUser(token);
-    const user = data.user;
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
-    if (!user) {
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
       throw new Error('User not authenticated');
+    }
+
+    // Check if user has super_admin role for POST, PUT, DELETE operations
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      const { data: userRole, error: roleError } = await supabaseClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (roleError || !userRole || userRole.role !== 'super_admin') {
+        console.error('Role check failed:', { userId: user.id, userRole, roleError });
+        throw new Error('Insufficient permissions - super admin required');
+      }
     }
 
     const method = req.method;
