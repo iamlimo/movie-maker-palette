@@ -97,7 +97,7 @@ serve(async (req) => {
         provider: "paystack",
         intent_id: idempotencyKey,
         enhanced_status: "initiated",
-        transaction_type: purpose === "wallet_topup" ? "credit" : "debit",
+        transaction_type: purpose,
       })
       .select()
       .single();
