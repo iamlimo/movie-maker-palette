@@ -384,7 +384,9 @@ export type Database = {
           reference_id: string | null
           status: Database["public"]["Enums"]["payment_status"]
           transaction_date: string
-          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          transaction_type:
+            | Database["public"]["Enums"]["transaction_type"]
+            | null
           updated_at: string | null
           user_id: string
         }
@@ -406,7 +408,9 @@ export type Database = {
           reference_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_date?: string
-          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          transaction_type?:
+            | Database["public"]["Enums"]["transaction_type"]
+            | null
           updated_at?: string | null
           user_id: string
         }
@@ -428,7 +432,9 @@ export type Database = {
           reference_id?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_date?: string
-          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          transaction_type?:
+            | Database["public"]["Enums"]["transaction_type"]
+            | null
           updated_at?: string | null
           user_id?: string
         }

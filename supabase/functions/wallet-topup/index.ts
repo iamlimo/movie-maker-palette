@@ -57,7 +57,8 @@ serve(async (req) => {
         purpose: 'wallet_topup',
         email,
         metadata: {
-          wallet_topup: true
+          wallet_topup: true,
+          user_id: user.id
         }
       })
     });

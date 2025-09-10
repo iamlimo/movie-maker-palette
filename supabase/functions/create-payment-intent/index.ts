@@ -84,7 +84,8 @@ serve(async (req) => {
         metadata,
         provider: 'paystack',
         intent_id: idempotencyKey,
-        enhanced_status: 'initiated'
+        enhanced_status: 'initiated',
+        transaction_type: purpose === 'wallet_topup' ? 'credit' : 'debit'
       })
       .select()
       .single();
