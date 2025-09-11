@@ -365,6 +365,47 @@ export type Database = {
           },
         ]
       }
+      payment_attempts: {
+        Row: {
+          attempt_number: number
+          attempted_at: string
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          payment_id: string
+          provider_response: Json | null
+          status: string
+        }
+        Insert: {
+          attempt_number?: number
+          attempted_at?: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          payment_id: string
+          provider_response?: Json | null
+          status?: string
+        }
+        Update: {
+          attempt_number?: number
+          attempted_at?: string
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          payment_id?: string
+          provider_response?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_attempts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -374,14 +415,18 @@ export type Database = {
             | Database["public"]["Enums"]["enhanced_payment_status"]
             | null
           error_message: string | null
+          expires_at: string | null
+          flow_direction: string | null
           id: string
           intent_id: string
+          last_retry_at: string | null
           metadata: Json | null
           method: string | null
           provider: string | null
           provider_reference: string | null
           purpose: string
           reference_id: string | null
+          retry_count: number | null
           status: Database["public"]["Enums"]["payment_status"]
           transaction_date: string
           transaction_type:
@@ -398,14 +443,18 @@ export type Database = {
             | Database["public"]["Enums"]["enhanced_payment_status"]
             | null
           error_message?: string | null
+          expires_at?: string | null
+          flow_direction?: string | null
           id?: string
           intent_id?: string
+          last_retry_at?: string | null
           metadata?: Json | null
           method?: string | null
           provider?: string | null
           provider_reference?: string | null
           purpose?: string
           reference_id?: string | null
+          retry_count?: number | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_date?: string
           transaction_type?:
@@ -422,14 +471,18 @@ export type Database = {
             | Database["public"]["Enums"]["enhanced_payment_status"]
             | null
           error_message?: string | null
+          expires_at?: string | null
+          flow_direction?: string | null
           id?: string
           intent_id?: string
+          last_retry_at?: string | null
           metadata?: Json | null
           method?: string | null
           provider?: string | null
           provider_reference?: string | null
           purpose?: string
           reference_id?: string | null
+          retry_count?: number | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_date?: string
           transaction_type?:
@@ -982,6 +1035,60 @@ export type Database = {
         }
         Relationships: []
       }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json | null
+          payment_id: string | null
+          transaction_type: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_id?: string | null
+          transaction_type: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_id?: string | null
+          transaction_type?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wallet_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["wallet_id"]
+          },
+        ]
+      }
       wallets: {
         Row: {
           balance: number
@@ -1102,6 +1209,10 @@ export type Database = {
       }
     }
     Functions: {
+      cleanup_expired_payments: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       get_current_user_profile: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1115,6 +1226,17 @@ export type Database = {
       }
       log_finance_action: {
         Args: { p_action: string; p_details?: Json }
+        Returns: string
+      }
+      process_wallet_transaction: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_metadata?: Json
+          p_payment_id?: string
+          p_type: string
+          p_wallet_id: string
+        }
         Returns: string
       }
       update_user_role: {
