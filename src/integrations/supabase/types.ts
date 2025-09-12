@@ -304,11 +304,14 @@ export type Database = {
           duration: number | null
           genre_id: string | null
           id: string
+          landscape_poster_url: string | null
           language: string | null
+          optimization_metadata: Json | null
           price: number
           rating: string | null
           release_date: string | null
           rental_expiry_duration: number | null
+          slider_cover_url: string | null
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
@@ -323,11 +326,14 @@ export type Database = {
           duration?: number | null
           genre_id?: string | null
           id?: string
+          landscape_poster_url?: string | null
           language?: string | null
+          optimization_metadata?: Json | null
           price?: number
           rating?: string | null
           release_date?: string | null
           rental_expiry_duration?: number | null
+          slider_cover_url?: string | null
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
@@ -342,11 +348,14 @@ export type Database = {
           duration?: number | null
           genre_id?: string | null
           id?: string
+          landscape_poster_url?: string | null
           language?: string | null
+          optimization_metadata?: Json | null
           price?: number
           rating?: string | null
           release_date?: string | null
           rental_expiry_duration?: number | null
+          slider_cover_url?: string | null
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string
@@ -925,10 +934,13 @@ export type Database = {
           description: string | null
           genre_id: string | null
           id: string
+          landscape_poster_url: string | null
           language: string | null
+          optimization_metadata: Json | null
           price: number
           rating: string | null
           release_date: string | null
+          slider_cover_url: string | null
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
@@ -940,10 +952,13 @@ export type Database = {
           description?: string | null
           genre_id?: string | null
           id?: string
+          landscape_poster_url?: string | null
           language?: string | null
+          optimization_metadata?: Json | null
           price?: number
           rating?: string | null
           release_date?: string | null
+          slider_cover_url?: string | null
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
@@ -955,10 +970,13 @@ export type Database = {
           description?: string | null
           genre_id?: string | null
           id?: string
+          landscape_poster_url?: string | null
           language?: string | null
+          optimization_metadata?: Json | null
           price?: number
           rating?: string | null
           release_date?: string | null
+          slider_cover_url?: string | null
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string
