@@ -49,8 +49,33 @@ serve(async (req) => {
       }
     }
 
-    // Parse request body
-    const body = await req.json();
+    // Parse request body with validation
+    let body;
+    try {
+      const contentType = req.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        return errorResponse("Content-Type must be application/json", 400);
+      }
+      
+      const bodyText = await req.text();
+      if (!bodyText.trim()) {
+        return errorResponse("Request body cannot be empty", 400);
+      }
+      
+      body = JSON.parse(bodyText);
+    } catch (error: any) {
+      console.error("JSON parsing error:", error);
+      return errorResponse("Invalid JSON in request body", 400);
+    }
+
+    // Validate required fields
+    if (!body.amount || typeof body.amount !== 'number' || body.amount <= 0) {
+      return errorResponse("Valid amount is required", 400);
+    }
+    
+    if (!body.purpose || typeof body.purpose !== 'string') {
+      return errorResponse("Valid purpose is required", 400);
+    }
     
     // Process payment with enhanced rental validation
     const processor = new PaymentProcessor(supabase, user);
