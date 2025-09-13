@@ -1,29 +1,31 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, jsonResponse, handleOptions, errorResponse } from "../_shared/cors.ts";
+import { authenticateUser } from "../_shared/auth.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
+  // Handle CORS preflight
+  const optionsResponse = handleOptions(req);
+  if (optionsResponse) return optionsResponse;
 
   try {
     const url = new URL(req.url);
     const id = url.pathname.split('/').pop();
 
-    // GET - Fetch slider items
+    // GET - Fetch slider items (public access)
     if (req.method === "GET") {
-      const { data, error } = await supabaseClient
+      const { user, supabase } = await authenticateUser(req).catch(() => ({
+        user: null,
+        supabase: null
+      }));
+      
+      // Create unauthenticated client for public access
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.56.0");
+      const publicSupabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      );
+
+      const { data, error } = await publicSupabase
         .from("slider_items")
         .select("*")
         .eq("status", "active")
@@ -31,38 +33,24 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(data);
     }
 
     // Authenticate user for admin operations
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No authorization header");
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError || !userData.user) {
-      throw new Error("Unauthorized");
-    }
+    const { user, supabase } = await authenticateUser(req);
 
     // Check if user is super admin
-    const { data: roleData } = await supabaseClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userData.user.id)
-      .single();
+    const { data: isAdmin } = await supabase
+      .rpc('has_role', { _user_id: user.id, _role: 'super_admin' });
 
-    if (!roleData || roleData.role !== "super_admin") {
-      throw new Error("Insufficient privileges");
+    if (!isAdmin) {
+      return errorResponse("Insufficient privileges", 403);
     }
 
     // POST - Create slider item
     if (req.method === "POST") {
       const body = await req.json();
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("slider_items")
         .insert(body)
         .select()
@@ -70,15 +58,13 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(data);
     }
 
     // PUT - Update slider item
     if (req.method === "PUT" && id) {
       const body = await req.json();
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("slider_items")
         .update(body)
         .eq("id", id)
@@ -87,32 +73,25 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(data);
     }
 
     // DELETE - Delete slider item
     if (req.method === "DELETE" && id) {
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from("slider_items")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: true });
     }
 
-    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+    return errorResponse("Method not allowed", 405);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in slider-items function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return errorResponse(error.message || 'Internal server error', 500);
   }
 });
