@@ -52,8 +52,26 @@ serve(async (req) => {
     // Parse request body
     const body = await req.json();
     
-    // Process payment
+    // Process payment with enhanced rental validation
     const processor = new PaymentProcessor(supabase, user);
+    
+    // For rentals, check if user already has access
+    if (body.purpose === 'rental' && body.metadata?.content_id) {
+      const { data: existingRental } = await supabase
+        .from("rentals")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("content_id", body.metadata.content_id)
+        .eq("content_type", body.metadata.content_type)
+        .eq("status", "active")
+        .gte("expiration_date", new Date().toISOString())
+        .maybeSingle();
+
+      if (existingRental) {
+        return errorResponse("You already have an active rental for this content", 409);
+      }
+    }
+    
     const result = await processor.processPayment(body);
 
     // Log payment attempt

@@ -1227,7 +1227,19 @@ export type Database = {
       }
     }
     Functions: {
+      check_existing_rental: {
+        Args: {
+          p_content_id: string
+          p_content_type: Database["public"]["Enums"]["content_type"]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       cleanup_expired_payments: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      expire_rentals: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
