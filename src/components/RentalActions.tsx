@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Play, CreditCard, Wallet, Clock, Shield, Zap } from "lucide-react";
+import { Play, CreditCard, Wallet, Clock, Shield, Zap, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePayments } from "@/hooks/usePayments";
+import { usePaymentService } from "@/hooks/usePaymentService";
 import { useWallet } from "@/hooks/useWallet";
+import { useRentals } from "@/hooks/useRentals";
 import { toast } from "@/hooks/use-toast";
 
 interface RentalActionsProps {
@@ -24,12 +25,21 @@ const RentalActions = ({
   rentalDuration = 48 
 }: RentalActionsProps) => {
   const { user } = useAuth();
-  const { processRental, openPaystackCheckout, isLoading } = usePayments();
+  const { rentContent, isLoading } = usePaymentService();
   const { balance, formatBalance } = useWallet();
+  const { checkContentAccess, formatTimeRemaining } = useRentals();
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card'>('card');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [accessInfo, setAccessInfo] = useState<any>(null);
 
   const canAffordWithWallet = balance >= price;
+
+  // Check if user already has access
+  useEffect(() => {
+    if (user) {
+      checkContentAccess(contentId, contentType).then(setAccessInfo);
+    }
+  }, [user, contentId, contentType, checkContentAccess]);
 
   const handleRent = async () => {
     if (!user) {
@@ -51,26 +61,19 @@ const RentalActions = ({
     }
 
     try {
-      const result = await processRental(contentId, contentType, price, rentalDuration);
+      const result = await rentContent(
+        contentId, 
+        contentType, 
+        price, 
+        rentalDuration,
+        paymentMethod
+      );
       
-      if (result.success && result.checkout_url) {
-        if (paymentMethod === 'card') {
-          openPaystackCheckout(result.checkout_url);
-          setIsDialogOpen(false);
-          toast({
-            title: "Redirecting to payment",
-            description: "You will be redirected to complete your payment.",
-          });
-        } else {
-          // Handle wallet payment (would need additional API endpoint)
-          toast({
-            title: "Payment processed",
-            description: `Successfully rented ${title}!`,
-          });
-          setIsDialogOpen(false);
-        }
-      } else {
-        throw new Error(result.error || 'Payment initiation failed');
+      if (result.success) {
+        setIsDialogOpen(false);
+        // Refresh access info
+        const updatedAccess = await checkContentAccess(contentId, contentType);
+        setAccessInfo(updatedAccess);
       }
     } catch (error: any) {
       console.error('Rental error:', error);
@@ -81,6 +84,33 @@ const RentalActions = ({
       });
     }
   };
+
+  // If user already has access, show different UI
+  if (accessInfo?.has_access) {
+    return (
+      <div className="p-6 rounded-xl border border-border bg-card">
+        <div className="text-center mb-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <CheckCircle className="h-6 w-6 text-green-500" />
+            <h3 className="text-xl font-bold">Access Granted</h3>
+          </div>
+          {accessInfo.access_type === 'rental' && accessInfo.expires_at && (
+            <p className="text-muted-foreground">
+              {formatTimeRemaining(accessInfo.expires_at)}
+            </p>
+          )}
+          {accessInfo.access_type === 'purchase' && (
+            <p className="text-muted-foreground">Owned forever</p>
+          )}
+        </div>
+        
+        <Button variant="premium" size="lg" className="w-full shadow-glow">
+          <Play className="h-5 w-5 mr-2" />
+          Watch Now
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 rounded-xl border border-border bg-card">

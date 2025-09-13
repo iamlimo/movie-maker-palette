@@ -58,7 +58,13 @@ serve(async (req) => {
     const idempotencyKey = req.headers.get("idempotency-key");
     if (!idempotencyKey) throw new Error("Idempotency-Key header is required");
 
-    // Only parse JSON for non-OPTIONS requests
+    // Check request body content length to avoid parsing empty JSON
+    const contentLength = req.headers.get("content-length");
+    if (!contentLength || parseInt(contentLength) === 0) {
+      throw new Error("Request body is required");
+    }
+
+    // Only parse JSON for non-OPTIONS requests with content
     const body: PaymentIntentRequest = await req.json();
     const { amount, currency = "NGN", purpose, metadata = {}, email } = body;
 
