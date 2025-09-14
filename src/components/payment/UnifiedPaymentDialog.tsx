@@ -131,12 +131,12 @@ export const UnifiedPaymentDialog = ({
               content_type: content.type
             });
           } else {
-            await purchaseContent(
-              content.id, 
-              content.type, 
-              currentPrice,
-              paymentMethod
-            );
+  await purchaseContent(
+    content.id, 
+    content.type, 
+    currentPrice,
+    paymentMethod
+  );
           }
           break;
       }

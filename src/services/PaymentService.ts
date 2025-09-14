@@ -62,7 +62,7 @@ export class PaymentService {
     return { ...this.currentState };
   }
 
-  // Main Payment Processing
+  // Main Payment Processing - UNIFIED ONLY
   async processPayment(request: PaymentRequest): Promise<PaymentResult> {
     this.setState({ status: 'processing', error: null });
 
@@ -87,11 +87,15 @@ export class PaymentService {
 
       const idempotencyKey = this.generateIdempotencyKey(request, user.id);
       
+      // Convert amounts to kobo consistently
+      const body = {
+        ...request,
+        amount: Math.round(request.amount * 100), // Always convert to kobo for backend
+        email: profile.email
+      };
+
       const { data, error } = await supabase.functions.invoke('unified-payment', {
-        body: {
-          ...request,
-          email: profile.email
-        },
+        body,
         headers: {
           'idempotency-key': idempotencyKey,
           'Content-Type': 'application/json'
@@ -120,6 +124,11 @@ export class PaymentService {
         walletTransactionId: result.wallet_transaction_id || null
       });
 
+      // Open checkout if URL provided
+      if (result.checkout_url) {
+        this.openCheckout(result.checkout_url);
+      }
+
       return result;
 
     } catch (error: any) {
@@ -135,10 +144,10 @@ export class PaymentService {
     }
   }
 
-  // Convenience Methods
+  // Convenience Methods - Fixed Amount Handling
   async walletTopup(amount: number): Promise<PaymentResult> {
     return this.processPayment({
-      amount: amount * 100, // Convert to kobo
+      amount, // Amount already in NGN
       purpose: 'wallet_topup',
       paymentMethod: 'card'
     });
@@ -146,33 +155,35 @@ export class PaymentService {
 
   async walletPayment(amount: number, purpose: 'rental' | 'purchase', metadata?: any): Promise<PaymentResult> {
     return this.processPayment({
-      amount: amount * 100, // Convert to kobo
+      amount, // Amount already in NGN
       purpose,
       metadata,
       paymentMethod: 'wallet'
     });
   }
 
-  async rentContent(contentId: string, contentType: 'movie' | 'episode', amount: number, rentalDuration = 48): Promise<PaymentResult> {
+  async rentContent(contentId: string, contentType: 'movie' | 'episode', amount: number, rentalDuration = 48, paymentMethod: 'card' | 'wallet' = 'card'): Promise<PaymentResult> {
     return this.processPayment({
-      amount: amount * 100, // Convert to kobo
+      amount, // Amount already in NGN
       purpose: 'rental',
       metadata: {
         content_id: contentId,
         content_type: contentType,
         rental_duration: rentalDuration
-      }
+      },
+      paymentMethod
     });
   }
 
-  async purchaseContent(contentId: string, contentType: 'movie' | 'episode', amount: number): Promise<PaymentResult> {
+  async purchaseContent(contentId: string, contentType: 'movie' | 'episode', amount: number, paymentMethod: 'card' | 'wallet' = 'card'): Promise<PaymentResult> {
     return this.processPayment({
-      amount: amount * 100, // Convert to kobo
+      amount, // Amount already in NGN
       purpose: 'purchase',
       metadata: {
         content_id: contentId,
         content_type: contentType
-      }
+      },
+      paymentMethod
     });
   }
 
