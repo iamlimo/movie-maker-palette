@@ -113,7 +113,7 @@ async function handleChargeSuccess(supabaseClient: any, data: any) {
       return;
     }
 
-    // IDEMPOTENCY: Use database transaction for atomic processing
+    // Find payment by reference (which is our payment ID)
     const { data: payment, error: paymentError } = await supabaseClient
       .from('payments')
       .select('*')
@@ -125,87 +125,50 @@ async function handleChargeSuccess(supabaseClient: any, data: any) {
       return;
     }
 
-    // IDEMPOTENCY: Check processing lock with atomic update
-    const { data: lockedPayment, error: lockError } = await supabaseClient
+    // Prevent double processing
+    if (payment.enhanced_status === 'success') {
+      console.log('Payment already processed:', payment.id);
+      return;
+    }
+
+    // Update payment status
+    await supabaseClient
       .from('payments')
       .update({
-        enhanced_status: 'processing',
-        updated_at: new Date().toISOString()
+        enhanced_status: 'success',
+        provider_reference: data.reference,
+        metadata: {
+          ...payment.metadata,
+          paystack_response: data
+        }
       })
-      .eq('id', payment.id)
-      .eq('enhanced_status', 'pending') // Only update if still pending
-      .select()
-      .single();
+      .eq('id', payment.id);
 
-    if (lockError || !lockedPayment) {
-      console.log('Payment already being processed or completed:', payment.id);
-      return;
+    // Process based on payment purpose
+    if (payment.purpose === 'wallet_topup') {
+      await processWalletTopup(supabaseClient, payment, data);
+    } else if (payment.purpose === 'rental') {
+      await processRental(supabaseClient, payment, data);
+    } else if (payment.purpose === 'purchase') {
+      await processPurchase(supabaseClient, payment, data);
     }
 
-    // Validate payment amount matches Paystack
-    const expectedAmount = Math.round(payment.amount * 100); // Convert to kobo
-    if (data.amount !== expectedAmount) {
-      console.error('Amount mismatch:', { expected: expectedAmount, received: data.amount });
-      await supabaseClient
-        .from('payments')
-        .update({ enhanced_status: 'failed', error_message: 'Amount mismatch' })
-        .eq('id', payment.id);
-      return;
-    }
+    // Create ledger entries for revenue split
+    await createLedgerEntries(supabaseClient, payment, data);
 
-    try {
-      // Process based on payment purpose (with rollback on failure)
-      if (payment.purpose === 'wallet_topup') {
-        await processWalletTopup(supabaseClient, payment, data);
-      } else if (payment.purpose === 'rental') {
-        await processRental(supabaseClient, payment, data);
-      } else if (payment.purpose === 'purchase') {
-        await processPurchase(supabaseClient, payment, data);
-      }
+    // Log successful payment
+    await supabaseClient
+      .rpc('log_finance_action', {
+        p_action: 'payment_completed',
+        p_details: {
+          payment_id: payment.id,
+          amount: data.amount,
+          purpose: payment.purpose,
+          paystack_reference: data.reference
+        }
+      });
 
-      // Create ledger entries for revenue split
-      await createLedgerEntries(supabaseClient, payment, data);
-
-      // FINAL: Mark as success only after all operations complete
-      await supabaseClient
-        .from('payments')
-        .update({
-          enhanced_status: 'success',
-          provider_reference: data.reference,
-          metadata: {
-            ...payment.metadata,
-            paystack_response: data,
-            processed_at: new Date().toISOString()
-          }
-        })
-        .eq('id', payment.id);
-
-      // Log successful payment
-      await supabaseClient
-        .rpc('log_finance_action', {
-          p_action: 'payment_completed',
-          p_details: {
-            payment_id: payment.id,
-            amount: data.amount,
-            purpose: payment.purpose,
-            paystack_reference: data.reference
-          }
-        });
-
-      console.log('Payment processed successfully:', payment.id);
-
-    } catch (processingError) {
-      console.error('Error during payment processing:', processingError);
-      // Rollback: Mark payment as failed
-      await supabaseClient
-        .from('payments')
-        .update({
-          enhanced_status: 'failed',
-          error_message: `Processing failed: ${processingError.message}`
-        })
-        .eq('id', payment.id);
-      throw processingError;
-    }
+    console.log('Payment processed successfully:', payment.id);
 
   } catch (error) {
     console.error('Error handling charge success:', error);
@@ -243,112 +206,50 @@ async function handleChargeFailed(supabaseClient: any, data: any) {
 }
 
 async function processWalletTopup(supabaseClient: any, payment: any, data: any) {
-  try {
-    // Use atomic wallet transaction function for thread safety
-    const { data: result, error } = await supabaseClient.rpc('process_wallet_transaction', {
-      p_wallet_id: null, // Will be resolved by user_id
-      p_amount: payment.amount,
-      p_type: 'credit',
-      p_description: 'Wallet top-up via Paystack',
-      p_payment_id: payment.id,
-      p_metadata: { paystack_reference: data.reference }
+  // Credit user wallet
+  const { error } = await supabaseClient
+    .from('wallets')
+    .upsert({
+      user_id: payment.user_id,
+      balance: supabaseClient.sql`balance + ${payment.amount}`
     });
 
-    if (error) {
-      console.error('Error updating wallet balance:', error);
-      throw error;
-    }
-
-    console.log('Wallet topped up successfully:', payment.user_id, payment.amount);
-  } catch (error) {
-    console.error('Wallet topup failed:', error);
+  if (error) {
+    console.error('Error updating wallet balance:', error);
     throw error;
   }
 }
 
 async function processRental(supabaseClient: any, payment: any, data: any) {
-  try {
-    const metadata = payment.metadata;
-    
-    // Check for existing active rental (prevent duplicates)
-    const { data: existingRental } = await supabaseClient
-      .from('rentals')
-      .select('id')
-      .eq('user_id', payment.user_id)
-      .eq('content_id', metadata.content_id)
-      .eq('content_type', metadata.content_type)
-      .eq('status', 'active')
-      .gte('expiration_date', new Date().toISOString())
-      .single();
+  // Create rental record
+  const metadata = payment.metadata;
+  const expirationDate = new Date();
+  expirationDate.setHours(expirationDate.getHours() + (metadata.rental_duration || 48));
 
-    if (existingRental) {
-      console.log('Rental already exists, skipping creation:', existingRental.id);
-      return;
-    }
-
-    const expirationDate = new Date();
-    expirationDate.setHours(expirationDate.getHours() + (metadata.rental_duration || 48));
-
-    const { error } = await supabaseClient
-      .from('rentals')
-      .insert({
-        user_id: payment.user_id,
-        content_id: metadata.content_id,
-        content_type: metadata.content_type,
-        price_paid: payment.amount,
-        expiration_date: expirationDate.toISOString(),
-        status: 'active'
-      });
-
-    if (error) {
-      console.error('Error creating rental:', error);
-      throw error;
-    }
-
-    console.log('Rental created successfully:', metadata.content_id);
-  } catch (error) {
-    console.error('Rental creation failed:', error);
-    throw error;
-  }
+  await supabaseClient
+    .from('rentals')
+    .insert({
+      user_id: payment.user_id,
+      content_id: metadata.content_id,
+      content_type: metadata.content_type,
+      price_paid: payment.amount,
+      expiration_date: expirationDate.toISOString(),
+      status: 'active'
+    });
 }
 
 async function processPurchase(supabaseClient: any, payment: any, data: any) {
-  try {
-    const metadata = payment.metadata;
-    
-    // Check for existing purchase (prevent duplicates)
-    const { data: existingPurchase } = await supabaseClient
-      .from('purchases')
-      .select('id')
-      .eq('user_id', payment.user_id)
-      .eq('content_id', metadata.content_id)
-      .eq('content_type', metadata.content_type)
-      .single();
-
-    if (existingPurchase) {
-      console.log('Purchase already exists, skipping creation:', existingPurchase.id);
-      return;
-    }
-
-    const { error } = await supabaseClient
-      .from('purchases')
-      .insert({
-        user_id: payment.user_id,
-        content_id: metadata.content_id,
-        content_type: metadata.content_type,
-        price_paid: payment.amount
-      });
-
-    if (error) {
-      console.error('Error creating purchase:', error);
-      throw error;
-    }
-
-    console.log('Purchase created successfully:', metadata.content_id);
-  } catch (error) {
-    console.error('Purchase creation failed:', error);
-    throw error;
-  }
+  // Create purchase record
+  const metadata = payment.metadata;
+  
+  await supabaseClient
+    .from('purchases')
+    .insert({
+      user_id: payment.user_id,
+      content_id: metadata.content_id,
+      content_type: metadata.content_type,
+      price_paid: payment.amount
+    });
 }
 
 async function createLedgerEntries(supabaseClient: any, payment: any, data: any) {

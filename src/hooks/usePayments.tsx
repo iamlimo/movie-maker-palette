@@ -29,12 +29,6 @@ export const usePayments = () => {
     setIsLoading(true);
     try {
       const idempotencyKey = `${intent.purpose}_${user.id}_${Date.now()}_${Math.random()}`;
-      const session = await supabase.auth.getSession();
-      const accessToken = session.data.session?.access_token;
-
-      if (!accessToken) {
-        throw new Error('No access token found');
-      }
 
       const { data, error } = await supabase.functions.invoke('create-payment-intent', {
         body: {
@@ -42,9 +36,7 @@ export const usePayments = () => {
           email: profile.email
         },
         headers: {
-          'idempotency-key': idempotencyKey,
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+          'idempotency-key': idempotencyKey
         }
       });
 
@@ -80,21 +72,10 @@ export const usePayments = () => {
 
     setIsLoading(true);
     try {
-      const session = await supabase.auth.getSession();
-      const accessToken = session.data.session?.access_token;
-      if (!accessToken) throw new Error('No access token found');
-
-      const idempotencyKey = `wallet_topup_${user.id}_${Date.now()}_${Math.random()}`;
-
       const { data, error } = await supabase.functions.invoke('wallet-topup', {
         body: {
           amount,
           email: profile.email
-        },
-        headers: {
-          'idempotency-key': idempotencyKey,
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
         }
       });
 

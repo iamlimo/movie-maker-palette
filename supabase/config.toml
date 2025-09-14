@@ -95,15 +95,3 @@ verify_jwt = true
 
 [functions.banners]
 verify_jwt = true
-
-[functions.unified-payment]
-verify_jwt = true
-
-[functions.rental-access]
-verify_jwt = true
-
-[functions.content-upload]
-verify_jwt = true
-
-[functions.enhanced-webhook]
-verify_jwt = false

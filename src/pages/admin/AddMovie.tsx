@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,20 +13,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSections } from "@/hooks/useSections";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UnifiedContentUploader } from "@/components/admin/UnifiedContentUploader";
-import { useContentManager, ContentFormData } from "@/hooks/useContentManager";
 
 interface Genre {
   id: string;
   name: string;
 }
 
+interface FormData {
+  title: string;
+  description: string;
+  genre_id: string;
+  release_date: string;
+  duration: string;
+  language: string;
+  rating: string;
+  price: string;
+  rental_expiry_duration: string;
+  selectedSections: string[];
+}
+
 const AddMovie = () => {
-  const [formData, setFormData] = useState<ContentFormData>({
+  const [formData, setFormData] = useState<FormData>({
     title: "",
     description: "",
     genre_id: "",
@@ -35,15 +47,17 @@ const AddMovie = () => {
     language: "",
     rating: "",
     price: "",
-    rental_expiry_duration: "48"
+    rental_expiry_duration: "48",
+    selectedSections: []
   });
   const [genres, setGenres] = useState<Genre[]>([]);
-  const [selectedSections, setSelectedSections] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { sections } = useSections();
-  const { createContent } = useContentManager('movie');
 
   useEffect(() => {
     fetchGenres();
@@ -68,20 +82,105 @@ const AddMovie = () => {
     }
   };
 
-  const handleInputChange = (field: keyof ContentFormData, value: string) => {
+  const handleInputChange = (field: keyof FormData, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSectionToggle = (sectionId: string, checked: boolean) => {
-    setSelectedSections(prev => 
-      checked 
-        ? [...prev, sectionId]
-        : prev.filter(id => id !== sectionId)
-    );
+    setFormData(prev => ({
+      ...prev,
+      selectedSections: checked 
+        ? [...prev.selectedSections, sectionId]
+        : prev.selectedSections.filter(id => id !== sectionId)
+    }));
   };
 
-  const handleMediaUpload = (field: keyof ContentFormData) => (url: string, filePath: string) => {
-    setFormData(prev => ({ ...prev, [field]: url }));
+  const uploadToSupabaseStorage = async (file: File, fileName: string): Promise<string> => {
+    console.log('Frontend Upload - Starting upload for:', fileName, 'Size:', file.size, 'Type:', file.type);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+
+      console.log('Session found, calling upload-video function...');
+
+      // Get upload info from our edge function
+      const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('upload-video', {
+        body: {
+          action: 'get_upload_info',
+          fileName: fileName,
+          fileSize: file.size,
+          fileType: file.type
+        }
+      });
+
+      console.log('Edge function response:', { uploadInfo, infoError });
+
+      if (infoError) {
+        console.error('Edge function error:', infoError);
+        throw new Error(`Edge function error: ${infoError.message}`);
+      }
+
+      if (!uploadInfo?.success) {
+        console.error('Upload info failed:', uploadInfo);
+        throw new Error(uploadInfo?.error || 'Failed to get upload info');
+      }
+
+      if (!uploadInfo.uploadUrl) {
+        console.error('No upload URL received:', uploadInfo);
+        throw new Error('No upload URL received from server');
+      }
+
+      console.log('Upload info received successfully, starting file upload...');
+
+      // Upload file using the signed URL
+      const uploadResponse = await fetch(uploadInfo.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+          'x-upsert': 'true'
+        }
+      });
+
+      console.log('Upload response:', uploadResponse.status, uploadResponse.statusText);
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('Upload failed:', errorText);
+        throw new Error(`Upload failed: ${uploadResponse.status} ${errorText}`);
+      }
+
+      console.log('File uploaded successfully, confirming...');
+
+      // Confirm upload with our edge function
+      const { data: confirmData, error: confirmError } = await supabase.functions.invoke('upload-video', {
+        body: {
+          action: 'confirm_upload',
+          filePath: uploadInfo.filePath,
+          bucket: uploadInfo.bucket
+        }
+      });
+
+      console.log('Confirm response:', { confirmData, confirmError });
+
+      if (confirmError) {
+        console.error('Confirm edge function error:', confirmError);
+        throw new Error(`Confirm error: ${confirmError.message}`);
+      }
+
+      if (!confirmData?.success) {
+        console.error('Upload confirmation failed:', confirmData);
+        throw new Error(confirmData?.error || 'Failed to confirm upload');
+      }
+
+      console.log('Upload successful:', confirmData.filePath);
+      
+      return confirmData.filePath;
+    } catch (error) {
+      console.error(`Upload failed:`, error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,20 +195,60 @@ const AddMovie = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsUploading(true);
+    setUploadProgress(0);
 
     try {
-      // Create the movie using the unified content manager
-      const createdMovie = await createContent(formData);
+      let thumbnailUrl = "";
+      let videoUrl = "";
 
-      if (!createdMovie) {
-        throw new Error('Failed to create movie');
+      // Upload thumbnail if provided
+      if (thumbnailFile) {
+        console.log('Starting thumbnail upload...');
+        setUploadProgress(25);
+        thumbnailUrl = await uploadToSupabaseStorage(thumbnailFile, thumbnailFile.name);
+        console.log('Thumbnail uploaded:', thumbnailUrl);
       }
 
+      // Upload video if provided
+      if (videoFile) {
+        console.log('Starting video upload...');
+        setUploadProgress(50);
+        videoUrl = await uploadToSupabaseStorage(videoFile, videoFile.name);
+        console.log('Video uploaded:', videoUrl);
+      }
+
+      setUploadProgress(75);
+
+      // Save to database
+      const movieData = {
+        title: formData.title,
+        description: formData.description || null,
+        genre_id: formData.genre_id || null,
+        release_date: formData.release_date || null,
+        duration: formData.duration ? parseInt(formData.duration) : null,
+        language: formData.language || null,
+        rating: formData.rating || null,
+        price: parseFloat(formData.price),
+        thumbnail_url: thumbnailUrl || null,
+        video_url: videoUrl || null,
+        status: 'approved' as const,
+        rental_expiry_duration: parseInt(formData.rental_expiry_duration),
+        uploaded_by: (await supabase.auth.getUser()).data.user?.id
+      };
+
+      const { data: insertedMovie, error } = await supabase
+        .from('movies')
+        .insert([movieData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
       // Assign movie to selected sections
-      if (selectedSections.length > 0) {
-        const contentSectionData = selectedSections.map((sectionId, index) => ({
-          content_id: createdMovie.id,
+      if (formData.selectedSections.length > 0 && insertedMovie) {
+        const contentSectionData = formData.selectedSections.map((sectionId, index) => ({
+          content_id: insertedMovie.id,
           content_type: 'movie',
           section_id: sectionId,
           display_order: index
@@ -130,6 +269,13 @@ const AddMovie = () => {
         }
       }
 
+      setUploadProgress(100);
+
+      toast({
+        title: "Success",
+        description: "Movie added successfully",
+      });
+
       navigate('/admin/movies');
     } catch (error) {
       console.error('Error adding movie:', error);
@@ -139,7 +285,8 @@ const AddMovie = () => {
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -283,92 +430,157 @@ const AddMovie = () => {
           </CardContent>
         </Card>
 
-        {/* Enhanced Media Uploads */}
+        {/* File Uploads */}
         <Card>
           <CardHeader>
-            <CardTitle>Media Uploads</CardTitle>
+            <CardTitle>File Uploads</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-8">
+          <CardContent className="space-y-4">
             {/* Thumbnail Upload */}
-            <UnifiedContentUploader
-              mediaType="thumbnail"
-              label="Thumbnail Image"
-              description="Upload a thumbnail image for the movie (recommended: 400x600px)"
-              onUploadComplete={handleMediaUpload('thumbnail_url')}
-              required
-            />
-
-            {/* Landscape Poster Upload */}
-            <UnifiedContentUploader
-              mediaType="landscape_poster"
-              label="Landscape Poster"
-              description="Upload a landscape poster for featured content (recommended: 1920x1080px)"
-              onUploadComplete={handleMediaUpload('landscape_poster_url')}
-            />
-
-            {/* Slider Cover Upload */}
-            <UnifiedContentUploader
-              mediaType="slider_cover"
-              label="Slider Cover"
-              description="Upload a cover image for hero sliders (recommended: 1600x900px)"
-              onUploadComplete={handleMediaUpload('slider_cover_url')}
-            />
+            <div>
+              <Label htmlFor="thumbnail">Thumbnail Image</Label>
+              <div className="mt-2">
+                <input
+                  id="thumbnail"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                  {thumbnailFile ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        <span className="text-sm">{thumbnailFile.name}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setThumbnailFile(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Click to upload thumbnail image
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('thumbnail')?.click()}
+                      >
+                        Choose File
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Video Upload */}
-            <UnifiedContentUploader
-              mediaType="video"
-              label="Main Video"
-              description="Upload the main movie video file (max 2GB)"
-              onUploadComplete={handleMediaUpload('video_url')}
-            />
-            
-            {/* Trailer Upload (Optional) */}
-            <UnifiedContentUploader
-              mediaType="trailer"
-              label="Trailer"
-              description="Upload a trailer video (max 500MB, optional)"
-              onUploadComplete={handleMediaUpload('trailer_url')}
-            />
+            <div>
+              <Label htmlFor="video">Video File</Label>
+              <div className="mt-2">
+                <input
+                  id="video"
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                  {videoFile ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        <span className="text-sm">{videoFile.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(videoFile.size / (1024 * 1024)).toFixed(2)} MB)
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setVideoFile(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Click to upload video file
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('video')?.click()}
+                      >
+                        Choose File
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Upload Progress */}
+            {isUploading && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Uploading...</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} />
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Section Assignment */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Section Assignment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <Label>Assign to Sections (Optional)</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {sections.map(section => (
+        {sections.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Section Assignment</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Choose which sections this movie should appear in
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sections.map((section) => (
                   <div key={section.id} className="flex items-center space-x-2">
                     <Checkbox
-                      id={section.id}
-                      checked={selectedSections.includes(section.id)}
+                      id={`section-${section.id}`}
+                      checked={formData.selectedSections.includes(section.id)}
                       onCheckedChange={(checked) => 
                         handleSectionToggle(section.id, checked as boolean)
                       }
                     />
-                    <Label htmlFor={section.id} className="text-sm font-medium">
+                    <Label 
+                      htmlFor={`section-${section.id}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
                       {section.title}
                       {section.subtitle && (
-                        <span className="text-muted-foreground ml-1">
-                          - {section.subtitle}
+                        <span className="block text-xs text-muted-foreground">
+                          {section.subtitle}
                         </span>
                       )}
                     </Label>
                   </div>
                 ))}
               </div>
-              {sections.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No sections available. Create sections in the admin dashboard first.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit Button */}
         <div className="flex justify-end gap-4">
@@ -376,15 +588,12 @@ const AddMovie = () => {
             type="button"
             variant="outline"
             onClick={() => navigate('/admin/movies')}
+            disabled={isUploading}
           >
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            disabled={isSubmitting}
-            className="min-w-32"
-          >
-            {isSubmitting ? 'Adding Movie...' : 'Add Movie'}
+          <Button type="submit" disabled={isUploading}>
+            {isUploading ? 'Adding Movie...' : 'Add Movie'}
           </Button>
         </div>
       </form>
