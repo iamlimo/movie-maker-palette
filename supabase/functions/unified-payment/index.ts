@@ -52,17 +52,24 @@ serve(async (req) => {
     // Parse request body with validation
     let body;
     try {
+      // Handle both direct calls and supabase.functions.invoke calls
       const contentType = req.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        return errorResponse("Content-Type must be application/json", 400);
-      }
       
-      const bodyText = await req.text();
-      if (!bodyText.trim()) {
-        return errorResponse("Request body cannot be empty", 400);
+      // For supabase.functions.invoke, the body is already parsed
+      if (req.method === 'POST') {
+        try {
+          body = await req.json();
+        } catch (jsonError) {
+          // Fallback to text parsing for edge cases
+          const bodyText = await req.text();
+          if (!bodyText.trim()) {
+            return errorResponse("Request body cannot be empty", 400);
+          }
+          body = JSON.parse(bodyText);
+        }
+      } else {
+        return errorResponse("Method not allowed", 405);
       }
-      
-      body = JSON.parse(bodyText);
     } catch (error: any) {
       console.error("JSON parsing error:", error);
       return errorResponse("Invalid JSON in request body", 400);
