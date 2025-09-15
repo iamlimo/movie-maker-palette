@@ -651,36 +651,33 @@ export type Database = {
       }
       rentals: {
         Row: {
+          amount: number
           content_id: string
-          content_type: Database["public"]["Enums"]["content_type"]
+          content_type: string
           created_at: string
-          expiration_date: string
+          expires_at: string
           id: string
-          price_paid: number
-          rental_date: string
-          status: Database["public"]["Enums"]["rental_status"]
+          status: string
           user_id: string
         }
         Insert: {
+          amount: number
           content_id: string
-          content_type: Database["public"]["Enums"]["content_type"]
+          content_type: string
           created_at?: string
-          expiration_date: string
+          expires_at: string
           id?: string
-          price_paid: number
-          rental_date?: string
-          status?: Database["public"]["Enums"]["rental_status"]
+          status?: string
           user_id: string
         }
         Update: {
+          amount?: number
           content_id?: string
-          content_type?: Database["public"]["Enums"]["content_type"]
+          content_type?: string
           created_at?: string
-          expiration_date?: string
+          expires_at?: string
           id?: string
-          price_paid?: number
-          rental_date?: string
-          status?: Database["public"]["Enums"]["rental_status"]
+          status?: string
           user_id?: string
         }
         Relationships: []

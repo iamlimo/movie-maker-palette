@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play, Plus, Star, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSliderItems, SliderItem } from '@/hooks/useSliderItems';
-import { usePayments } from '@/hooks/usePayments';
+// Removed rental functionality from slider
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -12,7 +12,7 @@ import FavoriteButton from '@/components/FavoriteButton';
 
 const CinematicHeroSlider = () => {
   const { sliderItems, loading } = useSliderItems();
-  const { processRental, openPaystackCheckout, isLoading: paymentLoading } = usePayments();
+  // Removed rental functionality
   const { toggleFavorite } = useFavorites();
   const { user } = useAuth();
   
@@ -45,37 +45,7 @@ const CinematicHeroSlider = () => {
     setIsAutoPlaying(false);
   }, []);
 
-  const handleRent = async (item: SliderItem) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in to rent movies.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const result = await processRental(
-        item.content_id,
-        item.content_type === 'movie' ? 'movie' : 'episode',
-        item.price,
-        48 // 48 hour rental
-      );
-
-      if (result.success && result.checkout_url) {
-        openPaystackCheckout(result.checkout_url);
-      } else {
-        throw new Error(result.error || 'Failed to process rental');
-      }
-    } catch (error: any) {
-      toast({
-        title: "Rental Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
+  // Rental functionality removed - use movie/TV preview pages for rentals
 
   const handleAddToWatchlist = async (item: SliderItem) => {
     if (!user) {
@@ -222,18 +192,15 @@ const CinematicHeroSlider = () => {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-4">
-                {currentItem.is_rentable && (
-                  <Button 
-                    variant="premium" 
-                    size="lg" 
-                    className="shadow-glow"
-                    onClick={() => handleRent(currentItem)}
-                    disabled={paymentLoading}
-                  >
-                    <Play className="h-5 w-5 mr-2" />
-                    {paymentLoading ? 'Processing...' : `Rent for ₦${currentItem.price}`}
-                  </Button>
-                )}
+                <Button 
+                  variant="premium" 
+                  size="lg" 
+                  className="shadow-glow"
+                  onClick={() => window.location.href = `/preview/${currentItem.content_type}/${currentItem.content_id}`}
+                >
+                  <Play className="h-5 w-5 mr-2" />
+                  View Details
+                </Button>
                 <div className="flex items-center gap-2">
                   <FavoriteButton
                     contentType={currentItem.content_type}

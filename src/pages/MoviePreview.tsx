@@ -9,7 +9,7 @@ import Header from "@/components/Header";
 import TrailerPlayer from "@/components/TrailerPlayer";
 import ContentHero from "@/components/ContentHero";
 import RecommendationsSection from "@/components/RecommendationsSection";
-import RentalActions from "@/components/RentalActions";
+import RentalButton from "@/components/RentalButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
@@ -236,7 +236,7 @@ const MoviePreview = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Rental Actions */}
-            <RentalActions
+            <RentalButton
               contentId={movie.id}
               contentType="movie"
               price={movie.price}

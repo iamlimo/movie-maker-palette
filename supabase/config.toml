@@ -3,7 +3,7 @@ project_id = "tsfwlereofjlxhjsarap"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -12,10 +12,21 @@ port = 54322
 shadow_port = 54320
 major_version = 15
 
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+ip_version = "ipv4"
+
 [studio]
 enabled = true
 port = 54323
-api_url = "http://127.0.0.1:54321"
+api_url = "http://127.0.0.1"
 
 [inbucket]
 enabled = true
@@ -25,85 +36,27 @@ pop3_port = 54326
 
 [storage]
 enabled = true
-file_size_limit = "1000MiB"
-image_transformation = { enabled = true }
+file_size_limit = "50MiB"
+image_transformation = true
 
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["https://localhost:3000"]
+additional_redirect_urls = ["https://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_manual_linking = false
+enable_email_confirmations = true
+enable_email_change_confirmations = true
+enable_phone_confirmations = true
 
-[auth.email]
-enable_signup = true
-double_confirm_changes = true
-enable_confirmations = false
-
-[edge_runtime]
-enabled = true
-inspector_port = 8083
-
-[functions.upload-video]
-verify_jwt = true
-
-[functions.get-video-url]
-verify_jwt = true
-
-[functions.delete-video]
-verify_jwt = true
-
-[functions.b2-upload]
-verify_jwt = true
-
-[functions.b2-signed-url]
-verify_jwt = true
-
-[functions.b2-delete]
-verify_jwt = true
-
-[functions.create-payment-intent]
+[functions.create-payment]
 verify_jwt = true
 
 [functions.paystack-webhook]
 verify_jwt = false
 
-[functions.wallet-topup]
-verify_jwt = true
-
-[functions.refund-payment]
-verify_jwt = true
-
-[functions.verify-payment]
-verify_jwt = true
-
-[functions.tv-show-upload]
-verify_jwt = true
-
-[functions.createSignedUploadUrl]
-verify_jwt = true
-
-[functions.slider-items]
-verify_jwt = false
-
-[functions.sections]
-verify_jwt = true
-
-[functions.content-sections]
-verify_jwt = true
-
-[functions.banners]
-verify_jwt = true
-
-[functions.unified-payment]
-verify_jwt = true
-
-[functions.rental-access]
-verify_jwt = true
-
-[functions.content-upload]
-verify_jwt = true
-
-[functions.enhanced-webhook]
-verify_jwt = false
+[edge-runtime]
+enabled = true
+ip_version = "ipv4"
+port = 54327
+inspector_port = 54330

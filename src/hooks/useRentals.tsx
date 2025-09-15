@@ -4,12 +4,13 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export interface Rental {
   id: string;
+  user_id: string;
   content_id: string;
-  content_type: 'movie' | 'episode';
-  expiration_date: string;
-  price_paid: number;
-  status: 'active' | 'expired';
-  rental_date: string;
+  content_type: string;
+  amount: number;
+  status: string;
+  expires_at: string;
+  created_at: string;
 }
 
 export interface RentalAccess {
@@ -35,8 +36,8 @@ export const useRentals = () => {
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .gte('expiration_date', new Date().toISOString())
-        .order('expiration_date', { ascending: true });
+        .gte('expires_at', new Date().toISOString())
+        .order('expires_at', { ascending: true });
 
       if (error) throw error;
       setActiveRentals(data || []);
@@ -47,38 +48,14 @@ export const useRentals = () => {
     }
   }, [user]);
 
-  const checkContentAccess = useCallback(async (contentId: string, contentType: 'movie' | 'episode'): Promise<RentalAccess> => {
-    if (!user) {
-      return {
-        has_access: false,
-        access_type: null,
-        rental: null,
-        purchase: null,
-        expires_at: null
-      };
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('rental-access', {
-        body: { content_id: contentId, content_type: contentType },
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error checking content access:', error);
-      return {
-        has_access: false,
-        access_type: null,
-        rental: null,
-        purchase: null,
-        expires_at: null
-      };
-    }
-  }, [user]);
+  const checkAccess = useCallback((contentId: string, contentType: string): boolean => {
+    return activeRentals.some(rental => 
+      rental.content_id === contentId && 
+      rental.content_type === contentType &&
+      rental.status === 'active' &&
+      new Date(rental.expires_at) > new Date()
+    );
+  }, [activeRentals]);
 
   const getTimeRemaining = useCallback((expirationDate: string) => {
     const now = new Date();
@@ -136,7 +113,8 @@ export const useRentals = () => {
     activeRentals,
     isLoading,
     fetchActiveRentals,
-    checkContentAccess,
+    fetchRentals: fetchActiveRentals,
+    checkAccess,
     getTimeRemaining,
     formatTimeRemaining,
     refreshRentals: fetchActiveRentals
