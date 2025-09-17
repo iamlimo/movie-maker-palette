@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, User, Menu, LogOut, Settings } from "lucide-react";
+import { Search, User, Menu, LogOut, Settings, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
 import {
@@ -12,12 +12,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import SearchModal from "./SearchModal";
 
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
   const { isSuperAdmin } = useRole();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     if (isSigningOut) return; // Prevent multiple clicks
@@ -55,23 +58,29 @@ const Header = () => {
 
         {/* Navigation */}
         <nav className="hidden md:flex items-center space-x-8">
-          <a href="#" className="text-foreground hover:text-primary transition-smooth">
+          <Link to="/" className="text-foreground hover:text-primary transition-smooth">
             Home
-          </a>
-          <a href="#" className="text-muted-foreground hover:text-primary transition-smooth">
+          </Link>
+          <Link to="/movies" className="text-muted-foreground hover:text-primary transition-smooth">
             Movies
-          </a>
-          <a href="#" className="text-muted-foreground hover:text-primary transition-smooth">
+          </Link>
+          <Link to="/genres" className="text-muted-foreground hover:text-primary transition-smooth">
             Genres
-          </a>
-          <a href="#" className="text-muted-foreground hover:text-primary transition-smooth">
+          </Link>
+          <Link to="/watchlist" className="text-muted-foreground hover:text-primary transition-smooth">
             Watchlist
-          </a>
+          </Link>
         </nav>
 
         {/* Right side */}
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" className="hidden md:flex text-muted-foreground hover:text-primary">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsSearchOpen(true)}
+            className="hidden md:flex text-muted-foreground hover:text-primary"
+            aria-label="Search"
+          >
             <Search className="h-5 w-5" />
           </Button>
           
@@ -141,11 +150,85 @@ const Header = () => {
             </div>
           )}
           
-          <Button variant="ghost" size="icon" className="md:hidden">
-            <Menu className="h-5 w-5" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
         </div>
       </div>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden bg-card border-t border-border">
+          <nav className="container mx-auto px-4 py-4 space-y-4">
+            <Link 
+              to="/" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block text-foreground hover:text-primary transition-smooth"
+            >
+              Home
+            </Link>
+            <Link 
+              to="/movies" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block text-muted-foreground hover:text-primary transition-smooth"
+            >
+              Movies
+            </Link>
+            <Link 
+              to="/genres" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block text-muted-foreground hover:text-primary transition-smooth"
+            >
+              Genres
+            </Link>
+            <Link 
+              to="/watchlist" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block text-muted-foreground hover:text-primary transition-smooth"
+            >
+              Watchlist
+            </Link>
+            
+            <div className="pt-4 border-t border-border">
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setIsSearchOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full justify-start text-muted-foreground hover:text-primary"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </div>
+
+            {!user && (
+              <div className="pt-4 border-t border-border space-y-3">
+                <Link to="/auth?mode=login" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start text-foreground hover:text-primary">
+                    Log In
+                  </Button>
+                </Link>
+                <Link to="/auth?mode=signup" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button className="w-full gradient-accent text-primary-foreground shadow-glow">
+                    Create Account
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </nav>
+        </div>
+      )}
+
+      {/* Search Modal */}
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </header>
   );
 };

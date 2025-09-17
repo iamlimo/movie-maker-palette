@@ -8,7 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
 import AdminDashboard from "@/pages/admin/Dashboard";
-import Movies from "@/pages/admin/Movies";
+import AdminMovies from "@/pages/admin/Movies";
 import AddMovieNew from "@/pages/admin/AddMovieNew";
 import ViewMovie from "@/pages/admin/ViewMovie";
 import EditMovie from "@/pages/admin/EditMovie";
@@ -30,6 +30,12 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import MoviePreview from "./pages/MoviePreview";
 import TVShowPreview from "./pages/TVShowPreview";
+import Movies from "./pages/Movies";
+import Genres from "./pages/Genres";
+import Watchlist from "./pages/Watchlist";
+import Help from "./pages/Help";
+import Contact from "./pages/Contact";
+import Terms from "./pages/Terms";
 
 
 const queryClient = new QueryClient();
@@ -47,6 +53,12 @@ const App: React.FC = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/movie/:id" element={<MoviePreview />} />
             <Route path="/tvshow/:id" element={<TVShowPreview />} />
+            <Route path="/movies" element={<Movies />} />
+            <Route path="/genres" element={<Genres />} />
+            <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/help" element={<Help />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/terms" element={<Terms />} />
             
             {/* Super Admin Routes */}
             <Route path="/admin" element={
@@ -55,7 +67,7 @@ const App: React.FC = () => (
               </SuperAdminRoute>
             }>
               <Route index element={<AdminDashboard />} />
-              <Route path="movies" element={<Movies />} />
+              <Route path="movies" element={<AdminMovies />} />
               <Route path="movies/add" element={<AddMovieNew />} />
               <Route path="movies/view/:id" element={<ViewMovie />} />
               <Route path="movies/edit/:id" element={<EditMovie />} />
