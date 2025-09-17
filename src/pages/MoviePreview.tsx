@@ -10,6 +10,7 @@ import TrailerPlayer from "@/components/TrailerPlayer";
 import ContentHero from "@/components/ContentHero";
 import RecommendationsSection from "@/components/RecommendationsSection";
 import RentalButton from "@/components/RentalButton";
+import VideoPlayerWithValidation from "@/components/VideoPlayerWithValidation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";

@@ -55,6 +55,15 @@ verify_jwt = true
 [functions.paystack-webhook]
 verify_jwt = false
 
+[functions.content-manager]
+verify_jwt = true
+
+[functions.file-upload]
+verify_jwt = true
+
+[functions.rental-validation]
+verify_jwt = true
+
 [edge-runtime]
 enabled = true
 ip_version = "ipv4"
