@@ -154,6 +154,7 @@ export type Database = {
       episodes: {
         Row: {
           created_at: string
+          description: string | null
           duration: number | null
           episode_number: number
           id: string
@@ -162,11 +163,13 @@ export type Database = {
           rental_expiry_duration: number
           season_id: string
           status: Database["public"]["Enums"]["content_status"]
+          thumbnail_url: string | null
           title: string
           video_url: string | null
         }
         Insert: {
           created_at?: string
+          description?: string | null
           duration?: number | null
           episode_number: number
           id?: string
@@ -175,11 +178,13 @@ export type Database = {
           rental_expiry_duration?: number
           season_id: string
           status?: Database["public"]["Enums"]["content_status"]
+          thumbnail_url?: string | null
           title: string
           video_url?: string | null
         }
         Update: {
           created_at?: string
+          description?: string | null
           duration?: number | null
           episode_number?: number
           id?: string
@@ -188,6 +193,7 @@ export type Database = {
           rental_expiry_duration?: number
           season_id?: string
           status?: Database["public"]["Enums"]["content_status"]
+          thumbnail_url?: string | null
           title?: string
           video_url?: string | null
         }
@@ -930,6 +936,7 @@ export type Database = {
           created_at: string
           description: string | null
           genre_id: string | null
+          genres: string[] | null
           id: string
           landscape_poster_url: string | null
           language: string | null
@@ -941,6 +948,7 @@ export type Database = {
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
+          trailer_url: string | null
           updated_at: string
           uploaded_by: string | null
         }
@@ -948,6 +956,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           genre_id?: string | null
+          genres?: string[] | null
           id?: string
           landscape_poster_url?: string | null
           language?: string | null
@@ -959,6 +968,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
+          trailer_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
         }
@@ -966,6 +976,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           genre_id?: string | null
+          genres?: string[] | null
           id?: string
           landscape_poster_url?: string | null
           language?: string | null
@@ -977,6 +988,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string
+          trailer_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
         }
@@ -989,6 +1001,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_payments: {
+        Row: {
+          access_expires_at: string
+          amount: number
+          created_at: string
+          id: string
+          payment_status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_expires_at: string
+          amount: number
+          created_at?: string
+          id?: string
+          payment_status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_expires_at?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          payment_status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_preferences: {
         Row: {

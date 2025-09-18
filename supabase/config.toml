@@ -64,6 +64,21 @@ verify_jwt = true
 [functions.rental-validation]
 verify_jwt = true
 
+[functions.create-tv-show]
+verify_jwt = true
+
+[functions.create-season]
+verify_jwt = true
+
+[functions.upload-episode]
+verify_jwt = true
+
+[functions.check-user-payment]
+verify_jwt = true
+
+[functions.get-episode-access]
+verify_jwt = false
+
 [edge-runtime]
 enabled = true
 ip_version = "ipv4"
