@@ -132,13 +132,12 @@ export const TVShowUploader = ({
       // Use the file-upload edge function with proper file type mapping
       console.log('[TVShowUploader] Uploading file directly...');
       
-      const fileTypeMapping = {
-        'poster': 'poster',
-        'trailer': 'trailer', 
-        'episode': 'episode'
-      };
+      // Create URL with query parameters for file type and name
+      const uploadUrl = new URL('/functions/v1/file-upload', `https://tsfwlereofjlxhjsarap.supabase.co`);
+      uploadUrl.searchParams.set('type', contentType);
+      uploadUrl.searchParams.set('filename', file.name);
       
-      const { data: uploadInfo, error: uploadInfoError } = await supabase.functions.invoke('file-upload', {
+      const response = await fetch(uploadUrl.toString(), {
         method: 'POST',
         body: file,
         headers: {
@@ -147,9 +146,17 @@ export const TVShowUploader = ({
         },
       });
 
-      if (uploadInfoError) {
-        console.error('[TVShowUploader] Upload info error:', uploadInfoError);
-        throw new Error(`Failed to get upload URL: ${uploadInfoError.message}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[TVShowUploader] Upload failed:', response.status, errorText);
+        throw new Error(`Failed to upload file: ${response.status} ${errorText}`);
+      }
+
+      const uploadInfo = await response.json();
+
+      if (!uploadInfo?.success) {
+        console.error('[TVShowUploader] Upload failed:', uploadInfo);
+        throw new Error(`Upload failed: ${uploadInfo?.error || 'Unknown error'}`);
       }
 
       if (!uploadInfo?.success) {
