@@ -1,25 +1,20 @@
+import { useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TVShowWizard } from "@/components/admin/TVShowWizard";
-
-interface Genre {
-  id: string;
-  name: string;
-}
-
-interface FormData {
-  title: string;
-  description: string;
-  genre_id: string;
-  release_date: string;
-  language: string;
-  rating: string;
-  price: number;
-}
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { UploadTester } from '@/components/admin/UploadTester';
+import { TVShowCreator } from '@/components/admin/TVShowCreator';
+import { 
+  TestTube, 
+  Tv,
+  CheckCircle
+} from 'lucide-react';
 
 const AddTVShow = () => {
   const navigate = useNavigate();
+  const [uploadTestsPassed, setUploadTestsPassed] = useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
@@ -35,7 +30,59 @@ const AddTVShow = () => {
           </Button>
         </div>
         
-        <TVShowWizard />
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">TV Show Management</h1>
+              <p className="text-muted-foreground mt-1">
+                Create and manage TV shows, seasons, and episodes
+              </p>
+            </div>
+          </div>
+
+          <Tabs defaultValue="tester" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="tester" className="flex items-center gap-2">
+                <TestTube className="h-4 w-4" />
+                Step 1: Upload Tester
+                {uploadTestsPassed && <CheckCircle className="h-4 w-4 text-green-600" />}
+              </TabsTrigger>
+              <TabsTrigger value="creator" className="flex items-center gap-2">
+                <Tv className="h-4 w-4" />
+                Step 2: TV Show Creator
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="tester" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>🧪 Step 1 — Upload Flow Tester</CardTitle>
+                  <p className="text-muted-foreground">
+                    Before building the full TV Shows feature, first verify and fix the media upload logic.
+                    This ensures all upload functionality works correctly.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <UploadTester />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="creator" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>📺 Step 2 — TV Shows Creation & Management</CardTitle>
+                  <p className="text-muted-foreground">
+                    Create and manage TV shows with all required fields, media uploads, and payment integration.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <TVShowCreator />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

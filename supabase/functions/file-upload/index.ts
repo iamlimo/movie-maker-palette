@@ -8,10 +8,16 @@ const corsHeadersExtended = {
 
 const BUCKET_MAPPINGS = {
   'video': 'videos',
-  'trailer': 'videos', 
+  'trailer': 'videos',
   'thumbnail': 'thumbnails',
   'landscape_poster': 'landscape-posters',
-  'slider_cover': 'slider-covers'
+  'slider_cover': 'slider-covers',
+  'tv_show_poster': 'tv-show-posters',
+  'tv_trailer': 'tv-trailers',
+  'episode_video': 'tv-episodes',
+  'episode_thumbnail': 'episode-thumbnails',
+  'poster': 'tv-show-posters',
+  'episode': 'tv-episodes'
 }
 
 Deno.serve(async (req) => {
@@ -51,16 +57,30 @@ Deno.serve(async (req) => {
       const fileType = url.searchParams.get('type') // video, thumbnail, etc.
       const fileName = url.searchParams.get('filename')
       
+      // For direct file uploads without query params, try to infer from content type
+      let inferredFileType = fileType;
+      let inferredFileName = fileName;
+      
       if (!fileType || !fileName) {
-        return new Response(JSON.stringify({ error: 'File type and filename required' }), {
+        const contentType = req.headers.get('content-type') || '';
+        if (contentType.startsWith('image/')) {
+          inferredFileType = 'poster';
+        } else if (contentType.startsWith('video/')) {
+          inferredFileType = 'trailer';
+        }
+        inferredFileName = `file-${Date.now()}${contentType.includes('jpeg') ? '.jpg' : contentType.includes('png') ? '.png' : contentType.includes('mp4') ? '.mp4' : ''}`;
+      }
+      
+      if (!inferredFileType) {
+        return new Response(JSON.stringify({ error: 'File type could not be determined' }), {
           status: 400,
           headers: corsHeadersExtended
         })
       }
 
-      const bucket = BUCKET_MAPPINGS[fileType as keyof typeof BUCKET_MAPPINGS]
+      const bucket = BUCKET_MAPPINGS[inferredFileType as keyof typeof BUCKET_MAPPINGS]
       if (!bucket) {
-        return new Response(JSON.stringify({ error: 'Invalid file type' }), {
+        return new Response(JSON.stringify({ error: `Invalid file type: ${inferredFileType}` }), {
           status: 400,
           headers: corsHeadersExtended
         })
@@ -68,7 +88,7 @@ Deno.serve(async (req) => {
 
       // Generate unique file path
       const timestamp = Date.now()
-      const uniqueFileName = `${timestamp}-${fileName}`
+      const uniqueFileName = `${timestamp}-${inferredFileName}`
       const filePath = `${user.id}/${uniqueFileName}`
 
       try {

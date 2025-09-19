@@ -129,14 +129,22 @@ export const TVShowUploader = ({
       // Determine the correct bucket based on file type
       const bucket = file.type.startsWith('image/') ? 'thumbnails' : 'videos';
 
-      // Get fresh signed upload URL from new streamlined function
-      console.log('[TVShowUploader] Getting signed upload URL...');
-      const { data: uploadInfo, error: uploadInfoError } = await supabase.functions.invoke('createSignedUploadUrl', {
-        body: {
-          fileName: file.name,
-          bucket: bucket,
-          contentType: file.type // Use actual MIME type
-        }
+      // Use the file-upload edge function with proper file type mapping
+      console.log('[TVShowUploader] Uploading file directly...');
+      
+      const fileTypeMapping = {
+        'poster': 'poster',
+        'trailer': 'trailer', 
+        'episode': 'episode'
+      };
+      
+      const { data: uploadInfo, error: uploadInfoError } = await supabase.functions.invoke('file-upload', {
+        method: 'POST',
+        body: file,
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': file.type,
+        },
       });
 
       if (uploadInfoError) {
@@ -144,59 +152,20 @@ export const TVShowUploader = ({
         throw new Error(`Failed to get upload URL: ${uploadInfoError.message}`);
       }
 
-      if (!uploadInfo?.signedUrl) {
-        console.error('[TVShowUploader] Invalid upload info:', uploadInfo);
-        throw new Error(uploadInfo?.error || 'Failed to get signed URL from server');
+      if (!uploadInfo?.success) {
+        console.error('[TVShowUploader] Invalid upload response:', uploadInfo);
+        throw new Error(uploadInfo?.error || 'Upload failed');
       }
 
-      console.log('[TVShowUploader] Upload info received:', {
-        hasSignedUrl: !!uploadInfo.signedUrl,
+      console.log('[TVShowUploader] Upload completed successfully:', {
         filePath: uploadInfo.filePath,
-        bucket: uploadInfo.bucket,
-        expiresAt: uploadInfo.expiresAt
-      });
-
-      setUploadState(prev => ({ ...prev, progress: 30 }));
-
-      // Upload file directly to the signed URL with progress tracking
-      console.log('[TVShowUploader] Starting file upload to signed URL...');
-      
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = (event.loaded / event.total) * 60 + 30; // 30-90%
-            setUploadState(prev => ({ ...prev, progress: Math.round(percentComplete) }));
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status === 200) {
-            console.log('[TVShowUploader] File upload completed successfully');
-            resolve();
-          } else {
-            console.error('[TVShowUploader] Upload failed with status:', xhr.status, xhr.statusText);
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          console.error('[TVShowUploader] Upload error event');
-          reject(new Error('Upload failed due to network error'));
-        });
-
-        xhr.open('PUT', uploadInfo.signedUrl);
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.send(file);
+        url: uploadInfo.url,
+        bucket: uploadInfo.bucket
       });
 
       setUploadState(prev => ({ ...prev, progress: 90 }));
 
-      // Get public URL directly from Supabase storage
-      const { data: urlData } = supabase.storage
-        .from(uploadInfo.bucket)
-        .getPublicUrl(uploadInfo.filePath);
+      const urlData = { publicUrl: uploadInfo.url };
 
       if (!urlData?.publicUrl) {
         throw new Error('Failed to get public URL after upload');
@@ -213,11 +182,11 @@ export const TVShowUploader = ({
         progress: 100,
         completed: true,
         filePath: uploadInfo.filePath,
-        publicUrl: urlData.publicUrl
+        publicUrl: uploadInfo.url
       }));
 
       // Call completion callback
-      onUploadComplete(uploadInfo.filePath, urlData.publicUrl);
+      onUploadComplete(uploadInfo.filePath, uploadInfo.url);
 
       toast({
         title: "Success",
