@@ -88,25 +88,44 @@ export const TVShowUploader = ({
       maxSize
     });
 
+    // Check if file has a MIME type
+    if (!file.type) {
+      return `File has no MIME type. Please ensure the file is a valid ${contentType} file.`;
+    }
+
+    // Check for text/plain which often indicates detection failure
+    if (file.type === 'text/plain') {
+      return `File detected as text/plain. This may indicate an unsupported format. Please ensure the file is a valid ${contentType === 'poster' ? 'image' : 'video'} file.`;
+    }
+
+    // Define expected MIME types for each content type
+    const expectedMimeTypes = {
+      'poster': ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+      'trailer': ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'],
+      'episode': ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska']
+    };
+
+    const validMimeTypes = expectedMimeTypes[contentType as keyof typeof expectedMimeTypes];
+    if (validMimeTypes && !validMimeTypes.includes(file.type)) {
+      return `MIME type '${file.type}' is not supported for ${contentType}. Expected: ${validMimeTypes.join(', ')}`;
+    }
+
     // Check file size
     if (file.size > maxSize) {
       return `File size (${formatFileSize(file.size)}) exceeds maximum allowed size (${formatFileSize(maxSize)})`;
     }
 
-    // Check file type
-    const acceptedTypes = accept.split(',').map(type => type.trim());
+    // Check file extension as backup validation
     const fileExtension = '.' + file.name.toLowerCase().split('.').pop();
-    
-    const isValidType = acceptedTypes.some(acceptType => {
-      if (acceptType.includes('*')) {
-        const baseType = acceptType.split('/')[0];
-        return file.type.startsWith(baseType + '/');
-      }
-      return acceptType === file.type || acceptType === fileExtension;
-    });
+    const expectedExtensions = {
+      'poster': ['.jpg', '.jpeg', '.png', '.webp'],
+      'trailer': ['.mp4', '.mov', '.avi', '.mkv'],
+      'episode': ['.mp4', '.mov', '.avi', '.mkv']
+    };
 
-    if (!isValidType) {
-      return `File type not supported. Accepted types: ${accept}`;
+    const validExtensions = expectedExtensions[contentType as keyof typeof expectedExtensions];
+    if (validExtensions && !validExtensions.includes(fileExtension)) {
+      return `File extension '${fileExtension}' is not supported for ${contentType}. Expected: ${validExtensions.join(', ')}`;
     }
 
     return null;
@@ -126,11 +145,12 @@ export const TVShowUploader = ({
 
       setUploadState(prev => ({ ...prev, progress: 20 }));
 
-      // Determine the correct bucket based on file type
-      const bucket = file.type.startsWith('image/') ? 'thumbnails' : 'videos';
+      // Validate MIME type before upload
+      if (!file.type || file.type === 'text/plain') {
+        throw new Error(`Invalid MIME type: ${file.type || 'none'}. Please ensure the file is a valid ${contentType === 'poster' ? 'image' : 'video'} file.`);
+      }
 
-      // Use the file-upload edge function with proper file type mapping
-      console.log('[TVShowUploader] Uploading file directly...');
+      console.log('[TVShowUploader] Uploading file with MIME type:', file.type);
       
       // Create URL with query parameters for file type and name
       const uploadUrl = new URL('/functions/v1/file-upload', `https://tsfwlereofjlxhjsarap.supabase.co`);
@@ -142,21 +162,37 @@ export const TVShowUploader = ({
         body: file,
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': file.type,
+          'Content-Type': file.type || 'application/octet-stream',
         },
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
+        let errorText = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorText = errorData.error || errorText;
+        } catch {
+          errorText = await response.text() || errorText;
+        }
         console.error('[TVShowUploader] Upload failed:', response.status, errorText);
-        throw new Error(`Failed to upload file: ${response.status} ${errorText}`);
+        
+        // Provide specific error messages for MIME type issues
+        if (errorText.includes('MIME type') || errorText.includes('mime type')) {
+          throw new Error(`File format error: ${errorText}`);
+        }
+        if (errorText.includes('Content-Type')) {
+          throw new Error(`Content type error: ${errorText}`);
+        }
+        
+        throw new Error(`Upload failed: ${errorText}`);
       }
 
       const uploadInfo = await response.json();
 
       if (!uploadInfo?.success) {
         console.error('[TVShowUploader] Upload failed:', uploadInfo);
-        throw new Error(`Upload failed: ${uploadInfo?.error || 'Unknown error'}`);
+        const errorMsg = uploadInfo?.error || 'Unknown error occurred during upload';
+        throw new Error(`Upload failed: ${errorMsg}`);
       }
 
       if (!uploadInfo?.success) {

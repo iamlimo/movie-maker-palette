@@ -8,7 +8,7 @@ const corsHeadersExtended = {
 
 const BUCKET_MAPPINGS = {
   'video': 'videos',
-  'trailer': 'videos',
+  'trailer': 'tv-trailers',
   'thumbnail': 'thumbnails',
   'landscape_poster': 'landscape-posters',
   'slider_cover': 'slider-covers',
@@ -18,6 +18,58 @@ const BUCKET_MAPPINGS = {
   'episode_thumbnail': 'episode-thumbnails',
   'poster': 'tv-show-posters',
   'episode': 'tv-episodes'
+}
+
+const MIME_TYPE_VALIDATION = {
+  'poster': {
+    allowed: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    extensions: ['.jpg', '.jpeg', '.png', '.webp']
+  },
+  'trailer': {
+    allowed: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'],
+    extensions: ['.mp4', '.mov', '.avi', '.mkv']
+  },
+  'episode': {
+    allowed: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'],
+    extensions: ['.mp4', '.mov', '.avi', '.mkv']
+  },
+  'video': {
+    allowed: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'],
+    extensions: ['.mp4', '.mov', '.avi', '.mkv']
+  },
+  'thumbnail': {
+    allowed: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    extensions: ['.jpg', '.jpeg', '.png', '.webp']
+  },
+  'landscape_poster': {
+    allowed: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    extensions: ['.jpg', '.jpeg', '.png', '.webp']
+  },
+  'slider_cover': {
+    allowed: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    extensions: ['.jpg', '.jpeg', '.png', '.webp']
+  }
+}
+
+function validateMimeType(fileType: string, contentType: string | null): string | null {
+  if (!contentType) {
+    return `Content-Type header is required`
+  }
+
+  const validation = MIME_TYPE_VALIDATION[fileType as keyof typeof MIME_TYPE_VALIDATION]
+  if (!validation) {
+    return `Unsupported file type: ${fileType}`
+  }
+
+  if (!validation.allowed.includes(contentType)) {
+    return `MIME type '${contentType}' is not supported for ${fileType}. Allowed types: ${validation.allowed.join(', ')}`
+  }
+
+  return null
+}
+
+function getFileExtension(fileName: string): string {
+  return '.' + fileName.toLowerCase().split('.').pop()
 }
 
 Deno.serve(async (req) => {
@@ -56,31 +108,48 @@ Deno.serve(async (req) => {
       const url = new URL(req.url)
       const fileType = url.searchParams.get('type') // video, thumbnail, etc.
       const fileName = url.searchParams.get('filename')
+      const contentType = req.headers.get('content-type')
       
-      // For direct file uploads without query params, try to infer from content type
-      let inferredFileType = fileType;
-      let inferredFileName = fileName;
+      console.log('Upload request:', { fileType, fileName, contentType })
       
-      if (!fileType || !fileName) {
-        const contentType = req.headers.get('content-type') || '';
-        if (contentType.startsWith('image/')) {
-          inferredFileType = 'poster';
-        } else if (contentType.startsWith('video/')) {
-          inferredFileType = 'trailer';
-        }
-        inferredFileName = `file-${Date.now()}${contentType.includes('jpeg') ? '.jpg' : contentType.includes('png') ? '.png' : contentType.includes('mp4') ? '.mp4' : ''}`;
+      if (!fileType) {
+        return new Response(JSON.stringify({ error: 'File type parameter is required' }), {
+          status: 400,
+          headers: corsHeadersExtended
+        })
       }
       
-      if (!inferredFileType) {
-        return new Response(JSON.stringify({ error: 'File type could not be determined' }), {
+      if (!fileName) {
+        return new Response(JSON.stringify({ error: 'Filename parameter is required' }), {
+          status: 400,
+          headers: corsHeadersExtended
+        })
+      }
+      
+      // Validate MIME type
+      const mimeValidationError = validateMimeType(fileType, contentType)
+      if (mimeValidationError) {
+        return new Response(JSON.stringify({ error: mimeValidationError }), {
+          status: 400,
+          headers: corsHeadersExtended
+        })
+      }
+      
+      // Additional validation: check file extension matches content type
+      const fileExtension = getFileExtension(fileName)
+      const validation = MIME_TYPE_VALIDATION[fileType as keyof typeof MIME_TYPE_VALIDATION]
+      if (validation && !validation.extensions.includes(fileExtension)) {
+        return new Response(JSON.stringify({ 
+          error: `File extension '${fileExtension}' does not match content type '${contentType}'. Expected extensions: ${validation.extensions.join(', ')}` 
+        }), {
           status: 400,
           headers: corsHeadersExtended
         })
       }
 
-      const bucket = BUCKET_MAPPINGS[inferredFileType as keyof typeof BUCKET_MAPPINGS]
+      const bucket = BUCKET_MAPPINGS[fileType as keyof typeof BUCKET_MAPPINGS]
       if (!bucket) {
-        return new Response(JSON.stringify({ error: `Invalid file type: ${inferredFileType}` }), {
+        return new Response(JSON.stringify({ error: `Invalid file type: ${fileType}` }), {
           status: 400,
           headers: corsHeadersExtended
         })
@@ -88,19 +157,20 @@ Deno.serve(async (req) => {
 
       // Generate unique file path
       const timestamp = Date.now()
-      const uniqueFileName = `${timestamp}-${inferredFileName}`
+      const uniqueFileName = `${timestamp}-${fileName}`
       const filePath = `${user.id}/${uniqueFileName}`
 
       try {
         // Get file data from request
         const fileData = await req.arrayBuffer()
         
-        // Upload to Supabase Storage
+        // Upload to Supabase Storage with proper content type
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from(bucket)
           .upload(filePath, fileData, {
             cacheControl: '3600',
-            upsert: false
+            upsert: false,
+            contentType: contentType // Preserve the original MIME type
           })
 
         if (uploadError) {
