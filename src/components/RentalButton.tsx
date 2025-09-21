@@ -8,7 +8,7 @@ import { toast } from "@/hooks/use-toast";
 
 interface RentalButtonProps {
   contentId: string;
-  contentType: 'movie' | 'tv';
+  contentType: 'movie' | 'tv' | 'season' | 'episode';
   price: number;
   title: string;
 }

@@ -4,13 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Heart, Star, Clock, Calendar, Globe, Play } from "lucide-react";
+import { ArrowLeft, Heart, Star, Clock, Calendar, Globe, Play, Lock } from "lucide-react";
 import Header from "@/components/Header";
 import ContentHero from "@/components/ContentHero";
 import RecommendationsSection from "@/components/RecommendationsSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useRentals } from "@/hooks/useRentals";
 import { toast } from "@/hooks/use-toast";
+import EpisodePlayer from "@/components/EpisodePlayer";
+import RentalButton from "@/components/RentalButton";
 
 interface TVShow {
   id: string;
@@ -32,6 +35,8 @@ interface Season {
   description: string;
   price: number;
   rental_expiry_duration: number;
+  cover_image_url?: string;
+  status: string;
 }
 
 interface Episode {
@@ -42,6 +47,7 @@ interface Episode {
   duration: number;
   price: number;
   video_url: string;
+  thumbnail_url?: string;
   status: string;
 }
 
@@ -50,12 +56,16 @@ const TVShowPreview = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { favorites, toggleFavorite, loading: favoritesLoading } = useFavorites();
+  const { checkAccess } = useRentals();
   const [tvShow, setTVShow] = useState<TVShow | null>(null);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [episodes, setEpisodes] = useState<{ [seasonId: string]: Episode[] }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
+  const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+  const [seasonAccess, setSeasonAccess] = useState<{ [seasonId: string]: boolean }>({});
+  const [episodeAccess, setEpisodeAccess] = useState<{ [episodeId: string]: boolean }>({});
 
   const isFavorite = tvShow ? favorites.some(fav => fav.content_id === tvShow.id && fav.content_type === 'tv_show') : false;
 
@@ -86,11 +96,12 @@ const TVShowPreview = () => {
 
       setTVShow(showData);
 
-      // Fetch seasons
+      // Fetch seasons (only approved ones for users)
       const { data: seasonsData, error: seasonsError } = await supabase
         .from('seasons')
         .select('*')
         .eq('tv_show_id', showId)
+        .eq('status', 'approved')
         .order('season_number');
 
       if (seasonsError) throw seasonsError;
@@ -115,6 +126,11 @@ const TVShowPreview = () => {
         });
 
         setEpisodes(episodesMap);
+        
+        // Check access for seasons and episodes if user is logged in
+        if (user) {
+          await checkSeasonAndEpisodeAccess(seasonsData, episodesMap);
+        }
       }
 
     } catch (error: any) {
@@ -122,6 +138,29 @@ const TVShowPreview = () => {
       setError(error.message || 'Failed to load TV show');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkSeasonAndEpisodeAccess = async (seasonsData: Season[], episodesMap: { [seasonId: string]: Episode[] }) => {
+    if (!user) return;
+
+    try {
+      // Check season access
+      const newSeasonAccess: { [seasonId: string]: boolean } = {};
+      seasonsData.forEach(season => {
+        newSeasonAccess[season.id] = checkAccess(season.id, 'season');
+      });
+
+      // Check episode access
+      const newEpisodeAccess: { [episodeId: string]: boolean } = {};
+      Object.values(episodesMap).flat().forEach(episode => {
+        newEpisodeAccess[episode.id] = checkAccess(episode.id, 'episode');
+      });
+
+      setSeasonAccess(newSeasonAccess);
+      setEpisodeAccess(newEpisodeAccess);
+    } catch (error) {
+      console.error('Error checking access:', error);
     }
   };
 
@@ -257,28 +296,75 @@ const TVShowPreview = () => {
                         )}
                         
                         <div className="space-y-3">
-                          {currentEpisodes.map((episode) => (
-                            <div key={episode.id} className="p-4 rounded-lg border border-border bg-card hover:bg-accent/50 transition-smooth">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <h4 className="font-semibold">
-                                    Episode {episode.episode_number}: {episode.title}
-                                  </h4>
-                                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      <span>{episode.duration} min</span>
+                          {currentEpisodes.map((episode, index) => {
+                            const hasEpisodeAccess = episodeAccess[episode.id];
+                            const hasSeasonAccess = seasonAccess[currentSeason?.id || ''];
+                            const hasAnyAccess = hasEpisodeAccess || hasSeasonAccess;
+                            const nextEpisode = currentEpisodes[index + 1];
+
+                            return (
+                              <div key={episode.id} className="space-y-3">
+                                <div className="p-4 rounded-lg border border-border bg-card hover:bg-accent/50 transition-smooth">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="font-semibold">
+                                          Episode {episode.episode_number}: {episode.title}
+                                        </h4>
+                                        {!hasAnyAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
+                                      </div>
+                                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                        <div className="flex items-center gap-1">
+                                          <Clock className="h-3 w-3" />
+                                          <span>{episode.duration} min</span>
+                                        </div>
+                                        <span>₦{episode.price}</span>
+                                        {hasAnyAccess && (
+                                          <Badge variant="outline" className="text-green-600 border-green-600">
+                                            Unlocked
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </div>
-                                    <span>₦{episode.price}</span>
+                                    <div className="flex items-center gap-2">
+                                      {hasAnyAccess ? (
+                                        <Button 
+                                          variant="default" 
+                                          size="sm"
+                                          onClick={() => setSelectedEpisode(episode)}
+                                        >
+                                          <Play className="h-4 w-4 mr-1" />
+                                          Watch
+                                        </Button>
+                                      ) : (
+                                        <RentalButton
+                                          contentId={episode.id}
+                                          contentType="episode"
+                                          price={episode.price}
+                                          title={`Episode ${episode.episode_number}: ${episode.title}`}
+                                        />
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                                <Button variant="outline" size="sm">
-                                  <Play className="h-4 w-4 mr-1" />
-                                  Rent
-                                </Button>
+
+                                {/* Episode Player */}
+                                {selectedEpisode?.id === episode.id && (
+                                  <div className="mt-4">
+                                    <EpisodePlayer
+                                      episodeId={episode.id}
+                                      seasonId={currentSeason?.id || ''}
+                                      title={episode.title}
+                                      price={episode.price}
+                                      posterUrl={episode.thumbnail_url}
+                                      nextEpisodeId={nextEpisode?.id}
+                                      autoPlay={true}
+                                    />
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                           
                           {currentEpisodes.length === 0 && (
                             <p className="text-center text-muted-foreground py-8">
@@ -348,6 +434,27 @@ const TVShowPreview = () => {
                     <p className="text-sm text-muted-foreground">Rental Duration</p>
                     <p className="font-semibold">{currentSeason.rental_expiry_duration} hours</p>
                   </div>
+                  
+                  {/* Season Rental Option */}
+                  {user && !seasonAccess[currentSeason.id] && (
+                    <div className="pt-4 border-t">
+                      <p className="text-sm text-muted-foreground mb-3">Unlock all episodes in this season:</p>
+                      <RentalButton
+                        contentId={currentSeason.id}
+                        contentType="season"
+                        price={currentSeason.price}
+                        title={`Season ${currentSeason.season_number}`}
+                      />
+                    </div>
+                  )}
+                  
+                  {seasonAccess[currentSeason.id] && (
+                    <div className="pt-4 border-t">
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        Season Unlocked
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

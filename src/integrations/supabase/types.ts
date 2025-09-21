@@ -159,6 +159,7 @@ export type Database = {
           episode_number: number
           id: string
           price: number
+          published_at: string | null
           release_date: string | null
           rental_expiry_duration: number
           season_id: string
@@ -174,6 +175,7 @@ export type Database = {
           episode_number: number
           id?: string
           price?: number
+          published_at?: string | null
           release_date?: string | null
           rental_expiry_duration?: number
           season_id: string
@@ -189,6 +191,7 @@ export type Database = {
           episode_number?: number
           id?: string
           price?: number
+          published_at?: string | null
           release_date?: string | null
           rental_expiry_duration?: number
           season_id?: string
@@ -690,30 +693,36 @@ export type Database = {
       }
       seasons: {
         Row: {
+          cover_image_url: string | null
           created_at: string
           description: string | null
           id: string
           price: number
           rental_expiry_duration: number
           season_number: number
+          status: Database["public"]["Enums"]["content_status"]
           tv_show_id: string
         }
         Insert: {
+          cover_image_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
           price?: number
           rental_expiry_duration?: number
           season_number: number
+          status?: Database["public"]["Enums"]["content_status"]
           tv_show_id: string
         }
         Update: {
+          cover_image_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
           price?: number
           rental_expiry_duration?: number
           season_number?: number
+          status?: Database["public"]["Enums"]["content_status"]
           tv_show_id?: string
         }
         Relationships: [
@@ -1286,6 +1295,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_season_episode_count: {
+        Args: { season_id_param: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1323,7 +1336,7 @@ export type Database = {
     Enums: {
       app_role: "user" | "admin" | "super_admin"
       content_status: "pending" | "approved" | "rejected"
-      content_type: "movie" | "episode"
+      content_type: "movie" | "episode" | "season"
       enhanced_payment_status:
         | "initiated"
         | "pending"
@@ -1466,7 +1479,7 @@ export const Constants = {
     Enums: {
       app_role: ["user", "admin", "super_admin"],
       content_status: ["pending", "approved", "rejected"],
-      content_type: ["movie", "episode"],
+      content_type: ["movie", "episode", "season"],
       enhanced_payment_status: [
         "initiated",
         "pending",
