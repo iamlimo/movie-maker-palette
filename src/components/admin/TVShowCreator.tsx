@@ -25,9 +25,9 @@ interface TVShowFormData {
   age_rating: string;
   category: string;
   tags: string[];
-  poster_url: string;
-  banner_url: string;
-  trailer_url: string;
+  poster_file: File | null;
+  banner_file: File | null;
+  trailer_file: File | null;
 }
 
 export const TVShowCreator = () => {
@@ -38,9 +38,9 @@ export const TVShowCreator = () => {
     age_rating: 'PG',
     category: 'Drama',
     tags: [],
-    poster_url: '',
-    banner_url: '',
-    trailer_url: ''
+    poster_file: null,
+    banner_file: null,
+    trailer_file: null
   });
   
   const [tagInput, setTagInput] = useState('');
@@ -54,12 +54,14 @@ export const TVShowCreator = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileUpload = (field: 'poster_url' | 'banner_url' | 'trailer_url') => (filePath: string, publicUrl: string) => {
-    setFormData(prev => ({ ...prev, [field]: publicUrl }));
-    toast({
-      title: "Upload Successful",
-      description: `${field.replace('_', ' ')} uploaded successfully`,
-    });
+  const handleFileSelect = (field: 'poster_file' | 'banner_file' | 'trailer_file') => (file: File | null) => {
+    setFormData(prev => ({ ...prev, [field]: file }));
+    if (file) {
+      toast({
+        title: "File Selected",
+        description: `${field.replace('_file', '')} file selected: ${file.name}`,
+      });
+    }
   };
 
   const addTag = () => {
@@ -80,10 +82,10 @@ export const TVShowCreator = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.title || !formData.description) {
+    if (!formData.title || !formData.description || !formData.poster_file) {
       toast({
         title: "Validation Error",
-        description: "Title and description are required",
+        description: "Title, description, and poster are required",
         variant: "destructive",
       });
       return;
@@ -91,26 +93,47 @@ export const TVShowCreator = () => {
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-tv-show', {
-        body: {
-          title: formData.title,
-          description: formData.description,
-          release_date: formData.release_date || null,
-          age_rating: formData.age_rating,
-          category: formData.category,
-          tags: formData.tags,
-          poster_url: formData.poster_url,
-          banner_url: formData.banner_url,
-          trailer_url: formData.trailer_url
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
+      // Create FormData to send files
+      const submitFormData = new FormData();
+      submitFormData.append('title', formData.title);
+      submitFormData.append('description', formData.description);
+      submitFormData.append('rating', formData.age_rating);
+      submitFormData.append('genres', JSON.stringify(formData.tags));
+      submitFormData.append('language', 'en');
+      submitFormData.append('price', '0');
+      
+      if (formData.release_date) {
+        submitFormData.append('release_date', formData.release_date);
+      }
+      
+      // Add files
+      submitFormData.append('poster', formData.poster_file);
+      if (formData.banner_file) {
+        submitFormData.append('banner', formData.banner_file);
+      }
+      if (formData.trailer_file) {
+        submitFormData.append('trailer', formData.trailer_file);
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create TV show');
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Authentication required');
+      }
+
+      // Make direct fetch request to edge function
+      const response = await fetch(`https://tsfwlereofjlxhjsarap.supabase.co/functions/v1/create-tv-show`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: submitFormData
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `HTTP ${response.status}`);
       }
 
       toast({
@@ -126,9 +149,9 @@ export const TVShowCreator = () => {
         age_rating: 'PG',
         category: 'Drama',
         tags: [],
-        poster_url: '',
-        banner_url: '',
-        trailer_url: ''
+        poster_file: null,
+        banner_file: null,
+        trailer_file: null
       });
 
     } catch (error) {
@@ -253,34 +276,37 @@ export const TVShowCreator = () => {
           {/* File Uploads */}
           <div className="space-y-6">
             <TVShowUploader
-              onUploadComplete={handleFileUpload('poster_url')}
+              onFileSelect={handleFileSelect('poster_file')}
               accept="image/*"
               maxSize={10 * 1024 * 1024} // 10MB
               label="Poster Image"
               description="Upload the main poster for this TV show"
               contentType="poster"
-              currentUrl={formData.poster_url}
+              selectedFile={formData.poster_file}
               required
+              autoUpload={false}
             />
 
             <TVShowUploader
-              onUploadComplete={handleFileUpload('banner_url')}
+              onFileSelect={handleFileSelect('banner_file')}
               accept="image/*"
               maxSize={10 * 1024 * 1024} // 10MB
               label="Banner Image"
               description="Upload a banner/landscape image for this TV show"
               contentType="poster"
-              currentUrl={formData.banner_url}
+              selectedFile={formData.banner_file}
+              autoUpload={false}
             />
 
             <TVShowUploader
-              onUploadComplete={handleFileUpload('trailer_url')}
+              onFileSelect={handleFileSelect('trailer_file')}
               accept="video/*"
               maxSize={100 * 1024 * 1024} // 100MB
               label="Trailer Video"
               description="Upload a trailer/preview video for this TV show"
               contentType="trailer"
-              currentUrl={formData.trailer_url}
+              selectedFile={formData.trailer_file}
+              autoUpload={false}
             />
           </div>
 
@@ -288,7 +314,7 @@ export const TVShowCreator = () => {
           <div className="pt-4">
             <Button 
               onClick={handleSubmit} 
-              disabled={saving || !formData.title || !formData.description}
+              disabled={saving || !formData.title || !formData.description || !formData.poster_file}
               className="w-full"
             >
               {saving ? (

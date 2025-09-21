@@ -28,25 +28,29 @@ interface UploadState {
 }
 
 interface TVShowUploaderProps {
-  onUploadComplete: (filePath: string, publicUrl: string) => void;
+  onUploadComplete?: (filePath: string, publicUrl: string) => void;
+  onFileSelect?: (file: File | null) => void;
   accept: string;
   maxSize: number;
   label: string;
   description: string;
   contentType: 'poster' | 'trailer' | 'episode';
   currentUrl?: string;
+  selectedFile?: File | null;
   required?: boolean;
   autoUpload?: boolean;
 }
 
 export const TVShowUploader = ({
   onUploadComplete,
+  onFileSelect,
   accept,
   maxSize,
   label,
   description,
   contentType,
   currentUrl,
+  selectedFile,
   required = false,
   autoUpload = true
 }: TVShowUploaderProps) => {
@@ -228,8 +232,8 @@ export const TVShowUploader = ({
         publicUrl: uploadInfo.url
       }));
 
-      // Call completion callback
-      onUploadComplete(uploadInfo.filePath, uploadInfo.url);
+      // Call completion callback if provided
+      onUploadComplete?.(uploadInfo.filePath, uploadInfo.url);
 
       toast({
         title: "Success",
@@ -267,7 +271,10 @@ export const TVShowUploader = ({
   }, [contentType, onUploadComplete, toast]);
 
   const handleFileSelect = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      onFileSelect?.(null);
+      return;
+    }
 
     const file = files[0];
     console.log('[TVShowUploader] File selected:', file.name, file.type, file.size);
@@ -284,6 +291,7 @@ export const TVShowUploader = ({
         description: validationError,
         variant: "destructive",
       });
+      onFileSelect?.(null);
       return;
     }
 
@@ -295,10 +303,16 @@ export const TVShowUploader = ({
       progress: 0
     }));
 
-    if (autoUpload) {
+    // For file selection mode, just notify parent
+    if (onFileSelect) {
+      onFileSelect(file);
+    }
+
+    // Only auto-upload if explicitly enabled and callback provided
+    if (autoUpload && onUploadComplete) {
       await uploadFile(file);
     }
-  }, [validateFile, autoUpload, uploadFile, toast]);
+  }, [validateFile, autoUpload, uploadFile, onFileSelect, onUploadComplete, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -327,6 +341,7 @@ export const TVShowUploader = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    onFileSelect?.(null);
   };
 
   const maxSizeInMB = Math.round(maxSize / 1024 / 1024);
@@ -351,7 +366,7 @@ export const TVShowUploader = ({
       </div>
 
       {/* Current URL Preview */}
-      {currentUrl && !uploadState.file && !uploadState.completed && (
+      {currentUrl && !uploadState.file && !uploadState.completed && !selectedFile && (
         <Card className="border-dashed">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -389,7 +404,7 @@ export const TVShowUploader = ({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
         >
-          {!uploadState.file && !uploadState.completed ? (
+          {!uploadState.file && !uploadState.completed && !selectedFile ? (
             <div className="text-center">
               <div className="mx-auto mb-4 text-muted-foreground">
                 {getContentIcon()}
@@ -423,10 +438,12 @@ export const TVShowUploader = ({
                   {getContentIcon()}
                   <div>
                     <p className="text-sm font-medium">
-                      {uploadState.file?.name || 'Upload completed'}
+                      {uploadState.file?.name || selectedFile?.name || 'Upload completed'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {uploadState.file ? formatFileSize(uploadState.file.size) : 'File uploaded successfully'}
+                      {uploadState.file ? formatFileSize(uploadState.file.size) : 
+                       selectedFile ? formatFileSize(selectedFile.size) : 
+                       'File uploaded successfully'}
                     </p>
                   </div>
                 </div>
@@ -484,9 +501,9 @@ export const TVShowUploader = ({
               )}
 
               {/* Manual Upload Button */}
-              {!autoUpload && uploadState.file && !uploadState.uploading && !uploadState.completed && !uploadState.error && (
+              {!autoUpload && (uploadState.file || selectedFile) && !uploadState.uploading && !uploadState.completed && !uploadState.error && onUploadComplete && (
                 <Button 
-                  onClick={() => uploadFile(uploadState.file!)}
+                  onClick={() => uploadFile(uploadState.file || selectedFile!)}
                   className="w-full"
                 >
                   Upload {contentType}
