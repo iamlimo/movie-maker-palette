@@ -127,6 +127,35 @@ const TVShows = () => {
     }
   };
 
+  const handleDelete = async (showId: string) => {
+    if (!confirm('Are you sure you want to delete this TV show? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tv_shows')
+        .delete()
+        .eq('id', showId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "TV show deleted successfully",
+      });
+
+      fetchTVShows();
+    } catch (error) {
+      console.error('Error deleting TV show:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete TV show",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: "bg-green-500 text-white",
@@ -274,7 +303,11 @@ const TVShows = () => {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDelete(show.id)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -320,10 +353,18 @@ const TVShows = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => navigate(`/admin/seasons/add/${show.id}/${season.id}`)}
+                          >
                             <Plus className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => navigate(`/admin/seasons/edit/${season.id}`)}
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </div>

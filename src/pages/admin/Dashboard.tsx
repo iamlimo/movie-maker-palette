@@ -303,6 +303,22 @@ export default function Dashboard() {
                 </div>
               </NavLink>
             </Button>
+
+            <Button 
+              variant="outline" 
+              className="w-full justify-start h-auto p-4 border-0 bg-gradient-to-r from-accent/10 to-primary/10 hover:from-accent/20 hover:to-primary/20 transition-all duration-300" 
+              asChild
+            >
+              <NavLink to="/admin/tv-shows/add" className="flex items-center space-x-3">
+                <div className="p-2 rounded-lg bg-accent/20">
+                  <Tv className="h-5 w-5 text-accent" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold text-foreground">Create TV Show</div>
+                  <div className="text-sm text-muted-foreground">Add series to platform</div>
+                </div>
+              </NavLink>
+            </Button>
             
             <Button 
               variant="outline" 
@@ -338,16 +354,32 @@ export default function Dashboard() {
 
             <Button 
               variant="outline" 
+              className="w-full justify-start h-auto p-4 border-0 bg-gradient-to-r from-primary/10 to-accent/10 hover:from-primary/20 hover:to-accent/20 transition-all duration-300" 
+              asChild
+            >
+              <NavLink to="/admin/tv-shows" className="flex items-center space-x-3">
+                <div className="p-2 rounded-lg bg-primary/20">
+                  <Tv className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold text-foreground">Manage TV Shows</div>
+                  <div className="text-sm text-muted-foreground">View all series & episodes</div>
+                </div>
+              </NavLink>
+            </Button>
+
+            <Button 
+              variant="outline" 
               className="w-full justify-start h-auto p-4 border-0 bg-gradient-to-r from-accent/10 to-primary/10 hover:from-accent/20 hover:to-primary/20 transition-all duration-300" 
               asChild
             >
               <NavLink to="/admin/movies" className="flex items-center space-x-3">
                 <div className="p-2 rounded-lg bg-accent/20">
-                  <Tv className="h-5 w-5 text-accent" />
+                  <Film className="h-5 w-5 text-accent" />
                 </div>
                 <div className="text-left">
-                  <div className="font-semibold text-foreground">Manage Content</div>
-                  <div className="text-sm text-muted-foreground">View all movies & shows</div>
+                  <div className="font-semibold text-foreground">Manage Movies</div>
+                  <div className="text-sm text-muted-foreground">View all movies</div>
                 </div>
               </NavLink>
             </Button>
