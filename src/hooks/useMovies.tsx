@@ -70,7 +70,17 @@ export const useMovies = (includeApprovedOnly = true) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setMovies(data || []);
+      
+      // Ensure data consistency with proper mapping
+      const mappedMovies = (data || []).map(movie => ({
+        ...movie,
+        genre: movie.genre ? {
+          id: movie.genre.id,
+          name: movie.genre.name
+        } : undefined
+      }));
+      
+      setMovies(mappedMovies);
       setError(null);
     } catch (err: any) {
       console.error('Error fetching movies:', err);

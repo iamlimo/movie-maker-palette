@@ -78,13 +78,17 @@ const Movies = () => {
   const fetchMovies = async () => {
     try {
       const { data, error } = await supabase
-        .from('movie_details')
-        .select('*')
+        .from('movies')
+        .select(`
+          *,
+          genre:genres(id, name)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setMovies((data || []).map((item: any) => ({
         ...item,
+        genre_name: item.genre?.name,
         cast_crew: Array.isArray(item.cast_crew) ? item.cast_crew : []
       })));
     } catch (error) {
@@ -223,13 +227,23 @@ const Movies = () => {
           <h1 className="text-3xl font-bold">Movie Management</h1>
           <p className="text-muted-foreground">Manage all movies in the platform</p>
         </div>
-        <Button 
-          onClick={() => navigate('/admin/movies/add')} 
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Movie
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => navigate('/admin/movies/add')} 
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Movie
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/admin/movies')} 
+            className="flex items-center gap-2"
+          >
+            <Eye className="h-4 w-4" />
+            View All
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
