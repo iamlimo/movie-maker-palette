@@ -15,6 +15,7 @@ interface ChunkedUploadProps {
   currentUrl?: string;
   fileType: "video" | "thumbnail" | "trailer";
   maxSize?: number; // in MB
+  episodeUpload?: boolean; // For episode-specific routing
 }
 
 const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
@@ -24,7 +25,8 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
   description,
   currentUrl,
   fileType,
-  maxSize = 1024 // Default 1GB for videos
+  maxSize = 1024, // Default 1GB for videos
+  episodeUpload = false
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -107,7 +109,8 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
           action: 'get_upload_info',
           fileName: file.name,
           fileSize: file.size,
-          fileType: file.type
+          fileType: file.type,
+          episodeUpload: episodeUpload
         }
       });
 

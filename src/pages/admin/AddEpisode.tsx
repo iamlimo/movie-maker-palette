@@ -350,6 +350,7 @@ const AddEpisode = () => {
                   label="Upload Episode Video"
                   description="Upload the main video file for this episode"
                   fileType="video"
+                  episodeUpload={true}
                 />
                 {videoUrl && (
                   <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
@@ -367,6 +368,7 @@ const AddEpisode = () => {
                   label="Upload Thumbnail"
                   description="Upload a thumbnail image for this episode"
                   fileType="thumbnail"
+                  episodeUpload={true}
                 />
                 {thumbnailUrl && (
                   <div className="mt-2">

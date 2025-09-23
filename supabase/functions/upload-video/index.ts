@@ -102,7 +102,15 @@ Deno.serve(async (req) => {
             );
           }
           
-          const bucket = isVideo ? 'videos' : 'thumbnails';
+          // Check for episode context
+          const { episodeUpload } = requestBody;
+          let bucket: string;
+          
+          if (episodeUpload) {
+            bucket = isVideo ? 'tv-episodes' : 'episode-thumbnails';
+          } else {
+            bucket = isVideo ? 'videos' : 'thumbnails';
+          }
           const maxSize = bucket === 'videos' ? 1073741824 : 10485760; // 1GB for videos, 10MB for thumbnails
           
           console.log('[UPLOAD-VIDEO] Determined bucket:', bucket, 'Max size:', maxSize, 'File validation:', { isVideo, isImage, fileType, fileExtension });
