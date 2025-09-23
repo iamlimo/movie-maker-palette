@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, Play } from "lucide-react";
+import { ArrowLeft, Upload, Play, Film, Image, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -338,41 +339,81 @@ const AddEpisode = () => {
           {/* Media Files */}
           <Card>
             <CardHeader>
-              <CardTitle>Media Files</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Film className="h-5 w-5" />
+                Media Files
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Upload video content and thumbnail for your episode
+              </p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label>Video File *</Label>
+            <CardContent className="space-y-8">
+              {/* Video Upload Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <Film className="h-4 w-4" />
+                    Episode Video *
+                  </Label>
+                  {videoUrl && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Uploaded
+                    </Badge>
+                  )}
+                </div>
                 <ChunkedUpload
                   onUploadComplete={(url) => setVideoUrl(url)}
-                  accept="video/*"
+                  accept="video/mp4,video/mov,video/avi,video/mkv"
                   maxSize={500}
-                  label="Upload Episode Video"
-                  description="Upload the main video file for this episode"
+                  label="Episode Video"
+                  description="Supported formats: MP4, MOV, AVI, MKV • Max size: 500MB"
                   fileType="video"
                   episodeUpload={true}
+                  currentUrl={videoUrl}
                 />
-                {videoUrl && (
-                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
-                    ✓ Video uploaded successfully
-                  </div>
-                )}
               </div>
 
-              <div>
-                <Label>Episode Thumbnail</Label>
+              {/* Thumbnail Upload Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <Image className="h-4 w-4" />
+                    Episode Thumbnail
+                  </Label>
+                  {thumbnailUrl && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Uploaded
+                    </Badge>
+                  )}
+                </div>
                 <ChunkedUpload
                   onUploadComplete={(url) => setThumbnailUrl(url)}
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
                   maxSize={5}
-                  label="Upload Thumbnail"
-                  description="Upload a thumbnail image for this episode"
+                  label="Thumbnail Image"
+                  description="Supported formats: JPG, PNG, WebP • Recommended: 1920x1080 • Max size: 5MB"
                   fileType="thumbnail"
                   episodeUpload={true}
+                  currentUrl={thumbnailUrl}
                 />
                 {thumbnailUrl && (
-                  <div className="mt-2">
-                    <img src={thumbnailUrl} alt="Thumbnail preview" className="w-32 h-20 object-cover rounded" />
+                  <div className="mt-4 p-4 border rounded-lg bg-muted/30">
+                    <Label className="text-sm font-medium text-muted-foreground">Preview</Label>
+                    <div className="mt-2 flex gap-4">
+                      <img 
+                        src={thumbnailUrl} 
+                        alt="Episode thumbnail preview" 
+                        className="w-32 h-20 object-cover rounded-md border shadow-sm" 
+                      />
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium">Thumbnail uploaded successfully</p>
+                        <p className="text-xs text-muted-foreground">
+                          This image will be displayed as your episode thumbnail
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, X, Film, Image, PlayCircle } from "lucide-react";
+import { Upload, X, Film, Image, PlayCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
@@ -247,73 +247,75 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">{label}</h3>
-          {description && (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          )}
-        </div>
-        <Badge variant="outline">
-          Max {maxSize}MB
-        </Badge>
-      </div>
-
-      {/* Current file preview */}
-      {currentUrl && !file && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              {fileType === "thumbnail" ? (
-                <img src={currentUrl} alt="Current thumbnail" className="w-16 h-16 object-cover rounded" />
-              ) : (
-                <div className="w-16 h-16 bg-secondary rounded flex items-center justify-center">
-                  <PlayCircle className="h-8 w-8 text-muted-foreground" />
-                </div>
-              )}
-              <div>
-                <p className="font-medium">Current {fileType}</p>
-                <p className="text-sm text-muted-foreground">Click to replace</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
+    <div className="space-y-3">
       {/* Upload area */}
       <Card
-        className={`border-dashed border-2 transition-colors ${
+        className={`border-dashed border-2 transition-all duration-200 cursor-pointer ${
           dragOver 
-            ? 'border-primary bg-primary/5' 
-            : 'border-border hover:border-primary/50'
-        }`}
+            ? 'border-primary bg-primary/10 shadow-lg scale-[1.02]' 
+            : currentUrl && !file
+            ? 'border-green-300 bg-green-50/50'
+            : 'border-border hover:border-primary/50 hover:bg-muted/30'
+        } ${uploading ? 'pointer-events-none opacity-75' : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
+        onClick={() => !uploading && !file && fileInputRef.current?.click()}
       >
-        <CardContent className="p-8">
+        <CardContent className="p-6">
+          {/* Current file preview */}
+          {currentUrl && !file && !uploading && (
+            <div className="flex items-center gap-4 mb-4 p-3 bg-background rounded-lg border">
+              {fileType === "thumbnail" ? (
+                <img src={currentUrl} alt="Current thumbnail" className="w-12 h-12 object-cover rounded border" />
+              ) : (
+                <div className="w-12 h-12 bg-primary/10 rounded flex items-center justify-center">
+                  <PlayCircle className="h-6 w-6 text-primary" />
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="font-medium text-sm">Current {fileType}</p>
+                <p className="text-xs text-muted-foreground">Click to replace or drag new file</p>
+              </div>
+              <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Uploaded
+              </Badge>
+            </div>
+          )}
+
           {!file ? (
             <div className="text-center space-y-4">
-              <div className="flex justify-center text-muted-foreground">
-                {getFileIcon()}
+              <div className={`flex justify-center transition-colors ${dragOver ? 'text-primary' : 'text-muted-foreground'}`}>
+                <div className={`p-4 rounded-full transition-all ${dragOver ? 'bg-primary/20 scale-110' : 'bg-muted/50'}`}>
+                  {getFileIcon()}
+                </div>
               </div>
               <div>
-                <p className="text-lg font-medium">
-                  Drag & drop {fileType} here
+                <p className={`font-medium transition-colors ${dragOver ? 'text-primary' : 'text-foreground'}`}>
+                  {dragOver ? `Drop ${fileType} here` : `Drag & drop ${fileType} here`}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  or click to browse files
+                <p className="text-sm text-muted-foreground mt-1">
+                  {description}
                 </p>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Select {fileType}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2 items-center justify-center">
+                <Button
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  disabled={uploading}
+                  className="w-full sm:w-auto"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Browse Files
+                </Button>
+                <Badge variant="outline" className="text-xs">
+                  Max {maxSize}MB
+                </Badge>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -329,21 +331,22 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                <div className="text-primary">
                   {getFileIcon()}
-                  <div>
-                    <p className="font-medium">{file.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatFileSize(file.size)}
-                    </p>
-                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{file.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatFileSize(file.size)}
+                  </p>
                 </div>
                 {!uploading && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={clearFile}
+                    className="shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -351,17 +354,24 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
               </div>
               
               {uploading && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Uploading...</span>
-                    <span>{progress}%</span>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                      Uploading {fileType}...
+                    </span>
+                    <span className="font-medium">{progress}%</span>
                   </div>
                   <Progress value={progress} className="h-2" />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Please don't close this page while uploading
+                  </p>
                 </div>
               )}
               
               {!uploading && (
-                <Button onClick={uploadFile} className="w-full">
+                <Button onClick={uploadFile} className="w-full" size="lg">
+                  <Upload className="h-4 w-4 mr-2" />
                   Upload {fileType}
                 </Button>
               )}
