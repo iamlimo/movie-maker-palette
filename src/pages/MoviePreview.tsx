@@ -59,7 +59,12 @@ const MoviePreview = () => {
         .from('movies')
         .select(`
           *,
-          genre:genres(name)
+          genre:genres(name),
+          thumbnail_url,
+          video_url,
+          trailer_url,
+          landscape_poster_url,
+          slider_cover_url
         `)
         .eq('id', movieId)
         .eq('status', 'approved')

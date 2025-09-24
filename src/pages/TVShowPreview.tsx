@@ -85,7 +85,11 @@ const TVShowPreview = () => {
         .from('tv_shows')
         .select(`
           *,
-          genre:genres(name)
+          genre:genres(name),
+          thumbnail_url,
+          landscape_poster_url,
+          slider_cover_url,
+          trailer_url
         `)
         .eq('id', showId)
         .eq('status', 'approved')
@@ -112,7 +116,11 @@ const TVShowPreview = () => {
         const episodesPromises = seasonsData.map(season =>
           supabase
             .from('episodes')
-            .select('*')
+            .select(`
+              *,
+              thumbnail_url,
+              video_url
+            `)
             .eq('season_id', season.id)
             .eq('status', 'approved')
             .order('episode_number')

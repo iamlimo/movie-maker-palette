@@ -66,7 +66,7 @@ const ContentCarousel: React.FC<ContentCarouselProps> = ({
 
       <div 
         ref={scrollContainerRef}
-        className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4"
+        className="flex space-x-4 overflow-x-auto scrollbar-hide pb-4 snap-x snap-mandatory"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {children}
@@ -88,7 +88,7 @@ export const ContentCarouselItem: React.FC<ContentCarouselItemProps> = ({
 }) => {
   return (
     <div 
-      className={cn('flex-shrink-0', className)}
+      className={cn('flex-shrink-0 snap-start', className)}
       style={{ minWidth }}
     >
       {children}
