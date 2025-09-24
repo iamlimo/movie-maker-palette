@@ -40,7 +40,9 @@ const VideoPlayerWithValidation = ({
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase.functions.invoke(`rental-validation?content_id=${contentId}&content_type=${contentType}`);
+      // Call rental-validation with proper parameters
+      const url = `rental-validation?content_id=${contentId}&content_type=${contentType}`;
+      const { data, error } = await supabase.functions.invoke(url);
       
       if (error) {
         console.error('Rental validation error:', error);

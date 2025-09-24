@@ -54,15 +54,24 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
           description: "Complete your payment in the popup window",
         });
 
-        // Poll for payment completion
+        // Poll for payment completion with webhook integration
         const pollPayment = setInterval(async () => {
-          await fetchRentals();
-          if (checkAccess(contentId, contentType)) {
-            clearInterval(pollPayment);
-            toast({
-              title: "Payment Successful!",
-              description: `You can now watch ${title}`,
+          try {
+            // Check payment status via verify-payment function
+            const { data: paymentData } = await supabase.functions.invoke('verify-payment', {
+              body: { payment_id: data.payment_id }
             });
+            
+            if (paymentData?.payment?.status === 'completed') {
+              clearInterval(pollPayment);
+              await fetchRentals(); // Refresh rental status
+              toast({
+                title: "Payment Successful!",
+                description: `You can now watch ${title}`,
+              });
+            }
+          } catch (pollError) {
+            console.error('Payment polling error:', pollError);
           }
         }, 3000);
 

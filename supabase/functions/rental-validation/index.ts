@@ -94,9 +94,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       hasAccess,
       rental: hasAccess ? {
-        id: rental.id,
-        expires_at: rental.expires_at,
-        amount: rental.amount
+        id: rental?.id,
+        expires_at: rental?.expires_at,
+        amount: rental?.amount
       } : null,
       videoUrl: hasAccess ? videoUrl : null
     }), {
