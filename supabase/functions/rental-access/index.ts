@@ -30,7 +30,7 @@ serve(async (req) => {
       }
     }
     
-    return await checkAccess(user, supabase, contentId, contentType);
+    return await checkAccess(user, supabase, contentId!, contentType!);
 
   } catch (error: any) {
     console.error("Error in rental-access:", error);

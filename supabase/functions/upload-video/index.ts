@@ -140,9 +140,7 @@ Deno.serve(async (req) => {
           console.log('[UPLOAD-VIDEO] Creating signed upload URL for bucket:', bucket);
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from(bucket)
-            .createSignedUploadUrl(filePath, {
-              expiresIn: 3600, // 1 hour
-            });
+            .createSignedUploadUrl(filePath);
 
           if (uploadError) {
             console.error('Upload URL creation error:', uploadError);
@@ -173,7 +171,7 @@ Deno.serve(async (req) => {
             JSON.stringify({ 
               success: false, 
               error: 'Internal server error in get_upload_info',
-              details: error.message
+              details: error instanceof Error ? error.message : 'Unknown error'
             }),
             { status: 500, headers: corsHeaders }
           );
@@ -228,7 +226,7 @@ Deno.serve(async (req) => {
             JSON.stringify({ 
               success: false, 
               error: 'Internal server error in confirm_upload',
-              details: error.message
+              details: error instanceof Error ? error.message : 'Unknown error'
             }),
             { status: 500, headers: corsHeaders }
           );

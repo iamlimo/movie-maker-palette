@@ -118,7 +118,7 @@ serve(async (req) => {
               }
             }
           } catch (error) {
-            errors.push(`Error deleting ${file.url}: ${error.message}`);
+            errors.push(`Error deleting ${file.url}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         }
       }

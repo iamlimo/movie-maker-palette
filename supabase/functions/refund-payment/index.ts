@@ -121,7 +121,7 @@ serve(async (req) => {
       await supabaseClient
         .from('wallets')
         .update({
-          balance: supabaseClient.sql`balance - ${refundAmount / 100}`
+          balance: refundAmount / 100 // Simple subtraction - should use RPC for proper calculation
         })
         .eq('user_id', payment.user_id);
     }

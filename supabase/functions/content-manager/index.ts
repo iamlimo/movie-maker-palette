@@ -147,7 +147,7 @@ async function createMovie(supabase: any, data: ContentData, userId: string) {
     return { success: true, data: movie }
   } catch (error) {
     console.error('Create movie error:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -176,7 +176,7 @@ async function createTVShow(supabase: any, data: ContentData, userId: string) {
     return { success: true, data: tvShow }
   } catch (error) {
     console.error('Create TV show error:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
@@ -202,6 +202,6 @@ async function createEpisode(supabase: any, data: EpisodeData, userId: string) {
     return { success: true, data: episode }
   } catch (error) {
     console.error('Create episode error:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }

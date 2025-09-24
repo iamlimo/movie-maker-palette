@@ -31,7 +31,7 @@ function verifyPaystackSignature(body: string, signature: string, secret: string
   
   // For demonstration - in production, use proper HMAC-SHA512 verification
   // This is a simplified version
-  return signature && signature.length > 0;
+  return Boolean(signature && signature.length > 0);
 }
 
 // Webhook event deduplication

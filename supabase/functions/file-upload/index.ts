@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
           .upload(filePath, fileData, {
             cacheControl: '3600',
             upsert: false,
-            contentType: contentType // Preserve the original MIME type
+            contentType: contentType || undefined // Preserve the original MIME type
           })
 
         if (uploadError) {

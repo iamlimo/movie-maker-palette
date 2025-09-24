@@ -93,9 +93,7 @@ Deno.serve(async (req) => {
     // Create signed upload URL with short expiry to avoid token issues
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucket)
-      .createSignedUploadUrl(filePath, {
-        expiresIn: 1800, // 30 minutes
-      });
+      .createSignedUploadUrl(filePath);
 
     if (uploadError) {
       console.error('[CREATE-SIGNED-UPLOAD-URL] Upload URL creation error:', uploadError);
