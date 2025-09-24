@@ -8,6 +8,7 @@ import { useSliderItems, SliderItem } from '@/hooks/useSliderItems';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import FavoriteButton from '@/components/FavoriteButton';
 
 const CinematicHeroSlider = () => {
@@ -104,9 +105,12 @@ const CinematicHeroSlider = () => {
           {/* Background Image */}
           <div className="absolute inset-0">
             <img 
-              src={currentItem.poster_url || '/placeholder.svg'} 
+              src={currentItem.poster_url || moviePlaceholder} 
               alt={currentItem.title}
               className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = moviePlaceholder;
+              }}
             />
             <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />

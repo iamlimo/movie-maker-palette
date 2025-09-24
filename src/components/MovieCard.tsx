@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, Play, Clock, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 
 interface MovieCardProps {
   id: string;
@@ -41,9 +42,12 @@ const MovieCard = ({
       {/* Movie Poster */}
       <div className="aspect-[2/3] overflow-hidden bg-secondary">
         <img 
-          src={imageUrl} 
+          src={imageUrl || moviePlaceholder} 
           alt={title}
           className="w-full h-full object-cover transition-smooth group-hover:scale-110"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = moviePlaceholder;
+          }}
         />
         
         {/* Overlay */}
@@ -78,7 +82,7 @@ const MovieCard = ({
           <span>{year}</span>
           <div className="flex items-center gap-1">
             <Star className="h-3 w-3 fill-primary text-primary" />
-            <span>{rating}</span>
+            <span>{rating || 0}</span>
           </div>
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
