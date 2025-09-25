@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Upload, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,10 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { MediaUploadManager } from '@/components/admin/MediaUploadManager';
+import { DeferredMediaUpload } from '@/components/admin/DeferredMediaUpload';
+import { useDeferredUpload } from '@/hooks/useDeferredUpload';
 import CastCrewManager from '@/components/admin/CastCrewManager';
+import NairaInput from '@/components/admin/NairaInput';
 
 interface Genre {
   id: string;
@@ -58,15 +61,23 @@ const AddMovieNew = () => {
   });
   
   const [genres, setGenres] = useState<Genre[]>([]);
-  const [thumbnailUrl, setThumbnailUrl] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [trailerUrl, setTrailerUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCastCrew, setSelectedCastCrew] = useState<CastCrew[]>([]);
   const [castAssignments, setCastAssignments] = useState<MovieCastAssignment[]>([]);
   
   const navigate = useNavigate();
   const { toast } = useToast();
+  const {
+    stagedFiles,
+    uploadProgress,
+    isUploading,
+    stageFile,
+    removeFile,
+    uploadAllFiles,
+    retryFailedUploads,
+    getFileByType,
+    getProgressByType
+  } = useDeferredUpload();
 
   useEffect(() => {
     fetchGenres();
@@ -145,13 +156,33 @@ const AddMovieNew = () => {
     }
   };
 
+  const validateForm = () => {
+    const errors: string[] = [];
+    
+    if (!formData.title.trim()) errors.push("Title is required");
+    if (!formData.price || parseFloat(formData.price) <= 0) errors.push("Valid price is required");
+    if (!formData.description?.trim()) errors.push("Description is required");
+    if (!formData.genre_id) errors.push("Genre is required");
+    
+    // Check if at least one media file is staged
+    const hasVideo = getFileByType('video');
+    const hasThumbnail = getFileByType('thumbnail');
+    
+    if (!hasVideo) errors.push("Video file is required");
+    if (!hasThumbnail) errors.push("Thumbnail is required");
+    
+    return errors;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.price) {
+    // Validate form
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
       toast({
         title: "Validation Error",
-        description: "Title and price are required fields",
+        description: validationErrors.join(", "),
         variant: "destructive",
       });
       return;
@@ -166,7 +197,27 @@ const AddMovieNew = () => {
         throw new Error('Authentication required');
       }
 
-      // Prepare movie data
+      console.log('[AddMovie] Starting upload process for', stagedFiles.length, 'files');
+
+      // Upload all staged files first
+      const uploadResults = await uploadAllFiles();
+      
+      // Check if any required uploads failed
+      const videoResult = uploadResults.find(r => r.fileType === 'video');
+      const thumbnailResult = uploadResults.find(r => r.fileType === 'thumbnail');
+      const trailerResult = uploadResults.find(r => r.fileType === 'trailer');
+
+      if (!videoResult) {
+        throw new Error('Video upload failed - cannot create movie without video');
+      }
+
+      if (!thumbnailResult) {
+        throw new Error('Thumbnail upload failed - cannot create movie without thumbnail');
+      }
+
+      console.log('[AddMovie] All uploads completed, creating movie record');
+
+      // Prepare movie data with uploaded file paths
       const movieData = {
         title: formData.title,
         description: formData.description || null,
@@ -176,14 +227,15 @@ const AddMovieNew = () => {
         language: formData.language || null,
         rating: formData.rating || null,
         price: parseFloat(formData.price),
-        thumbnail_url: thumbnailUrl || null,
-        video_url: videoUrl || null,
+        thumbnail_url: thumbnailResult.filePath,
+        video_url: videoResult.filePath,
+        trailer_url: trailerResult?.filePath || null,
         status: 'approved' as const,
         rental_expiry_duration: parseInt(formData.rental_expiry_duration),
         uploaded_by: user.id
       };
 
-      console.log('Inserting movie data:', movieData);
+      console.log('[AddMovie] Inserting movie data:', movieData);
 
       // Insert movie
       const { data: movie, error: movieError } = await supabase
@@ -194,22 +246,22 @@ const AddMovieNew = () => {
 
       if (movieError) throw movieError;
 
-      console.log('Movie created successfully:', movie);
+      console.log('[AddMovie] Movie created successfully:', movie.id);
 
       // Save cast and crew assignments
       await saveCastAssignments(movie.id);
 
       toast({
         title: "Success",
-        description: "Movie added successfully with cast and crew",
+        description: "Movie created successfully with all media files",
       });
 
       navigate('/admin/movies');
     } catch (error) {
-      console.error('Error adding movie:', error);
+      console.error('[AddMovie] Error:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add movie",
+        description: error instanceof Error ? error.message : "Failed to create movie",
         variant: "destructive",
       });
     } finally {
@@ -217,7 +269,26 @@ const AddMovieNew = () => {
     }
   };
 
-  const isFormValid = formData.title && formData.price;
+  const handleRetryFailedUploads = async () => {
+    try {
+      await retryFailedUploads();
+    } catch (error) {
+      console.error('[AddMovie] Retry failed:', error);
+    }
+  };
+
+  const isFormValid = () => {
+    const errors = validateForm();
+    return errors.length === 0;
+  };
+
+  const getOverallProgress = () => {
+    if (uploadProgress.length === 0) return 0;
+    const totalProgress = uploadProgress.reduce((sum, p) => sum + p.progress, 0);
+    return Math.round(totalProgress / uploadProgress.length);
+  };
+
+  const hasFailedUploads = uploadProgress.some(p => p.status === 'error');
 
   return (
     <div className="min-h-screen bg-background">
@@ -244,7 +315,7 @@ const AddMovieNew = () => {
             <CardHeader>
               <CardTitle className="text-foreground flex items-center gap-2">
                 Basic Information
-                {!isFormValid && (
+                {!isFormValid() && (
                   <Badge variant="destructive" className="text-xs">
                     Required fields missing
                   </Badge>
@@ -269,7 +340,7 @@ const AddMovieNew = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="genre" className="text-foreground">Genre</Label>
+                  <Label htmlFor="genre" className="text-foreground">Genre *</Label>
                   <Select onValueChange={(value) => handleInputChange('genre_id', value)}>
                     <SelectTrigger className="bg-input border-border text-foreground">
                       <SelectValue placeholder="Select a genre" />
@@ -287,7 +358,7 @@ const AddMovieNew = () => {
 
               {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-foreground">Description</Label>
+                <Label htmlFor="description" className="text-foreground">Description *</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
@@ -295,6 +366,7 @@ const AddMovieNew = () => {
                   placeholder="Enter movie description..."
                   rows={4}
                   className="bg-input border-border text-foreground resize-none"
+                  required
                 />
               </div>
 
@@ -354,18 +426,11 @@ const AddMovieNew = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="price" className="text-foreground">
-                    Price ($) *
-                  </Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) => handleInputChange('price', e.target.value)}
-                    placeholder="9.99"
-                    className="bg-input border-border text-foreground"
+                  <NairaInput
+                    label="Price ₦ *"
+                    value={parseFloat(formData.price) || 0}
+                    onChange={(value) => handleInputChange('price', value.toString())}
+                    placeholder="0.00"
                     required
                   />
                 </div>
@@ -395,41 +460,115 @@ const AddMovieNew = () => {
           {/* Media Files */}
           <Card className="gradient-card border-border shadow-card">
             <CardHeader>
-              <CardTitle className="text-foreground">Media Files</CardTitle>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                Media Files
+                {stagedFiles.length === 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    No files staged
+                  </Badge>
+                )}
+                {stagedFiles.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {stagedFiles.length} file(s) ready
+                  </Badge>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <MediaUploadManager
-                  onUploadComplete={(url, filePath) => setThumbnailUrl(filePath)}
+                <DeferredMediaUpload
+                  onFileStaged={stageFile}
+                  onFileRemoved={removeFile}
                   accept="image/*"
                   maxSize={10 * 1024 * 1024} // 10MB
                   label="Movie Thumbnail"
-                  description="Upload a thumbnail image for the movie"
+                  description="Select a thumbnail image for the movie"
                   fileType="thumbnail"
-                  currentUrl={thumbnailUrl}
+                  required
+                  stagedFile={getFileByType('thumbnail')}
+                  progress={getProgressByType('thumbnail')}
                 />
 
-                <MediaUploadManager
-                  onUploadComplete={(url, filePath) => setVideoUrl(filePath)}
+                <DeferredMediaUpload
+                  onFileStaged={stageFile}
+                  onFileRemoved={removeFile}
                   accept="video/*"
                   maxSize={1024 * 1024 * 1024} // 1GB
                   label="Movie Video"
-                  description="Upload the main movie video file"
+                  description="Select the main movie video file"
                   fileType="video"
-                  currentUrl={videoUrl}
+                  required
+                  stagedFile={getFileByType('video')}
+                  progress={getProgressByType('video')}
                 />
               </div>
 
               {/* Trailer Upload */}
-              <MediaUploadManager
-                onUploadComplete={(url, filePath) => setTrailerUrl(filePath)}
+              <DeferredMediaUpload
+                onFileStaged={stageFile}
+                onFileRemoved={removeFile}
                 accept="video/*"
                 maxSize={500 * 1024 * 1024} // 500MB for trailers
                 label="Movie Trailer (Optional)"
-                description="Upload a trailer or preview video for the movie"
+                description="Select a trailer or preview video for the movie"
                 fileType="trailer"
-                currentUrl={trailerUrl}
+                stagedFile={getFileByType('trailer')}
+                progress={getProgressByType('trailer')}
               />
+
+              {/* Upload Progress Summary */}
+              {(isUploading || uploadProgress.length > 0) && (
+                <Card className="p-4 bg-muted/50">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-foreground">Upload Progress</h4>
+                      {hasFailedUploads && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRetryFailedUploads}
+                          disabled={isUploading}
+                          className="text-xs"
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Retry Failed
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {isUploading && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Overall Progress</span>
+                          <span>{getOverallProgress()}%</span>
+                        </div>
+                        <Progress value={getOverallProgress()} className="h-2" />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {uploadProgress.map(progress => (
+                        <div key={progress.id} className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">{progress.fileName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              progress.status === 'completed' ? 'bg-green-500/10 text-green-600' :
+                              progress.status === 'error' ? 'bg-destructive/10 text-destructive' :
+                              progress.status === 'uploading' ? 'bg-primary/10 text-primary' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {progress.status === 'completed' ? 'Completed' :
+                               progress.status === 'error' ? 'Failed' :
+                               progress.status === 'uploading' ? `${progress.progress}%` :
+                               'Pending'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
             </CardContent>
           </Card>
 
@@ -496,45 +635,57 @@ const AddMovieNew = () => {
             </CardContent>
           </Card>
 
-          {/* Form Actions */}
-          <div className="flex items-center justify-between p-6 bg-card border border-border rounded-lg">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {!isFormValid && (
+          {/* Submit Section */}
+          <div className="flex justify-end gap-4 pt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/admin/movies')}
+              disabled={isSubmitting || isUploading}
+              className="px-8"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={!isFormValid() || isSubmitting || isUploading}
+              className="px-8 gradient-accent text-primary-foreground"
+            >
+              {isSubmitting ? (
                 <>
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                  <span>Please fill in all required fields</span>
+                  <Save className="h-4 w-4 mr-2 animate-spin" />
+                  Creating Movie...
+                </>
+              ) : isUploading ? (
+                <>
+                  <Upload className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading Files...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Create Movie
                 </>
               )}
-            </div>
-            
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/admin/movies')}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !isFormValid}
-                className="gradient-accent text-primary-foreground"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                    Creating Movie...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Create Movie
-                  </>
-                )}
-              </Button>
-            </div>
+            </Button>
           </div>
+
+          {/* Validation Summary */}
+          {!isFormValid() && (
+            <Card className="p-4 bg-destructive/5 border-destructive/20">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-destructive mb-2">Please complete the following:</h4>
+                  <ul className="text-sm text-destructive space-y-1">
+                    {validateForm().map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </Card>
+          )}
         </form>
       </div>
     </div>
