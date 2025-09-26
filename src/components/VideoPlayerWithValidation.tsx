@@ -40,9 +40,14 @@ const VideoPlayerWithValidation = ({
     try {
       setIsLoading(true);
       
-      // Call rental-validation with proper parameters
-      const url = `rental-validation?content_id=${contentId}&content_type=${contentType}`;
-      const { data, error } = await supabase.functions.invoke(url);
+      // Call unified rental manager to validate access
+      const { data, error } = await supabase.functions.invoke('unified-rental-manager', {
+        body: {
+          contentId,
+          contentType,
+          action: 'validate'
+        }
+      });
       
       if (error) {
         console.error('Rental validation error:', error);

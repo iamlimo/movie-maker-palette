@@ -1241,38 +1241,7 @@ export type Database = {
       }
     }
     Views: {
-      movie_details: {
-        Row: {
-          cast_crew: Json | null
-          created_at: string | null
-          description: string | null
-          duration: number | null
-          genre_id: string | null
-          genre_name: string | null
-          id: string | null
-          language: string | null
-          price: number | null
-          rating: string | null
-          release_date: string | null
-          rental_expiry_duration: number | null
-          status: Database["public"]["Enums"]["content_status"] | null
-          thumbnail_url: string | null
-          title: string | null
-          trailer_url: string | null
-          updated_at: string | null
-          uploaded_by: string | null
-          video_url: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "movies_genre_id_fkey"
-            columns: ["genre_id"]
-            isOneToOne: false
-            referencedRelation: "genres"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       check_existing_rental: {

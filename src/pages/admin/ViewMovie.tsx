@@ -45,7 +45,7 @@ const ViewMovie = () => {
   const fetchMovie = async (movieId: string) => {
     try {
       const { data, error } = await supabase
-        .from('movie_details')
+        .from('movies')
         .select('*')
         .eq('id', movieId)
         .single();
@@ -53,7 +53,7 @@ const ViewMovie = () => {
       if (error) throw error;
       setMovie({
         ...data,
-        cast_crew: Array.isArray(data.cast_crew) ? data.cast_crew : []
+        cast_crew: []
       });
     } catch (error) {
       console.error('Error fetching movie:', error);

@@ -49,34 +49,31 @@ enable_email_confirmations = true
 enable_email_change_confirmations = true
 enable_phone_confirmations = true
 
+[functions.unified-media-upload]
+verify_jwt = true
+
+[functions.unified-content-manager]
+verify_jwt = true
+
+[functions.unified-rental-manager]
+verify_jwt = true
+
 [functions.create-payment]
+verify_jwt = true
+
+[functions.verify-payment]
 verify_jwt = true
 
 [functions.paystack-webhook]
 verify_jwt = false
 
-[functions.content-manager]
-verify_jwt = true
+[functions.banners]
+verify_jwt = false
 
-[functions.file-upload]
-verify_jwt = true
+[functions.sections]
+verify_jwt = false
 
-[functions.rental-validation]
-verify_jwt = true
-
-[functions.create-tv-show]
-verify_jwt = true
-
-[functions.create-season]
-verify_jwt = true
-
-[functions.upload-episode]
-verify_jwt = true
-
-[functions.check-user-payment]
-verify_jwt = true
-
-[functions.get-episode-access]
+[functions.slider-items]
 verify_jwt = false
 
 [edge-runtime]

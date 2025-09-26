@@ -237,15 +237,29 @@ const AddMovieNew = () => {
 
       console.log('[AddMovie] Inserting movie data:', movieData);
 
-      // Insert movie
-      const { data: movie, error: movieError } = await supabase
-        .from('movies')
-        .insert([movieData])
-        .select()
-        .single();
+      // Create movie using unified content manager
+      const { data: movieResponse, error: movieError } = await supabase.functions.invoke('unified-content-manager', {
+        body: {
+          title: movieData.title,
+          description: movieData.description,
+          price: movieData.price,
+          genre_id: movieData.genre_id,
+          language: movieData.language,
+          rating: movieData.rating,
+          duration: movieData.duration,
+          release_date: movieData.release_date,
+          rental_expiry_duration: movieData.rental_expiry_duration,
+          video_url: movieData.video_url,
+          thumbnail_url: movieData.thumbnail_url,
+          trailer_url: movieData.trailer_url,
+          landscape_poster_url: movieData.thumbnail_url,
+          slider_cover_url: movieData.thumbnail_url
+        }
+      });
 
-      if (movieError) throw movieError;
+      if (movieError || !movieResponse?.success) throw movieError || new Error('Failed to create movie');
 
+      const movie = movieResponse.movie;
       console.log('[AddMovie] Movie created successfully:', movie.id);
 
       // Save cast and crew assignments

@@ -80,13 +80,12 @@ export const useDeferredUpload = () => {
     ));
 
     try {
-      // Get upload info
-      const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('upload-video', {
+      // Get upload info from unified media upload function
+      const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('unified-media-upload', {
         body: {
-          action: 'get_upload_info',
           fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type
+          fileType: fileType,
+          contentType: file.type
         }
       });
 
@@ -94,8 +93,8 @@ export const useDeferredUpload = () => {
         throw new Error(`Failed to get upload info: ${infoError.message}`);
       }
 
-      if (!uploadInfo?.uploadUrl) {
-        throw new Error(uploadInfo?.error || 'Failed to get upload URL');
+      if (!uploadInfo?.success || !uploadInfo?.uploadUrl) {
+        throw new Error('Failed to get upload URL');
       }
 
       // Update progress
@@ -138,22 +137,8 @@ export const useDeferredUpload = () => {
         p.id === id ? { ...p, progress: 90 } : p
       ));
 
-      // Confirm upload
-      const { data: confirmData, error: confirmError } = await supabase.functions.invoke('upload-video', {
-        body: {
-          action: 'confirm_upload',
-          filePath: uploadInfo.filePath,
-          bucket: uploadInfo.bucket
-        }
-      });
-
-      if (confirmError) {
-        throw new Error(`Failed to confirm upload: ${confirmError.message}`);
-      }
-
-      if (!confirmData?.publicUrl) {
-        throw new Error(confirmData?.error || 'Failed to get public URL');
-      }
+      // File uploaded successfully, get public URL
+      const publicUrl = uploadInfo.publicUrl;
 
       // Mark as completed
       setUploadProgress(prev => prev.map(p => 
@@ -161,7 +146,7 @@ export const useDeferredUpload = () => {
           ...p, 
           progress: 100, 
           status: 'completed',
-          url: confirmData.publicUrl,
+          url: publicUrl,
           filePath: uploadInfo.filePath
         } : p
       ));
@@ -169,7 +154,7 @@ export const useDeferredUpload = () => {
       console.log(`[DeferredUpload] ${fileType} upload completed successfully`);
 
       return {
-        url: confirmData.publicUrl,
+        url: publicUrl,
         filePath: uploadInfo.filePath,
         fileType
       };
