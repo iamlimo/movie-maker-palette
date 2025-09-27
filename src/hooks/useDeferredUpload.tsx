@@ -90,11 +90,18 @@ export const useDeferredUpload = () => {
       });
 
       if (infoError) {
+        console.error(`[DeferredUpload] Function invocation error:`, infoError);
         throw new Error(`Failed to get upload info: ${infoError.message}`);
       }
 
-      if (!uploadInfo?.success || !uploadInfo?.uploadUrl) {
-        throw new Error('Failed to get upload URL');
+      if (!uploadInfo) {
+        console.error(`[DeferredUpload] No response from function`);
+        throw new Error('No response from upload function');
+      }
+
+      if (!uploadInfo.success || !uploadInfo.uploadUrl) {
+        console.error(`[DeferredUpload] Invalid response:`, uploadInfo);
+        throw new Error(`Failed to get upload URL: ${uploadInfo.error || 'Unknown error'}`);
       }
 
       // Update progress

@@ -24,7 +24,11 @@ serve(async (req) => {
     if (authError || !user) {
       console.error('Authentication failed:', authError)
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'Unauthorized',
+          details: authError?.message || 'No user found'
+        }),
         { status: 401, headers: corsHeaders }
       )
     }
@@ -37,9 +41,13 @@ serve(async (req) => {
       .single()
 
     if (!userRole || userRole.role !== 'super_admin') {
-      console.error('User is not super admin:', user.id)
+      console.error('User is not super admin:', user.id, 'role:', userRole?.role)
       return new Response(
-        JSON.stringify({ error: 'Forbidden: Super admin access required' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Forbidden: Super admin access required',
+          details: `Current role: ${userRole?.role || 'none'}`
+        }),
         { status: 403, headers: corsHeaders }
       )
     }
@@ -98,6 +106,7 @@ serve(async (req) => {
     console.error('Upload URL generation failed:', error)
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: 'Failed to generate upload URL',
         details: error instanceof Error ? error.message : 'Unknown error'
       }),

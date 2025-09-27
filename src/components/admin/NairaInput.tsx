@@ -52,8 +52,8 @@ const NairaInput: React.FC<NairaInputProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     
-    // Remove the ₦ symbol for processing
-    const cleanValue = inputValue.replace('₦', '').trim();
+    // Remove formatting and keep only numbers and decimal
+    const cleanValue = inputValue.replace(/[^\d.]/g, '');
     const formatted = formatCurrency(cleanValue);
     
     setDisplayValue(formatted);
@@ -71,7 +71,15 @@ const NairaInput: React.FC<NairaInputProps> = ({
     }
   };
 
-  const displayWithSymbol = displayValue ? `₦${displayValue}` : "";
+  const formatDisplayValue = (value: string) => {
+    if (!value) return "";
+    const num = parseFloat(value);
+    if (isNaN(num)) return "";
+    return num.toLocaleString('en-NG', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+  };
 
   return (
     <div className="space-y-2">
@@ -84,10 +92,10 @@ const NairaInput: React.FC<NairaInputProps> = ({
       <div className="relative">
         <Input
           type="text"
-          value={displayWithSymbol}
+          value={formatDisplayValue(displayValue)}
           onChange={handleInputChange}
           onBlur={handleBlur}
-          placeholder={`₦${placeholder}`}
+          placeholder={placeholder}
           required={required}
           disabled={disabled}
           className="pl-8"
