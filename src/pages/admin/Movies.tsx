@@ -75,6 +75,18 @@ const Movies = () => {
     fetchGenres();
   }, []);
 
+  // Auto-refresh movies when navigating back to this page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchMovies();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   const fetchMovies = async () => {
     try {
       const { data, error } = await supabase

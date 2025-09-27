@@ -80,8 +80,8 @@ export const useDeferredUpload = () => {
     ));
 
     try {
-      // Get upload info from unified media upload function
-      const { data: uploadInfo, error: infoError } = await supabase.functions.invoke('unified-media-upload', {
+      // Get signed upload URL from unified media upload function
+      const { data: signedUrlResponse, error: urlError } = await supabase.functions.invoke('unified-media-upload', {
         body: {
           fileName: file.name,
           fileType: fileType,
@@ -89,19 +89,23 @@ export const useDeferredUpload = () => {
         }
       });
 
-      if (infoError) {
-        console.error(`[DeferredUpload] Function invocation error:`, infoError);
-        throw new Error(`Failed to get upload info: ${infoError.message}`);
+      console.log(`[DeferredUpload] Signed URL response:`, signedUrlResponse);
+
+      if (urlError) {
+        console.error(`[DeferredUpload] URL generation error:`, urlError);
+        throw new Error(`Failed to get upload URL: ${urlError.message}`);
       }
 
-      if (!uploadInfo) {
-        console.error(`[DeferredUpload] No response from function`);
-        throw new Error('No response from upload function');
+      if (!signedUrlResponse || !signedUrlResponse.success) {
+        const errorMsg = signedUrlResponse?.error || 'Unknown error getting upload URL';
+        console.error(`[DeferredUpload] Invalid URL response:`, signedUrlResponse);
+        throw new Error(`Upload URL generation failed: ${errorMsg}`);
       }
 
-      if (!uploadInfo.success || !uploadInfo.uploadUrl) {
-        console.error(`[DeferredUpload] Invalid response:`, uploadInfo);
-        throw new Error(`Failed to get upload URL: ${uploadInfo.error || 'Unknown error'}`);
+      const { uploadUrl, filePath, publicUrl } = signedUrlResponse;
+      
+      if (!uploadUrl) {
+        throw new Error('No upload URL received from server');
       }
 
       // Update progress
@@ -132,7 +136,7 @@ export const useDeferredUpload = () => {
 
         xhr.onerror = () => reject(new Error('Upload failed due to network error'));
         
-        xhr.open('PUT', uploadInfo.uploadUrl);
+        xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
       });
@@ -144,9 +148,6 @@ export const useDeferredUpload = () => {
         p.id === id ? { ...p, progress: 90 } : p
       ));
 
-      // File uploaded successfully, get public URL
-      const publicUrl = uploadInfo.publicUrl;
-
       // Mark as completed
       setUploadProgress(prev => prev.map(p => 
         p.id === id ? { 
@@ -154,7 +155,7 @@ export const useDeferredUpload = () => {
           progress: 100, 
           status: 'completed',
           url: publicUrl,
-          filePath: uploadInfo.filePath
+          filePath: filePath
         } : p
       ));
 
@@ -162,7 +163,7 @@ export const useDeferredUpload = () => {
 
       return {
         url: publicUrl,
-        filePath: uploadInfo.filePath,
+        filePath: filePath,
         fileType
       };
 

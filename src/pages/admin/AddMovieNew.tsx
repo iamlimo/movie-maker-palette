@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, AlertCircle, Upload, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,26 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { DeferredMediaUpload } from '@/components/admin/DeferredMediaUpload';
-import { useDeferredUpload } from '@/hooks/useDeferredUpload';
+import { OptimizedContentUploader } from '@/components/admin/OptimizedContentUploader';
+import { useOptimizedMovieUpload, type MovieFormData, type MovieCastAssignment } from '@/hooks/useOptimizedMovieUpload';
 import CastCrewManager from '@/components/admin/CastCrewManager';
 import NairaInput from '@/components/admin/NairaInput';
 
 interface Genre {
   id: string;
   name: string;
-}
-
-interface FormData {
-  title: string;
-  description: string;
-  genre_id: string;
-  release_date: string;
-  duration: string;
-  language: string;
-  rating: string;
-  price: string;
-  rental_expiry_duration: string;
 }
 
 interface CastCrew {
@@ -40,15 +28,8 @@ interface CastCrew {
   photo_url?: string;
 }
 
-interface MovieCastAssignment {
-  cast_crew_id: string;
-  role_type: 'actor' | 'director' | 'producer' | 'writer';
-  character_name?: string;
-  credit_order: number;
-}
-
 const AddMovieNew = () => {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<MovieFormData>({
     title: '',
     description: '',
     genre_id: '',
@@ -61,7 +42,6 @@ const AddMovieNew = () => {
   });
   
   const [genres, setGenres] = useState<Genre[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCastCrew, setSelectedCastCrew] = useState<CastCrew[]>([]);
   const [castAssignments, setCastAssignments] = useState<MovieCastAssignment[]>([]);
   
@@ -70,14 +50,16 @@ const AddMovieNew = () => {
   const {
     stagedFiles,
     uploadProgress,
+    isSubmitting,
     isUploading,
     stageFile,
     removeFile,
-    uploadAllFiles,
+    createMovie,
     retryFailedUploads,
     getFileByType,
-    getProgressByType
-  } = useDeferredUpload();
+    getProgressByType,
+    clearAllFiles
+  } = useOptimizedMovieUpload();
 
   useEffect(() => {
     fetchGenres();
@@ -102,7 +84,7 @@ const AddMovieNew = () => {
     }
   };
 
-  const handleInputChange = (field: keyof FormData, value: string) => {
+  const handleInputChange = (field: keyof MovieFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -156,6 +138,7 @@ const AddMovieNew = () => {
     }
   };
 
+  // Use the validation from the optimized hook
   const validateForm = () => {
     const errors: string[] = [];
     
@@ -188,98 +171,17 @@ const AddMovieNew = () => {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error('Authentication required');
-      }
-
-      console.log('[AddMovie] Starting upload process for', stagedFiles.length, 'files');
-
-      // Upload all staged files first
-      const uploadResults = await uploadAllFiles();
+      // Use the optimized movie creation hook
+      const movie = await createMovie(formData, castAssignments);
       
-      // Check if any required uploads failed
-      const videoResult = uploadResults.find(r => r.fileType === 'video');
-      const thumbnailResult = uploadResults.find(r => r.fileType === 'thumbnail');
-      const trailerResult = uploadResults.find(r => r.fileType === 'trailer');
-
-      if (!videoResult) {
-        throw new Error('Video upload failed - cannot create movie without video');
-      }
-
-      if (!thumbnailResult) {
-        throw new Error('Thumbnail upload failed - cannot create movie without thumbnail');
-      }
-
-      console.log('[AddMovie] All uploads completed, creating movie record');
-
-      // Prepare movie data with uploaded file paths
-      const movieData = {
-        title: formData.title,
-        description: formData.description || null,
-        genre_id: formData.genre_id || null,
-        release_date: formData.release_date || null,
-        duration: formData.duration ? parseInt(formData.duration) : null,
-        language: formData.language || null,
-        rating: formData.rating || null,
-        price: parseFloat(formData.price),
-        thumbnail_url: thumbnailResult.filePath,
-        video_url: videoResult.filePath,
-        trailer_url: trailerResult?.filePath || null,
-        status: 'approved' as const,
-        rental_expiry_duration: parseInt(formData.rental_expiry_duration),
-        uploaded_by: user.id
-      };
-
-      console.log('[AddMovie] Inserting movie data:', movieData);
-
-      // Create movie using unified content manager
-      const { data: movieResponse, error: movieError } = await supabase.functions.invoke('unified-content-manager', {
-        body: {
-          title: movieData.title,
-          description: movieData.description,
-          price: movieData.price,
-          genre_id: movieData.genre_id,
-          language: movieData.language,
-          rating: movieData.rating,
-          duration: movieData.duration,
-          release_date: movieData.release_date,
-          rental_expiry_duration: movieData.rental_expiry_duration,
-          video_url: movieData.video_url,
-          thumbnail_url: movieData.thumbnail_url,
-          trailer_url: movieData.trailer_url,
-          landscape_poster_url: movieData.thumbnail_url,
-          slider_cover_url: movieData.thumbnail_url
-        }
-      });
-
-      if (movieError || !movieResponse?.success) throw movieError || new Error('Failed to create movie');
-
-      const movie = movieResponse.movie;
       console.log('[AddMovie] Movie created successfully:', movie.id);
-
-      // Save cast and crew assignments
-      await saveCastAssignments(movie.id);
-
-      toast({
-        title: "Success",
-        description: "Movie created successfully with all media files",
-      });
-
+      
+      // Navigate to movies list
       navigate('/admin/movies');
     } catch (error) {
-      console.error('[AddMovie] Error:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create movie",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+      // Error handling is already done in the hook
+      console.error('[AddMovie] Submit failed:', error);
     }
   };
 
@@ -472,119 +374,16 @@ const AddMovieNew = () => {
           </Card>
 
           {/* Media Files */}
-          <Card className="gradient-card border-border shadow-card">
-            <CardHeader>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                Media Files
-                {stagedFiles.length === 0 && (
-                  <Badge variant="destructive" className="text-xs">
-                    No files staged
-                  </Badge>
-                )}
-                {stagedFiles.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {stagedFiles.length} file(s) ready
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <DeferredMediaUpload
-                  onFileStaged={stageFile}
-                  onFileRemoved={removeFile}
-                  accept="image/*"
-                  maxSize={10 * 1024 * 1024} // 10MB
-                  label="Movie Thumbnail"
-                  description="Select a thumbnail image for the movie"
-                  fileType="thumbnail"
-                  required
-                  stagedFile={getFileByType('thumbnail')}
-                  progress={getProgressByType('thumbnail')}
-                />
-
-                <DeferredMediaUpload
-                  onFileStaged={stageFile}
-                  onFileRemoved={removeFile}
-                  accept="video/*"
-                  maxSize={1024 * 1024 * 1024} // 1GB
-                  label="Movie Video"
-                  description="Select the main movie video file"
-                  fileType="video"
-                  required
-                  stagedFile={getFileByType('video')}
-                  progress={getProgressByType('video')}
-                />
-              </div>
-
-              {/* Trailer Upload */}
-              <DeferredMediaUpload
-                onFileStaged={stageFile}
-                onFileRemoved={removeFile}
-                accept="video/*"
-                maxSize={500 * 1024 * 1024} // 500MB for trailers
-                label="Movie Trailer (Optional)"
-                description="Select a trailer or preview video for the movie"
-                fileType="trailer"
-                stagedFile={getFileByType('trailer')}
-                progress={getProgressByType('trailer')}
-              />
-
-              {/* Upload Progress Summary */}
-              {(isUploading || uploadProgress.length > 0) && (
-                <Card className="p-4 bg-muted/50">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-foreground">Upload Progress</h4>
-                      {hasFailedUploads && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleRetryFailedUploads}
-                          disabled={isUploading}
-                          className="text-xs"
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Retry Failed
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {isUploading && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Overall Progress</span>
-                          <span>{getOverallProgress()}%</span>
-                        </div>
-                        <Progress value={getOverallProgress()} className="h-2" />
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      {uploadProgress.map(progress => (
-                        <div key={progress.id} className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">{progress.fileName}</span>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              progress.status === 'completed' ? 'bg-green-500/10 text-green-600' :
-                              progress.status === 'error' ? 'bg-destructive/10 text-destructive' :
-                              progress.status === 'uploading' ? 'bg-primary/10 text-primary' :
-                              'bg-muted text-muted-foreground'
-                            }`}>
-                              {progress.status === 'completed' ? 'Completed' :
-                               progress.status === 'error' ? 'Failed' :
-                               progress.status === 'uploading' ? `${progress.progress}%` :
-                               'Pending'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </Card>
-              )}
-            </CardContent>
-          </Card>
+          <OptimizedContentUploader
+            stagedFiles={stagedFiles}
+            uploadProgress={uploadProgress}
+            isUploading={isUploading}
+            onFileStaged={stageFile}
+            onFileRemoved={removeFile}
+            onRetryFailedUploads={retryFailedUploads}
+            getFileByType={getFileByType}
+            getProgressByType={getProgressByType}
+          />
 
           {/* Cast and Crew */}
           <Card className="gradient-card border-border shadow-card">
@@ -672,7 +471,7 @@ const AddMovieNew = () => {
                 </>
               ) : isUploading ? (
                 <>
-                  <Upload className="h-4 w-4 mr-2 animate-spin" />
+                  <Save className="h-4 w-4 mr-2 animate-spin" />
                   Uploading Files...
                 </>
               ) : (
@@ -688,7 +487,7 @@ const AddMovieNew = () => {
           {!isFormValid() && (
             <Card className="p-4 bg-destructive/5 border-destructive/20">
               <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <Save className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-medium text-destructive mb-2">Please complete the following:</h4>
                   <ul className="text-sm text-destructive space-y-1">
