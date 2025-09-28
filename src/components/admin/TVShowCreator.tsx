@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { TVShowUploader } from './TVShowUploader';
+import { UnifiedTVShowUploader } from './UnifiedTVShowUploader';
 import { 
   Tv, 
   Plus, 
@@ -43,6 +43,12 @@ export const TVShowCreator = () => {
     trailer_file: null
   });
   
+  const [uploadedUrls, setUploadedUrls] = useState<{
+    poster?: string;
+    banner?: string;
+    trailer?: string;
+  }>({});
+  
   const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -56,12 +62,24 @@ export const TVShowCreator = () => {
 
   const handleFileSelect = (field: 'poster_file' | 'banner_file' | 'trailer_file') => (file: File | null) => {
     setFormData(prev => ({ ...prev, [field]: file }));
+    // Clear uploaded URL when new file is selected
+    const urlField = field.replace('_file', '') as 'poster' | 'banner' | 'trailer';
+    setUploadedUrls(prev => ({ ...prev, [urlField]: undefined }));
+    
     if (file) {
       toast({
         title: "File Selected",
         description: `${field.replace('_file', '')} file selected: ${file.name}`,
       });
     }
+  };
+
+  const handleUploadComplete = (field: 'poster' | 'banner' | 'trailer') => (filePath: string, publicUrl: string) => {
+    setUploadedUrls(prev => ({ ...prev, [field]: publicUrl }));
+    toast({
+      title: "Upload Complete",
+      description: `${field.charAt(0).toUpperCase() + field.slice(1)} uploaded successfully`,
+    });
   };
 
   const addTag = () => {
@@ -82,7 +100,7 @@ export const TVShowCreator = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.title || !formData.description || !formData.poster_file) {
+    if (!formData.title || !formData.description || (!formData.poster_file && !uploadedUrls.poster)) {
       toast({
         title: "Validation Error",
         description: "Title, description, and poster are required",
@@ -93,7 +111,7 @@ export const TVShowCreator = () => {
 
     setSaving(true);
     try {
-      // Create FormData to send files
+      // Create FormData to send files and URLs
       const submitFormData = new FormData();
       submitFormData.append('title', formData.title);
       submitFormData.append('description', formData.description);
@@ -106,12 +124,22 @@ export const TVShowCreator = () => {
         submitFormData.append('release_date', formData.release_date);
       }
       
-      // Add files
-      submitFormData.append('poster', formData.poster_file);
-      if (formData.banner_file) {
+      // Add files if they haven't been uploaded yet, or URLs if they have
+      if (uploadedUrls.poster) {
+        submitFormData.append('poster_url', uploadedUrls.poster);
+      } else if (formData.poster_file) {
+        submitFormData.append('poster', formData.poster_file);
+      }
+      
+      if (uploadedUrls.banner) {
+        submitFormData.append('banner_url', uploadedUrls.banner);
+      } else if (formData.banner_file) {
         submitFormData.append('banner', formData.banner_file);
       }
-      if (formData.trailer_file) {
+      
+      if (uploadedUrls.trailer) {
+        submitFormData.append('trailer_url', uploadedUrls.trailer);
+      } else if (formData.trailer_file) {
         submitFormData.append('trailer', formData.trailer_file);
       }
 
@@ -153,6 +181,7 @@ export const TVShowCreator = () => {
         banner_file: null,
         trailer_file: null
       });
+      setUploadedUrls({});
 
     } catch (error) {
       console.error('TV Show creation error:', error);
@@ -275,38 +304,44 @@ export const TVShowCreator = () => {
 
           {/* File Uploads */}
           <div className="space-y-6">
-            <TVShowUploader
+            <UnifiedTVShowUploader
               onFileSelect={handleFileSelect('poster_file')}
+              onUploadComplete={handleUploadComplete('poster')}
               accept="image/*"
               maxSize={10 * 1024 * 1024} // 10MB
               label="Poster Image"
               description="Upload the main poster for this TV show"
               contentType="poster"
               selectedFile={formData.poster_file}
+              currentUrl={uploadedUrls.poster}
               required
-              autoUpload={false}
+              autoUpload={true}
             />
 
-            <TVShowUploader
+            <UnifiedTVShowUploader
               onFileSelect={handleFileSelect('banner_file')}
+              onUploadComplete={handleUploadComplete('banner')}
               accept="image/*"
               maxSize={10 * 1024 * 1024} // 10MB
               label="Banner Image"
               description="Upload a banner/landscape image for this TV show"
-              contentType="poster"
+              contentType="banner"
               selectedFile={formData.banner_file}
-              autoUpload={false}
+              currentUrl={uploadedUrls.banner}
+              autoUpload={true}
             />
 
-            <TVShowUploader
+            <UnifiedTVShowUploader
               onFileSelect={handleFileSelect('trailer_file')}
+              onUploadComplete={handleUploadComplete('trailer')}
               accept="video/*"
               maxSize={100 * 1024 * 1024} // 100MB
               label="Trailer Video"
               description="Upload a trailer/preview video for this TV show"
               contentType="trailer"
               selectedFile={formData.trailer_file}
-              autoUpload={false}
+              currentUrl={uploadedUrls.trailer}
+              autoUpload={true}
             />
           </div>
 
@@ -314,7 +349,7 @@ export const TVShowCreator = () => {
           <div className="pt-4">
             <Button 
               onClick={handleSubmit} 
-              disabled={saving || !formData.title || !formData.description || !formData.poster_file}
+              disabled={saving || !formData.title || !formData.description || (!formData.poster_file && !uploadedUrls.poster)}
               className="w-full"
             >
               {saving ? (

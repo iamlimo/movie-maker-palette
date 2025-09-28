@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UploadTester } from '@/components/admin/UploadTester';
 import { TVShowCreator } from '@/components/admin/TVShowCreator';
+import { TVShowFlowTest } from '@/components/admin/TVShowFlowTest';
 import { 
   TestTube, 
   Tv,
@@ -40,18 +41,26 @@ const AddTVShow = () => {
             </div>
           </div>
 
-          <Tabs defaultValue="tester" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs defaultValue="flow-test" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="flow-test" className="flex items-center gap-2">
+                <TestTube className="h-4 w-4" />
+                Complete Flow Test
+              </TabsTrigger>
               <TabsTrigger value="tester" className="flex items-center gap-2">
                 <TestTube className="h-4 w-4" />
-                Step 1: Upload Tester
+                Upload Tester
                 {uploadTestsPassed && <CheckCircle className="h-4 w-4 text-green-600" />}
               </TabsTrigger>
               <TabsTrigger value="creator" className="flex items-center gap-2">
                 <Tv className="h-4 w-4" />
-                Step 2: TV Show Creator
+                TV Show Creator
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="flow-test" className="space-y-6">
+              <TVShowFlowTest />
+            </TabsContent>
 
             <TabsContent value="tester" className="space-y-6">
               <Card>

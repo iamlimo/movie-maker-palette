@@ -63,36 +63,44 @@ export const UploadTester = () => {
         throw new Error('Authentication required');
       }
 
-      // Test signed URL generation
-      const { data: signedData, error: signedError } = await supabase.functions.invoke('file-upload', {
-        method: 'GET',
-        body: null,
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
+      // Map test file type to upload file type
+      const fileType = type === 'poster' ? 'thumbnail' : 'trailer';
+      
+      // Test upload URL generation
+      const { data: uploadUrlData, error: uploadUrlError } = await supabase.functions.invoke('unified-media-upload', {
+        body: {
+          fileName: file.name,
+          fileType,
+          contentType: file.type
+        }
       });
 
-      if (signedError) {
-        throw new Error(`Signed URL error: ${signedError.message}`);
+      if (uploadUrlError) {
+        throw new Error(`Upload URL error: ${uploadUrlError.message}`);
       }
 
-      // Test direct upload
-      const { data: uploadData, error: uploadError } = await supabase.functions.invoke('file-upload', {
-        method: 'POST',
+      if (!uploadUrlData?.success) {
+        throw new Error(uploadUrlData?.error || 'Failed to get upload URL');
+      }
+
+      // Test direct upload to signed URL
+      const uploadResponse = await fetch(uploadUrlData.uploadUrl, {
+        method: 'PUT',
         body: file,
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': file.type,
         },
       });
 
-      if (uploadError) {
-        throw new Error(`Upload error: ${uploadError.message}`);
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: HTTP ${uploadResponse.status}`);
       }
 
-      if (!uploadData?.success) {
-        throw new Error(uploadData?.error || 'Upload failed');
-      }
+      const uploadData = {
+        success: true,
+        url: uploadUrlData.publicUrl,
+        filePath: uploadUrlData.filePath
+      };
 
       const duration = Date.now() - startTime;
       

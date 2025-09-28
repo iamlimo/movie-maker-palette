@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -9,12 +9,10 @@ import {
   Upload, 
   Image, 
   Video, 
-  Film, 
   X, 
   CheckCircle, 
   AlertCircle,
-  Loader2,
-  Play
+  Loader2
 } from 'lucide-react';
 
 interface UploadState {
@@ -27,21 +25,21 @@ interface UploadState {
   publicUrl?: string;
 }
 
-interface TVShowUploaderProps {
+interface UnifiedTVShowUploaderProps {
   onUploadComplete?: (filePath: string, publicUrl: string) => void;
   onFileSelect?: (file: File | null) => void;
   accept: string;
   maxSize: number;
   label: string;
   description: string;
-  contentType: 'poster' | 'trailer' | 'episode';
+  contentType: 'poster' | 'banner' | 'trailer';
   currentUrl?: string;
   selectedFile?: File | null;
   required?: boolean;
   autoUpload?: boolean;
 }
 
-export const TVShowUploader = ({
+export const UnifiedTVShowUploader = ({
   onUploadComplete,
   onFileSelect,
   accept,
@@ -52,8 +50,8 @@ export const TVShowUploader = ({
   currentUrl,
   selectedFile,
   required = false,
-  autoUpload = true
-}: TVShowUploaderProps) => {
+  autoUpload = false
+}: UnifiedTVShowUploaderProps) => {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
     uploading: false,
@@ -67,10 +65,13 @@ export const TVShowUploader = ({
 
   const getContentIcon = () => {
     switch (contentType) {
-      case 'poster': return <Image className="h-8 w-8" />;
-      case 'trailer': return <Video className="h-8 w-8" />;
-      case 'episode': return <Film className="h-8 w-8" />;
-      default: return <Upload className="h-8 w-8" />;
+      case 'poster':
+      case 'banner': 
+        return <Image className="h-8 w-8" />;
+      case 'trailer': 
+        return <Video className="h-8 w-8" />;
+      default: 
+        return <Upload className="h-8 w-8" />;
     }
   };
 
@@ -83,7 +84,7 @@ export const TVShowUploader = ({
   };
 
   const validateFile = (file: File): string | null => {
-    console.log('[TVShowUploader] Validating file:', {
+    console.log('[UnifiedTVShowUploader] Validating file:', {
       name: file.name,
       type: file.type,
       size: file.size,
@@ -99,17 +100,17 @@ export const TVShowUploader = ({
 
     // Check for text/plain which often indicates detection failure
     if (file.type === 'text/plain') {
-      return `File detected as text/plain. This may indicate an unsupported format. Please ensure the file is a valid ${contentType === 'poster' ? 'image' : 'video'} file.`;
+      return `File detected as text/plain. This may indicate an unsupported format. Please ensure the file is a valid ${contentType === 'poster' || contentType === 'banner' ? 'image' : 'video'} file.`;
     }
 
     // Define expected MIME types for each content type
     const expectedMimeTypes = {
       'poster': ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
-      'trailer': ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'],
-      'episode': ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska']
+      'banner': ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+      'trailer': ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska']
     };
 
-    const validMimeTypes = expectedMimeTypes[contentType as keyof typeof expectedMimeTypes];
+    const validMimeTypes = expectedMimeTypes[contentType];
     if (validMimeTypes && !validMimeTypes.includes(file.type)) {
       return `MIME type '${file.type}' is not supported for ${contentType}. Expected: ${validMimeTypes.join(', ')}`;
     }
@@ -119,24 +120,11 @@ export const TVShowUploader = ({
       return `File size (${formatFileSize(file.size)}) exceeds maximum allowed size (${formatFileSize(maxSize)})`;
     }
 
-    // Check file extension as backup validation
-    const fileExtension = '.' + file.name.toLowerCase().split('.').pop();
-    const expectedExtensions = {
-      'poster': ['.jpg', '.jpeg', '.png', '.webp'],
-      'trailer': ['.mp4', '.mov', '.avi', '.mkv'],
-      'episode': ['.mp4', '.mov', '.avi', '.mkv']
-    };
-
-    const validExtensions = expectedExtensions[contentType as keyof typeof expectedExtensions];
-    if (validExtensions && !validExtensions.includes(fileExtension)) {
-      return `File extension '${fileExtension}' is not supported for ${contentType}. Expected: ${validExtensions.join(', ')}`;
-    }
-
     return null;
   };
 
   const uploadFile = useCallback(async (file: File, retryCount = 0) => {
-    console.log('[TVShowUploader] Starting upload for:', file.name, 'MIME type:', file.type, 'Content type:', contentType);
+    console.log('[UnifiedTVShowUploader] Starting upload for:', file.name, 'MIME type:', file.type, 'Content type:', contentType);
     
     setUploadState(prev => ({ ...prev, uploading: true, progress: 10, error: null }));
 
@@ -149,23 +137,16 @@ export const TVShowUploader = ({
 
       setUploadState(prev => ({ ...prev, progress: 20 }));
 
-      // Validate MIME type before upload
-      if (!file.type || file.type === 'text/plain') {
-        throw new Error(`Invalid MIME type: ${file.type || 'none'}. Please ensure the file is a valid ${contentType === 'poster' ? 'image' : 'video'} file.`);
-      }
-
-      console.log('[TVShowUploader] Uploading file with MIME type:', file.type);
-      
       // Map contentType to fileType for unified-media-upload
       const fileTypeMap: Record<string, string> = {
         'poster': 'thumbnail',
-        'trailer': 'trailer',
-        'episode': 'video'
+        'banner': 'thumbnail', 
+        'trailer': 'trailer'
       };
       
       const fileType = fileTypeMap[contentType] || 'thumbnail';
       
-      console.log('[TVShowUploader] Getting upload URL for:', { contentType, fileType, fileName: file.name });
+      console.log('[UnifiedTVShowUploader] Getting upload URL for:', { contentType, fileType, fileName: file.name });
       
       // Get upload URL from unified-media-upload
       const uploadUrlResponse = await supabase.functions.invoke('unified-media-upload', {
@@ -186,9 +167,9 @@ export const TVShowUploader = ({
 
       const { uploadUrl, filePath, publicUrl } = uploadUrlResponse.data;
 
-      console.log('[TVShowUploader] Got upload URL:', { uploadUrl, filePath, publicUrl });
+      console.log('[UnifiedTVShowUploader] Got upload URL:', { uploadUrl, filePath, publicUrl });
 
-      setUploadState(prev => ({ ...prev, progress: 40 }));
+      setUploadState(prev => ({ ...prev, progress: 50 }));
 
       // Upload file to signed URL
       const response = await fetch(uploadUrl, {
@@ -202,37 +183,16 @@ export const TVShowUploader = ({
       if (!response.ok) {
         let errorText = `HTTP ${response.status}`;
         try {
-          const errorData = await response.json();
-          errorText = errorData.error || errorText;
-        } catch {
-          errorText = await response.text() || errorText;
-        }
-        console.error('[TVShowUploader] Upload failed:', response.status, errorText);
-        
-        // Provide specific error messages for MIME type issues
-        if (errorText.includes('MIME type') || errorText.includes('mime type')) {
-          throw new Error(`File format error: ${errorText}`);
-        }
-        if (errorText.includes('Content-Type')) {
-          throw new Error(`Content type error: ${errorText}`);
-        }
-        
-        throw new Error(`Upload failed: ${errorText}`);
-      }
-
-      if (!response.ok) {
-        let errorText = `HTTP ${response.status}`;
-        try {
           const errorData = await response.text();
           errorText = errorData || errorText;
         } catch {
           // Continue with status code error
         }
-        console.error('[TVShowUploader] Upload failed:', response.status, errorText);
+        console.error('[UnifiedTVShowUploader] Upload failed:', response.status, errorText);
         throw new Error(`Upload failed: ${errorText}`);
       }
 
-      console.log('[TVShowUploader] Upload completed successfully to storage');
+      console.log('[UnifiedTVShowUploader] Upload completed successfully to storage');
 
       setUploadState(prev => ({ ...prev, progress: 90 }));
 
@@ -240,7 +200,7 @@ export const TVShowUploader = ({
         throw new Error('Failed to get public URL after upload');
       }
 
-      console.log('[TVShowUploader] Upload completed successfully:', {
+      console.log('[UnifiedTVShowUploader] Upload completed successfully:', {
         filePath,
         publicUrl
       });
@@ -263,12 +223,12 @@ export const TVShowUploader = ({
       });
 
     } catch (error) {
-      console.error('[TVShowUploader] Upload failed:', error);
+      console.error('[UnifiedTVShowUploader] Upload failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
       
       // Retry on token expiry (up to 2 times)
       if (errorMessage.includes('expired') && retryCount < 2) {
-        console.log('[TVShowUploader] Token expired, retrying...', retryCount + 1);
+        console.log('[UnifiedTVShowUploader] Token expired, retrying...', retryCount + 1);
         toast({
           title: "Retrying Upload",
           description: "Token expired, getting fresh upload URL...",
@@ -299,7 +259,7 @@ export const TVShowUploader = ({
     }
 
     const file = files[0];
-    console.log('[TVShowUploader] File selected:', file.name, file.type, file.size);
+    console.log('[UnifiedTVShowUploader] File selected:', file.name, file.type, file.size);
 
     const validationError = validateFile(file);
     if (validationError) {
@@ -366,7 +326,16 @@ export const TVShowUploader = ({
     onFileSelect?.(null);
   };
 
+  const triggerUpload = async () => {
+    if (uploadState.file) {
+      await uploadFile(uploadState.file);
+    } else if (selectedFile) {
+      await uploadFile(selectedFile);
+    }
+  };
+
   const maxSizeInMB = Math.round(maxSize / 1024 / 1024);
+  const currentFile = uploadState.file || selectedFile;
 
   return (
     <div className="space-y-4">
@@ -388,7 +357,7 @@ export const TVShowUploader = ({
       </div>
 
       {/* Current URL Preview */}
-      {currentUrl && !uploadState.file && !uploadState.completed && !selectedFile && (
+      {currentUrl && !currentFile && !uploadState.completed && (
         <Card className="border-dashed">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -399,12 +368,6 @@ export const TVShowUploader = ({
                 <p className="text-sm font-medium">Current file uploaded</p>
                 <p className="text-xs text-muted-foreground truncate">{currentUrl}</p>
               </div>
-              {contentType === 'trailer' && (
-                <Button variant="outline" size="sm">
-                  <Play className="h-4 w-4 mr-2" />
-                  Preview
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -426,7 +389,7 @@ export const TVShowUploader = ({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
         >
-          {!uploadState.file && !uploadState.completed && !selectedFile ? (
+          {!currentFile && !uploadState.completed ? (
             <div className="text-center">
               <div className="mx-auto mb-4 text-muted-foreground">
                 {getContentIcon()}
@@ -460,12 +423,10 @@ export const TVShowUploader = ({
                   {getContentIcon()}
                   <div>
                     <p className="text-sm font-medium">
-                      {uploadState.file?.name || selectedFile?.name || 'Upload completed'}
+                      {currentFile?.name || 'Upload completed'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {uploadState.file ? formatFileSize(uploadState.file.size) : 
-                       selectedFile ? formatFileSize(selectedFile.size) : 
-                       'File uploaded successfully'}
+                      {currentFile ? formatFileSize(currentFile.size) : 'File uploaded successfully'}
                     </p>
                   </div>
                 </div>
@@ -523,11 +484,9 @@ export const TVShowUploader = ({
               )}
 
               {/* Manual Upload Button */}
-              {!autoUpload && (uploadState.file || selectedFile) && !uploadState.uploading && !uploadState.completed && !uploadState.error && onUploadComplete && (
-                <Button 
-                  onClick={() => uploadFile(uploadState.file || selectedFile!)}
-                  className="w-full"
-                >
+              {!autoUpload && currentFile && !uploadState.completed && !uploadState.uploading && (
+                <Button onClick={triggerUpload} className="w-full">
+                  <Upload className="h-4 w-4 mr-2" />
                   Upload {contentType}
                 </Button>
               )}
