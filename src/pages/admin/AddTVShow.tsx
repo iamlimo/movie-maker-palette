@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UploadTester } from '@/components/admin/UploadTester';
 import { TVShowCreator } from '@/components/admin/TVShowCreator';
 import { TVShowFlowTest } from '@/components/admin/TVShowFlowTest';
+import EpisodeUploadTest from '@/components/admin/EpisodeUploadTest';
 import { 
   TestTube, 
   Tv,
@@ -60,6 +61,7 @@ const AddTVShow = () => {
 
             <TabsContent value="flow-test" className="space-y-6">
               <TVShowFlowTest />
+              <EpisodeUploadTest />
             </TabsContent>
 
             <TabsContent value="tester" className="space-y-6">

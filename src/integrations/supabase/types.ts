@@ -166,6 +166,7 @@ export type Database = {
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
+          trailer_url: string | null
           video_url: string | null
         }
         Insert: {
@@ -182,6 +183,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
+          trailer_url?: string | null
           video_url?: string | null
         }
         Update: {
@@ -198,6 +200,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string
+          trailer_url?: string | null
           video_url?: string | null
         }
         Relationships: [
