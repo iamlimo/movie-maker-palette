@@ -56,7 +56,7 @@ serve(async (req) => {
 
     console.log('Processing upload request:', { fileName, fileType, contentType })
 
-    // Determine bucket based on file type
+    // Determine bucket based on file type and content type
     let bucketName: string
     switch (fileType) {
       case 'video':
@@ -65,8 +65,13 @@ serve(async (req) => {
       case 'thumbnail':
         bucketName = 'thumbnails'
         break
+      case 'poster':
+      case 'banner':
+        bucketName = 'tv-show-posters'
+        break
       case 'trailer':
-        bucketName = 'trailers'
+        // Check if this is for TV shows or movies based on contentType
+        bucketName = contentType?.includes('tv') || contentType?.includes('show') ? 'tv-trailers' : 'trailers'
         break
       default:
         throw new Error(`Invalid file type: ${fileType}`)

@@ -139,12 +139,12 @@ export const UnifiedTVShowUploader = ({
 
       // Map contentType to fileType for unified-media-upload
       const fileTypeMap: Record<string, string> = {
-        'poster': 'thumbnail',
-        'banner': 'thumbnail', 
+        'poster': 'poster',
+        'banner': 'banner', 
         'trailer': 'trailer'
       };
       
-      const fileType = fileTypeMap[contentType] || 'thumbnail';
+      const fileType = fileTypeMap[contentType] || 'poster';
       
       console.log('[UnifiedTVShowUploader] Getting upload URL for:', { contentType, fileType, fileName: file.name });
       
@@ -153,7 +153,7 @@ export const UnifiedTVShowUploader = ({
         body: {
           fileName: file.name,
           fileType: fileType,
-          contentType: file.type
+          contentType: `tv-show-${contentType}` // Mark as TV show content
         }
       });
 

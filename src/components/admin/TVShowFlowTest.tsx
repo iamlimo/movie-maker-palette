@@ -83,8 +83,8 @@ export const TVShowFlowTest = () => {
       const { data: uploadUrlData, error: uploadUrlError } = await supabase.functions.invoke('unified-media-upload', {
         body: {
           fileName: 'test-poster.jpg',
-          fileType: 'thumbnail',
-          contentType: 'image/jpeg'
+          fileType: 'poster',
+          contentType: 'tv-show-poster'
         }
       });
 
@@ -129,7 +129,7 @@ export const TVShowFlowTest = () => {
         body: {
           fileName: 'test-trailer.mp4',
           fileType: 'trailer',
-          contentType: 'video/mp4'
+          contentType: 'tv-show-trailer'
         }
       });
 
