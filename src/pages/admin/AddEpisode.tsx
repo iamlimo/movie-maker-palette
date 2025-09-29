@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, Play, Film, Image, CheckCircle } from "lucide-react";
+import { ArrowLeft, Upload, Play, Film, Image, CheckCircle, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,7 @@ interface FormData {
   rental_expiry_duration: number;
   video_file: File | null;
   thumbnail_file: File | null;
+  trailer_file: File | null;
   status: 'pending' | 'approved';
   release_date: string;
 }
@@ -54,6 +55,7 @@ const AddEpisode = () => {
     rental_expiry_duration: 48,
     video_file: null,
     thumbnail_file: null,
+    trailer_file: null,
     status: 'pending',
     release_date: ""
   });
@@ -61,6 +63,7 @@ const AddEpisode = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
+  const [trailerUrl, setTrailerUrl] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -180,6 +183,7 @@ const AddEpisode = () => {
             rental_expiry_duration: formData.rental_expiry_duration || 48,
             video_url: videoUrl,
             thumbnail_url: thumbnailUrl || null,
+            trailer_url: trailerUrl || null,
             status: formData.status,
             release_date: formData.release_date || null,
             published_at: formData.status === 'approved' ? new Date().toISOString() : null
@@ -411,6 +415,48 @@ const AddEpisode = () => {
                         <p className="text-sm font-medium">Thumbnail uploaded successfully</p>
                         <p className="text-xs text-muted-foreground">
                           This image will be displayed as your episode thumbnail
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Trailer Upload Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <PlayCircle className="h-4 w-4" />
+                    Episode Trailer (Optional)
+                  </Label>
+                  {trailerUrl && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Uploaded
+                    </Badge>
+                  )}
+                </div>
+                <ChunkedUpload
+                  onUploadComplete={(url) => setTrailerUrl(url)}
+                  accept="video/mp4,video/mov,video/avi,video/mkv"
+                  maxSize={100}
+                  label="Episode Trailer"
+                  description="Supported formats: MP4, MOV, AVI, MKV • Max size: 100MB"
+                  fileType="trailer"
+                  episodeUpload={true}
+                  currentUrl={trailerUrl}
+                />
+                {trailerUrl && (
+                  <div className="mt-4 p-4 border rounded-lg bg-muted/30">
+                    <Label className="text-sm font-medium text-muted-foreground">Preview</Label>
+                    <div className="mt-2 flex gap-4">
+                      <div className="w-32 h-20 bg-primary/10 rounded-md border shadow-sm flex items-center justify-center">
+                        <PlayCircle className="h-8 w-8 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="text-sm font-medium">Trailer uploaded successfully</p>
+                        <p className="text-xs text-muted-foreground">
+                          This video will be used as the episode trailer
                         </p>
                       </div>
                     </div>

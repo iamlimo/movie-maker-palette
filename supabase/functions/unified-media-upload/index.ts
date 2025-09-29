@@ -73,6 +73,15 @@ serve(async (req) => {
         // Check if this is for TV shows or movies based on contentType
         bucketName = contentType?.includes('tv') || contentType?.includes('show') ? 'tv-trailers' : 'trailers'
         break
+      case 'episode-video':
+        bucketName = 'videos'
+        break
+      case 'episode-thumbnail':
+        bucketName = 'thumbnails'
+        break
+      case 'episode-trailer':
+        bucketName = 'tv-trailers'
+        break
       default:
         throw new Error(`Invalid file type: ${fileType}`)
     }
