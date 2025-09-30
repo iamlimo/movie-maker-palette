@@ -29,7 +29,7 @@ serve(async (req) => {
           error: 'Unauthorized',
           details: authError?.message || 'No user found'
         }),
-        { status: 401, headers: corsHeaders }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -48,7 +48,7 @@ serve(async (req) => {
           error: 'Forbidden: Super admin access required',
           details: `Current role: ${userRole?.role || 'none'}`
         }),
-        { status: 403, headers: corsHeaders }
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -65,7 +65,7 @@ serve(async (req) => {
           error: 'Video uploads are not supported through this API. Please upload videos to Backblaze B2 manually and provide the URL instead.',
           details: 'Videos should be uploaded directly to your Backblaze B2 bucket'
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -120,7 +120,7 @@ serve(async (req) => {
         bucket: bucketName,
         publicUrl: `${supabaseUrl}/storage/v1/object/public/${bucketName}/${uniqueFileName}`
       }),
-      { headers: corsHeaders }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
@@ -131,7 +131,7 @@ serve(async (req) => {
         error: 'Failed to generate upload URL',
         details: error instanceof Error ? error.message : 'Unknown error'
       }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
