@@ -38,6 +38,7 @@ import Watchlist from "./pages/Watchlist";
 import Help from "./pages/Help";
 import Contact from "./pages/Contact";
 import Terms from "./pages/Terms";
+import Docs from "./pages/Docs";
 
 
 const queryClient = new QueryClient();
@@ -61,6 +62,7 @@ const App: React.FC = () => (
             <Route path="/help" element={<Help />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/docs" element={<Docs />} />
             
             {/* Super Admin Routes */}
             <Route path="/admin" element={
