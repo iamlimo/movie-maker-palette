@@ -19,6 +19,7 @@ import { useSections } from "@/hooks/useSections";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UnifiedContentUploader } from "@/components/admin/UnifiedContentUploader";
 import { useContentManager, ContentFormData } from "@/hooks/useContentManager";
+import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
 
 interface Genre {
   id: string;
@@ -314,12 +315,12 @@ const AddMovie = () => {
               onUploadComplete={handleMediaUpload('slider_cover_url')}
             />
 
-            {/* Video Upload */}
-            <UnifiedContentUploader
-              mediaType="video"
-              label="Main Video"
-              description="Upload the main movie video file (max 2GB)"
-              onUploadComplete={handleMediaUpload('video_url')}
+            {/* Backblaze Video URL Input */}
+            <BackblazeUrlInput
+              value={formData.video_url || ''}
+              onChange={(url) => handleInputChange('video_url', url)}
+              label="Main Video (Backblaze URL)"
+              required={false}
             />
             
             {/* Trailer Upload (Optional) */}

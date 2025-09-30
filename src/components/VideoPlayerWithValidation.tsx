@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Play, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import RentalButton from './RentalButton';
+import SecureVideoPlayer from './SecureVideoPlayer';
 
 interface VideoPlayerWithValidationProps {
   contentId: string;
@@ -140,28 +141,22 @@ const VideoPlayerWithValidation = ({
     );
   }
 
-  if (isPlaying && videoUrl) {
+  if (isPlaying && hasAccess) {
     return (
-      <div className="aspect-video bg-black rounded-lg overflow-hidden">
-        <video
-          controls
-          autoPlay
-          className="w-full h-full"
-          poster={posterUrl}
-          onError={(e) => {
-            console.error('Video playback error:', e);
-            toast({
-              title: "Playback Error",
-              description: "Unable to play video. Please try again.",
-              variant: "destructive"
-            });
-            setIsPlaying(false);
-          }}
-        >
-          <source src={videoUrl} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-      </div>
+      <SecureVideoPlayer
+        contentId={contentId}
+        contentType={contentType}
+        posterUrl={posterUrl}
+        onError={(error) => {
+          console.error('Video playback error:', error);
+          toast({
+            title: "Playback Error",
+            description: error,
+            variant: "destructive"
+          });
+          setIsPlaying(false);
+        }}
+      />
     );
   }
 

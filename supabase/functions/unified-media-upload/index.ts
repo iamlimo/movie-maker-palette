@@ -56,12 +56,22 @@ serve(async (req) => {
 
     console.log('Processing upload request:', { fileName, fileType, contentType })
 
+    // Block video uploads - videos should be uploaded to Backblaze manually
+    if (fileType === 'video' || fileType === 'episode-video') {
+      console.log('Blocking video upload request')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Video uploads are not supported through this API. Please upload videos to Backblaze B2 manually and provide the URL instead.',
+          details: 'Videos should be uploaded directly to your Backblaze B2 bucket'
+        }),
+        { status: 400, headers: corsHeaders }
+      )
+    }
+
     // Determine bucket based on file type and content type
     let bucketName: string
     switch (fileType) {
-      case 'video':
-        bucketName = 'videos'
-        break
       case 'thumbnail':
         bucketName = 'thumbnails'
         break
@@ -72,9 +82,6 @@ serve(async (req) => {
       case 'trailer':
         // Check if this is for TV shows or movies based on contentType
         bucketName = contentType?.includes('tv') || contentType?.includes('show') ? 'tv-trailers' : 'trailers'
-        break
-      case 'episode-video':
-        bucketName = 'videos'
         break
       case 'episode-thumbnail':
         bucketName = 'thumbnails'

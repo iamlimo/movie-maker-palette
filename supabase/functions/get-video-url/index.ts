@@ -5,6 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const BACKBLAZE_API_URL = 'https://api.backblazeb2.com';
+
+interface B2AuthResponse {
+  authorizationToken: string;
+  apiUrl: string;
+  downloadUrl: string;
+}
+
+interface B2SignedUrlResponse {
+  authorizationToken: string;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -111,31 +123,119 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create signed URL for video access
-    const expiresIn = expiryHours * 3600; // Convert hours to seconds
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from('videos')
-      .createSignedUrl(movie.video_url, expiresIn);
+    const videoUrl = movie.video_url;
 
-    if (signedUrlError) {
-      console.error('Signed URL creation error:', signedUrlError);
+    // Check if it's a Backblaze URL
+    const isBackblazeUrl = videoUrl.includes('backblazeb2.com') || 
+                           videoUrl.includes('b2cdn.com') ||
+                           (!videoUrl.startsWith('http') && videoUrl.includes('/'));
+
+    if (isBackblazeUrl) {
+      // Generate Backblaze signed URL
+      const b2KeyId = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY_ID');
+      const b2AppKey = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY');
+      const b2BucketName = Deno.env.get('BACKBLAZE_B2_BUCKET_NAME');
+
+      if (!b2KeyId || !b2AppKey || !b2BucketName) {
+        return new Response(
+          JSON.stringify({ error: 'Backblaze credentials not configured' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      // Extract file path (remove domain if present)
+      let filePath = videoUrl;
+      if (videoUrl.includes('://')) {
+        try {
+          const urlObj = new URL(videoUrl);
+          filePath = urlObj.pathname.split('/').filter(p => p).slice(1).join('/');
+        } catch {
+          filePath = videoUrl;
+        }
+      }
+
+      // Authorize with Backblaze B2
+      const authResponse = await fetch(`${BACKBLAZE_API_URL}/b2api/v2/b2_authorize_account`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${btoa(`${b2KeyId}:${b2AppKey}`)}`
+        }
+      });
+
+      if (!authResponse.ok) {
+        console.error('Backblaze authorization failed');
+        return new Response(
+          JSON.stringify({ error: 'Failed to authorize with Backblaze' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      const authData: B2AuthResponse = await authResponse.json();
+
+      // Generate download authorization (2 hour expiry)
+      const validDurationInSeconds = 7200;
+      const downloadAuthResponse = await fetch(`${authData.apiUrl}/b2api/v2/b2_get_download_authorization`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authData.authorizationToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          bucketId: b2BucketName,
+          fileNamePrefix: filePath,
+          validDurationInSeconds
+        })
+      });
+
+      if (!downloadAuthResponse.ok) {
+        console.error('Backblaze download authorization failed');
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate download authorization' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      const downloadAuthData: B2SignedUrlResponse = await downloadAuthResponse.json();
+      const signedUrl = `${authData.downloadUrl}/file/${b2BucketName}/${filePath}?Authorization=${downloadAuthData.authorizationToken}`;
+      const expiresAt = new Date(Date.now() + validDurationInSeconds * 1000).toISOString();
+
       return new Response(
-        JSON.stringify({ error: 'Failed to generate video URL' }),
-        { status: 500, headers: corsHeaders }
+        JSON.stringify({
+          success: true,
+          signedUrl,
+          expiresAt,
+          message: 'Video URL generated successfully (Backblaze)'
+        }),
+        { headers: corsHeaders }
+      );
+
+    } else {
+      // Legacy Supabase storage support
+      const expiresIn = expiryHours * 3600;
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('videos')
+        .createSignedUrl(videoUrl, expiresIn);
+
+      if (signedUrlError) {
+        console.error('Signed URL creation error:', signedUrlError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate video URL' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          signedUrl: signedUrlData.signedUrl,
+          expiresAt,
+          message: 'Video URL generated successfully (Supabase)'
+        }),
+        { headers: corsHeaders }
       );
     }
-
-    const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        signedUrl: signedUrlData.signedUrl,
-        expiresAt: expiresAt,
-        message: 'Video URL generated successfully'
-      }),
-      { headers: corsHeaders }
-    );
 
   } catch (error) {
     console.error('Get video URL function error:', error);

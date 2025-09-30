@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import NairaInput from "@/components/admin/NairaInput";
 import ChunkedUpload from "@/components/admin/ChunkedUpload";
+import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
 
 interface Season {
   id: string;
@@ -352,29 +353,25 @@ const AddEpisode = () => {
               </p>
             </CardHeader>
             <CardContent className="space-y-8">
-              {/* Video Upload Section */}
+              {/* Backblaze Video URL Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-base font-semibold flex items-center gap-2">
                     <Film className="h-4 w-4" />
-                    Episode Video *
+                    Episode Video (Backblaze URL) *
                   </Label>
                   {videoUrl && (
                     <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
                       <CheckCircle className="h-3 w-3 mr-1" />
-                      Uploaded
+                      URL Added
                     </Badge>
                   )}
                 </div>
-                <ChunkedUpload
-                  onUploadComplete={(url) => setVideoUrl(url)}
-                  accept="video/mp4,video/mov,video/avi,video/mkv"
-                  maxSize={500}
-                  label="Episode Video"
-                  description="Supported formats: MP4, MOV, AVI, MKV • Max size: 500MB"
-                  fileType="video"
-                  episodeUpload={true}
-                  currentUrl={videoUrl}
+                <BackblazeUrlInput
+                  value={videoUrl}
+                  onChange={setVideoUrl}
+                  label=""
+                  required={true}
                 />
               </div>
 
