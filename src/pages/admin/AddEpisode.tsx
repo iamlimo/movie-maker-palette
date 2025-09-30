@@ -429,19 +429,15 @@ const AddEpisode = () => {
                   {trailerUrl && (
                     <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
                       <CheckCircle className="h-3 w-3 mr-1" />
-                      Uploaded
+                      Set
                     </Badge>
                   )}
                 </div>
-                <ChunkedUpload
-                  onUploadComplete={(url) => setTrailerUrl(url)}
-                  accept="video/mp4,video/mov,video/avi,video/mkv"
-                  maxSize={100}
-                  label="Episode Trailer"
-                  description="Supported formats: MP4, MOV, AVI, MKV • Max size: 100MB"
-                  fileType="trailer"
-                  episodeUpload={true}
-                  currentUrl={trailerUrl}
+                <BackblazeUrlInput
+                  value={trailerUrl || ''}
+                  onChange={setTrailerUrl}
+                  label="Episode Trailer URL (Backblaze B2)"
+                  required={false}
                 />
                 {trailerUrl && (
                   <div className="mt-4 p-4 border rounded-lg bg-muted/30">
@@ -451,9 +447,9 @@ const AddEpisode = () => {
                         <PlayCircle className="h-8 w-8 text-primary" />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <p className="text-sm font-medium">Trailer uploaded successfully</p>
+                        <p className="text-sm font-medium">Trailer URL set</p>
                         <p className="text-xs text-muted-foreground">
-                          This video will be used as the episode trailer
+                          {trailerUrl}
                         </p>
                       </div>
                     </div>

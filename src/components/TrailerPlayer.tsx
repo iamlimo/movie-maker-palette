@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TrailerPlayerProps {
   trailerUrl: string;
@@ -11,6 +12,43 @@ interface TrailerPlayerProps {
 const TrailerPlayer = ({ trailerUrl, title, className = "" }: TrailerPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [signedUrl, setSignedUrl] = useState<string>(trailerUrl);
+  const [isLoadingUrl, setIsLoadingUrl] = useState(false);
+
+  // Check if URL is a Backblaze URL
+  const isBackblazeUrl = (url: string) => {
+    return url.includes('backblazeb2.com') || url.includes('b2cdn.com');
+  };
+
+  // Fetch signed URL for Backblaze trailers
+  useEffect(() => {
+    const fetchSignedUrl = async () => {
+      if (!isBackblazeUrl(trailerUrl)) {
+        setSignedUrl(trailerUrl);
+        return;
+      }
+
+      setIsLoadingUrl(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-trailer-url', {
+          body: { trailerUrl }
+        });
+
+        if (error) throw error;
+        
+        if (data?.signedUrl) {
+          setSignedUrl(data.signedUrl);
+        }
+      } catch (error) {
+        console.error('Error fetching signed URL:', error);
+        setSignedUrl(trailerUrl); // Fallback to original URL
+      } finally {
+        setIsLoadingUrl(false);
+      }
+    };
+
+    fetchSignedUrl();
+  }, [trailerUrl]);
 
   // Check if it's a YouTube URL and extract video ID
   const getYouTubeVideoId = (url: string) => {
@@ -71,18 +109,26 @@ const TrailerPlayer = ({ trailerUrl, title, className = "" }: TrailerPlayerProps
     );
   }
 
-  // For direct video files
+  // For direct video files (including Backblaze)
   return (
     <div className={`relative aspect-video bg-secondary rounded-xl overflow-hidden ${className}`}>
-      <video
-        src={trailerUrl}
-        poster="/placeholder.svg"
-        className="w-full h-full object-cover"
-        controls
-        preload="metadata"
-      >
-        Your browser does not support the video tag.
-      </video>
+      {isLoadingUrl ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-secondary/80">
+          <p className="text-muted-foreground">Loading trailer...</p>
+        </div>
+      ) : (
+        <video
+          src={signedUrl}
+          poster="/placeholder.svg"
+          className="w-full h-full object-cover"
+          controls
+          preload="metadata"
+          controlsList="nodownload"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          Your browser does not support the video tag.
+        </video>
+      )}
       
       {/* Fallback message if video fails to load */}
       <div className="absolute inset-0 flex items-center justify-center bg-secondary/80 backdrop-blur">

@@ -56,38 +56,29 @@ serve(async (req) => {
 
     console.log('Processing upload request:', { fileName, fileType, contentType })
 
-    // Block video uploads - videos should be uploaded to Backblaze manually
-    if (fileType === 'video' || fileType === 'episode-video') {
-      console.log('Blocking video upload request')
+    // Block video and trailer uploads - should be uploaded to Backblaze manually
+    if (fileType === 'video' || fileType === 'episode-video' || fileType === 'trailer' || fileType === 'episode-trailer') {
+      console.log('Blocking video/trailer upload request')
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Video uploads are not supported through this API. Please upload videos to Backblaze B2 manually and provide the URL instead.',
-          details: 'Videos should be uploaded directly to your Backblaze B2 bucket'
+          error: 'Video and trailer uploads are not supported through this API. Please upload to Backblaze B2 manually and provide the URL instead.',
+          details: 'Videos and trailers should be uploaded directly to your Backblaze B2 bucket'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Determine bucket based on file type and content type
+    // Determine bucket based on file type
     let bucketName: string
     switch (fileType) {
       case 'thumbnail':
+      case 'episode-thumbnail':
         bucketName = 'thumbnails'
         break
       case 'poster':
       case 'banner':
         bucketName = 'tv-show-posters'
-        break
-      case 'trailer':
-        // Check if this is for TV shows or movies based on contentType
-        bucketName = contentType?.includes('tv') || contentType?.includes('show') ? 'tv-trailers' : 'trailers'
-        break
-      case 'episode-thumbnail':
-        bucketName = 'thumbnails'
-        break
-      case 'episode-trailer':
-        bucketName = 'tv-trailers'
         break
       default:
         throw new Error(`Invalid file type: ${fileType}`)

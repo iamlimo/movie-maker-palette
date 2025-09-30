@@ -76,6 +76,12 @@ verify_jwt = false
 [functions.slider-items]
 verify_jwt = false
 
+[functions.generate-b2-signed-url]
+verify_jwt = true
+
+[functions.generate-trailer-url]
+verify_jwt = false
+
 [edge-runtime]
 enabled = true
 ip_version = "ipv4"

@@ -323,12 +323,12 @@ const AddMovie = () => {
               required={false}
             />
             
-            {/* Trailer Upload (Optional) */}
-            <UnifiedContentUploader
-              mediaType="trailer"
-              label="Trailer"
-              description="Upload a trailer video (max 500MB, optional)"
-              onUploadComplete={handleMediaUpload('trailer_url')}
+            {/* Trailer */}
+            <BackblazeUrlInput
+              value={formData.trailer_url || ''}
+              onChange={(url) => handleInputChange('trailer_url', url)}
+              label="Trailer (Backblaze URL)"
+              required={false}
             />
           </CardContent>
         </Card>
