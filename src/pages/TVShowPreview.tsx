@@ -26,6 +26,7 @@ interface TVShow {
   rating: string;
   language: string;
   thumbnail_url: string;
+  trailer_url?: string;
   status: string;
 }
 
@@ -240,12 +241,14 @@ const TVShowPreview = () => {
       {/* Content Hero Section */}
       <ContentHero
         title={tvShow.title}
-        description={tvShow.description}
-        imageUrl={tvShow.thumbnail_url}
-        rating={tvShow.rating}
+        description={tvShow.description || ''}
+        imageUrl={tvShow.thumbnail_url || ''}
+        trailerUrl={tvShow.trailer_url || undefined}
+        rating={tvShow.rating || undefined}
         year={tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : undefined}
         genre={tvShow.genre?.name}
         price={tvShow.price}
+        language={tvShow.language || undefined}
         onBack={() => navigate('/')}
         contentType="tv_show"
       />

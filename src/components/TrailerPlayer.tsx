@@ -7,11 +7,21 @@ interface TrailerPlayerProps {
   trailerUrl: string;
   title: string;
   className?: string;
+  autoPlay?: boolean;
+  muted?: boolean;
+  controls?: boolean;
 }
 
-const TrailerPlayer = ({ trailerUrl, title, className = "" }: TrailerPlayerProps) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+const TrailerPlayer = ({ 
+  trailerUrl, 
+  title, 
+  className = "",
+  autoPlay = false,
+  muted = true,
+  controls = true
+}: TrailerPlayerProps) => {
+  const [isPlaying, setIsPlaying] = useState(autoPlay);
+  const [isMuted, setIsMuted] = useState(muted);
   const [signedUrl, setSignedUrl] = useState<string>(trailerUrl);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
 
@@ -49,6 +59,18 @@ const TrailerPlayer = ({ trailerUrl, title, className = "" }: TrailerPlayerProps
 
     fetchSignedUrl();
   }, [trailerUrl]);
+
+  // Auto-play when ready (credit optimized)
+  useEffect(() => {
+    if (autoPlay && signedUrl) {
+      const video = document.querySelector('video');
+      if (video) {
+        video.play().catch(err => {
+          console.error('Autoplay failed:', err);
+        });
+      }
+    }
+  }, [autoPlay, signedUrl]);
 
   // Check if it's a YouTube URL and extract video ID
   const getYouTubeVideoId = (url: string) => {

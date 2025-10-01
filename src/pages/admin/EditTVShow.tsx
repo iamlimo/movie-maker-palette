@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { useSections } from '@/hooks/useSections';
 
 interface TVShowData {
   title: string;
@@ -30,8 +32,11 @@ export default function EditTVShow() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { sections, loading: sectionsLoading } = useSections();
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [assignedSections, setAssignedSections] = useState<string[]>([]);
   const [formData, setFormData] = useState<TVShowData>({
     title: '',
     description: '',
@@ -45,6 +50,7 @@ export default function EditTVShow() {
   useEffect(() => {
     if (id) {
       fetchTVShow();
+      fetchAssignedSections();
     }
   }, [id]);
 
@@ -76,6 +82,23 @@ export default function EditTVShow() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAssignedSections = async () => {
+    if (!id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('content_sections')
+        .select('section_id')
+        .eq('content_id', id)
+        .eq('content_type', 'tv_show');
+
+      if (error) throw error;
+      setAssignedSections((data || []).map(d => d.section_id));
+    } catch (error) {
+      console.error('Error fetching assigned sections:', error);
     }
   };
 
@@ -121,6 +144,57 @@ export default function EditTVShow() {
 
   const handleInputChange = (field: keyof TVShowData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSectionToggle = async (sectionId: string, checked: boolean) => {
+    if (!id) return;
+
+    try {
+      if (checked) {
+        const { error } = await supabase
+          .from('content_sections')
+          .insert({
+            content_id: id,
+            content_type: 'tv_show',
+            section_id: sectionId,
+            display_order: 0
+          });
+
+        if (error) throw error;
+        setAssignedSections(prev => [...prev, sectionId]);
+        
+        toast({
+          title: "Success",
+          description: "Section assigned successfully",
+        });
+      } else {
+        const { error } = await supabase
+          .from('content_sections')
+          .delete()
+          .eq('content_id', id)
+          .eq('section_id', sectionId)
+          .eq('content_type', 'tv_show');
+
+        if (error) throw error;
+        setAssignedSections(prev => prev.filter(s => s !== sectionId));
+        
+        toast({
+          title: "Success",
+          description: "Section removed successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling section:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update section assignment",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isSectionAssigned = (sectionId: string) => {
+    return assignedSections.includes(sectionId);
   };
 
   if (loading) {
@@ -276,6 +350,51 @@ export default function EditTVShow() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Section Assignment */}
+      <Card className="max-w-2xl mt-6">
+        <CardHeader>
+          <CardTitle>Section Assignment</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose which sections this TV show should appear in on the homepage
+          </p>
+        </CardHeader>
+        <CardContent>
+          {sectionsLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <p className="text-sm text-muted-foreground mt-2">Loading sections...</p>
+            </div>
+          ) : sections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sections available</p>
+          ) : (
+            <div className="space-y-4">
+              {sections.map((section) => (
+                <div key={section.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`section-${section.id}`}
+                    checked={isSectionAssigned(section.id)}
+                    onCheckedChange={(checked) => 
+                      handleSectionToggle(section.id, checked as boolean)
+                    }
+                  />
+                  <Label 
+                    htmlFor={`section-${section.id}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    <div>
+                      <p className="font-medium">{section.title}</p>
+                      {section.subtitle && (
+                        <p className="text-xs text-muted-foreground">{section.subtitle}</p>
+                      )}
+                    </div>
+                  </Label>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

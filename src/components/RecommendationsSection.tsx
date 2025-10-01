@@ -188,9 +188,12 @@ const RecommendationsSection = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {visibleRecommendations.map((item) => (
-          <div key={item.id} className="cursor-pointer">
+          <div 
+            key={item.id} 
+            className="group transition-all duration-300 hover:scale-105 hover:z-10"
+          >
             <MovieCard
               id={item.id}
               title={item.title}

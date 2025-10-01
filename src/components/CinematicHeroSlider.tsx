@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play, Plus, Star, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSliderItems, SliderItem } from '@/hooks/useSliderItems';
-// Removed rental functionality from slider
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -12,8 +12,8 @@ import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import FavoriteButton from '@/components/FavoriteButton';
 
 const CinematicHeroSlider = () => {
+  const navigate = useNavigate();
   const { sliderItems, loading } = useSliderItems();
-  // Removed rental functionality
   const { toggleFavorite } = useFavorites();
   const { user } = useAuth();
   
@@ -197,10 +197,10 @@ const CinematicHeroSlider = () => {
               {/* Action Buttons */}
               <div className="flex items-center gap-4">
                 <Button 
-                  variant="premium" 
+                  variant="default" 
                   size="lg" 
-                  className="shadow-glow"
-                  onClick={() => window.location.href = `/preview/${currentItem.content_type}/${currentItem.content_id}`}
+                  className="shadow-glow hover:scale-105 transition-transform"
+                  onClick={() => navigate(`/preview/${currentItem.content_type}/${currentItem.content_id}`)}
                 >
                   <Play className="h-5 w-5 mr-2" />
                   View Details

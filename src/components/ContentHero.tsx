@@ -1,43 +1,107 @@
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Play, Star, Clock } from "lucide-react";
+import { ArrowLeft, Play, Star, Clock, Calendar } from "lucide-react";
+import TrailerPlayer from "./TrailerPlayer";
 
 interface ContentHeroProps {
   title: string;
   description: string;
   imageUrl: string;
+  trailerUrl?: string;
   rating?: string;
   duration?: number;
   year?: number;
   genre?: string;
   price?: number;
   contentType?: 'movie' | 'tv_show';
+  language?: string;
   onBack: () => void;
+  onRent?: () => void;
 }
 
 const ContentHero = ({
   title,
   description,
   imageUrl,
+  trailerUrl,
   rating,
   duration,
   year,
   genre,
   price,
   contentType = 'movie',
-  onBack
+  language,
+  onBack,
+  onRent
 }: ContentHeroProps) => {
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Auto-play trailer after 3 seconds (credit optimized)
+  useEffect(() => {
+    if (!trailerUrl || !imageLoaded) return;
+
+    const timer = setTimeout(() => {
+      setShowTrailer(true);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [trailerUrl, imageLoaded]);
+
+  // Pause video when section is out of view (credit optimization)
+  useEffect(() => {
+    if (!showTrailer) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          setShowTrailer(false);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [showTrailer]);
+
   return (
-    <section className="relative min-h-[70vh] flex items-center overflow-hidden">
-      {/* Background Image */}
+    <section 
+      ref={sectionRef}
+      className="relative min-h-[80vh] flex items-center overflow-hidden"
+    >
+      {/* Background - Poster or Trailer */}
       <div className="absolute inset-0">
-        <img 
-          src={imageUrl || '/placeholder.svg'} 
-          alt={title}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+        {showTrailer && trailerUrl ? (
+          <div className="relative w-full h-full">
+            <TrailerPlayer 
+              trailerUrl={trailerUrl}
+              title={title}
+              autoPlay
+              muted
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent pointer-events-none" />
+          </div>
+        ) : (
+          <>
+            <img 
+              src={imageUrl || '/placeholder.svg'} 
+              alt={title}
+              className="w-full h-full object-cover"
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(true)}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+          </>
+        )}
       </div>
 
       {/* Content */}
@@ -53,62 +117,75 @@ const ContentHero = ({
             Back to Home
           </Button>
 
-          {/* Content Badge & Metadata */}
-          <div className="flex items-center gap-4 mb-6 flex-wrap">
+          {/* Compact Metadata - Single Line */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap">
             <Badge variant="secondary" className="px-3 py-1">
               {contentType === 'movie' ? 'Movie' : 'TV Show'}
             </Badge>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {rating && (
-                <>
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-primary text-primary" />
-                    <span>{rating}</span>
-                  </div>
-                  <span>•</span>
-                </>
-              )}
-              {duration && contentType === 'movie' && (
-                <>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{duration}m</span>
-                  </div>
-                  <span>•</span>
-                </>
-              )}
-              {year && <span>{year}</span>}
-            </div>
+            {year && (
+              <>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>{year}</span>
+                </div>
+              </>
+            )}
+            {duration && contentType === 'movie' && (
+              <>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>{duration}m</span>
+                </div>
+              </>
+            )}
+            {language && (
+              <>
+                <span>•</span>
+                <span>{language}</span>
+              </>
+            )}
+            {rating && (
+              <>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5 fill-primary text-primary" />
+                  <span>{rating}</span>
+                </div>
+              </>
+            )}
+            {genre && (
+              <>
+                <span>•</span>
+                <Badge variant="outline" className="px-2 py-0.5 text-xs">{genre}</Badge>
+              </>
+            )}
           </div>
 
           {/* Title */}
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent leading-tight">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight text-foreground drop-shadow-lg">
             {title}
           </h1>
 
           {/* Description */}
-          <p className="text-lg text-muted-foreground mb-8 leading-relaxed max-w-2xl">
+          <p className="text-base md:text-lg text-foreground/90 mb-8 leading-relaxed max-w-2xl">
             {description}
           </p>
 
-          {/* Genres & Price */}
-          <div className="flex items-center gap-4 mb-8 flex-wrap">
-            {genre && (
-              <Badge variant="outline">{genre}</Badge>
-            )}
-            {price && (
-              <Badge variant="secondary" className="text-primary font-semibold">
-                ₦{price}
-              </Badge>
-            )}
-          </div>
-
           {/* Action Buttons */}
           <div className="flex items-center gap-4 flex-wrap">
-            <Button variant="premium" size="lg" className="shadow-glow">
-              <Play className="h-5 w-5 mr-2" />
-              {contentType === 'movie' ? `Rent for ₦${price}` : 'View Episodes'}
-            </Button>
+            {onRent && price && (
+              <Button 
+                variant="default" 
+                size="lg" 
+                className="shadow-glow hover:scale-105 transition-transform"
+                onClick={onRent}
+              >
+                <Play className="h-5 w-5 mr-2" />
+                {contentType === 'movie' ? `Rent for ₦${price}` : 'Rent Episodes'}
+              </Button>
+            )}
           </div>
 
           {/* Rental Info */}

@@ -152,13 +152,15 @@ const MoviePreview = () => {
       {/* Content Hero Section */}
       <ContentHero
         title={movie.title}
-        description={movie.description}
-        imageUrl={movie.thumbnail_url}
-        rating={movie.rating}
-        duration={movie.duration}
+        description={movie.description || ''}
+        imageUrl={movie.thumbnail_url || ''}
+        trailerUrl={movie.trailer_url || undefined}
+        rating={movie.rating || undefined}
+        duration={movie.duration || undefined}
         year={movie.release_date ? new Date(movie.release_date).getFullYear() : undefined}
         genre={movie.genre?.name}
         price={movie.price}
+        language={movie.language || undefined}
         onBack={() => navigate('/')}
       />
 
