@@ -123,6 +123,36 @@ const ViewTVShow = () => {
     }
   };
 
+  const handleDeleteEpisode = async (episodeId: string, seasonId: string) => {
+    if (!confirm('Delete this episode? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('episodes')
+        .delete()
+        .eq('id', episodeId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Episode deleted successfully",
+      });
+
+      // Refresh episodes for this season
+      fetchEpisodes(seasonId);
+    } catch (error) {
+      console.error('Error deleting episode:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete episode",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: "bg-green-500 text-white",
@@ -303,14 +333,29 @@ const ViewTVShow = () => {
                           <TableCell>
                             <div className="flex gap-2">
                               {episode.video_url && (
-                                <Button size="sm" variant="ghost">
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  title="Preview Episode"
+                                  onClick={() => window.open(`/tvshow/${tvShow.id}?episode=${episode.id}`, '_blank')}
+                                >
                                   <Play className="h-4 w-4" />
                                 </Button>
                               )}
-                              <Button size="sm" variant="ghost">
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                title="Edit Episode"
+                                onClick={() => navigate(`/admin/tv-shows/${tvShow.id}/seasons/${season.id}/episodes/${episode.id}/edit`)}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button size="sm" variant="ghost">
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                title="Delete Episode"
+                                onClick={() => handleDeleteEpisode(episode.id, season.id)}
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>

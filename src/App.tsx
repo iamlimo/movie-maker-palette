@@ -16,6 +16,8 @@ import TVShows from "@/pages/admin/TVShows";
 import AddTVShow from "@/pages/admin/AddTVShow";
 import AddSeason from "@/pages/admin/AddSeason";
 import AddEpisode from "@/pages/admin/AddEpisode";
+import EditSeason from "@/pages/admin/EditSeason";
+import EditEpisode from "@/pages/admin/EditEpisode";
 import ViewTVShow from "@/pages/admin/ViewTVShow";
 import EditTVShow from "@/pages/admin/EditTVShow";
 import Submissions from "@/pages/admin/Submissions";
@@ -77,8 +79,10 @@ const App: React.FC = () => (
               <Route path="movies/edit/:id" element={<EditMovie />} />
               <Route path="tv-shows" element={<TVShows />} />
               <Route path="tv-shows/add" element={<AddTVShow />} />
-              <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
-              <Route path="tv-shows/:showId/seasons/:seasonId/add-episode" element={<AddEpisode />} />
+                <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
+                <Route path="tv-shows/:showId/seasons/:seasonId/add-episode" element={<AddEpisode />} />
+                <Route path="tv-shows/:showId/seasons/:seasonId/edit" element={<EditSeason />} />
+                <Route path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit" element={<EditEpisode />} />
               <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
               <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
               <Route path="submissions" element={<Submissions />} />

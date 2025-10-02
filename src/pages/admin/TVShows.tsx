@@ -156,6 +156,45 @@ const TVShows = () => {
     }
   };
 
+  const handleDeleteSeason = async (seasonId: string, showId: string) => {
+    if (!confirm('Delete this season? All episodes will also be permanently deleted. This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      // First delete all episodes in this season
+      const { error: episodeError } = await supabase
+        .from('episodes')
+        .delete()
+        .eq('season_id', seasonId);
+
+      if (episodeError) throw episodeError;
+
+      // Then delete the season
+      const { error: seasonError } = await supabase
+        .from('seasons')
+        .delete()
+        .eq('id', seasonId);
+
+      if (seasonError) throw seasonError;
+
+      toast({
+        title: "Success",
+        description: "Season and all episodes deleted successfully",
+      });
+
+      // Refresh the seasons for this show
+      fetchSeasons(showId);
+    } catch (error) {
+      console.error('Error deleting season:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete season",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: "bg-green-500 text-white",
@@ -356,16 +395,26 @@ const TVShows = () => {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => navigate(`/admin/seasons/add/${show.id}/${season.id}`)}
+                            title="Add Episode"
+                            onClick={() => navigate(`/admin/tv-shows/${show.id}/seasons/${season.id}/add-episode`)}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => navigate(`/admin/seasons/edit/${season.id}`)}
+                            title="Edit Season"
+                            onClick={() => navigate(`/admin/tv-shows/${show.id}/seasons/${season.id}/edit`)}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            title="Delete Season"
+                            onClick={() => handleDeleteSeason(season.id, show.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
