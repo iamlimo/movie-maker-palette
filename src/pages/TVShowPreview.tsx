@@ -253,6 +253,74 @@ const TVShowPreview = () => {
         contentType="tv_show"
       />
 
+      {/* Pricing Options Section */}
+      {currentSeason && (
+        <div className="container mx-auto px-4 py-8 border-y border-border/50">
+          <h2 className="text-2xl font-bold mb-6">Rental Options</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Season Rental */}
+            <div className="p-6 rounded-xl border-2 border-primary/50 bg-primary/5 backdrop-blur-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Badge variant="default" className="bg-primary">Best Value</Badge>
+              </div>
+              <h3 className="text-xl font-bold mb-2">Rent Entire Season</h3>
+              <div className="text-3xl font-bold text-primary mb-2">
+                ₦{currentSeason.price}
+              </div>
+              <ul className="space-y-2 mb-4 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-primary"></div>
+                  {currentEpisodes.length} episodes included
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-primary"></div>
+                  {currentSeason.rental_expiry_duration} hours access
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-primary"></div>
+                  Watch anytime during rental period
+                </li>
+              </ul>
+              <RentalButton
+                contentId={currentSeason.id}
+                contentType="season"
+                price={currentSeason.price}
+                title={`${tvShow.title} - Season ${selectedSeason}`}
+              />
+            </div>
+
+            {/* Episode Rental */}
+            <div className="p-6 rounded-xl border border-border bg-card/50 backdrop-blur-sm">
+              <h3 className="text-xl font-bold mb-2">Rent Individual Episodes</h3>
+              <div className="text-3xl font-bold mb-2">
+                From ₦{currentEpisodes.length > 0 ? Math.min(...currentEpisodes.map(e => e.price)) : 0}
+              </div>
+              <ul className="space-y-2 mb-4 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-foreground"></div>
+                  Choose specific episodes
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-foreground"></div>
+                  48-hour rental per episode
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-foreground"></div>
+                  Flexible pricing
+                </li>
+              </ul>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => document.getElementById('episodes-section')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                Browse Episodes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -288,15 +356,23 @@ const TVShowPreview = () => {
 
             {/* Seasons & Episodes */}
             {seasons.length > 0 && (
-              <div>
+              <div id="episodes-section">
                 <h2 className="text-2xl font-bold mb-4">Seasons & Episodes</h2>
                 <Tabs value={selectedSeason.toString()} onValueChange={(value) => setSelectedSeason(parseInt(value))}>
                   <TabsList className="grid w-full grid-cols-auto">
-                    {seasons.map((season) => (
-                      <TabsTrigger key={season.id} value={season.season_number.toString()}>
-                        Season {season.season_number}
-                      </TabsTrigger>
-                    ))}
+                    {seasons.map((season) => {
+                      const seasonEpisodes = episodes[season.id] || [];
+                      return (
+                        <TabsTrigger key={season.id} value={season.season_number.toString()}>
+                          <div className="flex flex-col items-start">
+                            <span>Season {season.season_number}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {seasonEpisodes.length} episodes • ₦{season.price}
+                            </span>
+                          </div>
+                        </TabsTrigger>
+                      );
+                    })}
                   </TabsList>
                   
                   {seasons.map((season) => (
@@ -315,46 +391,71 @@ const TVShowPreview = () => {
 
                             return (
                               <div key={episode.id} className="space-y-3">
-                                <div className="p-4 rounded-lg border border-border bg-card hover:bg-accent/50 transition-smooth">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <h4 className="font-semibold">
-                                          Episode {episode.episode_number}: {episode.title}
-                                        </h4>
-                                        {!hasAnyAccess && <Lock className="h-4 w-4 text-muted-foreground" />}
-                                      </div>
-                                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                                        <div className="flex items-center gap-1">
-                                          <Clock className="h-3 w-3" />
-                                          <span>{episode.duration} min</span>
-                                        </div>
-                                        <span>₦{episode.price}</span>
-                                        {hasAnyAccess && (
-                                          <Badge variant="outline" className="text-green-600 border-green-600">
-                                            Unlocked
-                                          </Badge>
+                                <div className="group p-4 rounded-lg border border-border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-300 hover:scale-[1.01]">
+                                  <div className="flex gap-4">
+                                    {/* Episode Thumbnail */}
+                                    {episode.thumbnail_url && (
+                                      <div className="relative w-32 h-20 rounded overflow-hidden flex-shrink-0">
+                                        <img 
+                                          src={episode.thumbnail_url} 
+                                          alt={episode.title}
+                                          className="w-full h-full object-cover"
+                                        />
+                                        {!hasAnyAccess && (
+                                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <Lock className="h-6 w-6 text-white" />
+                                          </div>
                                         )}
                                       </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {hasAnyAccess ? (
-                                        <Button 
-                                          variant="default" 
-                                          size="sm"
-                                          onClick={() => setSelectedEpisode(episode)}
-                                        >
-                                          <Play className="h-4 w-4 mr-1" />
-                                          Watch
-                                        </Button>
-                                      ) : (
-                                        <RentalButton
-                                          contentId={episode.id}
-                                          contentType="episode"
-                                          price={episode.price}
-                                          title={`Episode ${episode.episode_number}: ${episode.title}`}
-                                        />
-                                      )}
+                                    )}
+                                    
+                                    {/* Episode Info */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                          <h4 className="font-semibold text-lg mb-1 group-hover:text-primary transition-colors">
+                                            {episode.episode_number}. {episode.title}
+                                          </h4>
+                                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                            <div className="flex items-center gap-1">
+                                              <Clock className="h-3 w-3" />
+                                              <span>{episode.duration} min</span>
+                                            </div>
+                                            <span>•</span>
+                                            <span className="font-semibold text-foreground">₦{episode.price}</span>
+                                            {hasAnyAccess && (
+                                              <>
+                                                <span>•</span>
+                                                <Badge variant="outline" className="text-green-600 border-green-600">
+                                                  ✓ Unlocked
+                                                </Badge>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Action Button */}
+                                        <div className="flex-shrink-0">
+                                          {hasAnyAccess ? (
+                                            <Button 
+                                              variant="default" 
+                                              size="sm"
+                                              onClick={() => setSelectedEpisode(episode)}
+                                              className="shadow-glow"
+                                            >
+                                              <Play className="h-4 w-4 mr-1" />
+                                              Watch
+                                            </Button>
+                                          ) : (
+                                            <RentalButton
+                                              contentId={episode.id}
+                                              contentType="episode"
+                                              price={episode.price}
+                                              title={`Episode ${episode.episode_number}: ${episode.title}`}
+                                            />
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -433,13 +534,20 @@ const TVShowPreview = () => {
               <div className="p-6 rounded-xl border border-border bg-card">
                 <h3 className="font-semibold mb-4">Season {currentSeason.season_number}</h3>
                 <div className="space-y-3">
+                  {seasonAccess[currentSeason.id] && (
+                    <div className="mb-4">
+                      <Badge variant="default" className="bg-green-600">
+                        Season Pass Active
+                      </Badge>
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm text-muted-foreground">Episodes</p>
                     <p className="font-semibold">{currentEpisodes.length}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Season Price</p>
-                    <p className="font-semibold">₦{currentSeason.price}</p>
+                    <p className="text-sm text-muted-foreground">Season Rental</p>
+                    <p className="font-semibold text-primary">₦{currentSeason.price}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Rental Duration</p>

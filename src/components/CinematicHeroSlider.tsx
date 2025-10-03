@@ -200,7 +200,12 @@ const CinematicHeroSlider = () => {
                   variant="default" 
                   size="lg" 
                   className="shadow-glow hover:scale-105 transition-transform"
-                  onClick={() => navigate(`/preview/${currentItem.content_type}/${currentItem.content_id}`)}
+                  onClick={() => {
+                    const route = currentItem.content_type === 'movie' 
+                      ? `/movie/${currentItem.content_id}` 
+                      : `/tvshow/${currentItem.content_id}`;
+                    navigate(route);
+                  }}
                 >
                   <Play className="h-5 w-5 mr-2" />
                   View Details

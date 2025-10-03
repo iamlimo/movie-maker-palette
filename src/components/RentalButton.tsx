@@ -99,11 +99,17 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
     );
   }
 
+  const rentalDuration = contentType === 'season' 
+    ? 'Full season access' 
+    : contentType === 'episode' 
+    ? '48-hour rental'
+    : '48-hour rental';
+
   return (
     <div className="space-y-4">
       <div className="text-center">
         <div className="text-2xl font-bold">₦{price}</div>
-        <div className="text-sm text-muted-foreground">48-hour rental</div>
+        <div className="text-sm text-muted-foreground">{rentalDuration}</div>
       </div>
       <Button 
         onClick={handleRent} 
@@ -117,7 +123,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
         ) : (
           <Play className="h-5 w-5 mr-2" />
         )}
-        Rent for ₦{price}
+        Rent {contentType === 'season' ? 'Season' : contentType === 'episode' ? 'Episode' : ''} for ₦{price}
       </Button>
     </div>
   );
