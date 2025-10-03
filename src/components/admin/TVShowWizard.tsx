@@ -474,17 +474,19 @@ export const TVShowWizard = () => {
 
                 <Separator />
 
-                <TVShowUploader
-                  accept="video/*"
-                  onUploadComplete={(filePath) => updateTVShowData('trailer_url', filePath)}
-                  label="TV Show Trailer"
-                  description="Upload a trailer or preview video for the show (optional)"
-                  contentType="trailer"
-                  currentUrl={tvShowData.trailer_url}
-                  maxSize={500 * 1024 * 1024}
-                  required={false}
-                  autoUpload={true}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="trailer_url">TV Show Trailer URL (Optional)</Label>
+                  <Input
+                    id="trailer_url"
+                    type="text"
+                    placeholder="Paste Backblaze B2 file URL or path (e.g., trailers/show-trailer.mp4)"
+                    value={tvShowData.trailer_url}
+                    onChange={(e) => updateTVShowData('trailer_url', e.target.value)}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Enter the Backblaze B2 file path or full URL for the trailer video
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>

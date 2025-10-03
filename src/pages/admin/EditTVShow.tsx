@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useSections } from '@/hooks/useSections';
+import BackblazeUrlInput from '@/components/admin/BackblazeUrlInput';
 
 interface TVShowData {
   title: string;
@@ -26,6 +27,7 @@ interface TVShowData {
   price: number;
   status: 'pending' | 'approved' | 'rejected';
   release_date: string;
+  trailer_url: string;
 }
 
 export default function EditTVShow() {
@@ -45,6 +47,7 @@ export default function EditTVShow() {
     price: 0,
     status: 'pending',
     release_date: '',
+    trailer_url: '',
   });
 
   useEffect(() => {
@@ -72,6 +75,7 @@ export default function EditTVShow() {
         price: data.price || 0,
         status: data.status || 'pending',
         release_date: data.release_date || '',
+        trailer_url: data.trailer_url || '',
       });
     } catch (error) {
       console.error('Error fetching TV show:', error);
@@ -118,6 +122,7 @@ export default function EditTVShow() {
           price: formData.price,
           status: formData.status,
           release_date: formData.release_date || null,
+          trailer_url: formData.trailer_url || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
@@ -326,6 +331,13 @@ export default function EditTVShow() {
                 </SelectContent>
               </Select>
             </div>
+
+            <BackblazeUrlInput
+              value={formData.trailer_url}
+              onChange={(url) => handleInputChange('trailer_url', url)}
+              label="Trailer Video URL"
+              required={false}
+            />
 
             <div className="flex gap-4">
               <Button type="submit" disabled={saving}>

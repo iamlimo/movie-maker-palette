@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedTVShowUploader } from './UnifiedTVShowUploader';
+import BackblazeUrlInput from './BackblazeUrlInput';
 import { 
   Tv, 
   Plus, 
@@ -27,7 +28,7 @@ interface TVShowFormData {
   tags: string[];
   poster_file: File | null;
   banner_file: File | null;
-  trailer_file: File | null;
+  trailer_url: string;
 }
 
 export const TVShowCreator = () => {
@@ -40,13 +41,12 @@ export const TVShowCreator = () => {
     tags: [],
     poster_file: null,
     banner_file: null,
-    trailer_file: null
+    trailer_url: ''
   });
   
   const [uploadedUrls, setUploadedUrls] = useState<{
     poster?: string;
     banner?: string;
-    trailer?: string;
   }>({});
   
   const [tagInput, setTagInput] = useState('');
@@ -60,10 +60,10 @@ export const TVShowCreator = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileSelect = (field: 'poster_file' | 'banner_file' | 'trailer_file') => (file: File | null) => {
+  const handleFileSelect = (field: 'poster_file' | 'banner_file') => (file: File | null) => {
     setFormData(prev => ({ ...prev, [field]: file }));
     // Clear uploaded URL when new file is selected
-    const urlField = field.replace('_file', '') as 'poster' | 'banner' | 'trailer';
+    const urlField = field.replace('_file', '') as 'poster' | 'banner';
     setUploadedUrls(prev => ({ ...prev, [urlField]: undefined }));
     
     if (file) {
@@ -74,7 +74,7 @@ export const TVShowCreator = () => {
     }
   };
 
-  const handleUploadComplete = (field: 'poster' | 'banner' | 'trailer') => (filePath: string, publicUrl: string) => {
+  const handleUploadComplete = (field: 'poster' | 'banner') => (filePath: string, publicUrl: string) => {
     setUploadedUrls(prev => ({ ...prev, [field]: publicUrl }));
     toast({
       title: "Upload Complete",
@@ -137,10 +137,8 @@ export const TVShowCreator = () => {
         submitFormData.append('banner', formData.banner_file);
       }
       
-      if (uploadedUrls.trailer) {
-        submitFormData.append('trailer_url', uploadedUrls.trailer);
-      } else if (formData.trailer_file) {
-        submitFormData.append('trailer', formData.trailer_file);
+      if (formData.trailer_url) {
+        submitFormData.append('trailer_url', formData.trailer_url);
       }
 
       // Get auth token
@@ -179,7 +177,7 @@ export const TVShowCreator = () => {
         tags: [],
         poster_file: null,
         banner_file: null,
-        trailer_file: null
+        trailer_url: ''
       });
       setUploadedUrls({});
 
@@ -331,18 +329,14 @@ export const TVShowCreator = () => {
               autoUpload={true}
             />
 
-            <UnifiedTVShowUploader
-              onFileSelect={handleFileSelect('trailer_file')}
-              onUploadComplete={handleUploadComplete('trailer')}
-              accept="video/*"
-              maxSize={100 * 1024 * 1024} // 100MB
-              label="Trailer Video"
-              description="Upload a trailer/preview video for this TV show"
-              contentType="trailer"
-              selectedFile={formData.trailer_file}
-              currentUrl={uploadedUrls.trailer}
-              autoUpload={true}
-            />
+            <div className="space-y-2">
+              <BackblazeUrlInput
+                value={formData.trailer_url}
+                onChange={(url) => handleInputChange('trailer_url', url)}
+                label="Trailer Video URL"
+                required={false}
+              />
+            </div>
           </div>
 
           {/* Submit Button */}
