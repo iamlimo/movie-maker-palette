@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedTVShowUploader } from './UnifiedTVShowUploader';
 import BackblazeUrlInput from './BackblazeUrlInput';
+import TrailerPlayer from '../TrailerPlayer';
 import { 
   Tv, 
   Plus, 
@@ -336,7 +337,41 @@ export const TVShowCreator = () => {
                 label="Trailer Video URL"
                 required={false}
               />
+              {formData.trailer_url && (
+                <div className="mt-4 p-4 border border-border rounded-lg bg-card">
+                  <Label className="mb-2 block">Trailer Preview</Label>
+                  <div className="aspect-video rounded-lg overflow-hidden bg-secondary">
+                    <TrailerPlayer 
+                      trailerUrl={formData.trailer_url}
+                      title={formData.title || 'Trailer Preview'}
+                      controls
+                    />
+                  </div>
+                </div>
+              )}
             </div>
+            
+            {uploadedUrls.poster && (
+              <div className="p-4 border border-border rounded-lg bg-card">
+                <Label className="mb-2 block">Poster Preview</Label>
+                <img 
+                  src={uploadedUrls.poster} 
+                  alt="Poster preview" 
+                  className="w-full max-w-xs rounded"
+                />
+              </div>
+            )}
+            
+            {uploadedUrls.banner && (
+              <div className="p-4 border border-border rounded-lg bg-card">
+                <Label className="mb-2 block">Banner Preview</Label>
+                <img 
+                  src={uploadedUrls.banner} 
+                  alt="Banner preview" 
+                  className="w-full max-w-xs rounded"
+                />
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}

@@ -138,7 +138,7 @@ const TrailerPlayer = ({
         <div className="absolute inset-0 flex items-center justify-center bg-secondary/80">
           <p className="text-muted-foreground">Loading trailer...</p>
         </div>
-      ) : (
+      ) : signedUrl ? (
         <video
           src={signedUrl}
           poster="/placeholder.svg"
@@ -150,20 +150,14 @@ const TrailerPlayer = ({
         >
           Your browser does not support the video tag.
         </video>
-      )}
-      
-      {/* Fallback message if video fails to load */}
-      <div className="absolute inset-0 flex items-center justify-center bg-secondary/80 backdrop-blur">
-        <div className="text-center">
-          <Play className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Trailer not available</p>
-          <Button variant="outline" className="mt-4" asChild>
-            <a href={trailerUrl} target="_blank" rel="noopener noreferrer">
-              Watch on External Site
-            </a>
-          </Button>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-secondary/80">
+          <div className="text-center">
+            <Play className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Trailer not available</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

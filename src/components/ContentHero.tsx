@@ -95,6 +95,7 @@ const ContentHero = ({
               src={imageUrl || '/placeholder.svg'} 
               alt={title}
               className="w-full h-full object-cover"
+              loading="eager"
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageLoaded(true)}
             />

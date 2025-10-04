@@ -21,11 +21,14 @@ interface TVShow {
   description: string;
   genre_id: string;
   genre?: { name: string };
+  genres?: string[];
   release_date: string;
   price: number;
   rating: string;
   language: string;
   thumbnail_url: string;
+  landscape_poster_url?: string;
+  slider_cover_url?: string;
   trailer_url?: string;
   status: string;
 }
@@ -45,6 +48,7 @@ interface Episode {
   season_id: string;
   episode_number: number;
   title: string;
+  description?: string;
   duration: number;
   price: number;
   video_url: string;
@@ -72,6 +76,7 @@ const TVShowPreview = () => {
 
   useEffect(() => {
     if (id) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       fetchTVShowData(id);
     }
   }, [id]);
@@ -242,7 +247,7 @@ const TVShowPreview = () => {
       <ContentHero
         title={tvShow.title}
         description={tvShow.description || ''}
-        imageUrl={tvShow.thumbnail_url || ''}
+        imageUrl={tvShow.landscape_poster_url || tvShow.slider_cover_url || tvShow.thumbnail_url || ''}
         trailerUrl={tvShow.trailer_url || undefined}
         rating={tvShow.rating || undefined}
         year={tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : undefined}
@@ -257,7 +262,7 @@ const TVShowPreview = () => {
       {currentSeason && (
         <div className="container mx-auto px-4 py-8 border-y border-border/50">
           <h2 className="text-2xl font-bold mb-6">Rental Options</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Season Rental */}
             <div className="p-6 rounded-xl border-2 border-primary/50 bg-primary/5 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-3">
@@ -390,16 +395,20 @@ const TVShowPreview = () => {
                             const nextEpisode = currentEpisodes[index + 1];
 
                             return (
-                              <div key={episode.id} className="space-y-3">
-                                <div className="group p-4 rounded-lg border border-border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-300 hover:scale-[1.01]">
-                                  <div className="flex gap-4">
+                                <div key={episode.id} className="space-y-3">
+                                 <div className="group p-4 rounded-lg border border-border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-300 hover:scale-[1.01]">
+                                   <div className="flex flex-col sm:flex-row gap-4">
                                     {/* Episode Thumbnail */}
-                                    {episode.thumbnail_url && (
-                                      <div className="relative w-32 h-20 rounded overflow-hidden flex-shrink-0">
+                                     {episode.thumbnail_url && (
+                                      <div className="relative w-full sm:w-32 h-48 sm:h-20 rounded overflow-hidden flex-shrink-0">
                                         <img 
                                           src={episode.thumbnail_url} 
                                           alt={episode.title}
                                           className="w-full h-full object-cover"
+                                          loading="lazy"
+                                          onError={(e) => {
+                                            e.currentTarget.src = '/placeholder.svg';
+                                          }}
                                         />
                                         {!hasAnyAccess && (
                                           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
@@ -431,7 +440,12 @@ const TVShowPreview = () => {
                                                 </Badge>
                                               </>
                                             )}
-                                          </div>
+                                           </div>
+                                          {episode.description && (
+                                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                              {episode.description}
+                                            </p>
+                                          )}
                                         </div>
                                         
                                         {/* Action Button */}
@@ -524,6 +538,26 @@ const TVShowPreview = () => {
                 {tvShow.genre?.name && (
                   <div className="pt-2">
                     <Badge variant="outline">{tvShow.genre.name}</Badge>
+                  </div>
+                )}
+                {tvShow.genres && tvShow.genres.length > 0 && (
+                  <div className="pt-3 border-t">
+                    <p className="text-sm text-muted-foreground mb-2">Tags</p>
+                    <div className="flex flex-wrap gap-2">
+                      {tvShow.genres.map((genre, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">
+                          {genre}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {tvShow.rating && (
+                  <div className="pt-3 border-t">
+                    <p className="text-sm text-muted-foreground mb-2">Content Rating</p>
+                    <Badge variant="outline" className="font-semibold">
+                      {tvShow.rating}
+                    </Badge>
                   </div>
                 )}
               </div>

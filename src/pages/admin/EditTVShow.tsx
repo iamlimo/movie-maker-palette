@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useSections } from '@/hooks/useSections';
 import BackblazeUrlInput from '@/components/admin/BackblazeUrlInput';
+import TrailerPlayer from '@/components/TrailerPlayer';
 
 interface TVShowData {
   title: string;
@@ -338,6 +339,19 @@ export default function EditTVShow() {
               label="Trailer Video URL"
               required={false}
             />
+            
+            {formData.trailer_url && (
+              <div className="mt-4 p-4 border border-border rounded-lg bg-card">
+                <Label className="mb-2 block">Current Trailer</Label>
+                <div className="aspect-video rounded-lg overflow-hidden bg-secondary">
+                  <TrailerPlayer 
+                    trailerUrl={formData.trailer_url}
+                    title={formData.title}
+                    controls
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-4">
               <Button type="submit" disabled={saving}>
