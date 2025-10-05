@@ -93,96 +93,86 @@ const EnhancedContentCard = ({
 
   return (
     <div 
-      className={`group relative overflow-hidden rounded-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer bg-card border border-border/50 hover:border-primary/20 hover:shadow-lg ${
-        featured ? 'shadow-premium ring-1 ring-primary/10' : 'shadow-sm'
+      className={`group relative overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
+        featured ? 'ring-1 ring-primary/20' : ''
       } ${className}`}
       onClick={handlePreview}
     >
-      {/* Poster Image */}
-      <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+      {/* Poster */}
+      <div className="relative aspect-[2/3] overflow-hidden bg-muted/30">
         <img 
           src={displayImage} 
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={() => setImageError(true)}
           loading="lazy"
         />
         
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        
-        {/* Content Type Badge */}
-        <Badge 
-          variant="secondary" 
-          className="absolute top-2 left-2 text-xs font-medium bg-background/90 text-foreground border-0"
-        >
-          {contentType === 'movie' ? 'Movie' : 'TV Show'}
-        </Badge>
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-x-4 bottom-4 space-y-2">
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                className="flex-1 h-8 text-xs font-medium shadow-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePreview();
+                }}
+              >
+                <Play className="h-3 w-3 mr-1.5" />
+                {price > 0 ? 'Rent' : 'Watch'}
+              </Button>
+              <Button 
+                variant="secondary" 
+                size="sm"
+                className="flex-1 h-8 text-xs font-medium shadow-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePreview();
+                }}
+              >
+                <Eye className="h-3 w-3 mr-1.5" />
+                Info
+              </Button>
+            </div>
+          </div>
+        </div>
 
         {/* Favorite Button */}
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-8 w-8 bg-background/80 hover:bg-background/90 opacity-0 group-hover:opacity-100 transition-all duration-300"
+          className="absolute top-2 left-2 h-8 w-8 backdrop-blur-sm bg-background/80 hover:bg-background/90 border-0 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm"
           onClick={handleToggleFavorite}
           disabled={favoritesLoading}
         >
-          <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-muted-foreground hover:text-foreground'}`} />
+          <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-rose-500 text-rose-500' : 'text-muted-foreground hover:text-foreground'}`} />
         </Button>
 
-        {/* Action Buttons Overlay */}
-        <div className="absolute inset-x-0 bottom-0 p-3 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-          <div className="flex gap-2">
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="flex-1 h-8 text-xs font-medium"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePreview();
-              }}
-            >
-              <Play className="h-3 w-3 mr-1" />
-              {price > 0 ? `Rent ${formatPrice(price)}` : 'Watch Free'}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="flex-1 h-8 text-xs font-medium bg-background/90 hover:bg-background"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePreview();
-              }}
-            >
-              <Eye className="h-3 w-3 mr-1" />
-              Details
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content Info */}
-      <div className="p-3 space-y-2">
-        {/* Title and Price */}
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-tight flex-1">
-            {title}
-          </h3>
+        {/* Price Badge */}
+        <div className="absolute top-2 right-2">
           <Badge 
-            variant={price > 0 ? "default" : "secondary"} 
-            className="text-xs font-medium shrink-0"
+            variant={price > 0 ? 'default' : 'secondary'}
+            className="text-xs font-semibold backdrop-blur-sm bg-background/90 border-0 shadow-sm"
           >
             {formatPrice(price)}
           </Badge>
         </div>
+      </div>
+
+      {/* Info */}
+      <div className="p-3 space-y-2">
+        <h3 className="font-semibold text-sm leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
+          {title}
+        </h3>
         
-        {/* Metadata */}
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {year && <span>{year}</span>}
+          {year && <span className="font-medium">{year}</span>}
           {rating && (
             <div className="flex items-center gap-1">
-              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-              <span>{displayRating}</span>
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span className="font-medium">{displayRating}</span>
             </div>
           )}
           {duration && (
@@ -193,16 +183,14 @@ const EnhancedContentCard = ({
           )}
         </div>
         
-        {/* Genre */}
         {genre && (
-          <Badge variant="outline" className="text-xs font-normal">
+          <Badge variant="outline" className="text-xs font-normal border-border/60">
             {genre}
           </Badge>
         )}
 
-        {/* Description (if provided) */}
         {description && (
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+          <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
             {description}
           </p>
         )}

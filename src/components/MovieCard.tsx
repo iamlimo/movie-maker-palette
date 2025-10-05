@@ -35,64 +35,90 @@ const MovieCard = ({
     const route = contentType === 'movie' ? `/movie/${id}` : `/tvshow/${id}`;
     navigate(route);
   };
+
+  const formatPrice = (p: string) => {
+    const numPrice = parseFloat(p.replace(/[^0-9.]/g, ''));
+    return numPrice > 0 ? `₦${numPrice.toLocaleString()}` : 'Free';
+  };
+
   return (
-    <div className={`group relative overflow-hidden rounded-xl transition-smooth hover:scale-105 ${
-      featured ? 'shadow-premium' : 'shadow-card'
-    }`}>
-      {/* Movie Poster */}
-      <div className="aspect-[2/3] overflow-hidden bg-secondary">
+    <div 
+      onClick={handlePreview}
+      className={`group relative overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
+        featured ? 'ring-1 ring-primary/20' : ''
+      }`}
+    >
+      {/* Poster */}
+      <div className="relative aspect-[2/3] overflow-hidden bg-muted/30">
         <img 
           src={imageUrl || moviePlaceholder} 
           alt={title}
-          className="w-full h-full object-cover transition-smooth group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {
             (e.target as HTMLImageElement).src = moviePlaceholder;
           }}
+          loading="lazy"
         />
         
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-smooth">
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Button variant="premium" size="sm" onClick={handlePreview}>
-                <Play className="h-4 w-4 mr-1" />
-                Rent {price}
-              </Button>
-              <Button variant="cinema" size="sm" onClick={handlePreview}>
-                <Eye className="h-4 w-4 mr-1" />
-                Preview
-              </Button>
-            </div>
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-x-4 bottom-4 flex gap-2">
+            <Button 
+              size="sm" 
+              className="flex-1 h-8 text-xs font-medium shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Play className="h-3 w-3 mr-1.5" />
+              {formatPrice(price) === 'Free' ? 'Watch' : 'Rent'}
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="sm"
+              className="flex-1 h-8 text-xs font-medium shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Eye className="h-3 w-3 mr-1.5" />
+              Info
+            </Button>
           </div>
+        </div>
+
+        {/* Price Badge */}
+        <div className="absolute top-2 right-2">
+          <Badge 
+            variant={formatPrice(price) === 'Free' ? 'secondary' : 'default'}
+            className="text-xs font-semibold backdrop-blur-sm bg-background/90 border-0 shadow-sm"
+          >
+            {formatPrice(price)}
+          </Badge>
         </div>
       </div>
 
-      {/* Movie Info */}
-      <div className="p-4 gradient-card">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-foreground group-hover:text-primary transition-smooth line-clamp-2">
-            {title}
-          </h3>
-          <Badge variant="secondary" className="text-xs">
-            {price}
+      {/* Info */}
+      <div className="p-3 space-y-2">
+        <h3 className="font-semibold text-sm leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
+          {title}
+        </h3>
+        
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-medium">{year}</span>
+          <div className="flex items-center gap-1">
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+            <span className="font-medium">{rating || '0.0'}</span>
+          </div>
+          {duration && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              <span>{duration}</span>
+            </div>
+          )}
+        </div>
+        
+        {genre && (
+          <Badge variant="outline" className="text-xs font-normal border-border/60">
+            {genre}
           </Badge>
-        </div>
-        
-        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-          <span>{year}</span>
-          <div className="flex items-center gap-1">
-            <Star className="h-3 w-3 fill-primary text-primary" />
-            <span>{rating || 0}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>{duration}</span>
-          </div>
-        </div>
-        
-        <Badge variant="outline" className="text-xs">
-          {genre}
-        </Badge>
+        )}
       </div>
     </div>
   );
