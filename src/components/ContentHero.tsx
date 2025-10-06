@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Play, Star, Clock, Calendar } from "lucide-react";
-import TrailerPlayer from "./TrailerPlayer";
+import { ArrowLeft, Play, Star, Clock, Calendar, Heart, Share2 } from "lucide-react";
 
 interface ContentHeroProps {
   title: string;
@@ -18,6 +16,8 @@ interface ContentHeroProps {
   language?: string;
   onBack: () => void;
   onRent?: () => void;
+  onToggleFavorite?: () => void;
+  isFavorite?: boolean;
 }
 
 const ContentHero = ({
@@ -33,76 +33,23 @@ const ContentHero = ({
   contentType = 'movie',
   language,
   onBack,
-  onRent
+  onRent,
+  onToggleFavorite,
+  isFavorite
 }: ContentHeroProps) => {
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const sectionRef = useRef<HTMLElement>(null);
-
-  // Auto-play trailer after 3 seconds (credit optimized)
-  useEffect(() => {
-    if (!trailerUrl || !imageLoaded) return;
-
-    const timer = setTimeout(() => {
-      setShowTrailer(true);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [trailerUrl, imageLoaded]);
-
-  // Pause video when section is out of view (credit optimization)
-  useEffect(() => {
-    if (!showTrailer) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) {
-          setShowTrailer(false);
-        }
-      },
-      { threshold: 0.5 }
-    );
-
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [showTrailer]);
 
   return (
-    <section 
-      ref={sectionRef}
-      className="relative min-h-[80vh] flex items-center overflow-hidden"
-    >
-      {/* Background - Poster or Trailer */}
+    <section className="relative min-h-[80vh] flex items-center overflow-hidden">
+      {/* Background - Static Poster Only */}
       <div className="absolute inset-0">
-        {showTrailer && trailerUrl ? (
-          <div className="relative w-full h-full">
-            <TrailerPlayer 
-              trailerUrl={trailerUrl}
-              title={title}
-              autoPlay
-              muted
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent pointer-events-none" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent pointer-events-none" />
-          </div>
-        ) : (
-          <>
-            <img 
-              src={imageUrl || '/placeholder.svg'} 
-              alt={title}
-              className="w-full h-full object-cover"
-              loading="eager"
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageLoaded(true)}
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-          </>
-        )}
+        <img 
+          src={imageUrl || '/placeholder.svg'} 
+          alt={title}
+          className="w-full h-full object-cover"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
       </div>
 
       {/* Content */}
@@ -187,6 +134,20 @@ const ContentHero = ({
                 {contentType === 'movie' ? `Rent for ₦${price}` : 'Rent Episodes'}
               </Button>
             )}
+            {onToggleFavorite && (
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={onToggleFavorite}
+              >
+                <Heart className={`h-5 w-5 mr-2 ${isFavorite ? 'fill-current' : ''}`} />
+                {isFavorite ? 'In Watchlist' : 'Add to Watchlist'}
+              </Button>
+            )}
+            <Button variant="outline" size="lg">
+              <Share2 className="h-5 w-5 mr-2" />
+              Share
+            </Button>
           </div>
 
           {/* Rental Info */}

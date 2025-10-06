@@ -1,9 +1,10 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Heart, Star, Clock, Calendar, Globe, Play, Lock } from "lucide-react";
 import Header from "@/components/Header";
 import ContentHero from "@/components/ContentHero";
@@ -14,6 +15,7 @@ import { useRentals } from "@/hooks/useRentals";
 import { toast } from "@/hooks/use-toast";
 import EpisodePlayer from "@/components/EpisodePlayer";
 import RentalButton from "@/components/RentalButton";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TVShow {
   id: string;
@@ -62,6 +64,7 @@ const TVShowPreview = () => {
   const { user } = useAuth();
   const { favorites, toggleFavorite, loading: favoritesLoading } = useFavorites();
   const { checkAccess } = useRentals();
+  const isMobile = useIsMobile();
   const [tvShow, setTVShow] = useState<TVShow | null>(null);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [episodes, setEpisodes] = useState<{ [seasonId: string]: Episode[] }>({});
@@ -71,6 +74,9 @@ const TVShowPreview = () => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [seasonAccess, setSeasonAccess] = useState<{ [seasonId: string]: boolean }>({});
   const [episodeAccess, setEpisodeAccess] = useState<{ [episodeId: string]: boolean }>({});
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isSticky, setIsSticky] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
 
   const isFavorite = tvShow ? favorites.some(fav => fav.content_id === tvShow.id && fav.content_type === 'tv_show') : false;
 
@@ -80,6 +86,28 @@ const TVShowPreview = () => {
       fetchTVShowData(id);
     }
   }, [id]);
+
+  // Sticky nav on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (navRef.current) {
+        const navTop = navRef.current.offsetTop;
+        setIsSticky(window.scrollY > navTop - 64);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [tvShow]);
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      const offset = 80;
+      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: elementPosition - offset, behavior: 'smooth' });
+      setActiveTab(sectionId);
+    }
+  };
 
   const fetchTVShowData = async (showId: string) => {
     try {
@@ -248,96 +276,67 @@ const TVShowPreview = () => {
         title={tvShow.title}
         description={tvShow.description || ''}
         imageUrl={tvShow.landscape_poster_url || tvShow.slider_cover_url || tvShow.thumbnail_url || ''}
-        trailerUrl={tvShow.trailer_url || undefined}
         rating={tvShow.rating || undefined}
         year={tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : undefined}
         genre={tvShow.genre?.name}
         price={tvShow.price}
         language={tvShow.language || undefined}
         onBack={() => navigate('/')}
+        onToggleFavorite={handleToggleFavorite}
+        isFavorite={isFavorite}
         contentType="tv_show"
       />
 
-      {/* Pricing Options Section */}
-      {currentSeason && (
-        <div className="container mx-auto px-4 py-8 border-y border-border/50">
-          <h2 className="text-2xl font-bold mb-6">Rental Options</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Season Rental */}
-            <div className="p-6 rounded-xl border-2 border-primary/50 bg-primary/5 backdrop-blur-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <Badge variant="default" className="bg-primary">Best Value</Badge>
-              </div>
-              <h3 className="text-xl font-bold mb-2">Rent Entire Season</h3>
-              <div className="text-3xl font-bold text-primary mb-2">
-                ₦{currentSeason.price}
-              </div>
-              <ul className="space-y-2 mb-4 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-primary"></div>
-                  {currentEpisodes.length} episodes included
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-primary"></div>
-                  {currentSeason.rental_expiry_duration} hours access
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-primary"></div>
-                  Watch anytime during rental period
-                </li>
-              </ul>
-              <RentalButton
-                contentId={currentSeason.id}
-                contentType="season"
-                price={currentSeason.price}
-                title={`${tvShow.title} - Season ${selectedSeason}`}
-              />
+      {/* Sticky Navigation */}
+      <div 
+        ref={navRef}
+        className={`${isSticky ? 'fixed top-16 left-0 right-0 z-40 shadow-lg' : 'relative'} bg-background/95 backdrop-blur-sm border-b border-border transition-all`}
+      >
+        <div className="container mx-auto px-4">
+          {isMobile ? (
+            <Select value={activeTab} onValueChange={(val) => scrollToSection(val)}>
+              <SelectTrigger className="w-full h-12 border-0 focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="overview">Overview</SelectItem>
+                <SelectItem value="episodes-section">Episodes</SelectItem>
+                <SelectItem value="similar-section">More Like This</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex gap-8 h-14">
+              {[
+                { id: 'overview', label: 'Overview' },
+                { id: 'episodes-section', label: 'Episodes' },
+                { id: 'similar-section', label: 'More Like This' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => scrollToSection(tab.id)}
+                  className={`px-4 border-b-2 transition-colors ${
+                    activeTab === tab.id 
+                      ? 'border-primary text-primary font-semibold' 
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-
-            {/* Episode Rental */}
-            <div className="p-6 rounded-xl border border-border bg-card/50 backdrop-blur-sm">
-              <h3 className="text-xl font-bold mb-2">Rent Individual Episodes</h3>
-              <div className="text-3xl font-bold mb-2">
-                From ₦{currentEpisodes.length > 0 ? Math.min(...currentEpisodes.map(e => e.price)) : 0}
-              </div>
-              <ul className="space-y-2 mb-4 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-foreground"></div>
-                  Choose specific episodes
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-foreground"></div>
-                  48-hour rental per episode
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-foreground"></div>
-                  Flexible pricing
-                </li>
-              </ul>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => document.getElementById('episodes-section')?.scrollIntoView({ behavior: 'smooth' })}
-              >
-                Browse Episodes
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-12">
+      {/* Overview Section */}
+      <div id="overview" className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Show Details */}
             <div>
               <h2 className="text-2xl font-bold mb-4">About This Show</h2>
               <p className="text-muted-foreground leading-relaxed mb-6">
                 {tvShow.description}
               </p>
-
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">First Aired</p>
@@ -358,168 +357,207 @@ const TVShowPreview = () => {
                 </div>
               </div>
             </div>
-
-            {/* Seasons & Episodes */}
-            {seasons.length > 0 && (
-              <div id="episodes-section">
-                <h2 className="text-2xl font-bold mb-4">Seasons & Episodes</h2>
-                <Tabs value={selectedSeason.toString()} onValueChange={(value) => setSelectedSeason(parseInt(value))}>
-                  <TabsList className="grid w-full grid-cols-auto">
-                    {seasons.map((season) => {
-                      const seasonEpisodes = episodes[season.id] || [];
-                      return (
-                        <TabsTrigger key={season.id} value={season.season_number.toString()}>
-                          <div className="flex flex-col items-start">
-                            <span>Season {season.season_number}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {seasonEpisodes.length} episodes • ₦{season.price}
-                            </span>
-                          </div>
-                        </TabsTrigger>
-                      );
-                    })}
-                  </TabsList>
-                  
-                  {seasons.map((season) => (
-                    <TabsContent key={season.id} value={season.season_number.toString()}>
-                      <div className="space-y-4">
-                        {season.description && (
-                          <p className="text-muted-foreground">{season.description}</p>
-                        )}
-                        
-                        <div className="space-y-3">
-                          {currentEpisodes.map((episode, index) => {
-                            const hasEpisodeAccess = episodeAccess[episode.id];
-                            const hasSeasonAccess = seasonAccess[currentSeason?.id || ''];
-                            const hasAnyAccess = hasEpisodeAccess || hasSeasonAccess;
-                            const nextEpisode = currentEpisodes[index + 1];
-
-                            return (
-                                <div key={episode.id} className="space-y-3">
-                                 <div className="group p-4 rounded-lg border border-border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all duration-300 hover:scale-[1.01]">
-                                   <div className="flex flex-col sm:flex-row gap-4">
-                                    {/* Episode Thumbnail */}
-                                     {episode.thumbnail_url && (
-                                      <div className="relative w-full sm:w-32 h-48 sm:h-20 rounded overflow-hidden flex-shrink-0">
-                                        <img 
-                                          src={episode.thumbnail_url} 
-                                          alt={episode.title}
-                                          className="w-full h-full object-cover"
-                                          loading="lazy"
-                                          onError={(e) => {
-                                            e.currentTarget.src = '/placeholder.svg';
-                                          }}
-                                        />
-                                        {!hasAnyAccess && (
-                                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                            <Lock className="h-6 w-6 text-white" />
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Episode Info */}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1">
-                                          <h4 className="font-semibold text-lg mb-1 group-hover:text-primary transition-colors">
-                                            {episode.episode_number}. {episode.title}
-                                          </h4>
-                                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                            <div className="flex items-center gap-1">
-                                              <Clock className="h-3 w-3" />
-                                              <span>{episode.duration} min</span>
-                                            </div>
-                                            <span>•</span>
-                                            <span className="font-semibold text-foreground">₦{episode.price}</span>
-                                            {hasAnyAccess && (
-                                              <>
-                                                <span>•</span>
-                                                <Badge variant="outline" className="text-green-600 border-green-600">
-                                                  ✓ Unlocked
-                                                </Badge>
-                                              </>
-                                            )}
-                                           </div>
-                                          {episode.description && (
-                                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                                              {episode.description}
-                                            </p>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Action Button */}
-                                        <div className="flex-shrink-0">
-                                          {hasAnyAccess ? (
-                                            <Button 
-                                              variant="default" 
-                                              size="sm"
-                                              onClick={() => setSelectedEpisode(episode)}
-                                              className="shadow-glow"
-                                            >
-                                              <Play className="h-4 w-4 mr-1" />
-                                              Watch
-                                            </Button>
-                                          ) : (
-                                            <RentalButton
-                                              contentId={episode.id}
-                                              contentType="episode"
-                                              price={episode.price}
-                                              title={`Episode ${episode.episode_number}: ${episode.title}`}
-                                            />
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Episode Player */}
-                                {selectedEpisode?.id === episode.id && (
-                                  <div className="mt-4">
-                                    <EpisodePlayer
-                                      episodeId={episode.id}
-                                      seasonId={currentSeason?.id || ''}
-                                      title={episode.title}
-                                      price={episode.price}
-                                      posterUrl={episode.thumbnail_url}
-                                      nextEpisodeId={nextEpisode?.id}
-                                      autoPlay={true}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                          
-                          {currentEpisodes.length === 0 && (
-                            <p className="text-center text-muted-foreground py-8">
-                              No episodes available for this season.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </div>
-            )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Watchlist Action */}
-            <div className="p-6 rounded-xl border border-border bg-card">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleToggleFavorite}
-                disabled={favoritesLoading}
-              >
-                <Heart className={`h-4 w-4 mr-2 ${isFavorite ? 'fill-primary text-primary' : ''}`} />
-                {isFavorite ? 'Remove from Watchlist' : 'Add to Watchlist'}
-              </Button>
+          {/* Sidebar - Desktop Only */}
+          <div className="hidden lg:block space-y-6">
+            <div className="p-6 rounded-xl border bg-card">
+              <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
+              {currentSeason && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <Badge variant="default" className="mb-2">Best Value</Badge>
+                    <p className="text-sm font-semibold mb-1">Full Season</p>
+                    <p className="text-2xl font-bold text-primary mb-2">₦{currentSeason.price}</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {currentEpisodes.length} episodes • {currentSeason.rental_expiry_duration}h access
+                    </p>
+                    <RentalButton
+                      contentId={currentSeason.id}
+                      contentType="season"
+                      price={currentSeason.price}
+                      title={`${tvShow.title} - Season ${selectedSeason}`}
+                    />
+                  </div>
+                  <div className="p-4 rounded-lg border">
+                    <p className="text-sm font-semibold mb-1">Individual Episodes</p>
+                    <p className="text-xl font-bold mb-2">
+                      From ₦{currentEpisodes.length > 0 ? Math.min(...currentEpisodes.map(e => e.price)) : 0}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => scrollToSection('episodes-section')}
+                    >
+                      Browse Episodes
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+
+        {/* Mobile Pricing - Below Overview */}
+        {currentSeason && (
+          <div className="lg:hidden mt-8 p-4 rounded-xl border bg-card">
+            <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <Badge variant="default" className="mb-2 text-xs">Best Value</Badge>
+                <p className="text-sm font-semibold mb-1">Full Season</p>
+                <p className="text-xl font-bold text-primary mb-2">₦{currentSeason.price}</p>
+                <RentalButton
+                  contentId={currentSeason.id}
+                  contentType="season"
+                  price={currentSeason.price}
+                  title={`${tvShow.title} - Season ${selectedSeason}`}
+                />
+              </div>
+              <div className="p-3 rounded-lg border">
+                <p className="text-sm font-semibold mb-1">Individual Episodes</p>
+                <p className="text-lg font-bold mb-2">
+                  From ₦{currentEpisodes.length > 0 ? Math.min(...currentEpisodes.map(e => e.price)) : 0}
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full"
+                  onClick={() => scrollToSection('episodes-section')}
+                >
+                  Browse Episodes
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Episodes Section */}
+      {seasons.length > 0 && (
+        <div id="episodes-section" className="container mx-auto px-4 py-12 border-t border-border">
+          <h2 className="text-2xl font-bold mb-6">Episodes</h2>
+          <Tabs value={selectedSeason.toString()} onValueChange={(value) => setSelectedSeason(parseInt(value))}>
+            <TabsList className="w-full justify-start">
+              {seasons.map((season) => {
+                const seasonEpisodes = episodes[season.id] || [];
+                return (
+                  <TabsTrigger key={season.id} value={season.season_number.toString()}>
+                    Season {season.season_number} ({seasonEpisodes.length})
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+            
+            {seasons.map((season) => (
+              <TabsContent key={season.id} value={season.season_number.toString()}>
+                <div className="space-y-4 mt-4">
+                  {season.description && (
+                    <p className="text-muted-foreground mb-4">{season.description}</p>
+                  )}
+                  
+                  <div className="grid gap-3">
+                    {currentEpisodes.map((episode, index) => {
+                      const hasEpisodeAccess = episodeAccess[episode.id];
+                      const hasSeasonAccess = seasonAccess[currentSeason?.id || ''];
+                      const hasAnyAccess = hasEpisodeAccess || hasSeasonAccess;
+                      const nextEpisode = currentEpisodes[index + 1];
+
+                      return (
+                        <div key={episode.id} className="space-y-3">
+                          <div className="group p-4 rounded-lg border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              {episode.thumbnail_url && (
+                                <div className="relative w-full sm:w-40 aspect-video rounded overflow-hidden flex-shrink-0">
+                                  <img 
+                                    src={episode.thumbnail_url} 
+                                    alt={episode.title}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      e.currentTarget.src = '/placeholder.svg';
+                                    }}
+                                  />
+                                  {!hasAnyAccess && (
+                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                      <Lock className="h-5 w-5 text-white" />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold mb-1 group-hover:text-primary transition-colors">
+                                      {episode.episode_number}. {episode.title}
+                                    </h4>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                                      <Clock className="h-3 w-3" />
+                                      <span>{episode.duration}m</span>
+                                      <span>•</span>
+                                      <span className="font-semibold text-foreground">₦{episode.price}</span>
+                                    </div>
+                                    {episode.description && (
+                                      <p className="text-sm text-muted-foreground line-clamp-2">
+                                        {episode.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex-shrink-0">
+                                    {hasAnyAccess ? (
+                                      <Button 
+                                        variant="default" 
+                                        size="sm"
+                                        onClick={() => setSelectedEpisode(episode)}
+                                      >
+                                        <Play className="h-4 w-4 mr-1" />
+                                        Watch
+                                      </Button>
+                                    ) : (
+                                      <RentalButton
+                                        contentId={episode.id}
+                                        contentType="episode"
+                                        price={episode.price}
+                                        title={`Episode ${episode.episode_number}: ${episode.title}`}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {selectedEpisode?.id === episode.id && (
+                            <div className="mt-4">
+                              <EpisodePlayer
+                                episodeId={episode.id}
+                                seasonId={currentSeason?.id || ''}
+                                title={episode.title}
+                                price={episode.price}
+                                posterUrl={episode.thumbnail_url}
+                                nextEpisodeId={nextEpisode?.id}
+                                autoPlay={true}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    
+                    {currentEpisodes.length === 0 && (
+                      <p className="text-center text-muted-foreground py-8">
+                        No episodes available for this season.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
+      )}
 
             {/* Show Info */}
             <div className="p-6 rounded-xl border border-border bg-card">
@@ -563,60 +601,8 @@ const TVShowPreview = () => {
               </div>
             </div>
 
-            {/* Season Info */}
-            {currentSeason && (
-              <div className="p-6 rounded-xl border border-border bg-card">
-                <h3 className="font-semibold mb-4">Season {currentSeason.season_number}</h3>
-                <div className="space-y-3">
-                  {seasonAccess[currentSeason.id] && (
-                    <div className="mb-4">
-                      <Badge variant="default" className="bg-green-600">
-                        Season Pass Active
-                      </Badge>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm text-muted-foreground">Episodes</p>
-                    <p className="font-semibold">{currentEpisodes.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Season Rental</p>
-                    <p className="font-semibold text-primary">₦{currentSeason.price}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Rental Duration</p>
-                    <p className="font-semibold">{currentSeason.rental_expiry_duration} hours</p>
-                  </div>
-                  
-                  {/* Season Rental Option */}
-                  {user && !seasonAccess[currentSeason.id] && (
-                    <div className="pt-4 border-t">
-                      <p className="text-sm text-muted-foreground mb-3">Unlock all episodes in this season:</p>
-                      <RentalButton
-                        contentId={currentSeason.id}
-                        contentType="season"
-                        price={currentSeason.price}
-                        title={`Season ${currentSeason.season_number}`}
-                      />
-                    </div>
-                  )}
-                  
-                  {seasonAccess[currentSeason.id] && (
-                    <div className="pt-4 border-t">
-                      <Badge variant="outline" className="text-green-600 border-green-600">
-                        Season Unlocked
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Recommendations */}
-      <div className="container mx-auto px-4 pb-12">
+      <div id="similar-section" className="container mx-auto px-4 py-12 border-t border-border">
         <RecommendationsSection
           currentContentId={tvShow.id}
           contentType="tv_show"
