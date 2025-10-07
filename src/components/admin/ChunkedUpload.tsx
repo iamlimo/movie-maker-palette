@@ -71,9 +71,15 @@ const ChunkedUpload: React.FC<ChunkedUploadProps> = ({
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
     const mimeType = file.type;
 
-    const isValidType = validTypes.some(type => 
-      type === mimeType || type === fileExtension || file.name.toLowerCase().endsWith(type)
-    );
+    const isValidType = validTypes.some(type => {
+      // Handle wildcard patterns like "image/*" or "video/*"
+      if (type.includes('/*')) {
+        const baseType = type.split('/')[0];
+        return mimeType.startsWith(baseType + '/');
+      }
+      // Exact match for MIME type, extension, or filename ending
+      return type === mimeType || type === fileExtension || file.name.toLowerCase().endsWith(type);
+    });
 
     if (!isValidType) {
       toast({
