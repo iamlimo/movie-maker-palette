@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import ChunkedUpload from "@/components/admin/ChunkedUpload";
 import CastCrewManager from "@/components/admin/CastCrewManager";
 import NairaInput from "@/components/admin/NairaInput";
+import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
 
 interface Genre {
   id: string;
@@ -69,6 +70,7 @@ const AddMovieImproved = () => {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState<string>("");
+  const [trailerUrl, setTrailerUrl] = useState<string>("");
   const [selectedCastCrew, setSelectedCastCrew] = useState<CastCrew[]>([]);
   const [castAssignments, setCastAssignments] = useState<MovieCastAssignment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -191,6 +193,7 @@ const AddMovieImproved = () => {
             price: formData.price || 0,
             thumbnail_url: thumbnailUrl,
             video_url: videoUrl || null,
+            trailer_url: trailerUrl || null,
             rental_expiry_duration: formData.rental_expiry_duration || 48,
             status: 'approved'
           }
@@ -393,17 +396,20 @@ const AddMovieImproved = () => {
 
               <Separator />
 
-              <ChunkedUpload
-                accept="video/*"
-                onUploadComplete={(url, filePath) => {
-                  console.log('[AddMovieImproved] Video upload completed:', { url, filePath });
-                  setVideoUrl(url);
-                }}
-                label="Movie Video (Optional)"
-                description="Upload the movie video file"
-                fileType="video"
-                currentUrl={videoUrl}
-                maxSize={1024}
+              <BackblazeUrlInput
+                value={videoUrl}
+                onChange={setVideoUrl}
+                label="Movie Video URL"
+                required={false}
+              />
+
+              <Separator />
+
+              <BackblazeUrlInput
+                value={trailerUrl}
+                onChange={setTrailerUrl}
+                label="Movie Trailer URL (Optional)"
+                required={false}
               />
             </CardContent>
           </Card>

@@ -11,10 +11,29 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { OptimizedContentUploader } from '@/components/admin/OptimizedContentUploader';
-import { useOptimizedMovieUpload, type MovieFormData, type MovieCastAssignment } from '@/hooks/useOptimizedMovieUpload';
+import ChunkedUpload from '@/components/admin/ChunkedUpload';
+import BackblazeUrlInput from '@/components/admin/BackblazeUrlInput';
 import CastCrewManager from '@/components/admin/CastCrewManager';
 import NairaInput from '@/components/admin/NairaInput';
+
+interface MovieFormData {
+  title: string;
+  description: string;
+  genre_id: string;
+  release_date: string;
+  duration: string;
+  language: string;
+  rating: string;
+  price: string;
+  rental_expiry_duration: string;
+}
+
+interface MovieCastAssignment {
+  cast_crew_id: string;
+  role_type: string;
+  character_name?: string;
+  credit_order: number;
+}
 
 interface Genre {
   id: string;
@@ -44,22 +63,13 @@ const AddMovieNew = () => {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [selectedCastCrew, setSelectedCastCrew] = useState<CastCrew[]>([]);
   const [castAssignments, setCastAssignments] = useState<MovieCastAssignment[]>([]);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
+  const [videoUrl, setVideoUrl] = useState<string>('');
+  const [trailerUrl, setTrailerUrl] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const navigate = useNavigate();
   const { toast } = useToast();
-  const {
-    stagedFiles,
-    uploadProgress,
-    isSubmitting,
-    isUploading,
-    stageFile,
-    removeFile,
-    createMovie,
-    retryFailedUploads,
-    getFileByType,
-    getProgressByType,
-    clearAllFiles
-  } = useOptimizedMovieUpload();
 
   useEffect(() => {
     fetchGenres();
@@ -138,7 +148,6 @@ const AddMovieNew = () => {
     }
   };
 
-  // Use the validation from the optimized hook
   const validateForm = () => {
     const errors: string[] = [];
     
@@ -146,13 +155,8 @@ const AddMovieNew = () => {
     if (!formData.price || parseFloat(formData.price) <= 0) errors.push("Valid price is required");
     if (!formData.description?.trim()) errors.push("Description is required");
     if (!formData.genre_id) errors.push("Genre is required");
-    
-    // Check if at least one media file is staged
-    const hasVideo = getFileByType('video');
-    const hasThumbnail = getFileByType('thumbnail');
-    
-    if (!hasVideo) errors.push("Video file is required");
-    if (!hasThumbnail) errors.push("Thumbnail is required");
+    if (!thumbnailUrl) errors.push("Thumbnail is required");
+    if (!videoUrl) errors.push("Video URL is required");
     
     return errors;
   };
@@ -160,7 +164,6 @@ const AddMovieNew = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
       toast({
@@ -171,25 +174,55 @@ const AddMovieNew = () => {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
-      // Use the optimized movie creation hook
-      const movie = await createMovie(formData, castAssignments);
-      
-      console.log('[AddMovie] Movie created successfully:', movie.id);
-      
-      // Navigate to movies list
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data: movie, error } = await supabase
+        .from('movies')
+        .insert([{
+          title: formData.title,
+          description: formData.description || null,
+          genre_id: formData.genre_id || null,
+          release_date: formData.release_date || null,
+          duration: formData.duration ? parseInt(formData.duration) : null,
+          language: formData.language || null,
+          rating: formData.rating || null,
+          price: parseFloat(formData.price),
+          rental_expiry_duration: parseInt(formData.rental_expiry_duration),
+          thumbnail_url: thumbnailUrl,
+          video_url: videoUrl,
+          trailer_url: trailerUrl || null,
+          status: 'approved',
+          uploaded_by: user.id
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Save cast assignments
+      if (castAssignments.length > 0) {
+        await saveCastAssignments(movie.id);
+      }
+
+      toast({
+        title: "Success",
+        description: "Movie created successfully!",
+      });
+
       navigate('/admin/movies');
     } catch (error) {
-      // Error handling is already done in the hook
       console.error('[AddMovie] Submit failed:', error);
-    }
-  };
-
-  const handleRetryFailedUploads = async () => {
-    try {
-      await retryFailedUploads();
-    } catch (error) {
-      console.error('[AddMovie] Retry failed:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create movie",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -197,14 +230,6 @@ const AddMovieNew = () => {
     const errors = validateForm();
     return errors.length === 0;
   };
-
-  const getOverallProgress = () => {
-    if (uploadProgress.length === 0) return 0;
-    const totalProgress = uploadProgress.reduce((sum, p) => sum + p.progress, 0);
-    return Math.round(totalProgress / uploadProgress.length);
-  };
-
-  const hasFailedUploads = uploadProgress.some(p => p.status === 'error');
 
   return (
     <div className="min-h-screen bg-background">
@@ -374,16 +399,36 @@ const AddMovieNew = () => {
           </Card>
 
           {/* Media Files */}
-          <OptimizedContentUploader
-            stagedFiles={stagedFiles}
-            uploadProgress={uploadProgress}
-            isUploading={isUploading}
-            onFileStaged={stageFile}
-            onFileRemoved={removeFile}
-            onRetryFailedUploads={retryFailedUploads}
-            getFileByType={getFileByType}
-            getProgressByType={getProgressByType}
-          />
+          <Card className="gradient-card border-border shadow-card">
+            <CardHeader>
+              <CardTitle className="text-foreground">Media Files</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <ChunkedUpload
+                accept="image/*"
+                onUploadComplete={(url) => setThumbnailUrl(url)}
+                label="Movie Thumbnail *"
+                description="Upload the movie poster/thumbnail"
+                fileType="thumbnail"
+                currentUrl={thumbnailUrl}
+                maxSize={10}
+              />
+
+              <BackblazeUrlInput
+                value={videoUrl}
+                onChange={setVideoUrl}
+                label="Movie Video URL *"
+                required={true}
+              />
+
+              <BackblazeUrlInput
+                value={trailerUrl}
+                onChange={setTrailerUrl}
+                label="Movie Trailer URL (Optional)"
+                required={false}
+              />
+            </CardContent>
+          </Card>
 
           {/* Cast and Crew */}
           <Card className="gradient-card border-border shadow-card">
@@ -454,25 +499,20 @@ const AddMovieNew = () => {
               type="button"
               variant="outline"
               onClick={() => navigate('/admin/movies')}
-              disabled={isSubmitting || isUploading}
+              disabled={isSubmitting}
               className="px-8"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={!isFormValid() || isSubmitting || isUploading}
+              disabled={!isFormValid() || isSubmitting}
               className="px-8 gradient-accent text-primary-foreground"
             >
               {isSubmitting ? (
                 <>
                   <Save className="h-4 w-4 mr-2 animate-spin" />
                   Creating Movie...
-                </>
-              ) : isUploading ? (
-                <>
-                  <Save className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading Files...
                 </>
               ) : (
                 <>

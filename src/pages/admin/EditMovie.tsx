@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import NairaInput from "@/components/admin/NairaInput";
 import { useSections } from "@/hooks/useSections";
 import { Checkbox } from "@/components/ui/checkbox";
+import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
+import { Separator } from "@/components/ui/separator";
 
 interface Genre {
   id: string;
@@ -35,6 +37,8 @@ interface FormData {
   price: number;
   rental_expiry_duration: string;
   status: string;
+  video_url: string;
+  trailer_url: string;
   selectedSections: string[];
 }
 
@@ -54,6 +58,8 @@ const EditMovie = () => {
     price: 0,
     rental_expiry_duration: "48",
     status: "pending",
+    video_url: "",
+    trailer_url: "",
     selectedSections: []
   });
   
@@ -90,6 +96,8 @@ const EditMovie = () => {
         price: data.price || 0,
         rental_expiry_duration: data.rental_expiry_duration?.toString() || "48",
         status: data.status || "pending",
+        video_url: data.video_url || "",
+        trailer_url: data.trailer_url || "",
         selectedSections: []
       });
 
@@ -173,6 +181,8 @@ const EditMovie = () => {
         price: formData.price,
         rental_expiry_duration: parseInt(formData.rental_expiry_duration),
         status: formData.status as 'pending' | 'approved' | 'rejected',
+        video_url: formData.video_url || null,
+        trailer_url: formData.trailer_url || null,
         updated_at: new Date().toISOString()
       };
 
@@ -392,6 +402,30 @@ const EditMovie = () => {
                 </Select>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Media URLs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Media URLs</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <BackblazeUrlInput
+              value={formData.video_url}
+              onChange={(url) => handleInputChange('video_url', url)}
+              label="Movie Video URL"
+              required={false}
+            />
+
+            <Separator />
+
+            <BackblazeUrlInput
+              value={formData.trailer_url}
+              onChange={(url) => handleInputChange('trailer_url', url)}
+              label="Movie Trailer URL"
+              required={false}
+            />
           </CardContent>
         </Card>
 
