@@ -32,6 +32,7 @@ interface Season {
   description?: string;
   price: number;
   rental_expiry_duration: number;
+  status: 'pending' | 'approved' | 'rejected';
   created_at: string;
 }
 
@@ -284,7 +285,11 @@ const ViewTVShow = () => {
             <Card key={season.id}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Season {season.season_number}</CardTitle>
+                  <div className="flex items-center gap-3">
+                    <CardTitle>Season {season.season_number}</CardTitle>
+                    {getStatusBadge(season.status)}
+                    <span className="text-sm text-muted-foreground">₦{season.price}</span>
+                  </div>
                   <div className="flex gap-2">
                     <Button 
                       size="sm" 

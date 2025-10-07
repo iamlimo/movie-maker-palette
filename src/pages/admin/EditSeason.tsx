@@ -30,6 +30,7 @@ interface Season {
   description: string;
   price: number;
   rental_expiry_duration: number;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 interface FormData {
@@ -37,6 +38,7 @@ interface FormData {
   description: string;
   price: number;
   rental_expiry_duration: number;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 const EditSeason = () => {
@@ -47,7 +49,8 @@ const EditSeason = () => {
     season_number: 1,
     description: "",
     price: 0,
-    rental_expiry_duration: 336
+    rental_expiry_duration: 336,
+    status: 'pending'
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,7 +93,8 @@ const EditSeason = () => {
         season_number: seasonData.season_number,
         description: seasonData.description || "",
         price: seasonData.price || 0,
-        rental_expiry_duration: seasonData.rental_expiry_duration || 336
+        rental_expiry_duration: seasonData.rental_expiry_duration || 336,
+        status: seasonData.status || 'pending'
       });
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -143,7 +147,8 @@ const EditSeason = () => {
           season_number: formData.season_number,
           description: formData.description || null,
           price: formData.price || 0,
-          rental_expiry_duration: formData.rental_expiry_duration || 336
+          rental_expiry_duration: formData.rental_expiry_duration || 336,
+          status: formData.status
         })
         .eq('id', seasonId);
 
@@ -221,7 +226,7 @@ const EditSeason = () => {
               <CardTitle>Season Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="season_number">Season Number *</Label>
                   <Input
@@ -232,6 +237,22 @@ const EditSeason = () => {
                     onChange={(e) => handleInputChange('season_number', parseInt(e.target.value) || 1)}
                     required
                   />
+                </div>
+                <div>
+                  <Label htmlFor="status">Status *</Label>
+                  <Select 
+                    value={formData.status} 
+                    onValueChange={(value) => handleInputChange('status', value as 'pending' | 'approved' | 'rejected')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="rental_expiry">Rental Duration</Label>
