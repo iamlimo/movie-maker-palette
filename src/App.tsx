@@ -27,6 +27,7 @@ import Producers from "@/pages/admin/Producers";
 import Sections from "@/pages/admin/Sections";
 import HeroSlider from "@/pages/admin/HeroSlider";
 import Banners from "@/pages/admin/Banners";
+import Wallets from "@/pages/admin/Wallets";
 import Settings from "@/pages/admin/Settings";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -37,6 +38,7 @@ import TVShowPreview from "./pages/TVShowPreview";
 import Movies from "./pages/Movies";
 import Genres from "./pages/Genres";
 import Watchlist from "./pages/Watchlist";
+import Wallet from "./pages/Wallet";
 import Help from "./pages/Help";
 import Contact from "./pages/Contact";
 import Terms from "./pages/Terms";
@@ -61,6 +63,7 @@ const App: React.FC = () => (
             <Route path="/movies" element={<Movies />} />
             <Route path="/genres" element={<Genres />} />
             <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/wallet" element={<Wallet />} />
             <Route path="/help" element={<Help />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/terms" element={<Terms />} />
@@ -92,6 +95,7 @@ const App: React.FC = () => (
               <Route path="sections" element={<Sections />} />
               <Route path="hero-slider" element={<HeroSlider />} />
               <Route path="banners" element={<Banners />} />
+              <Route path="wallets" element={<Wallets />} />
               <Route path="settings" element={<Settings />} />
             </Route>
             

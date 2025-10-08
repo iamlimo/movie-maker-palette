@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, User, Menu, LogOut, Settings, X } from "lucide-react";
+import { Search, User, Menu, LogOut, Settings, X, Wallet } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
+import { useWallet } from "@/hooks/useWallet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +18,7 @@ import SearchModal from "./SearchModal";
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
   const { isSuperAdmin } = useRole();
+  const { formatBalance } = useWallet();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -99,6 +101,17 @@ const Header = () => {
 
           {user ? (
             <div className="flex items-center space-x-3">
+              {/* Wallet Widget */}
+              <Link to="/wallet">
+                <Button
+                  variant="outline"
+                  className="hidden md:flex items-center space-x-2 text-foreground hover:border-primary"
+                >
+                  <Wallet className="h-4 w-4" />
+                  <span className="text-sm font-medium">{formatBalance()}</span>
+                </Button>
+              </Link>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -122,6 +135,15 @@ const Header = () => {
                     >
                       <User className="mr-2 h-4 w-4" />
                       Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/wallet"
+                      className="flex items-center text-foreground"
+                    >
+                      <Wallet className="mr-2 h-4 w-4" />
+                      My Wallet
                     </Link>
                   </DropdownMenuItem>
                   {isSuperAdmin() && (
@@ -231,6 +253,15 @@ const Header = () => {
             >
               Watchlist
             </Link>
+            {user && (
+              <Link
+                to="/wallet"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block text-muted-foreground hover:text-primary transition-smooth"
+              >
+                Wallet
+              </Link>
+            )}
 
             <div className="pt-4 border-t border-border">
               <Button

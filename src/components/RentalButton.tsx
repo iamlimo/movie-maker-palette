@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Loader2 } from "lucide-react";
+import { Play, Loader2, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRentals } from "@/hooks/useRentals";
+import { useWallet } from "@/hooks/useWallet";
 import { toast } from "@/hooks/use-toast";
 
 interface RentalButtonProps {
@@ -16,11 +17,13 @@ interface RentalButtonProps {
 const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProps) => {
   const { user } = useAuth();
   const { checkAccess, fetchRentals } = useRentals();
+  const { balance, canAfford, formatBalance, refreshWallet } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card' | null>(null);
 
   const hasAccess = checkAccess(contentId, contentType);
 
-  const handleRent = async () => {
+  const handleRent = async (useWallet: boolean = false) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -31,21 +34,29 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
     }
 
     setIsLoading(true);
+    setPaymentMethod(useWallet ? 'wallet' : 'card');
+
     try {
-      const { data, error } = await supabase.functions.invoke('create-payment', {
+      const { data, error } = await supabase.functions.invoke('wallet-payment', {
         body: {
-          userId: user.id,
           contentId,
           contentType,
-          price
+          price,
+          useWallet
         }
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw error;
 
-      if (data.success) {
+      if (data.payment_method === 'wallet') {
+        // Wallet payment successful
+        await fetchRentals();
+        refreshWallet();
+        toast({
+          title: "Payment Successful!",
+          description: `You can now watch ${title}`,
+        });
+      } else if (data.payment_method === 'paystack') {
         // Open Paystack checkout
         window.open(data.authorization_url, '_blank', 'width=500,height=700');
         
@@ -54,17 +65,16 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
           description: "Complete your payment in the popup window",
         });
 
-        // Poll for payment completion with webhook integration
+        // Poll for payment completion
         const pollPayment = setInterval(async () => {
           try {
-            // Check payment status via verify-payment function
             const { data: paymentData } = await supabase.functions.invoke('verify-payment', {
               body: { payment_id: data.payment_id }
             });
             
             if (paymentData?.payment?.status === 'completed') {
               clearInterval(pollPayment);
-              await fetchRentals(); // Refresh rental status
+              await fetchRentals();
               toast({
                 title: "Payment Successful!",
                 description: `You can now watch ${title}`,
@@ -75,18 +85,27 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
           }
         }, 3000);
 
-        // Stop polling after 5 minutes
         setTimeout(() => clearInterval(pollPayment), 300000);
       }
     } catch (error: any) {
       console.error('Rental error:', error);
-      toast({
-        title: "Payment Failed",
-        description: error.message || "Failed to initiate payment",
-        variant: "destructive"
-      });
+      
+      if (error.message?.includes('Insufficient wallet balance')) {
+        toast({
+          title: "Insufficient Balance",
+          description: `You need ₦${(price / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} but have ${formatBalance()}`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Payment Failed",
+          description: error.message || "Failed to initiate payment",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
+      setPaymentMethod(null);
     }
   };
 
@@ -108,23 +127,65 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <div className="text-2xl font-bold">₦{price}</div>
+        <div className="text-2xl font-bold">₦{(price / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
         <div className="text-sm text-muted-foreground">{rentalDuration}</div>
       </div>
-      <Button 
-        onClick={handleRent} 
-        disabled={isLoading}
-        variant="default" 
-        size="lg" 
-        className="w-full"
-      >
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-        ) : (
-          <Play className="h-5 w-5 mr-2" />
-        )}
-        Rent {contentType === 'season' ? 'Season' : contentType === 'episode' ? 'Episode' : ''} for ₦{price}
-      </Button>
+
+      {/* Wallet Balance Display */}
+      {user && (
+        <div className="text-center text-sm text-muted-foreground">
+          Wallet Balance: <span className="font-medium">{formatBalance()}</span>
+        </div>
+      )}
+
+      {/* Payment Buttons */}
+      {user && canAfford(price) ? (
+        <div className="space-y-2">
+          <Button 
+            onClick={() => handleRent(true)} 
+            disabled={isLoading}
+            variant="default" 
+            size="lg" 
+            className="w-full gradient-accent text-primary-foreground"
+          >
+            {isLoading && paymentMethod === 'wallet' ? (
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            ) : (
+              <Wallet className="h-5 w-5 mr-2" />
+            )}
+            Pay with Wallet
+          </Button>
+          <Button 
+            onClick={() => handleRent(false)} 
+            disabled={isLoading}
+            variant="outline" 
+            size="lg" 
+            className="w-full"
+          >
+            {isLoading && paymentMethod === 'card' ? (
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-5 w-5 mr-2" />
+            )}
+            Pay with Card
+          </Button>
+        </div>
+      ) : (
+        <Button 
+          onClick={() => handleRent(false)} 
+          disabled={isLoading}
+          variant="default" 
+          size="lg" 
+          className="w-full"
+        >
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+          ) : (
+            <Play className="h-5 w-5 mr-2" />
+          )}
+          Rent for ₦{(price / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+        </Button>
+      )}
     </div>
   );
 };

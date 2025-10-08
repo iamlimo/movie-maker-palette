@@ -15,7 +15,8 @@ import {
   Grid3X3,
   Image,
   Megaphone,
-  Settings
+  Settings,
+  Wallet
 } from 'lucide-react';
 import {
   Sidebar,
@@ -70,6 +71,7 @@ const sidebarItems = [
     ]
   },
   { title: 'Finance', url: '/admin/finance', icon: DollarSign },
+  { title: 'Wallets', url: '/admin/wallets', icon: Wallet },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
