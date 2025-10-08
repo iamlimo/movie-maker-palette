@@ -6,10 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail } from 'lucide-react';
+import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CreateUserModal } from '@/components/admin/CreateUserModal';
+import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
+import { UserDetailModal } from '@/components/admin/UserDetailModal';
+import { Link } from 'react-router-dom';
 
 interface UserProfile {
   id: string;
@@ -20,6 +25,7 @@ interface UserProfile {
   country?: string;
   phone_number?: string;
   wallet_balance: number;
+  status?: string;
 }
 
 interface UserRole {
@@ -36,9 +42,14 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState<'user' | 'admin' | 'super_admin'>('user');
   const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
 
@@ -91,8 +102,57 @@ export default function Users() {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+    return matchesSearch && matchesRole && matchesStatus;
   });
+
+  const handleSuspend = async (user: UserWithRole) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-management', {
+        body: { action: 'suspend', user_id: user.user_id }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "User Suspended",
+          description: `${user.name} has been suspended`
+        });
+        fetchUsers();
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to suspend user"
+      });
+    }
+  };
+
+  const handleActivate = async (user: UserWithRole) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-management', {
+        body: { action: 'activate', user_id: user.user_id }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "User Activated",
+          description: `${user.name} has been activated`
+        });
+        fetchUsers();
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to activate user"
+      });
+    }
+  };
 
   const handleRoleChange = async () => {
     if (!selectedUser) return;
@@ -222,6 +282,13 @@ export default function Users() {
             Manage user accounts, roles, and permissions
           </p>
         </div>
+        <Button 
+          onClick={() => setShowCreateModal(true)}
+          className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          Create User
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -304,6 +371,16 @@ export default function Users() {
                   <SelectItem value="user">User</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -314,6 +391,7 @@ export default function Users() {
                 <TableRow className="bg-muted/5">
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead>Wallet Balance</TableHead>
                   <TableHead>Join Date</TableHead>
@@ -324,7 +402,13 @@ export default function Users() {
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id} className="hover:bg-muted/5">
                     <TableCell>
-                      <div className="flex items-center space-x-3">
+                      <div 
+                        className="flex items-center space-x-3 cursor-pointer hover:text-primary"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowDetailModal(true);
+                        }}
+                      >
                         <div className="w-10 h-10 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 flex items-center justify-center">
                           <span className="text-sm font-medium text-primary">
                             {user.name.charAt(0).toUpperCase()}
@@ -343,13 +427,22 @@ export default function Users() {
                       {getRoleBadge(user.role)}
                     </TableCell>
                     <TableCell>
+                      <Badge variant={user.status === 'suspended' ? 'destructive' : 'default'}>
+                        {user.status === 'suspended' ? (
+                          <><Ban className="h-3 w-3 mr-1" /> Suspended</>
+                        ) : (
+                          <><CheckCircle className="h-3 w-3 mr-1" /> Active</>
+                        )}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <div className="text-sm">
                         {user.country || 'Not specified'}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">
-                        ${user.wallet_balance.toFixed(2)}
+                        ₦{user.wallet_balance.toFixed(2)}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -359,14 +452,61 @@ export default function Users() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openRoleDialog(user)}
-                        className="h-8"
-                      >
-                        Change Role
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedUser(user);
+                            setShowDetailModal(true);
+                          }}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openRoleDialog(user)}>
+                            <Shield className="h-4 w-4 mr-2" />
+                            Change Role
+                          </DropdownMenuItem>
+                          <Link to={`/admin/wallets?user=${user.user_id}`}>
+                            <DropdownMenuItem>
+                              <WalletIcon className="h-4 w-4 mr-2" />
+                              Manage Wallet
+                            </DropdownMenuItem>
+                          </Link>
+                          <DropdownMenuSeparator />
+                          {user.status !== 'suspended' ? (
+                            <DropdownMenuItem 
+                              className="text-orange-600"
+                              onClick={() => handleSuspend(user)}
+                            >
+                              <Ban className="h-4 w-4 mr-2" />
+                              Suspend User
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              className="text-green-600"
+                              onClick={() => handleActivate(user)}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Activate User
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => {
+                              setUserToDelete(user);
+                              setShowDeleteDialog(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -441,6 +581,28 @@ export default function Users() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create User Modal */}
+      <CreateUserModal 
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        onUserCreated={fetchUsers}
+      />
+
+      {/* Delete User Dialog */}
+      <DeleteUserDialog 
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        user={userToDelete}
+        onUserDeleted={fetchUsers}
+      />
+
+      {/* User Detail Modal */}
+      <UserDetailModal 
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        user={selectedUser}
+      />
     </div>
   );
 }

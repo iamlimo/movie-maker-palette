@@ -91,6 +91,9 @@ verify_jwt = true
 [functions.admin-wallet-adjustment]
 verify_jwt = true
 
+[functions.admin-user-management]
+verify_jwt = true
+
 [edge-runtime]
 enabled = true
 ip_version = "ipv4"

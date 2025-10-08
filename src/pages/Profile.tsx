@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Progress } from '@/components/ui/progress';
 import { ProfileSidebar } from '@/components/ui/sidebar-profile';
 import { PinnedContent } from '@/components/PinnedContent';
+import { WalletWidget } from '@/components/wallet/WalletWidget';
 import { 
   CalendarIcon, 
   Camera, 
@@ -224,17 +225,9 @@ const Profile = () => {
                 >
                   <Menu size={18} />
                 </Button>
-                {profile?.wallet_balance !== undefined && (
-                  <Card className="bg-white/10 border-white/20 text-white shadow-card">
-                    <CardContent className="p-4 flex items-center space-x-2">
-                      <Wallet size={20} />
-                      <div>
-                        <p className="text-sm opacity-80">Wallet Balance</p>
-                        <p className="font-bold">₦{profile.wallet_balance.toLocaleString()}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                <div className="hidden lg:block w-72">
+                  <WalletWidget />
+                </div>
               </div>
             </div>
           </div>
