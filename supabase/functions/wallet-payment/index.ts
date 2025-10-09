@@ -38,6 +38,27 @@ serve(async (req) => {
       });
     }
 
+    // Check for existing active rental
+    const { data: existingRental } = await supabase
+      .from('rentals')
+      .select('id, expires_at')
+      .eq('user_id', user.id)
+      .eq('content_id', contentId)
+      .eq('content_type', contentType)
+      .eq('status', 'active')
+      .gte('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (existingRental) {
+      return new Response(JSON.stringify({ 
+        error: 'Active rental exists', 
+        expires_at: existingRental.expires_at 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Get user wallet
     const { data: wallet } = await supabase
       .from('wallets')
@@ -100,9 +121,33 @@ serve(async (req) => {
 
       if (walletError) throw walletError;
 
-      // Calculate expiration based on content type
-      const hoursToAdd = contentType === 'season' ? 336 : 48; // 14 days or 48 hours
-      const expiresAt = new Date(Date.now() + hoursToAdd * 60 * 60 * 1000).toISOString();
+      // Fetch content-specific rental expiry duration
+      let expiryHours = 48; // default fallback
+      
+      if (contentType === 'movie') {
+        const { data: movieData } = await supabase
+          .from('movies')
+          .select('rental_expiry_duration')
+          .eq('id', contentId)
+          .single();
+        expiryHours = movieData?.rental_expiry_duration || 48;
+      } else if (contentType === 'season') {
+        const { data: seasonData } = await supabase
+          .from('seasons')
+          .select('rental_expiry_duration')
+          .eq('id', contentId)
+          .single();
+        expiryHours = seasonData?.rental_expiry_duration || 336;
+      } else if (contentType === 'episode') {
+        const { data: episodeData } = await supabase
+          .from('episodes')
+          .select('rental_expiry_duration')
+          .eq('id', contentId)
+          .single();
+        expiryHours = episodeData?.rental_expiry_duration || 48;
+      }
+
+      const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString();
 
       // Create rental record
       const { error: rentalError } = await supabase
@@ -161,7 +206,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email: profile?.email || user.email,
-        amount: price,
+        amount: price, // price is already in kobo from database
         reference: payment.intent_id,
         callback_url: `${new URL(req.url).origin}/${contentType}/${contentId}?payment=success`,
         metadata: {

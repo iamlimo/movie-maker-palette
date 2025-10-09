@@ -2,9 +2,13 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// Helper functions for Naira <-> Kobo conversion
+export const nairaToKobo = (naira: number): number => Math.round(naira * 100);
+export const koboToNaira = (kobo: number): number => kobo / 100;
+
 interface NairaInputProps {
-  value: number;
-  onChange: (value: number) => void;
+  value: number; // Value in kobo
+  onChange: (value: number) => void; // Returns value in kobo
   label?: string;
   placeholder?: string;
   required?: boolean;
@@ -12,8 +16,8 @@ interface NairaInputProps {
 }
 
 const NairaInput: React.FC<NairaInputProps> = ({
-  value,
-  onChange,
+  value, // value in kobo
+  onChange, // onChange expects kobo
   label,
   placeholder = "0.00",
   required = false,
@@ -22,11 +26,12 @@ const NairaInput: React.FC<NairaInputProps> = ({
   const [displayValue, setDisplayValue] = useState("");
 
   useEffect(() => {
-    // Format the value for display
+    // Convert kobo to naira for display
+    const nairaValue = koboToNaira(value);
     if (value === 0) {
       setDisplayValue("");
     } else {
-      setDisplayValue(value.toFixed(2));
+      setDisplayValue(nairaValue.toFixed(2));
     }
   }, [value]);
 
@@ -58,9 +63,10 @@ const NairaInput: React.FC<NairaInputProps> = ({
     
     setDisplayValue(formatted);
     
-    // Convert to number and call onChange
-    const numericValue = parseFloat(formatted) || 0;
-    onChange(numericValue);
+    // Convert Naira to Kobo and call onChange
+    const nairaValue = parseFloat(formatted) || 0;
+    const koboValue = nairaToKobo(nairaValue);
+    onChange(koboValue);
   };
 
   const handleBlur = () => {

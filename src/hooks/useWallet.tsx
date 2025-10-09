@@ -86,7 +86,9 @@ export const useWallet = () => {
   };
 
   const formatBalance = (): string => {
-    return wallet ? `₦${wallet.balance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}` : '₦0.00';
+    // Balance is stored in kobo, convert to Naira for display
+    const balanceInNaira = wallet ? wallet.balance / 100 : 0;
+    return `₦${balanceInNaira.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
   };
 
   return {

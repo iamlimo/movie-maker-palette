@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { UnifiedContentUploader } from "@/components/admin/UnifiedContentUploader";
 import { useContentManager, ContentFormData } from "@/hooks/useContentManager";
 import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
+import NairaInput from "@/components/admin/NairaInput";
 
 interface Genre {
   id: string;
@@ -35,7 +36,7 @@ const AddMovie = () => {
     duration: "",
     language: "",
     rating: "",
-    price: "",
+    price: "", // Will be converted to kobo by NairaInput
     rental_expiry_duration: "48"
   });
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -251,14 +252,11 @@ const AddMovie = () => {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="price">Price ($) *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => handleInputChange('price', e.target.value)}
-                  placeholder="9.99"
+                <NairaInput
+                  value={parseFloat(formData.price) || 0}
+                  onChange={(value) => handleInputChange('price', value.toString())}
+                  label="Price *"
+                  placeholder="0.00"
                   required
                 />
               </div>

@@ -33,6 +33,15 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
       return;
     }
 
+    // Check for existing rental before payment
+    if (hasAccess) {
+      toast({
+        title: "Already Rented",
+        description: "You already have access to this content",
+      });
+      return;
+    }
+
     setIsLoading(true);
     setPaymentMethod(useWallet ? 'wallet' : 'card');
 
@@ -41,7 +50,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
         body: {
           contentId,
           contentType,
-          price,
+          price, // price already in kobo from database
           useWallet
         }
       });
@@ -90,11 +99,17 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
     } catch (error: any) {
       console.error('Rental error:', error);
       
-      if (error.message?.includes('Insufficient wallet balance')) {
+      if (error.message?.includes('Insufficient') || error.message?.includes('balance')) {
+        const priceInNaira = price / 100;
         toast({
           title: "Insufficient Balance",
-          description: `You need ₦${(price / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} but have ${formatBalance()}`,
+          description: `You need ₦${priceInNaira.toLocaleString('en-NG', { minimumFractionDigits: 2 })} but have ${formatBalance()}`,
           variant: "destructive"
+        });
+      } else if (error.message?.includes('Active rental exists')) {
+        toast({
+          title: "Already Rented",
+          description: "You already have an active rental for this content",
         });
       } else {
         toast({
@@ -124,10 +139,13 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
     ? '48-hour rental'
     : '48-hour rental';
 
+  const priceInNaira = price / 100;
+  const canAffordRental = canAfford(price);
+
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <div className="text-2xl font-bold">₦{(price / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+        <div className="text-2xl font-bold">₦{priceInNaira.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
         <div className="text-sm text-muted-foreground">{rentalDuration}</div>
       </div>
 
@@ -139,7 +157,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
       )}
 
       {/* Payment Buttons */}
-      {user && canAfford(price) ? (
+      {user && canAffordRental ? (
         <div className="space-y-2">
           <Button 
             onClick={() => handleRent(true)} 
@@ -171,20 +189,27 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
           </Button>
         </div>
       ) : (
-        <Button 
-          onClick={() => handleRent(false)} 
-          disabled={isLoading}
-          variant="default" 
-          size="lg" 
-          className="w-full"
-        >
-          {isLoading ? (
-            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-          ) : (
-            <Play className="h-5 w-5 mr-2" />
+        <div className="space-y-2">
+          {user && !canAffordRental && (
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+              Add ₦{((price - balance) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} to your wallet for instant checkout
+            </div>
           )}
-          Rent for ₦{(price / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
-        </Button>
+          <Button 
+            onClick={() => handleRent(false)} 
+            disabled={isLoading}
+            variant="default" 
+            size="lg" 
+            className="w-full"
+          >
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-5 w-5 mr-2" />
+            )}
+            Rent for ₦{priceInNaira.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+          </Button>
+        </div>
       )}
     </div>
   );

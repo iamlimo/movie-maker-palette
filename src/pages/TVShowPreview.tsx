@@ -368,7 +368,7 @@ const TVShowPreview = () => {
                   <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                     <Badge variant="default" className="mb-2">Best Value</Badge>
                     <p className="text-sm font-semibold mb-1">Full Season</p>
-                    <p className="text-2xl font-bold text-primary mb-2">₦{currentSeason.price}</p>
+                    <p className="text-2xl font-bold text-primary mb-2">₦{(currentSeason.price / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</p>
                     <p className="text-xs text-muted-foreground mb-3">
                       {currentEpisodes.length} episodes • {currentSeason.rental_expiry_duration}h access
                     </p>
@@ -382,7 +382,7 @@ const TVShowPreview = () => {
                   <div className="p-4 rounded-lg border">
                     <p className="text-sm font-semibold mb-1">Individual Episodes</p>
                     <p className="text-xl font-bold mb-2">
-                      From ₦{currentEpisodes.length > 0 ? Math.min(...currentEpisodes.map(e => e.price)) : 0}
+                      From ₦{currentEpisodes.length > 0 ? (Math.min(...currentEpisodes.map(e => e.price)) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 }) : '0.00'}
                     </p>
                     <Button 
                       variant="outline" 

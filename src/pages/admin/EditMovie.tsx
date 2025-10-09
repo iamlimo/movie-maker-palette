@@ -55,7 +55,7 @@ const EditMovie = () => {
     duration: "",
     language: "",
     rating: "",
-    price: 0,
+    price: 0, // Stored in kobo, displayed in Naira by NairaInput
     rental_expiry_duration: "48",
     status: "pending",
     video_url: "",
@@ -93,7 +93,7 @@ const EditMovie = () => {
         duration: data.duration?.toString() || "",
         language: data.language || "",
         rating: data.rating || "",
-        price: data.price || 0,
+        price: data.price || 0, // Already in kobo from database
         rental_expiry_duration: data.rental_expiry_duration?.toString() || "48",
         status: data.status || "pending",
         video_url: data.video_url || "",

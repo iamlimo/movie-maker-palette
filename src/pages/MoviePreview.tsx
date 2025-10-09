@@ -159,7 +159,7 @@ const MoviePreview = () => {
         duration={movie.duration || undefined}
         year={movie.release_date ? new Date(movie.release_date).getFullYear() : undefined}
         genre={movie.genre?.name}
-        price={movie.price}
+        price={movie.price / 100} // Convert kobo to Naira for display
         language={movie.language || undefined}
         onBack={() => navigate('/')}
       />
