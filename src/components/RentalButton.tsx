@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRentals } from "@/hooks/useRentals";
 import { useWallet } from "@/hooks/useWallet";
 import { toast } from "@/hooks/use-toast";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface RentalButtonProps {
   contentId: string;
@@ -145,7 +146,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <div className="text-2xl font-bold">₦{priceInNaira.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+        <div className="text-2xl font-bold">{formatNaira(price)}</div>
         <div className="text-sm text-muted-foreground">{rentalDuration}</div>
       </div>
 
@@ -192,7 +193,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
         <div className="space-y-2">
           {user && !canAffordRental && (
             <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
-              Add ₦{((price - balance) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} to your wallet for instant checkout
+              Add {formatNaira(price - balance)} to your wallet for instant checkout
             </div>
           )}
           <Button 
@@ -207,7 +208,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
             ) : (
               <Play className="h-5 w-5 mr-2" />
             )}
-            Rent for ₦{priceInNaira.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+            Rent for {formatNaira(price)}
           </Button>
         </div>
       )}

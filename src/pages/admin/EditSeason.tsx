@@ -288,7 +288,7 @@ const EditSeason = () => {
                 value={formData.price}
                 onChange={(value) => handleInputChange('price', value)}
                 label="Season Price"
-                placeholder={tvShow.price.toString()}
+                placeholder={(tvShow.price / 100).toFixed(2)}
               />
 
               <div className="bg-secondary/20 p-4 rounded-lg">

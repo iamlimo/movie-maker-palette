@@ -14,6 +14,7 @@ import VideoPlayerWithValidation from "@/components/VideoPlayerWithValidation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface Movie {
   id: string;
