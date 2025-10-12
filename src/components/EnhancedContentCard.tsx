@@ -17,41 +17,47 @@ interface EnhancedContentCardProps {
   price: number;
   genre?: string;
   imageUrl?: string;
-  contentType: 'movie' | 'tv_show';
+  contentType: "movie" | "tv_show";
   description?: string;
   featured?: boolean;
   className?: string;
 }
 
-const EnhancedContentCard = ({ 
+const EnhancedContentCard = ({
   id,
-  title, 
-  year, 
-  rating, 
-  duration, 
-  price, 
-  genre, 
+  title,
+  year,
+  rating,
+  duration,
+  price,
+  genre,
   imageUrl,
   contentType,
   description,
   featured = false,
-  className = ""
+  className = "",
 }: EnhancedContentCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { favorites, toggleFavorite, loading: favoritesLoading } = useFavorites();
+  const {
+    favorites,
+    toggleFavorite,
+    loading: favoritesLoading,
+  } = useFavorites();
   const [imageError, setImageError] = useState(false);
 
-  const isFavorite = favorites.some(fav => fav.content_id === id && fav.content_type === contentType);
+  const isFavorite = favorites.some(
+    (fav) => fav.content_id === id && fav.content_type === contentType
+  );
 
   const handlePreview = () => {
-    const route = contentType === 'movie' ? `/movie/${id}` : `/tvshow/${id}`;
+    const route = contentType === "movie" ? `/movie/${id}` : `/tvshow/${id}`;
     navigate(route);
   };
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!user) {
       toast({
         title: "Sign in required",
@@ -65,7 +71,7 @@ const EnhancedContentCard = ({
       await toggleFavorite(contentType, id);
       toast({
         title: isFavorite ? "Removed from Watchlist" : "Added to Watchlist",
-        description: isFavorite 
+        description: isFavorite
           ? `${title} has been removed from your watchlist.`
           : `${title} has been added to your watchlist.`,
       });
@@ -79,41 +85,45 @@ const EnhancedContentCard = ({
   };
 
   const formatDuration = (dur?: string | number) => {
-    if (!dur) return '';
-    if (typeof dur === 'string') return dur;
+    if (!dur) return "";
+    if (typeof dur === "string") return dur;
     return `${dur}min`;
   };
 
   const formatPrice = (p: number) => {
-    return p > 0 ? `₦${p.toLocaleString()}` : 'Free';
+    return p > 0 ? `₦${p.toLocaleString()}` : "Free";
   };
 
-  const displayRating = rating ? (typeof rating === 'string' ? rating : rating.toFixed(1)) : '0.0';
+  const displayRating = rating
+    ? typeof rating === "string"
+      ? rating
+      : rating.toFixed(1)
+    : "0.0";
   const displayImage = imageError || !imageUrl ? moviePlaceholder : imageUrl;
 
   return (
-    <div 
+    <div
       className={`group relative overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
-        featured ? 'ring-1 ring-primary/20' : ''
+        featured ? "ring-1 ring-primary/20" : ""
       } ${className}`}
       onClick={handlePreview}
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] overflow-hidden bg-muted/30">
-        <img 
-          src={displayImage} 
+        <img
+          src={displayImage}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={() => setImageError(true)}
           loading="lazy"
         />
-        
+
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <div className="absolute inset-x-4 bottom-4 space-y-2">
             <div className="flex gap-2">
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="flex-1 h-8 text-xs font-medium shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -121,10 +131,10 @@ const EnhancedContentCard = ({
                 }}
               >
                 <Play className="h-3 w-3 mr-1.5" />
-                {price > 0 ? 'Rent' : 'Watch'}
+                {price > 0 ? "Rent" : "Watch"}
               </Button>
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 size="sm"
                 className="flex-1 h-8 text-xs font-medium shadow-lg"
                 onClick={(e) => {
@@ -147,13 +157,19 @@ const EnhancedContentCard = ({
           onClick={handleToggleFavorite}
           disabled={favoritesLoading}
         >
-          <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-rose-500 text-rose-500' : 'text-muted-foreground hover:text-foreground'}`} />
+          <Heart
+            className={`h-4 w-4 transition-colors ${
+              isFavorite
+                ? "fill-rose-500 text-rose-500"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          />
         </Button>
 
         {/* Price Badge */}
         <div className="absolute top-2 right-2">
-          <Badge 
-            variant={price > 0 ? 'default' : 'secondary'}
+          <Badge
+            variant={price > 0 ? "default" : "secondary"}
             className="text-xs font-semibold backdrop-blur-sm bg-background/90 border-0 shadow-sm"
           >
             {formatPrice(price)}
@@ -166,13 +182,13 @@ const EnhancedContentCard = ({
         <h3 className="font-semibold text-sm leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
           {title}
         </h3>
-        
+
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {year && <span className="font-medium">{year}</span>}
           {rating && (
             <div className="flex items-center gap-1">
               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              <span className="font-medium">{displayRating}</span>
+              {/* <span className="font-medium">{displayRating}</span> */}
             </div>
           )}
           {duration && (
@@ -182,9 +198,12 @@ const EnhancedContentCard = ({
             </div>
           )}
         </div>
-        
+
         {genre && (
-          <Badge variant="outline" className="text-xs font-normal border-border/60">
+          <Badge
+            variant="outline"
+            className="text-xs font-normal border-border/60"
+          >
             {genre}
           </Badge>
         )}

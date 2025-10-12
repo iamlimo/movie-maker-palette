@@ -11,11 +11,12 @@ const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { sectionsWithContent, loading } = useSectionsWithContent();
+  const currentYear = new Date().getFullYear();
 
   // Redirect authenticated users away from auth page
   useEffect(() => {
-    if (user && window.location.pathname === '/auth') {
-      navigate('/');
+    if (user && window.location.pathname === "/auth") {
+      navigate("/");
     }
   }, [user, navigate]);
 
@@ -35,23 +36,25 @@ const Index = () => {
       <Header />
       <CinematicHeroSlider />
       <BrandStrip />
-      
+
       {sectionsWithContent.map((section) => (
-        <MovieSection 
+        <MovieSection
           key={section.id}
           title={section.title}
-          subtitle={section.subtitle || ''}
-          movies={section.content.map(item => ({
+          subtitle={section.subtitle || ""}
+          movies={section.content.map((item) => ({
             id: item.id,
             title: item.title,
-            year: item.release_date ? new Date(item.release_date).getFullYear() : undefined,
-            rating: item.rating ? (typeof item.rating === 'string' ? parseFloat(item.rating) : item.rating) : undefined,
+            year: item.release_date
+              ? new Date(item.release_date).getFullYear()
+              : undefined,
+            // rating: item.rating ? (typeof item.rating === 'string' ? parseFloat(item.rating) : item.rating) : undefined,
             duration: item.duration ? `${item.duration}min` : undefined,
             price: item.price || 0,
             genre: item.genre || undefined,
             imageUrl: item.thumbnail_url,
-            contentType: item.content_type as 'movie' | 'tv_show',
-            description: item.description
+            contentType: item.content_type as "movie" | "tv_show",
+            description: item.description,
           }))}
         />
       ))}
@@ -60,11 +63,12 @@ const Index = () => {
         <div className="container mx-auto px-4 py-12 text-center">
           <h2 className="text-2xl font-bold mb-4">No Content Available</h2>
           <p className="text-muted-foreground">
-            Content will appear here once sections are created and movies are assigned to them.
+            Content will appear here once sections are created and movies are
+            assigned to them.
           </p>
         </div>
       )}
-      
+
       {/* Footer */}
       <footer className="bg-secondary/20 border-t border-border py-12">
         <div className="container mx-auto px-4">
@@ -72,50 +76,101 @@ const Index = () => {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <div className="w-8 h-8 gradient-accent rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-lg">S</span>
+                  <span className="text-primary-foreground font-bold text-lg">
+                    S
+                  </span>
                 </div>
                 <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                   Signature TV
                 </span>
               </div>
               <p className="text-muted-foreground">
-                Premium movie rental platform with the latest releases and timeless classics.
+                Premium movie rental platform with the latest releases and
+                timeless classics.
               </p>
             </div>
-            
+
             <div>
               <h3 className="font-semibold text-foreground mb-4">Browse</h3>
               <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-smooth">New Releases</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Popular</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Action</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Drama</a></li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    New Releases
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Popular
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Action
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Drama
+                  </a>
+                </li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="font-semibold text-foreground mb-4">Support</h3>
               <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-smooth">Help Center</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Contact Us</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Rental Terms</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Privacy Policy</a></li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Help Center
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Contact Us
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Rental Terms
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Privacy Policy
+                  </a>
+                </li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="font-semibold text-foreground mb-4">Connect</h3>
               <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-smooth">Twitter</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Facebook</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">Instagram</a></li>
-                <li><a href="#" className="hover:text-primary transition-smooth">YouTube</a></li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Twitter
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Facebook
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    Instagram
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-primary transition-smooth">
+                    YouTube
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
-          
+
           <div className="border-t border-border mt-8 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 Signature TV. All rights reserved.</p>
+            <p>&copy; {currentYear} Signature TV. All rights reserved.</p>
           </div>
         </div>
       </footer>
