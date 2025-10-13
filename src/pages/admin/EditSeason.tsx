@@ -288,7 +288,8 @@ const EditSeason = () => {
                 value={formData.price}
                 onChange={(value) => handleInputChange('price', value)}
                 label="Season Price"
-                placeholder={(tvShow.price / 100).toFixed(2)}
+                placeholder="3,000.00"
+                defaultPriceHint="Platform Default: ₦3,000 (Full season access)"
               />
 
               <div className="bg-secondary/20 p-4 rounded-lg">

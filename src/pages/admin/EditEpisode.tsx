@@ -357,7 +357,8 @@ const EditEpisode = () => {
                 value={formData.price}
                 onChange={(value) => handleInputChange('price', value)}
                 label="Episode Price"
-                placeholder="0.00"
+                placeholder="350.00"
+                defaultPriceHint="Platform Default: ₦350 per episode"
               />
             </CardContent>
           </Card>

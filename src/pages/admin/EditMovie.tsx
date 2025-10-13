@@ -362,7 +362,8 @@ const EditMovie = () => {
                   value={formData.price}
                   onChange={(value) => handleInputChange('price', value)}
                   label="Price"
-                  placeholder="0.00"
+                  placeholder="1,000.00"
+                  defaultPriceHint="Platform Default: ₦1,000"
                 />
               </div>
               

@@ -36,7 +36,7 @@ const AddSeason = () => {
   const [formData, setFormData] = useState<FormData>({
     season_number: 1,
     description: "",
-    price: 0,
+    price: 300000, // Default ₦3,000 in kobo
     rental_expiry_duration: 336 // 14 days default
   });
 
@@ -259,7 +259,8 @@ const AddSeason = () => {
                 value={formData.price}
                 onChange={(value) => handleInputChange('price', value)}
                 label="Season Price"
-                placeholder={tvShow.price.toString()}
+                placeholder="3,000.00"
+                defaultPriceHint="Platform Default: ₦3,000 (Full season access)"
               />
 
               <div className="bg-secondary/20 p-4 rounded-lg">

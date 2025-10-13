@@ -52,7 +52,7 @@ const AddEpisode = () => {
     title: "",
     description: "",
     duration: 0,
-    price: 0,
+    price: 35000, // Default ₦350 in kobo
     rental_expiry_duration: 48,
     video_file: null,
     thumbnail_file: null,
@@ -336,7 +336,8 @@ const AddEpisode = () => {
                 value={formData.price}
                 onChange={(value) => handleInputChange('price', value)}
                 label="Episode Price"
-                placeholder="0.00"
+                placeholder="350.00"
+                defaultPriceHint="Platform Default: ₦350 per episode"
               />
             </CardContent>
           </Card>

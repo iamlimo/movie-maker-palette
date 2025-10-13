@@ -7,6 +7,40 @@
  */
 
 /**
+ * Platform default prices in kobo (100 kobo = 1 Naira)
+ */
+export const DEFAULT_PRICES = {
+  MOVIE: 100000,      // ₦1,000
+  SEASON: 300000,     // ₦3,000
+  EPISODE: 35000,     // ₦350
+} as const;
+
+/**
+ * Platform default prices in Naira (for display)
+ */
+export const DEFAULT_PRICES_NAIRA = {
+  MOVIE: 1000,
+  SEASON: 3000,
+  EPISODE: 350,
+} as const;
+
+/**
+ * Get default price for content type
+ */
+export const getDefaultPrice = (contentType: 'movie' | 'season' | 'episode'): number => {
+  switch (contentType) {
+    case 'movie':
+      return DEFAULT_PRICES.MOVIE;
+    case 'season':
+      return DEFAULT_PRICES.SEASON;
+    case 'episode':
+      return DEFAULT_PRICES.EPISODE;
+    default:
+      return 0;
+  }
+};
+
+/**
  * Convert kobo to Naira for display
  * @param kobo - Amount in kobo
  * @returns Amount in Naira

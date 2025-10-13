@@ -36,7 +36,7 @@ const AddMovie = () => {
     duration: "",
     language: "",
     rating: "",
-    price: "", // Will be converted to kobo by NairaInput
+    price: "100000", // Default ₦1,000 in kobo
     rental_expiry_duration: "48"
   });
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -253,10 +253,11 @@ const AddMovie = () => {
               </div>
               <div>
                 <NairaInput
-                  value={parseFloat(formData.price) || 0}
+                  value={parseFloat(formData.price) || 100000}
                   onChange={(value) => handleInputChange('price', value.toString())}
                   label="Price *"
-                  placeholder="0.00"
+                  placeholder="1,000.00"
+                  defaultPriceHint="Platform Default: ₦1,000"
                   required
                 />
               </div>

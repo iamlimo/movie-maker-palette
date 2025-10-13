@@ -13,6 +13,7 @@ interface NairaInputProps {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  defaultPriceHint?: string; // e.g., "Default: ₦1,000"
 }
 
 const NairaInput: React.FC<NairaInputProps> = ({
@@ -21,7 +22,8 @@ const NairaInput: React.FC<NairaInputProps> = ({
   label,
   placeholder = "0.00",
   required = false,
-  disabled = false
+  disabled = false,
+  defaultPriceHint
 }) => {
   const [displayValue, setDisplayValue] = useState("");
 
@@ -94,6 +96,11 @@ const NairaInput: React.FC<NairaInputProps> = ({
           {label}
           {required && <span className="text-destructive ml-1">*</span>}
         </Label>
+      )}
+      {defaultPriceHint && (
+        <p className="text-xs text-muted-foreground">
+          {defaultPriceHint}
+        </p>
       )}
       <div className="relative">
         <Input
