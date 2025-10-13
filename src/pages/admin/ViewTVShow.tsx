@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface TVShow {
   id: string;
@@ -272,7 +273,10 @@ const ViewTVShow = () => {
                     </div>
                     <div>
                       <p className="text-sm font-medium">Base Price</p>
-                      <p className="text-muted-foreground">₦{tvShow.price}</p>
+                      <div>
+                        <p className="font-semibold">{formatNaira(tvShow.price)}</p>
+                        <p className="text-xs text-muted-foreground">{tvShow.price} kobo</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -288,7 +292,7 @@ const ViewTVShow = () => {
                   <div className="flex items-center gap-3">
                     <CardTitle>Season {season.season_number}</CardTitle>
                     {getStatusBadge(season.status)}
-                    <span className="text-sm text-muted-foreground">₦{season.price}</span>
+                    <span className="text-sm text-muted-foreground">{formatNaira(season.price)}</span>
                   </div>
                   <div className="flex gap-2">
                     <Button 
@@ -334,7 +338,12 @@ const ViewTVShow = () => {
                             {episode.duration ? `${episode.duration} min` : 'N/A'}
                           </TableCell>
                           <TableCell>{getStatusBadge(episode.status)}</TableCell>
-                          <TableCell>₦{episode.price}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{formatNaira(episode.price)}</div>
+                              <div className="text-xs text-muted-foreground">{episode.price} kobo</div>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               {episode.video_url && (

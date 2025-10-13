@@ -13,6 +13,7 @@ import { useAllContent } from '@/hooks/useMovies';
 import CinematicHeroSlider from '@/components/CinematicHeroSlider';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { formatNaira } from '@/lib/priceUtils';
 
 export default function HeroSlider() {
   const { sliderItems, loading, refetch } = useSliderItems();
@@ -230,7 +231,7 @@ export default function HeroSlider() {
                           <div className="flex items-center space-x-2 mt-1">
                             <Badge variant="outline" className="text-xs">{item.content_type}</Badge>
                             {item.genre?.name && <Badge variant="secondary" className="text-xs">{item.genre.name}</Badge>}
-                            <Badge variant="outline" className="text-xs">₦{item.price}</Badge>
+                            <Badge variant="outline" className="text-xs">{formatNaira(item.price)}</Badge>
                           </div>
                         </div>
                       </div>
@@ -317,7 +318,7 @@ export default function HeroSlider() {
                     <div className="flex items-center space-x-2 mt-2">
                       <Badge variant="outline">{item.content_type}</Badge>
                       {item.genre && <Badge variant="secondary">{item.genre}</Badge>}
-                      <Badge variant="outline">₦{item.price}</Badge>
+                      <Badge variant="outline">{formatNaira(item.price)}</Badge>
                     </div>
                   </div>
                   

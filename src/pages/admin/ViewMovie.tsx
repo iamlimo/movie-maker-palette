@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface Movie {
   id: string;
@@ -235,7 +236,8 @@ const ViewMovie = () => {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium">Price</p>
-                <p className="text-2xl font-bold text-primary">₦{movie.price}</p>
+                <p className="text-2xl font-bold text-primary">{formatNaira(movie.price)}</p>
+                <p className="text-xs text-muted-foreground">{movie.price} kobo</p>
               </div>
               <Separator />
               <div>
