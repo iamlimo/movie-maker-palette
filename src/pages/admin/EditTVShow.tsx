@@ -19,6 +19,8 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useSections } from '@/hooks/useSections';
 import BackblazeUrlInput from '@/components/admin/BackblazeUrlInput';
 import TrailerPlayer from '@/components/TrailerPlayer';
+import NairaInput from '@/components/admin/NairaInput';
+import { DEFAULT_PRICES_NAIRA } from '@/lib/priceUtils';
 
 interface TVShowData {
   title: string;
@@ -293,17 +295,13 @@ export default function EditTVShow() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Base Price (₦)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => handleInputChange('price', parseFloat(e.target.value) || 0)}
-                />
-              </div>
+              <NairaInput
+                label="Base Price"
+                value={formData.price}
+                onChange={(koboValue) => handleInputChange('price', koboValue)}
+                defaultPriceHint={`Default: ₦${DEFAULT_PRICES_NAIRA.SEASON.toLocaleString()}`}
+                placeholder="3000.00"
+              />
 
               <div className="space-y-2">
                 <Label htmlFor="release_date">Release Date</Label>
