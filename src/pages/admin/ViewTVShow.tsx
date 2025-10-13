@@ -155,6 +155,32 @@ const ViewTVShow = () => {
     }
   };
 
+  const handleApproveEpisode = async (episodeId: string, seasonId: string) => {
+    try {
+      const { error } = await supabase
+        .from('episodes')
+        .update({ status: 'approved' })
+        .eq('id', episodeId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Episode approved successfully",
+      });
+
+      // Refresh episodes for this season
+      fetchEpisodes(seasonId);
+    } catch (error) {
+      console.error('Error approving episode:', error);
+      toast({
+        title: "Error",
+        description: "Failed to approve episode",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: "bg-green-500 text-white",
@@ -346,6 +372,16 @@ const ViewTVShow = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
+                              {episode.status !== 'approved' && (
+                                <Button 
+                                  size="sm" 
+                                  variant="default"
+                                  title="Approve Episode"
+                                  onClick={() => handleApproveEpisode(episode.id, season.id)}
+                                >
+                                  Approve
+                                </Button>
+                              )}
                               {episode.video_url && (
                                 <Button 
                                   size="sm" 

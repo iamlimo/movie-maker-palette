@@ -497,7 +497,7 @@ const TVShowPreview = () => {
                                       <Clock className="h-3 w-3" />
                                       <span>{episode.duration}m</span>
                                       <span>•</span>
-                                      <span className="font-semibold text-foreground">₦{episode.price}</span>
+                                      <span className="font-semibold text-foreground">{formatNaira(episode.price)}</span>
                                     </div>
                                     {episode.description && (
                                       <p className="text-sm text-muted-foreground line-clamp-2">
