@@ -47,14 +47,39 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
     setPaymentMethod(useWallet ? 'wallet' : 'card');
 
     try {
-      const { data, error } = await supabase.functions.invoke('wallet-payment', {
-        body: {
-          contentId,
-          contentType,
-          price, // price already in kobo from database
-          useWallet
+      let data, error;
+
+      // Try primary payment method
+      try {
+        const response = await supabase.functions.invoke('wallet-payment', {
+          body: {
+            contentId,
+            contentType,
+            price, // price already in kobo from database
+            useWallet
+          }
+        });
+        data = response.data;
+        error = response.error;
+      } catch (primaryError: any) {
+        console.error('wallet-payment failed, trying fallback:', primaryError);
+        
+        // Fallback to create-payment for card payments only
+        if (!useWallet) {
+          const fallbackResponse = await supabase.functions.invoke('create-payment', {
+            body: {
+              userId: user.id,
+              contentId,
+              contentType,
+              price
+            }
+          });
+          data = fallbackResponse.data;
+          error = fallbackResponse.error;
+        } else {
+          throw new Error('Wallet payment service unavailable. Please try card payment.');
         }
-      });
+      }
 
       if (error) throw error;
 
@@ -66,9 +91,12 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
           title: "Payment Successful!",
           description: `You can now watch ${title}`,
         });
-      } else if (data.payment_method === 'paystack') {
+      } else if (data.payment_method === 'paystack' || data.authorization_url) {
         // Open Paystack checkout
-        window.open(data.authorization_url, '_blank', 'width=500,height=700');
+        const authUrl = data.authorization_url;
+        const paymentId = data.payment_id || data.id;
+        
+        window.open(authUrl, '_blank', 'width=500,height=700');
         
         toast({
           title: "Payment Initiated",
@@ -79,7 +107,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
         const pollPayment = setInterval(async () => {
           try {
             const { data: paymentData } = await supabase.functions.invoke('verify-payment', {
-              body: { payment_id: data.payment_id }
+              body: { payment_id: paymentId }
             });
             
             if (paymentData?.payment?.status === 'completed') {
