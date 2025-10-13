@@ -34,6 +34,16 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
       return;
     }
 
+    // Prevent wallet payment if wallet hasn't loaded yet
+    if (useWallet && isLoading) {
+      toast({
+        title: "Wallet Loading",
+        description: "Please wait for your wallet to load",
+        variant: "default"
+      });
+      return;
+    }
+
     // Check for existing rental before payment
     if (hasAccess) {
       toast({

@@ -29,11 +29,30 @@ export const useWallet = () => {
         .from('wallets')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (walletError) {
         console.error('Error fetching wallet:', walletError);
         setError(walletError.message);
+        return;
+      }
+
+      // If no wallet exists, create one
+      if (!data) {
+        console.log('No wallet found, creating one for user:', user.id);
+        const { data: newWallet, error: createError } = await supabase
+          .from('wallets')
+          .insert({ user_id: user.id, balance: 0 })
+          .select()
+          .maybeSingle();
+        
+        if (createError) {
+          console.error('Error creating wallet:', createError);
+          setError('Failed to create wallet');
+          return;
+        }
+        
+        setWallet(newWallet);
         return;
       }
 
