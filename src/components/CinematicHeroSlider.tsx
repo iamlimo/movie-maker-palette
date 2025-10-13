@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import FavoriteButton from '@/components/FavoriteButton';
+import { formatNaira } from '@/lib/priceUtils';
 
 const CinematicHeroSlider = () => {
   const navigate = useNavigate();
@@ -171,7 +172,7 @@ const CinematicHeroSlider = () => {
                     <span>48h rental</span>
                   </div>
                   <span>•</span>
-                  <span>₦{currentItem.price}</span>
+                  <span>{formatNaira(currentItem.price)}</span>
                 </div>
               </div>
 

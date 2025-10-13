@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
 import moviePlaceholder from "@/assets/movie-placeholder.jpg";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface EnhancedContentCardProps {
   id: string;
@@ -90,10 +91,6 @@ const EnhancedContentCard = ({
     return `${dur}min`;
   };
 
-  const formatPrice = (p: number) => {
-    return p > 0 ? `₦${p.toLocaleString()}` : "Free";
-  };
-
   const displayRating = rating
     ? typeof rating === "string"
       ? rating
@@ -172,7 +169,7 @@ const EnhancedContentCard = ({
             variant={price > 0 ? "default" : "secondary"}
             className="text-xs font-semibold backdrop-blur-sm bg-background/90 border-0 shadow-sm"
           >
-            {formatPrice(price)}
+            {price > 0 ? formatNaira(price) : "Free"}
           </Badge>
         </div>
       </div>

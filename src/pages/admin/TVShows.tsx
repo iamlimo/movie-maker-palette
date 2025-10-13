@@ -4,6 +4,7 @@ import { Plus, Search, Filter, Edit, Trash2, Eye, ChevronDown, ChevronRight } fr
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { formatNaira } from "@/lib/priceUtils";
 import {
   Table,
   TableBody,
@@ -319,7 +320,12 @@ const TVShows = () => {
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(show.status)}</TableCell>
-                    <TableCell>₦{show.price}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-semibold">{formatNaira(show.price)}</div>
+                        <div className="text-xs text-muted-foreground">{show.price} kobo</div>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {show.release_date 
                         ? new Date(show.release_date).toLocaleDateString()
@@ -386,7 +392,12 @@ const TVShows = () => {
                       <TableCell>
                         <Badge variant="outline">Season</Badge>
                       </TableCell>
-                      <TableCell>₦{season.price}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-semibold">{formatNaira(season.price)}</div>
+                          <div className="text-xs text-muted-foreground">{season.price} kobo</div>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {season.rental_expiry_duration}h rental
                       </TableCell>

@@ -1,9 +1,28 @@
 /**
  * Price conversion utilities for handling Naira ↔ Kobo conversions
  * 
- * Storage: All prices are stored in kobo (smallest unit)
- * Display: All prices are shown in Naira to users
- * API: Paystack receives amounts in kobo
+ * PRICING SYSTEM OVERVIEW:
+ * =========================
+ * 
+ * Storage Layer (Database):
+ * - All prices stored in KOBO (smallest unit)
+ * - 100 kobo = 1 Naira
+ * - Example: ₦1,000 = 100000 kobo
+ * 
+ * API/Backend Layer:
+ * - Paystack receives amounts in KOBO
+ * - Edge functions process prices in KOBO
+ * - Wallet balances stored in KOBO
+ * 
+ * Display Layer (Frontend):
+ * - All prices shown to users in NAIRA
+ * - Use formatNaira() for all user-facing prices
+ * - Admin inputs in NAIRA (auto-converted to kobo)
+ * 
+ * Default Prices:
+ * - Movies: 100000 kobo (₦1,000)
+ * - Seasons: 300000 kobo (₦3,000)
+ * - Episodes: 35000 kobo (₦350)
  */
 
 /**

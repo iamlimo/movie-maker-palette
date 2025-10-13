@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Star, Play, Clock, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import moviePlaceholder from "@/assets/movie-placeholder.jpg";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface MovieCardProps {
   id: string;
@@ -10,7 +11,7 @@ interface MovieCardProps {
   year: number;
   rating: number;
   duration: string;
-  price: string;
+  price: string | number;
   genre: string;
   imageUrl: string;
   contentType?: "movie" | "tv_show";
@@ -36,9 +37,9 @@ const MovieCard = ({
     navigate(route);
   };
 
-  const formatPrice = (p: string) => {
-    const numPrice = parseFloat(p.replace(/[^0-9.]/g, ""));
-    return numPrice > 0 ? `₦${numPrice.toLocaleString()}` : "Free";
+  const getFormattedPrice = () => {
+    const numPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, "")) : price;
+    return numPrice > 0 ? formatNaira(numPrice) : "Free";
   };
 
   return (
@@ -69,7 +70,7 @@ const MovieCard = ({
               onClick={(e) => e.stopPropagation()}
             >
               <Play className="h-3 w-3 mr-1.5" />
-              {formatPrice(price) === "Free" ? "Watch" : "Rent"}
+              {getFormattedPrice() === "Free" ? "Watch" : "Rent"}
             </Button>
             <Button
               variant="secondary"
@@ -86,10 +87,10 @@ const MovieCard = ({
         {/* Price Badge */}
         <div className="absolute top-2 right-2">
           <Badge
-            variant={formatPrice(price) === "Free" ? "secondary" : "default"}
+            variant={getFormattedPrice() === "Free" ? "secondary" : "default"}
             className="text-xs font-semibold backdrop-blur-sm bg-background/90 border-0 shadow-sm"
           >
-            {formatPrice(price)}
+            {getFormattedPrice()}
           </Badge>
         </div>
       </div>

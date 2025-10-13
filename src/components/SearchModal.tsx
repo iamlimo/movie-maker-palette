@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useSearch } from '@/hooks/useSearch';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -106,7 +107,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                     {result.rating && (
                       <span className="text-sm text-muted-foreground">Rated {result.rating}</span>
                     )}
-                    <span className="text-sm font-medium text-primary">₦{result.price}</span>
+                    <span className="text-sm font-medium text-primary">{formatNaira(result.price)}</span>
                   </div>
                 </div>
               </div>

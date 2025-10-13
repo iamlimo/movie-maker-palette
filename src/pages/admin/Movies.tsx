@@ -4,6 +4,7 @@ import { Plus, Search, Filter, Edit, Trash2, Eye, Clock, FileVideo, FileImage, A
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { formatNaira } from "@/lib/priceUtils";
 import {
   Table,
   TableBody,
@@ -319,7 +320,7 @@ const Movies = () => {
                 <TableHead>Media Files</TableHead>
                 <TableHead>Release Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Price (₦)</TableHead>
+                <TableHead>Price</TableHead>
                 <TableHead>Rental Expiry</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -389,7 +390,12 @@ const Movies = () => {
                     }
                   </TableCell>
                   <TableCell>{getStatusBadge(movie.status)}</TableCell>
-                  <TableCell>₦{movie.price}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-semibold">{formatNaira(movie.price)}</div>
+                      <div className="text-xs text-muted-foreground">{movie.price} kobo</div>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span>{movie.rental_expiry_duration}h</span>
