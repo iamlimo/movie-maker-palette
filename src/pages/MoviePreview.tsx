@@ -170,17 +170,6 @@ const MoviePreview = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Trailer Section */}
-            {movie.trailer_url && (
-              <div>
-                <h2 className="text-2xl font-bold mb-4">Watch Trailer</h2>
-                <TrailerPlayer 
-                  trailerUrl={movie.trailer_url}
-                  title={movie.title}
-                />
-              </div>
-            )}
-
             {/* Movie Details */}
             <div>
               <h2 className="text-2xl font-bold mb-4">About This Movie</h2>

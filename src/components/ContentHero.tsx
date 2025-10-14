@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Play, Star, Clock, Calendar, Heart, Share2 } from "lucide-react";
+import TrailerPlayer from "@/components/TrailerPlayer";
+import { useState } from "react";
 
 interface ContentHeroProps {
   title: string;
@@ -37,19 +39,37 @@ const ContentHero = ({
   onToggleFavorite,
   isFavorite
 }: ContentHeroProps) => {
+  const [showTrailer, setShowTrailer] = useState(!!trailerUrl);
 
   return (
     <section className="relative min-h-[80vh] flex items-center overflow-hidden">
-      {/* Background - Static Poster Only */}
+      {/* Background - Auto-play Trailer or Static Poster */}
       <div className="absolute inset-0">
-        <img 
-          src={imageUrl || '/placeholder.svg'} 
-          alt={title}
-          className="w-full h-full object-cover"
-          loading="eager"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+        {trailerUrl && showTrailer ? (
+          <div className="absolute inset-0">
+            <TrailerPlayer 
+              trailerUrl={trailerUrl}
+              title={title}
+              autoPlay={true}
+              muted={true}
+              controls={false}
+              className="absolute inset-0 w-full h-full"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+          </div>
+        ) : (
+          <>
+            <img 
+              src={imageUrl || '/placeholder.svg'} 
+              alt={title}
+              className="w-full h-full object-cover"
+              loading="eager"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+          </>
+        )}
       </div>
 
       {/* Content */}

@@ -91,7 +91,10 @@ const TrailerPlayer = ({
 
   if (youtubeId) {
     return (
-      <div className={`relative aspect-video bg-secondary rounded-xl overflow-hidden ${className}`}>
+      <div className={controls 
+        ? `relative aspect-video bg-secondary rounded-xl overflow-hidden ${className}` 
+        : className || "relative w-full h-full"
+      }>
         <iframe
           src={`https://www.youtube.com/embed/${youtubeId}?autoplay=${isPlaying ? 1 : 0}&mute=${isMuted ? 1 : 0}&rel=0&modestbranding=1`}
           title={`${title} - Trailer`}
@@ -119,7 +122,10 @@ const TrailerPlayer = ({
 
   if (vimeoId) {
     return (
-      <div className={`relative aspect-video bg-secondary rounded-xl overflow-hidden ${className}`}>
+      <div className={controls 
+        ? `relative aspect-video bg-secondary rounded-xl overflow-hidden ${className}` 
+        : className || "relative w-full h-full"
+      }>
         <iframe
           src={`https://player.vimeo.com/video/${vimeoId}?autoplay=${isPlaying ? 1 : 0}&muted=${isMuted ? 1 : 0}&title=0&byline=0&portrait=0`}
           title={`${title} - Trailer`}
@@ -133,7 +139,10 @@ const TrailerPlayer = ({
 
   // For direct video files (including Backblaze)
   return (
-    <div className={`relative aspect-video bg-secondary rounded-xl overflow-hidden ${className}`}>
+    <div className={controls 
+      ? `relative aspect-video bg-secondary rounded-xl overflow-hidden ${className}` 
+      : className || "relative w-full h-full"
+    }>
       {isLoadingUrl ? (
         <div className="absolute inset-0 flex items-center justify-center bg-secondary/80">
           <p className="text-muted-foreground">Loading trailer...</p>
@@ -142,8 +151,12 @@ const TrailerPlayer = ({
         <video
           src={signedUrl}
           poster="/placeholder.svg"
-          className="w-full h-full object-cover"
-          controls
+          className={controls ? "w-full h-full object-cover" : "w-full h-full object-cover absolute inset-0"}
+          controls={controls}
+          autoPlay={autoPlay}
+          muted={muted}
+          loop={!controls}
+          playsInline
           preload="metadata"
           controlsList="nodownload"
           onContextMenu={(e) => e.preventDefault()}

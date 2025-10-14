@@ -277,6 +277,7 @@ const TVShowPreview = () => {
         title={tvShow.title}
         description={tvShow.description || ''}
         imageUrl={tvShow.landscape_poster_url || tvShow.slider_cover_url || tvShow.thumbnail_url || ''}
+        trailerUrl={tvShow.trailer_url}
         rating={tvShow.rating || undefined}
         year={tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : undefined}
         genre={tvShow.genre?.name}
