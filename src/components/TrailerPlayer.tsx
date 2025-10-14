@@ -10,6 +10,7 @@ interface TrailerPlayerProps {
   autoPlay?: boolean;
   muted?: boolean;
   controls?: boolean;
+  poster?: string;
 }
 
 const TrailerPlayer = ({ 
@@ -18,7 +19,8 @@ const TrailerPlayer = ({
   className = "",
   autoPlay = false,
   muted = true,
-  controls = true
+  controls = true,
+  poster = "/placeholder.svg"
 }: TrailerPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [isMuted, setIsMuted] = useState(muted);
@@ -150,7 +152,7 @@ const TrailerPlayer = ({
       ) : signedUrl ? (
         <video
           src={signedUrl}
-          poster="/placeholder.svg"
+          poster={poster}
           className={controls ? "w-full h-full object-cover" : "w-full h-full object-cover absolute inset-0"}
           controls={controls}
           autoPlay={autoPlay}

@@ -58,6 +58,7 @@ const ContentHero = ({
               autoPlay={true}
               muted={false}
               controls={false}
+              poster={imageUrl}
               className="absolute inset-0 w-full h-full"
             />
             {isHovered && (
