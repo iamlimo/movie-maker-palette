@@ -40,9 +40,14 @@ const ContentHero = ({
   isFavorite
 }: ContentHeroProps) => {
   const [showTrailer, setShowTrailer] = useState(!!trailerUrl);
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <section className="relative min-h-[80vh] flex items-center overflow-hidden">
+    <section 
+      className="relative min-h-[80vh] flex items-center overflow-hidden"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       {/* Background - Auto-play Trailer or Static Poster */}
       <div className="absolute inset-0">
         {trailerUrl && showTrailer ? (
@@ -51,12 +56,16 @@ const ContentHero = ({
               trailerUrl={trailerUrl}
               title={title}
               autoPlay={true}
-              muted={true}
+              muted={false}
               controls={false}
               className="absolute inset-0 w-full h-full"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+            {isHovered && (
+              <>
+                <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent transition-opacity duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent transition-opacity duration-300" />
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -73,7 +82,11 @@ const ContentHero = ({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 pt-16">
+      <div 
+        className={`relative z-10 container mx-auto px-4 pt-16 transition-opacity duration-300 ${
+          trailerUrl && showTrailer ? (isHovered ? 'opacity-100' : 'opacity-0') : 'opacity-100'
+        }`}
+      >
         <div className="max-w-3xl">
           {/* Back Button */}
           <Button 
