@@ -15,12 +15,15 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, X } from 'lucide-react';
 import { useSections } from '@/hooks/useSections';
 import BackblazeUrlInput from '@/components/admin/BackblazeUrlInput';
 import TrailerPlayer from '@/components/TrailerPlayer';
 import NairaInput from '@/components/admin/NairaInput';
 import { DEFAULT_PRICES_NAIRA } from '@/lib/priceUtils';
+import { UnifiedContentUploader } from '@/components/admin/UnifiedContentUploader';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 interface TVShowData {
   title: string;
@@ -31,6 +34,10 @@ interface TVShowData {
   status: 'pending' | 'approved' | 'rejected';
   release_date: string;
   trailer_url: string;
+  thumbnail_url: string;
+  landscape_poster_url: string;
+  slider_cover_url: string;
+  genres: string[];
 }
 
 export default function EditTVShow() {
@@ -51,6 +58,10 @@ export default function EditTVShow() {
     status: 'pending',
     release_date: '',
     trailer_url: '',
+    thumbnail_url: '',
+    landscape_poster_url: '',
+    slider_cover_url: '',
+    genres: [],
   });
 
   useEffect(() => {
@@ -79,6 +90,10 @@ export default function EditTVShow() {
         status: data.status || 'pending',
         release_date: data.release_date || '',
         trailer_url: data.trailer_url || '',
+        thumbnail_url: data.thumbnail_url || '',
+        landscape_poster_url: data.landscape_poster_url || '',
+        slider_cover_url: data.slider_cover_url || '',
+        genres: data.genres || [],
       });
     } catch (error) {
       console.error('Error fetching TV show:', error);
@@ -126,6 +141,10 @@ export default function EditTVShow() {
           status: formData.status,
           release_date: formData.release_date || null,
           trailer_url: formData.trailer_url || null,
+          thumbnail_url: formData.thumbnail_url || null,
+          landscape_poster_url: formData.landscape_poster_url || null,
+          slider_cover_url: formData.slider_cover_url || null,
+          genres: formData.genres,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
@@ -150,7 +169,7 @@ export default function EditTVShow() {
     }
   };
 
-  const handleInputChange = (field: keyof TVShowData, value: string | number) => {
+  const handleInputChange = (field: keyof TVShowData, value: string | number | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -374,6 +393,143 @@ export default function EditTVShow() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Media & Posters */}
+      <Card className="max-w-2xl mt-6">
+        <CardHeader>
+          <CardTitle>Media & Posters</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Upload or update images for this TV show
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Portrait Thumbnail */}
+          <div className="space-y-2">
+            <Label>Portrait Poster (Thumbnail)</Label>
+            <p className="text-xs text-muted-foreground">
+              Recommended: 300x450px, vertical orientation
+            </p>
+            <UnifiedContentUploader
+              mediaType="thumbnail"
+              label="Portrait Poster"
+              description="Upload vertical poster image"
+              currentUrl={formData.thumbnail_url}
+              onUploadComplete={(url) => handleInputChange('thumbnail_url', url)}
+            />
+            {formData.thumbnail_url && (
+              <div className="mt-2">
+                <Label className="text-xs text-muted-foreground">Current Image:</Label>
+                <img 
+                  src={formData.thumbnail_url} 
+                  alt="Thumbnail preview" 
+                  className="mt-1 rounded-lg max-h-40 object-cover"
+                />
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Landscape Poster */}
+          <div className="space-y-2">
+            <Label>Landscape Poster</Label>
+            <p className="text-xs text-muted-foreground">
+              Recommended: 1920x1080px, horizontal orientation
+            </p>
+            <UnifiedContentUploader
+              mediaType="landscape_poster"
+              label="Landscape Poster"
+              description="Upload horizontal poster image"
+              currentUrl={formData.landscape_poster_url}
+              onUploadComplete={(url) => handleInputChange('landscape_poster_url', url)}
+            />
+            {formData.landscape_poster_url && (
+              <div className="mt-2">
+                <Label className="text-xs text-muted-foreground">Current Image:</Label>
+                <img 
+                  src={formData.landscape_poster_url} 
+                  alt="Landscape poster preview" 
+                  className="mt-1 rounded-lg max-h-40 object-cover"
+                />
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Hero Banner/Slider Cover */}
+          <div className="space-y-2">
+            <Label>Hero Banner (Slider Cover)</Label>
+            <p className="text-xs text-muted-foreground">
+              Recommended: 2560x1440px, ultra-wide format
+            </p>
+            <UnifiedContentUploader
+              mediaType="slider_cover"
+              label="Hero Banner"
+              description="Upload hero slider image"
+              currentUrl={formData.slider_cover_url}
+              onUploadComplete={(url) => handleInputChange('slider_cover_url', url)}
+            />
+            {formData.slider_cover_url && (
+              <div className="mt-2">
+                <Label className="text-xs text-muted-foreground">Current Image:</Label>
+                <img 
+                  src={formData.slider_cover_url} 
+                  alt="Slider cover preview" 
+                  className="mt-1 rounded-lg max-h-40 object-cover"
+                />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tags & Categories */}
+      <Card className="max-w-2xl mt-6">
+        <CardHeader>
+          <CardTitle>Tags & Categories</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Add tags to help users discover this TV show
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="genres">Genres/Tags</Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Enter comma-separated tags (e.g., Drama, Action, Thriller)
+            </p>
+            <Input
+              id="genres"
+              value={formData.genres.join(', ')}
+              onChange={(e) => {
+                const tags = e.target.value
+                  .split(',')
+                  .map(tag => tag.trim())
+                  .filter(tag => tag.length > 0);
+                handleInputChange('genres', tags);
+              }}
+              placeholder="Drama, Action, Thriller"
+            />
+            {/* Display current tags as badges */}
+            {formData.genres.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {formData.genres.map((genre, index) => (
+                  <Badge key={index} variant="secondary">
+                    {genre}
+                    <X 
+                      className="h-3 w-3 ml-1 cursor-pointer" 
+                      onClick={() => {
+                        const newGenres = formData.genres.filter((_, i) => i !== index);
+                        handleInputChange('genres', newGenres);
+                      }}
+                    />
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
