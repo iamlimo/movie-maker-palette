@@ -94,6 +94,9 @@ verify_jwt = true
 [functions.admin-user-management]
 verify_jwt = true
 
+[functions.content-upload]
+verify_jwt = true
+
 [edge-runtime]
 enabled = true
 ip_version = "ipv4"
