@@ -41,12 +41,19 @@ const ContentHero = ({
 }: ContentHeroProps) => {
   const [showTrailer, setShowTrailer] = useState(!!trailerUrl);
   const [isHovered, setIsHovered] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   return (
     <section 
       className="relative min-h-[80vh] flex items-center overflow-hidden"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        setIsMuted(false);
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsMuted(true);
+      }}
     >
       {/* Background - Auto-play Trailer or Static Poster */}
       <div className="absolute inset-0">
@@ -56,7 +63,7 @@ const ContentHero = ({
               trailerUrl={trailerUrl}
               title={title}
               autoPlay={true}
-              muted={false}
+              muted={isMuted}
               controls={false}
               poster={imageUrl}
               className="absolute inset-0 w-full h-full"
