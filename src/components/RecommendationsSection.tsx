@@ -64,7 +64,7 @@ const RecommendationsSection = ({
           rating,
           price,
           thumbnail_url,
-          genre:genres(name)
+          genres
         `)
         .eq('status', 'approved')
         .neq('id', contentType === 'tv_show' ? currentContentId : '00000000-0000-0000-0000-000000000000');
@@ -91,6 +91,7 @@ const RecommendationsSection = ({
 
       const tvShows = (tvShowsResult.data || []).map(item => ({
         ...item,
+        genre: item.genres?.[0] ? { name: item.genres[0] } : undefined,
         content_type: 'tv_show' as const
       }));
 
@@ -100,26 +101,51 @@ const RecommendationsSection = ({
       
       // If we don't have enough recommendations with genre filter, fetch more without genre filter
       if (shuffled.length < 6 && genreId) {
-        const additionalMovies = await supabase
-          .from('movies')
-          .select(`
-            id,
-            title,
-            release_date,
-            rating,
-            duration,
-            price,
-            thumbnail_url,
-            genre:genres(name)
-          `)
-          .eq('status', 'approved')
-          .neq('id', contentType === 'movie' ? currentContentId : '00000000-0000-0000-0000-000000000000')
-          .limit(6 - shuffled.length);
+        const [additionalMovies, additionalTVShows] = await Promise.all([
+          supabase
+            .from('movies')
+            .select(`
+              id,
+              title,
+              release_date,
+              rating,
+              duration,
+              price,
+              thumbnail_url,
+              genre:genres(name)
+            `)
+            .eq('status', 'approved')
+            .neq('id', contentType === 'movie' ? currentContentId : '00000000-0000-0000-0000-000000000000')
+            .limit(3),
+          supabase
+            .from('tv_shows')
+            .select(`
+              id,
+              title,
+              release_date,
+              rating,
+              price,
+              thumbnail_url,
+              genres
+            `)
+            .eq('status', 'approved')
+            .neq('id', contentType === 'tv_show' ? currentContentId : '00000000-0000-0000-0000-000000000000')
+            .limit(3)
+        ]);
 
         if (additionalMovies.data) {
           const additionalItems = additionalMovies.data.map(item => ({
             ...item,
             content_type: 'movie' as const
+          }));
+          shuffled.push(...additionalItems);
+        }
+        
+        if (additionalTVShows.data) {
+          const additionalItems = additionalTVShows.data.map(item => ({
+            ...item,
+            genre: item.genres?.[0] ? { name: item.genres[0] } : undefined,
+            content_type: 'tv_show' as const
           }));
           shuffled.push(...additionalItems);
         }
