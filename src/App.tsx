@@ -12,7 +12,7 @@ import AdminMovies from "@/pages/admin/Movies";
 import AddMovieNew from "@/pages/admin/AddMovieNew";
 import ViewMovie from "@/pages/admin/ViewMovie";
 import EditMovie from "@/pages/admin/EditMovie";
-import TVShows from "@/pages/admin/TVShows";
+import AdminTVShows from "@/pages/admin/TVShows";
 import AddTVShow from "@/pages/admin/AddTVShow";
 import AddSeason from "@/pages/admin/AddSeason";
 import AddEpisode from "@/pages/admin/AddEpisode";
@@ -36,6 +36,7 @@ import Profile from "./pages/Profile";
 import MoviePreview from "./pages/MoviePreview";
 import TVShowPreview from "./pages/TVShowPreview";
 import Movies from "./pages/Movies";
+import TVShows from "./pages/TVShows";
 import Genres from "./pages/Genres";
 import Watchlist from "./pages/Watchlist";
 import Wallet from "./pages/Wallet";
@@ -61,6 +62,7 @@ const App: React.FC = () => (
             <Route path="/movie/:id" element={<MoviePreview />} />
             <Route path="/tvshow/:id" element={<TVShowPreview />} />
             <Route path="/movies" element={<Movies />} />
+            <Route path="/tvshows" element={<TVShows />} />
             <Route path="/genres" element={<Genres />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/wallet" element={<Wallet />} />
@@ -80,7 +82,7 @@ const App: React.FC = () => (
               <Route path="movies/add" element={<AddMovieNew />} />
               <Route path="movies/view/:id" element={<ViewMovie />} />
               <Route path="movies/edit/:id" element={<EditMovie />} />
-              <Route path="tv-shows" element={<TVShows />} />
+              <Route path="tv-shows" element={<AdminTVShows />} />
               <Route path="tv-shows/add" element={<AddTVShow />} />
                 <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
                 <Route path="tv-shows/:showId/seasons/:seasonId/add-episode" element={<AddEpisode />} />

@@ -67,18 +67,24 @@ const Header = () => {
           >
             Home
           </Link>
-          <Link
-            to="/movies"
-            className="text-muted-foreground hover:text-primary transition-smooth"
-          >
-            Movies
-          </Link>
-          <Link
-            to="/genres"
-            className="text-muted-foreground hover:text-primary transition-smooth"
-          >
-            Genres
-          </Link>
+              <Link
+                to="/movies"
+                className="text-muted-foreground hover:text-primary transition-smooth"
+              >
+                Movies
+              </Link>
+              <Link
+                to="/tvshows"
+                className="text-muted-foreground hover:text-primary transition-smooth"
+              >
+                TV Shows
+              </Link>
+              <Link
+                to="/genres"
+                className="text-muted-foreground hover:text-primary transition-smooth"
+              >
+                Genres
+              </Link>
           <Link
             to="/watchlist"
             className="text-muted-foreground hover:text-primary transition-smooth"
@@ -238,6 +244,13 @@ const Header = () => {
               className="block text-muted-foreground hover:text-primary transition-smooth"
             >
               Movies
+            </Link>
+            <Link
+              to="/tvshows"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block text-muted-foreground hover:text-primary transition-smooth"
+            >
+              TV Shows
             </Link>
             <Link
               to="/genres"
