@@ -3,18 +3,15 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Play, Heart, Star, Clock, Calendar, Globe } from "lucide-react";
+import { Star, Clock, Calendar, Globe, Heart, ArrowLeft } from "lucide-react";
 import Header from "@/components/Header";
-import TrailerPlayer from "@/components/TrailerPlayer";
 import ContentHero from "@/components/ContentHero";
+import AutoPlayMediaPlayer from "@/components/AutoPlayMediaPlayer";
 import RecommendationsSection from "@/components/RecommendationsSection";
 import RentalButton from "@/components/RentalButton";
-import VideoPlayerWithValidation from "@/components/VideoPlayerWithValidation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
-import { formatNaira } from "@/lib/priceUtils";
 
 interface Movie {
   id: string;
@@ -155,7 +152,6 @@ const MoviePreview = () => {
         title={movie.title}
         description={movie.description || ''}
         imageUrl={movie.thumbnail_url || ''}
-        trailerUrl={movie.trailer_url || undefined}
         rating={movie.rating || undefined}
         duration={movie.duration || undefined}
         year={movie.release_date ? new Date(movie.release_date).getFullYear() : undefined}
@@ -163,6 +159,15 @@ const MoviePreview = () => {
         price={movie.price / 100} // Convert kobo to Naira for display
         language={movie.language || undefined}
         onBack={() => navigate('/')}
+      />
+
+      {/* Auto-play Media Player */}
+      <AutoPlayMediaPlayer
+        trailerUrl={movie.trailer_url || undefined}
+        posterUrl={movie.thumbnail_url || ''}
+        title={movie.title}
+        contentId={movie.id}
+        contentType="movie"
       />
 
       {/* Main Content */}

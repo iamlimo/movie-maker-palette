@@ -1,14 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Play, Star, Clock, Calendar, Heart, Share2 } from "lucide-react";
-import TrailerPlayer from "@/components/TrailerPlayer";
-import { useState } from "react";
 
 interface ContentHeroProps {
   title: string;
   description: string;
   imageUrl: string;
-  trailerUrl?: string;
   rating?: string;
   duration?: number;
   year?: number;
@@ -26,7 +23,6 @@ const ContentHero = ({
   title,
   description,
   imageUrl,
-  trailerUrl,
   rating,
   duration,
   year,
@@ -39,62 +35,22 @@ const ContentHero = ({
   onToggleFavorite,
   isFavorite
 }: ContentHeroProps) => {
-  const [showTrailer, setShowTrailer] = useState(!!trailerUrl);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-
   return (
-    <section 
-      className="relative min-h-[80vh] flex items-center overflow-hidden"
-      onMouseEnter={() => {
-        setIsHovered(true);
-        setIsMuted(false);
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setIsMuted(true);
-      }}
-    >
-      {/* Background - Auto-play Trailer or Static Poster */}
+    <section className="relative min-h-[70vh] flex items-center overflow-hidden">
+      {/* Background Image */}
       <div className="absolute inset-0">
-        {trailerUrl && showTrailer ? (
-          <div className="absolute inset-0">
-            <TrailerPlayer 
-              trailerUrl={trailerUrl}
-              title={title}
-              autoPlay={true}
-              muted={isMuted}
-              controls={false}
-              poster={imageUrl}
-              className="absolute inset-0 w-full h-full"
-            />
-            {isHovered && (
-              <>
-                <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent transition-opacity duration-300" />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent transition-opacity duration-300" />
-              </>
-            )}
-          </div>
-        ) : (
-          <>
-            <img 
-              src={imageUrl || '/placeholder.svg'} 
-              alt={title}
-              className="w-full h-full object-cover"
-              loading="eager"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-          </>
-        )}
+        <img 
+          src={imageUrl || '/placeholder.svg'} 
+          alt={title}
+          className="w-full h-full object-cover"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
       </div>
 
       {/* Content */}
-      <div 
-        className={`relative z-10 container mx-auto px-4 pt-16 transition-opacity duration-300 ${
-          trailerUrl && showTrailer ? (isHovered ? 'opacity-100' : 'opacity-0') : 'opacity-100'
-        }`}
-      >
+      <div className="relative z-10 container mx-auto px-4 pt-16">
         <div className="max-w-3xl">
           {/* Back Button */}
           <Button 

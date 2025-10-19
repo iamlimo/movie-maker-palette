@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Heart, Star, Clock, Calendar, Globe, Play, Lock } from "lucide-react";
 import Header from "@/components/Header";
 import ContentHero from "@/components/ContentHero";
+import AutoPlayMediaPlayer from "@/components/AutoPlayMediaPlayer";
 import RecommendationsSection from "@/components/RecommendationsSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -277,7 +278,6 @@ const TVShowPreview = () => {
         title={tvShow.title}
         description={tvShow.description || ''}
         imageUrl={tvShow.landscape_poster_url || tvShow.slider_cover_url || tvShow.thumbnail_url || ''}
-        trailerUrl={tvShow.trailer_url}
         rating={tvShow.rating || undefined}
         year={tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : undefined}
         genre={tvShow.genre?.name}
@@ -286,6 +286,15 @@ const TVShowPreview = () => {
         onBack={() => navigate('/')}
         onToggleFavorite={handleToggleFavorite}
         isFavorite={isFavorite}
+        contentType="tv_show"
+      />
+
+      {/* Auto-play Media Player */}
+      <AutoPlayMediaPlayer
+        trailerUrl={tvShow.trailer_url || undefined}
+        posterUrl={tvShow.landscape_poster_url || tvShow.slider_cover_url || tvShow.thumbnail_url || ''}
+        title={tvShow.title}
+        contentId={tvShow.id}
         contentType="tv_show"
       />
 
