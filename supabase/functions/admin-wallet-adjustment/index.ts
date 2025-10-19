@@ -98,7 +98,12 @@ serve(async (req) => {
       }
     });
 
-    if (txError) throw txError;
+    if (txError) {
+      console.error('Transaction error:', txError);
+      throw txError;
+    }
+
+    console.log('Wallet transaction completed:', transactionId);
 
     // Log finance action
     await supabase.rpc('log_finance_action', {

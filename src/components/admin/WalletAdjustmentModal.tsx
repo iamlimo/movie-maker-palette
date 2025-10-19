@@ -74,9 +74,10 @@ export default function WalletAdjustmentModal({
       if (error) throw error;
 
       if (data.success) {
+        console.log('Wallet updated successfully. New balance:', data.new_balance);
         toast({
           title: 'Adjustment Successful',
-          description: `Wallet ${type === 'credit' ? 'credited' : 'debited'} with ₦${(amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+          description: `Wallet ${type === 'credit' ? 'credited' : 'debited'} with ₦${(amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}. New balance: ₦${(data.new_balance / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
         });
         onSuccess();
       }
