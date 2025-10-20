@@ -98,6 +98,17 @@ const EnhancedContentCard = ({
     : "0.0";
   const displayImage = imageError || !imageUrl ? moviePlaceholder : imageUrl;
 
+  const getFormattedPrice = () => {
+    if (price === 0) return "Free";
+    
+    if (contentType === "movie") {
+      return `${formatNaira(price)} • Rent`;
+    } else {
+      // TV Show pricing
+      return "From ₦350/ep";
+    }
+  };
+
   return (
     <div
       className={`group relative overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
@@ -167,16 +178,16 @@ const EnhancedContentCard = ({
         <div className="absolute top-2 right-2">
           <Badge
             variant={price > 0 ? "default" : "secondary"}
-            className="text-xs font-semibold backdrop-blur-sm bg-background/90 border-0 shadow-sm"
+            className="text-xs font-semibold backdrop-blur-md bg-background/95 border-0 shadow-md"
           >
-            {price > 0 ? formatNaira(price) : "Free"}
+            <span className="text-gray-400">{getFormattedPrice()}</span>
           </Badge>
         </div>
       </div>
 
       {/* Info */}
       <div className="p-3 space-y-2">
-        <h3 className="font-semibold text-sm leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
+        <h3 className="font-semibold text-sm leading-tight text-white group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
           {title}
         </h3>
 

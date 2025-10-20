@@ -39,7 +39,15 @@ const MovieCard = ({
 
   const getFormattedPrice = () => {
     const numPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, "")) : price;
-    return numPrice > 0 ? formatNaira(numPrice) : "Free";
+    
+    if (numPrice === 0) return "Free";
+    
+    if (contentType === "movie") {
+      return `${formatNaira(numPrice)} • Rent`;
+    } else {
+      // TV Show pricing
+      return "From ₦350/ep";
+    }
   };
 
   return (
@@ -88,16 +96,16 @@ const MovieCard = ({
         <div className="absolute top-2 right-2">
           <Badge
             variant={getFormattedPrice() === "Free" ? "secondary" : "default"}
-            className="text-xs font-semibold backdrop-blur-sm bg-background/90 border-0 shadow-sm"
+            className="text-xs font-semibold backdrop-blur-md bg-background/95 border-0 shadow-md"
           >
-            {getFormattedPrice()}
+            <span className="text-gray-400">{getFormattedPrice()}</span>
           </Badge>
         </div>
       </div>
 
       {/* Info */}
       <div className="p-3 space-y-2">
-        <h3 className="font-semibold text-sm leading-tight text-foreground group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
+        <h3 className="font-semibold text-sm leading-tight text-white group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
           {title}
         </h3>
 
