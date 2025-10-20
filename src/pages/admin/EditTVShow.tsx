@@ -25,6 +25,11 @@ import { UnifiedContentUploader } from '@/components/admin/UnifiedContentUploade
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
+interface Genre {
+  id: string;
+  name: string;
+}
+
 interface TVShowData {
   title: string;
   description: string;
@@ -38,6 +43,7 @@ interface TVShowData {
   landscape_poster_url: string;
   slider_cover_url: string;
   genres: string[];
+  genre_id: string | null;
 }
 
 export default function EditTVShow() {
@@ -49,6 +55,7 @@ export default function EditTVShow() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [assignedSections, setAssignedSections] = useState<string[]>([]);
+  const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
   const [formData, setFormData] = useState<TVShowData>({
     title: '',
     description: '',
@@ -62,14 +69,30 @@ export default function EditTVShow() {
     landscape_poster_url: '',
     slider_cover_url: '',
     genres: [],
+    genre_id: null,
   });
 
   useEffect(() => {
+    fetchGenres();
     if (id) {
       fetchTVShow();
       fetchAssignedSections();
     }
   }, [id]);
+
+  const fetchGenres = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('genres')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setAvailableGenres(data || []);
+    } catch (error) {
+      console.error('Error fetching genres:', error);
+    }
+  };
 
   const fetchTVShow = async () => {
     try {
@@ -94,6 +117,7 @@ export default function EditTVShow() {
         landscape_poster_url: data.landscape_poster_url || '',
         slider_cover_url: data.slider_cover_url || '',
         genres: data.genres || [],
+        genre_id: data.genre_id || null,
       });
     } catch (error) {
       console.error('Error fetching TV show:', error);
@@ -145,6 +169,7 @@ export default function EditTVShow() {
           landscape_poster_url: formData.landscape_poster_url || null,
           slider_cover_url: formData.slider_cover_url || null,
           genres: formData.genres,
+          genre_id: formData.genre_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
@@ -169,7 +194,7 @@ export default function EditTVShow() {
     }
   };
 
-  const handleInputChange = (field: keyof TVShowData, value: string | number | string[]) => {
+  const handleInputChange = (field: keyof TVShowData, value: string | number | string[] | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -311,6 +336,29 @@ export default function EditTVShow() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="genre">Primary Category/Genre</Label>
+              <Select
+                value={formData.genre_id || ''}
+                onValueChange={(value) => handleInputChange('genre_id', value || null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select primary genre" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {availableGenres.map((genre) => (
+                    <SelectItem key={genre.id} value={genre.id}>
+                      {genre.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This will be the main category displayed on the TV show card
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
