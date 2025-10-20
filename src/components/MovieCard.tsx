@@ -53,7 +53,7 @@ const MovieCard = ({
   return (
     <div
       onClick={handlePreview}
-      className={`group relative overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
+      className={`group relative flex flex-col overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
         featured ? "ring-1 ring-primary/20" : ""
       }`}
     >
@@ -104,7 +104,7 @@ const MovieCard = ({
       </div>
 
       {/* Info */}
-      <div className="p-3 space-y-2">
+      <div className="p-3 space-y-2 flex-1 flex flex-col">
         <h3 className="font-semibold text-sm leading-tight text-white group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
           {title}
         </h3>
