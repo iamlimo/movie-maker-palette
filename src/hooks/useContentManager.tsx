@@ -23,6 +23,10 @@ export interface ContentItem {
   language?: string;
   duration?: number;
   release_date?: string;
+  age_restriction?: number;
+  content_warnings?: string[];
+  viewer_discretion?: string;
+  cast_info?: string;
   status: 'pending' | 'approved' | 'rejected';
   content_type: ContentType;
   optimization_metadata?: any;
@@ -38,6 +42,10 @@ export interface ContentFormData {
   duration?: string;
   language: string;
   rating: string;
+  age_restriction?: string;
+  content_warnings?: string[];
+  viewer_discretion?: string;
+  cast_info?: string;
   price: string;
   rental_expiry_duration: string;
   thumbnail_url?: string;
@@ -106,6 +114,10 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
         duration: formData.duration ? parseInt(formData.duration) : null,
         language: formData.language || null,
         rating: formData.rating || null,
+        age_restriction: formData.age_restriction ? parseInt(formData.age_restriction) : null,
+        content_warnings: formData.content_warnings || null,
+        viewer_discretion: formData.viewer_discretion || null,
+        cast_info: formData.cast_info || null,
         price: parseFloat(formData.price),
         thumbnail_url: formData.thumbnail_url || null,
         landscape_poster_url: formData.landscape_poster_url || null,
@@ -170,6 +182,7 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
         ...updates,
         price: updates.price ? parseFloat(updates.price) : undefined,
         duration: updates.duration ? parseInt(updates.duration) : undefined,
+        age_restriction: updates.age_restriction ? parseInt(updates.age_restriction) : undefined,
         rental_expiry_duration: updates.rental_expiry_duration ? parseInt(updates.rental_expiry_duration) : undefined,
         updated_at: new Date().toISOString()
       };

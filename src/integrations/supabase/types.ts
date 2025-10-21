@@ -311,6 +311,9 @@ export type Database = {
       }
       movies: {
         Row: {
+          age_restriction: number | null
+          cast_info: string | null
+          content_warnings: string[] | null
           created_at: string
           description: string | null
           duration: number | null
@@ -331,8 +334,12 @@ export type Database = {
           updated_at: string
           uploaded_by: string | null
           video_url: string | null
+          viewer_discretion: string | null
         }
         Insert: {
+          age_restriction?: number | null
+          cast_info?: string | null
+          content_warnings?: string[] | null
           created_at?: string
           description?: string | null
           duration?: number | null
@@ -353,8 +360,12 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string | null
           video_url?: string | null
+          viewer_discretion?: string | null
         }
         Update: {
+          age_restriction?: number | null
+          cast_info?: string | null
+          content_warnings?: string[] | null
           created_at?: string
           description?: string | null
           duration?: number | null
@@ -375,6 +386,7 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string | null
           video_url?: string | null
+          viewer_discretion?: string | null
         }
         Relationships: [
           {
@@ -945,6 +957,9 @@ export type Database = {
       }
       tv_shows: {
         Row: {
+          age_restriction: number | null
+          cast_info: string | null
+          content_warnings: string[] | null
           created_at: string
           description: string | null
           genre_id: string | null
@@ -963,8 +978,12 @@ export type Database = {
           trailer_url: string | null
           updated_at: string
           uploaded_by: string | null
+          viewer_discretion: string | null
         }
         Insert: {
+          age_restriction?: number | null
+          cast_info?: string | null
+          content_warnings?: string[] | null
           created_at?: string
           description?: string | null
           genre_id?: string | null
@@ -983,8 +1002,12 @@ export type Database = {
           trailer_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          viewer_discretion?: string | null
         }
         Update: {
+          age_restriction?: number | null
+          cast_info?: string | null
+          content_warnings?: string[] | null
           created_at?: string
           description?: string | null
           genre_id?: string | null
@@ -1003,6 +1026,7 @@ export type Database = {
           trailer_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          viewer_discretion?: string | null
         }
         Relationships: [
           {
@@ -1177,7 +1201,15 @@ export type Database = {
           user_id?: string | null
           wallet_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "wallets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       watch_history: {
         Row: {

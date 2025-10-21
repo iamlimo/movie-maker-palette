@@ -34,6 +34,10 @@ interface FormData {
   duration: string;
   language: string;
   rating: string;
+  age_restriction: string;
+  content_warnings: string[];
+  viewer_discretion: string;
+  cast_info: string;
   price: number;
   rental_expiry_duration: string;
   status: string;
@@ -55,6 +59,10 @@ const EditMovie = () => {
     duration: "",
     language: "",
     rating: "",
+    age_restriction: "",
+    content_warnings: [],
+    viewer_discretion: "",
+    cast_info: "",
     price: 0, // Stored in kobo, displayed in Naira by NairaInput
     rental_expiry_duration: "48",
     status: "pending",
@@ -93,6 +101,10 @@ const EditMovie = () => {
         duration: data.duration?.toString() || "",
         language: data.language || "",
         rating: data.rating || "",
+        age_restriction: data.age_restriction?.toString() || "",
+        content_warnings: data.content_warnings || [],
+        viewer_discretion: data.viewer_discretion || "",
+        cast_info: data.cast_info || "",
         price: data.price || 0, // Already in kobo from database
         rental_expiry_duration: data.rental_expiry_duration?.toString() || "48",
         status: data.status || "pending",
@@ -155,6 +167,15 @@ const EditMovie = () => {
     }));
   };
 
+  const handleWarningToggle = (warning: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      content_warnings: checked
+        ? [...prev.content_warnings, warning]
+        : prev.content_warnings.filter(w => w !== warning)
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -178,6 +199,10 @@ const EditMovie = () => {
         duration: formData.duration ? parseInt(formData.duration) : null,
         language: formData.language || null,
         rating: formData.rating || null,
+        age_restriction: formData.age_restriction ? parseInt(formData.age_restriction) : null,
+        content_warnings: formData.content_warnings.length > 0 ? formData.content_warnings : null,
+        viewer_discretion: formData.viewer_discretion || null,
+        cast_info: formData.cast_info || null,
         price: formData.price,
         rental_expiry_duration: parseInt(formData.rental_expiry_duration),
         status: formData.status as 'pending' | 'approved' | 'rejected',
@@ -337,26 +362,7 @@ const EditMovie = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="rating">Rating</Label>
-                <Select 
-                  value={formData.rating}
-                  onValueChange={(value) => handleInputChange('rating', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select rating" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="G">G</SelectItem>
-                    <SelectItem value="PG">PG</SelectItem>
-                    <SelectItem value="PG-13">PG-13</SelectItem>
-                    <SelectItem value="R">R</SelectItem>
-                    <SelectItem value="NC-17">NC-17</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <NairaInput
                   value={formData.price}
@@ -402,6 +408,102 @@ const EditMovie = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Safety & Cast Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Content Safety & Cast Information</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Optional fields to help viewers make informed decisions
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Rating & Age Restriction */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="rating">Rating (Optional)</Label>
+                <Select 
+                  value={formData.rating}
+                  onValueChange={(value) => handleInputChange('rating', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select rating" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="G">G - General Audiences</SelectItem>
+                    <SelectItem value="PG">PG - Parental Guidance</SelectItem>
+                    <SelectItem value="16+">16+ - Ages 16 and Over</SelectItem>
+                    <SelectItem value="18+">18+ - Adults Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="age_restriction">Age Restriction (Optional)</Label>
+                <Select 
+                  value={formData.age_restriction}
+                  onValueChange={(value) => handleInputChange('age_restriction', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select age restriction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 - All Ages</SelectItem>
+                    <SelectItem value="13">13+</SelectItem>
+                    <SelectItem value="16">16+</SelectItem>
+                    <SelectItem value="18">18+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Content Warnings */}
+            <div>
+              <Label>Content Warnings (Optional)</Label>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
+                {['violence', 'sex', 'drugs', 'horror', 'language'].map(warning => (
+                  <div key={warning} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`warning-${warning}`}
+                      checked={formData.content_warnings?.includes(warning)}
+                      onCheckedChange={(checked) => handleWarningToggle(warning, checked as boolean)}
+                    />
+                    <Label htmlFor={`warning-${warning}`} className="capitalize cursor-pointer text-sm">
+                      {warning}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Viewer Discretion */}
+            <div>
+              <Label htmlFor="viewer_discretion">Viewer Discretion Message (Optional)</Label>
+              <Textarea
+                id="viewer_discretion"
+                value={formData.viewer_discretion}
+                onChange={(e) => handleInputChange('viewer_discretion', e.target.value)}
+                placeholder="Enter custom viewer discretion message (e.g., 'Contains graphic violence and strong language')"
+                rows={3}
+              />
+            </div>
+            
+            {/* Cast Info */}
+            <div>
+              <Label htmlFor="cast_info">Cast Information (Optional)</Label>
+              <Textarea
+                id="cast_info"
+                value={formData.cast_info}
+                onChange={(e) => handleInputChange('cast_info', e.target.value)}
+                placeholder="Enter cast information (e.g., 'Starring: John Doe, Jane Smith, ...')"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Note: For detailed cast management, use the dedicated cast/crew manager
+              </p>
             </div>
           </CardContent>
         </Card>

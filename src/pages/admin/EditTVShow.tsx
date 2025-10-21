@@ -35,6 +35,10 @@ interface TVShowData {
   description: string;
   language: string;
   rating: string;
+  age_restriction: string;
+  content_warnings: string[];
+  viewer_discretion: string;
+  cast_info: string;
   price: number;
   status: 'pending' | 'approved' | 'rejected';
   release_date: string;
@@ -61,6 +65,10 @@ export default function EditTVShow() {
     description: '',
     language: '',
     rating: '',
+    age_restriction: '',
+    content_warnings: [],
+    viewer_discretion: '',
+    cast_info: '',
     price: 0,
     status: 'pending',
     release_date: '',
@@ -109,6 +117,10 @@ export default function EditTVShow() {
         description: data.description || '',
         language: data.language || '',
         rating: data.rating || '',
+        age_restriction: data.age_restriction?.toString() || '',
+        content_warnings: data.content_warnings || [],
+        viewer_discretion: data.viewer_discretion || '',
+        cast_info: data.cast_info || '',
         price: data.price || 0,
         status: data.status || 'pending',
         release_date: data.release_date || '',
@@ -161,6 +173,10 @@ export default function EditTVShow() {
           description: formData.description,
           language: formData.language,
           rating: formData.rating,
+          age_restriction: formData.age_restriction ? parseInt(formData.age_restriction) : null,
+          content_warnings: formData.content_warnings.length > 0 ? formData.content_warnings : null,
+          viewer_discretion: formData.viewer_discretion || null,
+          cast_info: formData.cast_info || null,
           price: formData.price,
           status: formData.status,
           release_date: formData.release_date || null,
@@ -249,6 +265,15 @@ export default function EditTVShow() {
     return assignedSections.includes(sectionId);
   };
 
+  const handleWarningToggle = (warning: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      content_warnings: checked
+        ? [...prev.content_warnings, warning]
+        : prev.content_warnings.filter(w => w !== warning)
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -299,43 +324,22 @@ export default function EditTVShow() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="language">Language</Label>
-                <Select
-                  value={formData.language}
-                  onValueChange={(value) => handleInputChange('language', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="English">English</SelectItem>
-                    <SelectItem value="Yoruba">Yoruba</SelectItem>
-                    <SelectItem value="Igbo">Igbo</SelectItem>
-                    <SelectItem value="Hausa">Hausa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="rating">Rating</Label>
-                <Select
-                  value={formData.rating}
-                  onValueChange={(value) => handleInputChange('rating', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select rating" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="G">G</SelectItem>
-                    <SelectItem value="PG">PG</SelectItem>
-                    <SelectItem value="PG-13">PG-13</SelectItem>
-                    <SelectItem value="R">R</SelectItem>
-                    <SelectItem value="NC-17">NC-17</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="language">Language</Label>
+              <Select
+                value={formData.language}
+                onValueChange={(value) => handleInputChange('language', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="English">English</SelectItem>
+                  <SelectItem value="Yoruba">Yoruba</SelectItem>
+                  <SelectItem value="Igbo">Igbo</SelectItem>
+                  <SelectItem value="Hausa">Hausa</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -397,6 +401,95 @@ export default function EditTVShow() {
                 </SelectContent>
               </Select>
             </div>
+
+            <Separator className="my-6" />
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Content Safety & Cast</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="rating">Rating (Optional)</Label>
+                  <Select
+                    value={formData.rating}
+                    onValueChange={(value) => handleInputChange('rating', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select rating" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="G">G - General Audiences</SelectItem>
+                      <SelectItem value="PG">PG - Parental Guidance</SelectItem>
+                      <SelectItem value="16+">16+ - Ages 16 and Over</SelectItem>
+                      <SelectItem value="18+">18+ - Adults Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="age_restriction">Age Restriction (Optional)</Label>
+                  <Select
+                    value={formData.age_restriction}
+                    onValueChange={(value) => handleInputChange('age_restriction', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select age restriction" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0 - All Ages</SelectItem>
+                      <SelectItem value="13">13+</SelectItem>
+                      <SelectItem value="16">16+</SelectItem>
+                      <SelectItem value="18">18+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Content Warnings (Optional)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {['violence', 'sex', 'drugs', 'horror', 'language'].map(warning => (
+                    <div key={warning} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`warning-${warning}`}
+                        checked={formData.content_warnings?.includes(warning)}
+                        onCheckedChange={(checked) => handleWarningToggle(warning, checked as boolean)}
+                      />
+                      <Label htmlFor={`warning-${warning}`} className="capitalize cursor-pointer text-sm">
+                        {warning}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="viewer_discretion">Viewer Discretion Message (Optional)</Label>
+                <Textarea
+                  id="viewer_discretion"
+                  value={formData.viewer_discretion}
+                  onChange={(e) => handleInputChange('viewer_discretion', e.target.value)}
+                  placeholder="Enter custom viewer discretion message"
+                  rows={3}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cast_info">Cast Information (Optional)</Label>
+                <Textarea
+                  id="cast_info"
+                  value={formData.cast_info}
+                  onChange={(e) => handleInputChange('cast_info', e.target.value)}
+                  placeholder="Enter cast information (e.g., 'Starring: John Doe, Jane Smith, ...')"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Note: For detailed cast management, use the dedicated cast/crew manager
+                </p>
+              </div>
+            </div>
+
+            <Separator className="my-6" />
 
             <BackblazeUrlInput
               value={formData.trailer_url}

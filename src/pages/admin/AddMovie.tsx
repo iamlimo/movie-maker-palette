@@ -36,6 +36,10 @@ const AddMovie = () => {
     duration: "",
     language: "",
     rating: "",
+    age_restriction: "",
+    content_warnings: [],
+    viewer_discretion: "",
+    cast_info: "",
     price: "100000", // Default ₦1,000 in kobo
     rental_expiry_duration: "48"
   });
@@ -84,6 +88,15 @@ const AddMovie = () => {
 
   const handleMediaUpload = (field: keyof ContentFormData) => (url: string, filePath: string) => {
     setFormData(prev => ({ ...prev, [field]: url }));
+  };
+
+  const handleWarningToggle = (warning: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      content_warnings: checked
+        ? [...(prev.content_warnings || []), warning]
+        : (prev.content_warnings || []).filter(w => w !== warning)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -235,22 +248,7 @@ const AddMovie = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="rating">Rating</Label>
-                <Select onValueChange={(value) => handleInputChange('rating', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select rating" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="G">G</SelectItem>
-                    <SelectItem value="PG">PG</SelectItem>
-                    <SelectItem value="PG-13">PG-13</SelectItem>
-                    <SelectItem value="R">R</SelectItem>
-                    <SelectItem value="NC-17">NC-17</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <NairaInput
                   value={parseFloat(formData.price) || 100000}
@@ -279,6 +277,102 @@ const AddMovie = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Safety & Cast Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Content Safety & Cast Information</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Optional fields to help viewers make informed decisions
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Rating & Age Restriction */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="rating">Rating (Optional)</Label>
+                <Select 
+                  value={formData.rating}
+                  onValueChange={(value) => handleInputChange('rating', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select rating" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="G">G - General Audiences</SelectItem>
+                    <SelectItem value="PG">PG - Parental Guidance</SelectItem>
+                    <SelectItem value="16+">16+ - Ages 16 and Over</SelectItem>
+                    <SelectItem value="18+">18+ - Adults Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="age_restriction">Age Restriction (Optional)</Label>
+                <Select 
+                  value={formData.age_restriction}
+                  onValueChange={(value) => handleInputChange('age_restriction', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select age restriction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 - All Ages</SelectItem>
+                    <SelectItem value="13">13+</SelectItem>
+                    <SelectItem value="16">16+</SelectItem>
+                    <SelectItem value="18">18+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Content Warnings */}
+            <div>
+              <Label>Content Warnings (Optional)</Label>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
+                {['violence', 'sex', 'drugs', 'horror', 'language'].map(warning => (
+                  <div key={warning} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={warning}
+                      checked={formData.content_warnings?.includes(warning)}
+                      onCheckedChange={(checked) => handleWarningToggle(warning, checked as boolean)}
+                    />
+                    <Label htmlFor={warning} className="capitalize cursor-pointer text-sm">
+                      {warning}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Viewer Discretion */}
+            <div>
+              <Label htmlFor="viewer_discretion">Viewer Discretion Message (Optional)</Label>
+              <Textarea
+                id="viewer_discretion"
+                value={formData.viewer_discretion}
+                onChange={(e) => handleInputChange('viewer_discretion', e.target.value)}
+                placeholder="Enter custom viewer discretion message (e.g., 'Contains graphic violence and strong language')"
+                rows={3}
+              />
+            </div>
+            
+            {/* Cast Info */}
+            <div>
+              <Label htmlFor="cast_info">Cast Information (Optional)</Label>
+              <Textarea
+                id="cast_info"
+                value={formData.cast_info}
+                onChange={(e) => handleInputChange('cast_info', e.target.value)}
+                placeholder="Enter cast information (e.g., 'Starring: John Doe, Jane Smith, ...')"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Note: For detailed cast management, use the dedicated cast/crew manager
+              </p>
             </div>
           </CardContent>
         </Card>
