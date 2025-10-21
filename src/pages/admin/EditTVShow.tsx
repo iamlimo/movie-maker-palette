@@ -341,14 +341,14 @@ export default function EditTVShow() {
             <div className="space-y-2">
               <Label htmlFor="genre">Primary Category/Genre</Label>
               <Select
-                value={formData.genre_id || ''}
-                onValueChange={(value) => handleInputChange('genre_id', value || null)}
+                value={formData.genre_id || 'none'}
+                onValueChange={(value) => handleInputChange('genre_id', value === 'none' ? null : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select primary genre" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {availableGenres.map((genre) => (
                     <SelectItem key={genre.id} value={genre.id}>
                       {genre.name}
