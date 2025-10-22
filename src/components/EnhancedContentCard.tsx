@@ -201,7 +201,7 @@ const EnhancedContentCard = ({
           )}
           {duration && (
             <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
+              {/* <Clock className="h-3 w-3" /> */}
               {/* <span>{formatDuration(duration)}</span> */}
             </div>
           )}
