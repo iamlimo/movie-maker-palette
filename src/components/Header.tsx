@@ -50,7 +50,9 @@ const Header = () => {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2">
-          <img src="/signature-tv-logo.png" alt="Logo" className="h-12" />
+          <Link to="/">
+            <img src="/signature-tv-logo.png" alt="Logo" className="h-12" />
+          </Link>
           {/* <div className="w-8 h-8 gradient-accent rounded-lg flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-lg">S</span>
           </div>
@@ -67,24 +69,24 @@ const Header = () => {
           >
             Home
           </Link>
-              <Link
-                to="/movies"
-                className="text-muted-foreground hover:text-primary transition-smooth"
-              >
-                Movies
-              </Link>
-              <Link
-                to="/tvshows"
-                className="text-muted-foreground hover:text-primary transition-smooth"
-              >
-                TV Shows
-              </Link>
-              <Link
-                to="/genres"
-                className="text-muted-foreground hover:text-primary transition-smooth"
-              >
-                Genres
-              </Link>
+          <Link
+            to="/movies"
+            className="text-muted-foreground hover:text-primary transition-smooth"
+          >
+            Movies
+          </Link>
+          <Link
+            to="/tvshows"
+            className="text-muted-foreground hover:text-primary transition-smooth"
+          >
+            TV Shows
+          </Link>
+          <Link
+            to="/genres"
+            className="text-muted-foreground hover:text-primary transition-smooth"
+          >
+            Genres
+          </Link>
           <Link
             to="/watchlist"
             className="text-muted-foreground hover:text-primary transition-smooth"
