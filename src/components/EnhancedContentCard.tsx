@@ -100,12 +100,12 @@ const EnhancedContentCard = ({
 
   const getFormattedPrice = () => {
     if (price === 0) return "Free";
-    
+
     if (contentType === "movie") {
       return `${formatNaira(price)} • Rent`;
     } else {
       // TV Show pricing
-      return "From ₦350/ep";
+      return "₦3,000.00 • Season";
     }
   };
 
@@ -202,7 +202,7 @@ const EnhancedContentCard = ({
           {duration && (
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              <span>{formatDuration(duration)}</span>
+              {/* <span>{formatDuration(duration)}</span> */}
             </div>
           )}
         </div>
