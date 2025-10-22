@@ -316,6 +316,7 @@ export type Database = {
           content_warnings: string[] | null
           created_at: string
           description: string | null
+          director: string | null
           duration: number | null
           genre_id: string | null
           id: string
@@ -323,6 +324,7 @@ export type Database = {
           language: string | null
           optimization_metadata: Json | null
           price: number
+          production_company: string | null
           rating: string | null
           release_date: string | null
           rental_expiry_duration: number | null
@@ -342,6 +344,7 @@ export type Database = {
           content_warnings?: string[] | null
           created_at?: string
           description?: string | null
+          director?: string | null
           duration?: number | null
           genre_id?: string | null
           id?: string
@@ -349,6 +352,7 @@ export type Database = {
           language?: string | null
           optimization_metadata?: Json | null
           price?: number
+          production_company?: string | null
           rating?: string | null
           release_date?: string | null
           rental_expiry_duration?: number | null
@@ -368,6 +372,7 @@ export type Database = {
           content_warnings?: string[] | null
           created_at?: string
           description?: string | null
+          director?: string | null
           duration?: number | null
           genre_id?: string | null
           id?: string
@@ -375,6 +380,7 @@ export type Database = {
           language?: string | null
           optimization_metadata?: Json | null
           price?: number
+          production_company?: string | null
           rating?: string | null
           release_date?: string | null
           rental_expiry_duration?: number | null
@@ -962,6 +968,7 @@ export type Database = {
           content_warnings: string[] | null
           created_at: string
           description: string | null
+          director: string | null
           genre_id: string | null
           genres: string[] | null
           id: string
@@ -969,6 +976,7 @@ export type Database = {
           language: string | null
           optimization_metadata: Json | null
           price: number
+          production_company: string | null
           rating: string | null
           release_date: string | null
           slider_cover_url: string | null
@@ -986,6 +994,7 @@ export type Database = {
           content_warnings?: string[] | null
           created_at?: string
           description?: string | null
+          director?: string | null
           genre_id?: string | null
           genres?: string[] | null
           id?: string
@@ -993,6 +1002,7 @@ export type Database = {
           language?: string | null
           optimization_metadata?: Json | null
           price?: number
+          production_company?: string | null
           rating?: string | null
           release_date?: string | null
           slider_cover_url?: string | null
@@ -1010,6 +1020,7 @@ export type Database = {
           content_warnings?: string[] | null
           created_at?: string
           description?: string | null
+          director?: string | null
           genre_id?: string | null
           genres?: string[] | null
           id?: string
@@ -1017,6 +1028,7 @@ export type Database = {
           language?: string | null
           optimization_metadata?: Json | null
           price?: number
+          production_company?: string | null
           rating?: string | null
           release_date?: string | null
           slider_cover_url?: string | null
@@ -1287,18 +1299,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      cleanup_expired_payments: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      expire_rentals: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      get_current_user_profile: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      cleanup_expired_payments: { Args: never; Returns: number }
+      expire_rentals: { Args: never; Returns: number }
+      get_current_user_profile: { Args: never; Returns: string }
       get_season_episode_count: {
         Args: { season_id_param: string }
         Returns: number

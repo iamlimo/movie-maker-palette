@@ -487,6 +487,28 @@ export default function EditTVShow() {
                   Note: For detailed cast management, use the dedicated cast/crew manager
                 </p>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="director">Director (Optional)</Label>
+                <Textarea
+                  id="director"
+                  value={(formData as any).director || ''}
+                  onChange={(e) => handleInputChange('director' as any, e.target.value)}
+                  placeholder="Enter director name(s)"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="production_company">Production Company (Optional)</Label>
+                <Textarea
+                  id="production_company"
+                  value={(formData as any).production_company || ''}
+                  onChange={(e) => handleInputChange('production_company' as any, e.target.value)}
+                  placeholder="Enter production company name"
+                  rows={2}
+                />
+              </div>
             </div>
 
             <Separator className="my-6" />

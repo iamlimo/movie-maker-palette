@@ -273,30 +273,9 @@ export const FinanceOverview = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-center gap-4 p-3 border rounded-lg">
-              <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Payment Received</p>
-                <p className="text-xs text-muted-foreground">Movie rental - The Dark Knight</p>
-              </div>
-              <Badge variant="secondary">₦500</Badge>
-            </div>
-            <div className="flex items-center gap-4 p-3 border rounded-lg">
-              <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Wallet Top-up</p>
-                <p className="text-xs text-muted-foreground">User balance increase</p>
-              </div>
-              <Badge variant="secondary">₦2,000</Badge>
-            </div>
-            <div className="flex items-center gap-4 p-3 border rounded-lg">
-              <div className="h-2 w-2 bg-orange-500 rounded-full"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Payout Queued</p>
-                <p className="text-xs text-muted-foreground">Producer revenue distribution</p>
-              </div>
-              <Badge variant="outline">₦1,400</Badge>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              View detailed transaction history in the Transactions tab
+            </p>
           </div>
         </CardContent>
       </Card>

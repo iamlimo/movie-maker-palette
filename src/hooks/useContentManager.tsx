@@ -46,6 +46,8 @@ export interface ContentFormData {
   content_warnings?: string[];
   viewer_discretion?: string;
   cast_info?: string;
+  director?: string;
+  production_company?: string;
   price: string;
   rental_expiry_duration: string;
   thumbnail_url?: string;
@@ -118,6 +120,8 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
         content_warnings: formData.content_warnings || null,
         viewer_discretion: formData.viewer_discretion || null,
         cast_info: formData.cast_info || null,
+        director: formData.director || null,
+        production_company: formData.production_company || null,
         price: parseFloat(formData.price),
         thumbnail_url: formData.thumbnail_url || null,
         landscape_poster_url: formData.landscape_poster_url || null,

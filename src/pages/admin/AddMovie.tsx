@@ -374,6 +374,30 @@ const AddMovie = () => {
                 Note: For detailed cast management, use the dedicated cast/crew manager
               </p>
             </div>
+
+            {/* Director */}
+            <div>
+              <Label htmlFor="director">Director (Optional)</Label>
+              <Textarea
+                id="director"
+                value={formData.director || ''}
+                onChange={(e) => handleInputChange('director', e.target.value)}
+                placeholder="Enter director name(s)"
+                rows={2}
+              />
+            </div>
+
+            {/* Production Company */}
+            <div>
+              <Label htmlFor="production_company">Production Company (Optional)</Label>
+              <Textarea
+                id="production_company"
+                value={formData.production_company || ''}
+                onChange={(e) => handleInputChange('production_company', e.target.value)}
+                placeholder="Enter production company name"
+                rows={2}
+              />
+            </div>
           </CardContent>
         </Card>
 
