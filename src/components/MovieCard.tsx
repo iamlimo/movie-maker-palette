@@ -38,15 +38,18 @@ const MovieCard = ({
   };
 
   const getFormattedPrice = () => {
-    const numPrice = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, "")) : price;
-    
+    const numPrice =
+      typeof price === "string"
+        ? parseFloat(price.replace(/[^0-9.]/g, ""))
+        : price;
+
     if (numPrice === 0) return "Free";
-    
+
     if (contentType === "movie") {
       return `${formatNaira(numPrice)} • Rent`;
     } else {
       // TV Show pricing
-      return "From ₦350/ep";
+      return "₦3000 • Season";
     }
   };
 
@@ -117,8 +120,8 @@ const MovieCard = ({
           </div>
           {duration && (
             <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              <span>{duration}</span>
+              {/* <Clock className="h-3 w-3" />
+              <span>{duration}</span> */}
             </div>
           )}
         </div>

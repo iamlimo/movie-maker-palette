@@ -23,11 +23,15 @@ interface Movie {
   thumbnail_url?: string;
   video_url?: string;
   trailer_url?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   rental_expiry_duration: number;
   created_at: string;
   updated_at: string;
   cast_crew?: any[];
+  age_restriction?: number;
+  content_warnings?: string[];
+  viewer_discretion?: string;
+  cast_info?: string;
 }
 
 const ViewMovie = () => {
@@ -46,18 +50,18 @@ const ViewMovie = () => {
   const fetchMovie = async (movieId: string) => {
     try {
       const { data, error } = await supabase
-        .from('movies')
-        .select('*')
-        .eq('id', movieId)
+        .from("movies")
+        .select("*")
+        .eq("id", movieId)
         .single();
 
       if (error) throw error;
       setMovie({
         ...data,
-        cast_crew: []
+        cast_crew: [],
       });
     } catch (error) {
-      console.error('Error fetching movie:', error);
+      console.error("Error fetching movie:", error);
       toast({
         title: "Error",
         description: "Failed to fetch movie details",
@@ -72,10 +76,14 @@ const ViewMovie = () => {
     const variants = {
       approved: "bg-green-500 text-white",
       rejected: "bg-red-500 text-white",
-      pending: "bg-yellow-500 text-white"
+      pending: "bg-yellow-500 text-white",
     };
     return (
-      <Badge className={variants[status as keyof typeof variants] || "bg-gray-500 text-white"}>
+      <Badge
+        className={
+          variants[status as keyof typeof variants] || "bg-gray-500 text-white"
+        }
+      >
         {status}
       </Badge>
     );
@@ -97,7 +105,7 @@ const ViewMovie = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Movie Not Found</h1>
-          <Button onClick={() => navigate('/admin/movies')}>
+          <Button onClick={() => navigate("/admin/movies")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Movies
           </Button>
@@ -110,7 +118,7 @@ const ViewMovie = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate('/admin/movies')}>
+          <Button variant="ghost" onClick={() => navigate("/admin/movies")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Movies
           </Button>
@@ -119,12 +127,14 @@ const ViewMovie = () => {
             <div className="flex items-center gap-2 mt-1">
               {getStatusBadge(movie.status)}
               <span className="text-muted-foreground">•</span>
-              <span className="text-muted-foreground">{movie.genre_name || 'No genre'}</span>
+              <span className="text-muted-foreground">
+                {movie.genre_name || "No genre"}
+              </span>
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button 
+          <Button
             variant="outline"
             onClick={() => navigate(`/admin/movies/edit/${movie.id}`)}
           >
@@ -156,36 +166,38 @@ const ViewMovie = () => {
                   <div>
                     <h2 className="text-xl font-semibold mb-2">Description</h2>
                     <p className="text-muted-foreground">
-                      {movie.description || 'No description available'}
+                      {movie.description || "No description available"}
                     </p>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium">Duration</p>
                       <p className="text-muted-foreground">
-                        {movie.duration ? `${movie.duration} minutes` : 'Not specified'}
+                        {movie.duration
+                          ? `${movie.duration} minutes`
+                          : "Not specified"}
                       </p>
+                     
                     </div>
                     <div>
                       <p className="text-sm font-medium">Language</p>
                       <p className="text-muted-foreground">
-                        {movie.language || 'Not specified'}
+                        {movie.language || "Not specified"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm font-medium">Rating</p>
                       <p className="text-muted-foreground">
-                        {movie.rating || 'Not rated'}
+                        {movie.rating || "Not rated"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm font-medium">Release Date</p>
                       <p className="text-muted-foreground">
-                        {movie.release_date 
+                        {movie.release_date
                           ? new Date(movie.release_date).toLocaleDateString()
-                          : 'Not specified'
-                        }
+                          : "Not specified"}
                       </p>
                     </div>
                   </div>
@@ -203,19 +215,26 @@ const ViewMovie = () => {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {movie.cast_crew.map((member: any, index: number) => (
-                    <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-3 border rounded-lg"
+                    >
                       {member.photo_url && (
-                        <img 
-                          src={member.photo_url} 
+                        <img
+                          src={member.photo_url}
                           alt={member.name}
                           className="w-12 h-12 object-cover rounded-full"
                         />
                       )}
                       <div>
                         <p className="font-medium">{member.name}</p>
-                        <p className="text-sm text-muted-foreground">{member.role_type}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {member.role_type}
+                        </p>
                         {member.character_name && (
-                          <p className="text-xs text-muted-foreground">as {member.character_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            as {member.character_name}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -236,13 +255,19 @@ const ViewMovie = () => {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium">Price</p>
-                <p className="text-2xl font-bold text-primary">{formatNaira(movie.price)}</p>
-                <p className="text-xs text-muted-foreground">{movie.price} kobo</p>
+                <p className="text-2xl font-bold text-primary">
+                  {formatNaira(movie.price)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {movie.price} kobo
+                </p>
               </div>
               <Separator />
               <div>
                 <p className="text-sm font-medium">Rental Duration</p>
-                <p className="text-muted-foreground">{movie.rental_expiry_duration} hours</p>
+                <p className="text-muted-foreground">
+                  {movie.rental_expiry_duration} hours
+                </p>
               </div>
             </CardContent>
           </Card>

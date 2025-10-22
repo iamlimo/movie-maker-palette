@@ -29,18 +29,30 @@ interface Movie {
   trailer_url: string;
   status: string;
   cast_crew?: any[];
+  age_restriction?: number;
+  content_warnings?: string[];
+  viewer_discretion?: string;
+  cast_info?: string;
 }
 
 const MoviePreview = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { favorites, toggleFavorite, loading: favoritesLoading } = useFavorites();
+  const {
+    favorites,
+    toggleFavorite,
+    loading: favoritesLoading,
+  } = useFavorites();
   const [movie, setMovie] = useState<Movie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isFavorite = movie ? favorites.some(fav => fav.content_id === movie.id && fav.content_type === 'movie') : false;
+  const isFavorite = movie
+    ? favorites.some(
+        (fav) => fav.content_id === movie.id && fav.content_type === "movie"
+      )
+    : false;
 
   useEffect(() => {
     if (id) {
@@ -54,8 +66,9 @@ const MoviePreview = () => {
       setError(null);
 
       const { data, error } = await supabase
-        .from('movies')
-        .select(`
+        .from("movies")
+        .select(
+          `
           *,
           genre:genres(name),
           thumbnail_url,
@@ -63,9 +76,10 @@ const MoviePreview = () => {
           trailer_url,
           landscape_poster_url,
           slider_cover_url
-        `)
-        .eq('id', movieId)
-        .eq('status', 'approved')
+        `
+        )
+        .eq("id", movieId)
+        .eq("status", "approved")
         .single();
 
       if (error) {
@@ -73,13 +87,13 @@ const MoviePreview = () => {
       }
 
       if (!data) {
-        throw new Error('Movie not found');
+        throw new Error("Movie not found");
       }
 
       setMovie(data);
     } catch (error: any) {
-      console.error('Error fetching movie:', error);
-      setError(error.message || 'Failed to load movie');
+      console.error("Error fetching movie:", error);
+      setError(error.message || "Failed to load movie");
     } finally {
       setLoading(false);
     }
@@ -96,10 +110,10 @@ const MoviePreview = () => {
     }
 
     try {
-      await toggleFavorite('movie', movie.id);
+      await toggleFavorite("movie", movie.id);
       toast({
         title: isFavorite ? "Removed from Watchlist" : "Added to Watchlist",
-        description: isFavorite 
+        description: isFavorite
           ? `${movie.title} has been removed from your watchlist.`
           : `${movie.title} has been added to your watchlist.`,
       });
@@ -131,9 +145,10 @@ const MoviePreview = () => {
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Movie Not Found</h1>
             <p className="text-muted-foreground mb-6">
-              {error || "The movie you're looking for doesn't exist or is not available."}
+              {error ||
+                "The movie you're looking for doesn't exist or is not available."}
             </p>
-            <Button onClick={() => navigate('/')}>
+            <Button onClick={() => navigate("/")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Home
             </Button>
@@ -146,25 +161,31 @@ const MoviePreview = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      
+
       {/* Content Hero Section */}
       <ContentHero
         title={movie.title}
-        description={movie.description || ''}
-        imageUrl={movie.thumbnail_url || ''}
+        description={movie.description || ""}
+        imageUrl={movie.thumbnail_url || ""}
         rating={movie.rating || undefined}
         duration={movie.duration || undefined}
-        year={movie.release_date ? new Date(movie.release_date).getFullYear() : undefined}
+        year={
+          movie.release_date
+            ? new Date(movie.release_date).getFullYear()
+            : undefined
+        }
         genre={movie.genre?.name}
+        viewer_discretion={movie.viewer_discretion || undefined}
+        cast_info={movie.cast_info || undefined}
         price={movie.price / 100} // Convert kobo to Naira for display
         language={movie.language || undefined}
-        onBack={() => navigate('/')}
+        onBack={() => navigate("/")}
       />
 
       {/* Auto-play Media Player */}
       <AutoPlayMediaPlayer
         trailerUrl={movie.trailer_url || undefined}
-        posterUrl={movie.thumbnail_url || ''}
+        posterUrl={movie.thumbnail_url || ""}
         title={movie.title}
         contentId={movie.id}
         contentType="movie"
@@ -186,7 +207,9 @@ const MoviePreview = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Release Year</p>
                   <p className="font-semibold">
-                    {movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown'}
+                    {movie.release_date
+                      ? new Date(movie.release_date).getFullYear()
+                      : "Unknown"}
                   </p>
                 </div>
                 <div>
@@ -195,7 +218,7 @@ const MoviePreview = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Language</p>
-                  <p className="font-semibold">{movie.language || 'English'}</p>
+                  <p className="font-semibold">{movie.language || "English"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Rating</p>
@@ -206,31 +229,36 @@ const MoviePreview = () => {
                 </div>
               </div>
             </div>
+            {/* end of movie details */}
 
             {/* Cast & Crew */}
             {movie.cast_crew && movie.cast_crew.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Cast & Crew</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {movie.cast_crew.slice(0, 8).map((member: any, index: number) => (
-                    <div key={index} className="text-center">
-                      <div className="w-20 h-20 rounded-full bg-secondary mx-auto mb-2 flex items-center justify-center">
-                        {member.photo_url ? (
-                          <img 
-                            src={member.photo_url} 
-                            alt={member.name}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-2xl font-bold text-muted-foreground">
-                            {member.name?.charAt(0)}
-                          </span>
-                        )}
+                  {movie.cast_crew
+                    .slice(0, 8)
+                    .map((member: any, index: number) => (
+                      <div key={index} className="text-center">
+                        <div className="w-20 h-20 rounded-full bg-secondary mx-auto mb-2 flex items-center justify-center">
+                          {member.photo_url ? (
+                            <img
+                              src={member.photo_url}
+                              alt={member.name}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-2xl font-bold text-muted-foreground">
+                              {member.name?.charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-sm">{member.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {member.role}
+                        </p>
                       </div>
-                      <p className="font-semibold text-sm">{member.name}</p>
-                      <p className="text-xs text-muted-foreground">{member.role}</p>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             )}
@@ -254,8 +282,12 @@ const MoviePreview = () => {
                 onClick={handleToggleFavorite}
                 disabled={favoritesLoading}
               >
-                <Heart className={`h-4 w-4 mr-2 ${isFavorite ? 'fill-primary text-primary' : ''}`} />
-                {isFavorite ? 'Remove from Watchlist' : 'Add to Watchlist'}
+                <Heart
+                  className={`h-4 w-4 mr-2 ${
+                    isFavorite ? "fill-primary text-primary" : ""
+                  }`}
+                />
+                {isFavorite ? "Remove from Watchlist" : "Add to Watchlist"}
               </Button>
             </div>
 
@@ -266,7 +298,10 @@ const MoviePreview = () => {
                 <div className="flex items-center gap-3">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">
-                    Released {movie.release_date ? new Date(movie.release_date).toLocaleDateString() : 'Unknown'}
+                    Released{" "}
+                    {movie.release_date
+                      ? new Date(movie.release_date).toLocaleDateString()
+                      : "Unknown"}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -275,7 +310,7 @@ const MoviePreview = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <Globe className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{movie.language || 'English'}</span>
+                  <span className="text-sm">{movie.language || "English"}</span>
                 </div>
                 {movie.genre?.name && (
                   <div className="pt-2">

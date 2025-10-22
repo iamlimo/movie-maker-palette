@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Filter, Edit, Trash2, Eye, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  Eye,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,9 +44,13 @@ interface TVShow {
   price: number;
   thumbnail_url?: string;
   trailer_url?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   created_at: string;
   updated_at: string;
+  age_restriction?: number;
+  content_warnings?: string[];
+  viewer_discretion?: string;
+  cast_info?: string;
 }
 
 interface Season {
@@ -48,6 +61,10 @@ interface Season {
   price: number;
   rental_expiry_duration: number;
   created_at: string;
+  age_restriction?: number;
+  content_warnings?: string[];
+  viewer_discretion?: string;
+  cast_info?: string;
 }
 
 interface Episode {
@@ -58,7 +75,7 @@ interface Episode {
   duration?: number;
   price: number;
   rental_expiry_duration: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   video_url?: string;
   release_date?: string;
   created_at: string;
@@ -69,7 +86,9 @@ const TVShows = () => {
   const [seasons, setSeasons] = useState<Record<string, Season[]>>({});
   const [episodes, setEpisodes] = useState<Record<string, Episode[]>>({});
   const [expandedShows, setExpandedShows] = useState<Set<string>>(new Set());
-  const [expandedSeasons, setExpandedSeasons] = useState<Set<string>>(new Set());
+  const [expandedSeasons, setExpandedSeasons] = useState<Set<string>>(
+    new Set()
+  );
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -83,14 +102,14 @@ const TVShows = () => {
   const fetchTVShows = async () => {
     try {
       const { data, error } = await supabase
-        .from('tv_shows')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("tv_shows")
+        .select("*")
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setTvShows(data || []);
     } catch (error) {
-      console.error('Error fetching TV shows:', error);
+      console.error("Error fetching TV shows:", error);
       toast({
         title: "Error",
         description: "Failed to fetch TV shows",
@@ -116,28 +135,32 @@ const TVShows = () => {
   const fetchSeasons = async (showId: string) => {
     try {
       const { data, error } = await supabase
-        .from('seasons')
-        .select('*')
-        .eq('tv_show_id', showId)
-        .order('season_number');
+        .from("seasons")
+        .select("*")
+        .eq("tv_show_id", showId)
+        .order("season_number");
 
       if (error) throw error;
-      setSeasons(prev => ({ ...prev, [showId]: data || [] }));
+      setSeasons((prev) => ({ ...prev, [showId]: data || [] }));
     } catch (error) {
-      console.error('Error fetching seasons:', error);
+      console.error("Error fetching seasons:", error);
     }
   };
 
   const handleDelete = async (showId: string) => {
-    if (!confirm('Are you sure you want to delete this TV show? This action cannot be undone.')) {
+    if (
+      !confirm(
+        "Are you sure you want to delete this TV show? This action cannot be undone."
+      )
+    ) {
       return;
     }
 
     try {
       const { error } = await supabase
-        .from('tv_shows')
+        .from("tv_shows")
         .delete()
-        .eq('id', showId);
+        .eq("id", showId);
 
       if (error) throw error;
 
@@ -148,7 +171,7 @@ const TVShows = () => {
 
       fetchTVShows();
     } catch (error) {
-      console.error('Error deleting TV show:', error);
+      console.error("Error deleting TV show:", error);
       toast({
         title: "Error",
         description: "Failed to delete TV show",
@@ -158,24 +181,28 @@ const TVShows = () => {
   };
 
   const handleDeleteSeason = async (seasonId: string, showId: string) => {
-    if (!confirm('Delete this season? All episodes will also be permanently deleted. This cannot be undone.')) {
+    if (
+      !confirm(
+        "Delete this season? All episodes will also be permanently deleted. This cannot be undone."
+      )
+    ) {
       return;
     }
 
     try {
       // First delete all episodes in this season
       const { error: episodeError } = await supabase
-        .from('episodes')
+        .from("episodes")
         .delete()
-        .eq('season_id', seasonId);
+        .eq("season_id", seasonId);
 
       if (episodeError) throw episodeError;
 
       // Then delete the season
       const { error: seasonError } = await supabase
-        .from('seasons')
+        .from("seasons")
         .delete()
-        .eq('id', seasonId);
+        .eq("id", seasonId);
 
       if (seasonError) throw seasonError;
 
@@ -187,7 +214,7 @@ const TVShows = () => {
       // Refresh the seasons for this show
       fetchSeasons(showId);
     } catch (error) {
-      console.error('Error deleting season:', error);
+      console.error("Error deleting season:", error);
       toast({
         title: "Error",
         description: "Failed to delete season",
@@ -200,18 +227,25 @@ const TVShows = () => {
     const variants = {
       approved: "bg-green-500 text-white",
       rejected: "bg-red-500 text-white",
-      pending: "bg-yellow-500 text-white"
+      pending: "bg-yellow-500 text-white",
     };
     return (
-      <Badge className={variants[status as keyof typeof variants] || "bg-gray-500 text-white"}>
+      <Badge
+        className={
+          variants[status as keyof typeof variants] || "bg-gray-500 text-white"
+        }
+      >
         {status}
       </Badge>
     );
   };
 
-  const filteredTVShows = tvShows.filter(show => {
-    const matchesSearch = show.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || show.status === statusFilter;
+  const filteredTVShows = tvShows.filter((show) => {
+    const matchesSearch = show.title
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "all" || show.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -231,9 +265,11 @@ const TVShows = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">TV Shows Management</h1>
-          <p className="text-muted-foreground">Manage all TV shows, seasons, and episodes</p>
+          <p className="text-muted-foreground">
+            Manage all TV shows, seasons, and episodes
+          </p>
         </div>
-        <Button onClick={() => navigate('/admin/tv-shows/add')}>
+        <Button onClick={() => navigate("/admin/tv-shows/add")}>
           <Plus className="h-4 w-4 mr-2" />
           Create TV Show
         </Button>
@@ -305,8 +341,8 @@ const TVShows = () => {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {show.thumbnail_url && (
-                          <img 
-                            src={show.thumbnail_url} 
+                          <img
+                            src={show.thumbnail_url}
                             alt={show.title}
                             className="w-12 h-16 object-cover rounded"
                           />
@@ -322,34 +358,41 @@ const TVShows = () => {
                     <TableCell>{getStatusBadge(show.status)}</TableCell>
                     <TableCell>
                       <div>
-                        <div className="font-semibold">{formatNaira(show.price)}</div>
-                        <div className="text-xs text-muted-foreground">{show.price} kobo</div>
+                        <div className="font-semibold">
+                          {formatNaira(show.price)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {show.price} kobo
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      {show.release_date 
+                      {show.release_date
                         ? new Date(show.release_date).toLocaleDateString()
-                        : 'No date'
-                      }
+                        : "No date"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
-                          onClick={() => navigate(`/admin/tv-shows/view/${show.id}`)}
+                          onClick={() =>
+                            navigate(`/admin/tv-shows/view/${show.id}`)
+                          }
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
-                          onClick={() => navigate(`/admin/tv-shows/edit/${show.id}`)}
+                          onClick={() =>
+                            navigate(`/admin/tv-shows/edit/${show.id}`)
+                          }
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(show.id)}
                         >
@@ -358,79 +401,96 @@ const TVShows = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                  
+
                   {/* Seasons */}
-                  {expandedShows.has(show.id) && seasons[show.id]?.map((season) => (
-                    <TableRow key={season.id} className="bg-secondary/30">
-                      <TableCell className="pl-8">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const newExpanded = new Set(expandedSeasons);
-                            if (expandedSeasons.has(season.id)) {
-                              newExpanded.delete(season.id);
-                            } else {
-                              newExpanded.add(season.id);
-                            }
-                            setExpandedSeasons(newExpanded);
-                          }}
-                        >
-                          {expandedSeasons.has(season.id) ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">Season {season.season_number}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {season.description || 'No description'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">Season</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-semibold">{formatNaira(season.price)}</div>
-                          <div className="text-xs text-muted-foreground">{season.price} kobo</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {season.rental_expiry_duration}h rental
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="ghost" 
+                  {expandedShows.has(show.id) &&
+                    seasons[show.id]?.map((season) => (
+                      <TableRow key={season.id} className="bg-secondary/30">
+                        <TableCell className="pl-8">
+                          <Button
+                            variant="ghost"
                             size="sm"
-                            title="Add Episode"
-                            onClick={() => navigate(`/admin/tv-shows/${show.id}/seasons/${season.id}/add-episode`)}
+                            onClick={() => {
+                              const newExpanded = new Set(expandedSeasons);
+                              if (expandedSeasons.has(season.id)) {
+                                newExpanded.delete(season.id);
+                              } else {
+                                newExpanded.add(season.id);
+                              }
+                              setExpandedSeasons(newExpanded);
+                            }}
                           >
-                            <Plus className="h-4 w-4" />
+                            {expandedSeasons.has(season.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            title="Edit Season"
-                            onClick={() => navigate(`/admin/tv-shows/${show.id}/seasons/${season.id}/edit`)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            title="Delete Season"
-                            onClick={() => handleDeleteSeason(season.id, show.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            Season {season.season_number}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {season.description || "No description"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">Season</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-semibold">
+                              {formatNaira(season.price)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {season.price} kobo
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {season.rental_expiry_duration}h rental
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Add Episode"
+                              onClick={() =>
+                                navigate(
+                                  `/admin/tv-shows/${show.id}/seasons/${season.id}/add-episode`
+                                )
+                              }
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Edit Season"
+                              onClick={() =>
+                                navigate(
+                                  `/admin/tv-shows/${show.id}/seasons/${season.id}/edit`
+                                )
+                              }
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Delete Season"
+                              onClick={() =>
+                                handleDeleteSeason(season.id, show.id)
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </>
               ))}
             </TableBody>
