@@ -401,52 +401,75 @@ const AddMovie = () => {
           </CardContent>
         </Card>
 
-        {/* Enhanced Media Uploads */}
+        {/* Media Files Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Media Uploads</CardTitle>
+            <CardTitle>Media Files</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-8">
-            {/* Thumbnail Upload */}
-            <UnifiedContentUploader
-              mediaType="thumbnail"
-              label="Thumbnail Image"
-              description="Upload a thumbnail image for the movie (recommended: 400x600px)"
-              onUploadComplete={handleMediaUpload('thumbnail_url')}
-              required
-            />
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="video_url">Video URL</Label>
+              <BackblazeUrlInput
+                value={formData.video_url}
+                onChange={(value) => handleInputChange('video_url', value)}
+                label=""
+                required={false}
+              />
+            </div>
 
-            {/* Landscape Poster Upload */}
-            <UnifiedContentUploader
-              mediaType="landscape_poster"
-              label="Landscape Poster"
-              description="Upload a landscape poster for featured content (recommended: 1920x1080px)"
-              onUploadComplete={handleMediaUpload('landscape_poster_url')}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="trailer_url">Trailer URL (Optional)</Label>
+              <BackblazeUrlInput
+                value={formData.trailer_url}
+                onChange={(value) => handleInputChange('trailer_url', value)}
+                label=""
+                required={false}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-            {/* Slider Cover Upload */}
-            <UnifiedContentUploader
-              mediaType="slider_cover"
-              label="Slider Cover"
-              description="Upload a cover image for hero sliders (recommended: 1600x900px)"
-              onUploadComplete={handleMediaUpload('slider_cover_url')}
-            />
+        {/* Banner & Poster Images Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Banner & Poster Images</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Upload different image formats for various display contexts
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="slider_cover_url">Slider Cover/Banner (Landscape - 1920x1080)</Label>
+              <BackblazeUrlInput
+                value={formData.slider_cover_url}
+                onChange={(value) => handleInputChange('slider_cover_url', value)}
+                label=""
+                required={false}
+              />
+              <p className="text-xs text-muted-foreground">
+                This image will be used in the main hero slider
+              </p>
+            </div>
 
-            {/* Backblaze Video URL Input */}
-            <BackblazeUrlInput
-              value={formData.video_url || ''}
-              onChange={(url) => handleInputChange('video_url', url)}
-              label="Main Video (Backblaze URL)"
-              required={false}
-            />
-            
-            {/* Trailer */}
-            <BackblazeUrlInput
-              value={formData.trailer_url || ''}
-              onChange={(url) => handleInputChange('trailer_url', url)}
-              label="Trailer (Backblaze URL)"
-              required={false}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="landscape_poster_url">Landscape Poster (16:9 format)</Label>
+              <BackblazeUrlInput
+                value={formData.landscape_poster_url}
+                onChange={(value) => handleInputChange('landscape_poster_url', value)}
+                label=""
+                required={false}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="thumbnail_url">Thumbnail (Portrait - 2:3 format)</Label>
+              <BackblazeUrlInput
+                value={formData.thumbnail_url}
+                onChange={(value) => handleInputChange('thumbnail_url', value)}
+                label=""
+                required={false}
+              />
+            </div>
           </CardContent>
         </Card>
 

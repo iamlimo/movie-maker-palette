@@ -622,6 +622,49 @@ export default function EditTVShow() {
 
           <Separator />
 
+          {/* Banner & Poster Images */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium">Banner & Poster Images</h3>
+            <p className="text-xs text-muted-foreground">
+              Upload different image formats for various display contexts
+            </p>
+            
+            <div className="space-y-2">
+              <Label htmlFor="slider_cover_url">Slider Cover/Banner (Landscape - 1920x1080)</Label>
+              <BackblazeUrlInput
+                value={formData.slider_cover_url}
+                onChange={(url) => handleInputChange('slider_cover_url', url)}
+                label=""
+                required={false}
+              />
+              <p className="text-xs text-muted-foreground">
+                This image will be used in the main hero slider
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="landscape_poster_url">Landscape Poster (16:9 format)</Label>
+              <BackblazeUrlInput
+                value={formData.landscape_poster_url}
+                onChange={(url) => handleInputChange('landscape_poster_url', url)}
+                label=""
+                required={false}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="thumbnail_url">Thumbnail (Portrait - 2:3 format)</Label>
+              <BackblazeUrlInput
+                value={formData.thumbnail_url}
+                onChange={(url) => handleInputChange('thumbnail_url', url)}
+                label=""
+                required={false}
+              />
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Hero Banner/Slider Cover */}
           <div className="space-y-2">
             <Label>Hero Banner (Slider Cover)</Label>
