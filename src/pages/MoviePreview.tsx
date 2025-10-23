@@ -33,6 +33,8 @@ interface Movie {
   content_warnings?: string[];
   viewer_discretion?: string;
   cast_info?: string;
+  director?: string;
+  production_company?: string;
 }
 
 const MoviePreview = () => {
@@ -230,6 +232,41 @@ const MoviePreview = () => {
               </div>
             </div>
             {/* end of movie details */}
+
+            {/* Production Information */}
+            {(movie.director || movie.production_company) && (
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="text-lg font-semibold mb-3">Production Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {movie.director && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Director</p>
+                      <p className="font-medium">{movie.director}</p>
+                    </div>
+                  )}
+                  {movie.production_company && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Production Company</p>
+                      <p className="font-medium">{movie.production_company}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Content Warnings */}
+            {movie.content_warnings && movie.content_warnings.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="text-lg font-semibold mb-3">Content Warnings</h3>
+                <div className="flex flex-wrap gap-2">
+                  {movie.content_warnings.map((warning, index) => (
+                    <Badge key={index} variant="destructive" className="capitalize">
+                      {warning}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Cast & Crew */}
             {movie.cast_crew && movie.cast_crew.length > 0 && (

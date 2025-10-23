@@ -51,7 +51,7 @@ export default function HeroSlider() {
           content_type: item.content_type,
           title: item.title,
           description: item.description || '',
-          poster_url: item.thumbnail_url,
+          poster_url: item.slider_cover_url || item.landscape_poster_url || item.thumbnail_url,
           genre: item.genre?.name || null,
           rating: item.rating,
           price: item.price,

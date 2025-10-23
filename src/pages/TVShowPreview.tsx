@@ -54,7 +54,8 @@ interface TVShow {
   content_warnings?: string[];
   viewer_discretion?: string;
   cast_info?: string;
-  director_info?: string;
+  director?: string;
+  production_company?: string;
 }
 
 interface Season {
@@ -435,6 +436,41 @@ const TVShowPreview = () => {
                 </div>
               </div>
             </div>
+
+            {/* Production Information */}
+            {(tvShow.director || tvShow.production_company) && (
+              <div className="mb-6 pb-6 border-b">
+                <h3 className="text-lg font-semibold mb-3">Production Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {tvShow.director && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Director</p>
+                      <p className="font-medium">{tvShow.director}</p>
+                    </div>
+                  )}
+                  {tvShow.production_company && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Production Company</p>
+                      <p className="font-medium">{tvShow.production_company}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Content Warnings */}
+            {tvShow.content_warnings && tvShow.content_warnings.length > 0 && (
+              <div className="mb-6 pb-6 border-b">
+                <h3 className="text-lg font-semibold mb-3">Content Warnings</h3>
+                <div className="flex flex-wrap gap-2">
+                  {tvShow.content_warnings.map((warning, index) => (
+                    <Badge key={index} variant="destructive" className="capitalize">
+                      {warning}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar - Desktop Only */}

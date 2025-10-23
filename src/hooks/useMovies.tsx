@@ -7,6 +7,8 @@ export interface Movie {
   title: string;
   description?: string;
   thumbnail_url?: string;
+  landscape_poster_url?: string;
+  slider_cover_url?: string;
   trailer_url?: string;
   video_url?: string;
   price: number;
@@ -29,6 +31,8 @@ export interface TVShow {
   title: string;
   description?: string;
   thumbnail_url?: string;
+  landscape_poster_url?: string;
+  slider_cover_url?: string;
   price: number;
   genre_id?: string;
   genre?: {
