@@ -440,7 +440,9 @@ const TVShowPreview = () => {
             {/* Production Information */}
             {(tvShow.director || tvShow.production_company) && (
               <div className="mb-6 pb-6 border-b">
-                <h3 className="text-lg font-semibold mb-3">Production Details</h3>
+                <h3 className="text-lg font-semibold mb-3">
+                  Production Details
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {tvShow.director && (
                     <div>
@@ -450,7 +452,9 @@ const TVShowPreview = () => {
                   )}
                   {tvShow.production_company && (
                     <div>
-                      <p className="text-sm text-muted-foreground">Production Company</p>
+                      <p className="text-sm text-muted-foreground">
+                        Production Company
+                      </p>
                       <p className="font-medium">{tvShow.production_company}</p>
                     </div>
                   )}
@@ -464,7 +468,11 @@ const TVShowPreview = () => {
                 <h3 className="text-lg font-semibold mb-3">Content Warnings</h3>
                 <div className="flex flex-wrap gap-2">
                   {tvShow.content_warnings.map((warning, index) => (
-                    <Badge key={index} variant="destructive" className="capitalize">
+                    <Badge
+                      key={index}
+                      variant="destructive"
+                      className="capitalize"
+                    >
                       {warning}
                     </Badge>
                   ))}
