@@ -44,13 +44,15 @@ interface FormData {
   video_url: string;
   trailer_url: string;
   selectedSections: string[];
+  director?: string;              // added
+  production_company?: string;    // added
 }
 
 const EditMovie = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState<FormData>({
     title: "",
     description: "",
@@ -63,14 +65,16 @@ const EditMovie = () => {
     content_warnings: [],
     viewer_discretion: "",
     cast_info: "",
-    price: 0, // Stored in kobo, displayed in Naira by NairaInput
+    price: 0,
     rental_expiry_duration: "48",
     status: "pending",
     video_url: "",
     trailer_url: "",
-    selectedSections: []
+    selectedSections: [],
+    director: "",               // added
+    production_company: ""      // added
   });
-  
+
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,13 +90,13 @@ const EditMovie = () => {
   const fetchMovie = async (movieId: string) => {
     try {
       const { data, error } = await supabase
-        .from('movies')
-        .select('*')
-        .eq('id', movieId)
+        .from("movies")
+        .select("*")
+        .eq("id", movieId)
         .single();
 
       if (error) throw error;
-      
+
       setFormData({
         title: data.title || "",
         description: data.description || "",
@@ -105,31 +109,39 @@ const EditMovie = () => {
         content_warnings: data.content_warnings || [],
         viewer_discretion: data.viewer_discretion || "",
         cast_info: data.cast_info || "",
-        price: data.price || 0, // Already in kobo from database
+        price: data.price || 0,
         rental_expiry_duration: data.rental_expiry_duration?.toString() || "48",
         status: data.status || "pending",
         video_url: data.video_url || "",
         trailer_url: data.trailer_url || "",
-        selectedSections: []
+        selectedSections: [],
+        director: data.director || "",                   // added
+        production_company: data.production_company || ""// added
       });
 
       // Fetch current section assignments
-      const { data: contentSections } = await supabase.functions.invoke('content-sections', {
-        method: 'GET'
-      });
+      const { data: contentSections } = await supabase.functions.invoke(
+        "content-sections",
+        {
+          method: "GET",
+        }
+      );
 
       if (contentSections) {
         const movieSections = contentSections
-          .filter((cs: any) => cs.content_id === movieId && cs.content_type === 'movie')
+          .filter(
+            (cs: any) =>
+              cs.content_id === movieId && cs.content_type === "movie"
+          )
           .map((cs: any) => cs.section_id);
-        
-        setFormData(prev => ({
+
+        setFormData((prev) => ({
           ...prev,
-          selectedSections: movieSections
+          selectedSections: movieSections,
         }));
       }
     } catch (error) {
-      console.error('Error fetching movie:', error);
+      console.error("Error fetching movie:", error);
       toast({
         title: "Error",
         description: "Failed to fetch movie details",
@@ -143,42 +155,45 @@ const EditMovie = () => {
   const fetchGenres = async () => {
     try {
       const { data, error } = await supabase
-        .from('genres')
-        .select('*')
-        .order('name');
+        .from("genres")
+        .select("*")
+        .order("name");
 
       if (error) throw error;
       setGenres(data || []);
     } catch (error) {
-      console.error('Error fetching genres:', error);
+      console.error("Error fetching genres:", error);
     }
   };
 
-  const handleInputChange = (field: keyof FormData, value: string | number | string[]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (
+    field: keyof FormData,
+    value: string | number | string[]
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSectionToggle = (sectionId: string, checked: boolean) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      selectedSections: checked 
+      selectedSections: checked
         ? [...prev.selectedSections, sectionId]
-        : prev.selectedSections.filter(id => id !== sectionId)
+        : prev.selectedSections.filter((id) => id !== sectionId),
     }));
   };
 
   const handleWarningToggle = (warning: string, checked: boolean) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       content_warnings: checked
         ? [...prev.content_warnings, warning]
-        : prev.content_warnings.filter(w => w !== warning)
+        : prev.content_warnings.filter((w) => w !== warning),
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.title) {
       toast({
         title: "Error",
@@ -199,44 +214,51 @@ const EditMovie = () => {
         duration: formData.duration ? parseInt(formData.duration) : null,
         language: formData.language || null,
         rating: formData.rating || null,
-        age_restriction: formData.age_restriction ? parseInt(formData.age_restriction) : null,
-        content_warnings: formData.content_warnings.length > 0 ? formData.content_warnings : null,
+        age_restriction: formData.age_restriction
+          ? parseInt(formData.age_restriction)
+          : null,
+        content_warnings:
+          formData.content_warnings.length > 0
+            ? formData.content_warnings
+            : null,
         viewer_discretion: formData.viewer_discretion || null,
         cast_info: formData.cast_info || null,
         price: formData.price,
         rental_expiry_duration: parseInt(formData.rental_expiry_duration),
-        status: formData.status as 'pending' | 'approved' | 'rejected',
+        status: formData.status as "pending" | "approved" | "rejected",
         video_url: formData.video_url || null,
         trailer_url: formData.trailer_url || null,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
-        .from('movies')
+        .from("movies")
         .update(updateData)
-        .eq('id', id);
+        .eq("id", id);
 
       if (error) throw error;
 
       // Update section assignments
       if (formData.selectedSections.length > 0) {
         // First, remove existing assignments
-        await supabase.functions.invoke('content-sections', {
-          method: 'DELETE',
-          body: { content_id: id, content_type: 'movie' }
+        await supabase.functions.invoke("content-sections", {
+          method: "DELETE",
+          body: { content_id: id, content_type: "movie" },
         });
 
         // Then add new assignments
-        const contentSectionData = formData.selectedSections.map((sectionId, index) => ({
-          content_id: id,
-          content_type: 'movie',
-          section_id: sectionId,
-          display_order: index
-        }));
+        const contentSectionData = formData.selectedSections.map(
+          (sectionId, index) => ({
+            content_id: id,
+            content_type: "movie",
+            section_id: sectionId,
+            display_order: index,
+          })
+        );
 
-        await supabase.functions.invoke('content-sections', {
-          method: 'POST',
-          body: contentSectionData
+        await supabase.functions.invoke("content-sections", {
+          method: "POST",
+          body: contentSectionData,
         });
       }
 
@@ -247,10 +269,11 @@ const EditMovie = () => {
 
       navigate(`/admin/movies/view/${id}`);
     } catch (error) {
-      console.error('Error updating movie:', error);
+      console.error("Error updating movie:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update movie",
+        description:
+          error instanceof Error ? error.message : "Failed to update movie",
         variant: "destructive",
       });
     } finally {
@@ -272,7 +295,10 @@ const EditMovie = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center gap-4 mb-8">
-        <Button variant="ghost" onClick={() => navigate(`/admin/movies/view/${id}`)}>
+        <Button
+          variant="ghost"
+          onClick={() => navigate(`/admin/movies/view/${id}`)}
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Movie
         </Button>
@@ -295,22 +321,24 @@ const EditMovie = () => {
                 <Input
                   id="title"
                   value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  onChange={(e) => handleInputChange("title", e.target.value)}
                   placeholder="Enter movie title"
                   required
                 />
               </div>
               <div>
                 <Label htmlFor="genre">Genre</Label>
-                <Select 
+                <Select
                   value={formData.genre_id}
-                  onValueChange={(value) => handleInputChange('genre_id', value)}
+                  onValueChange={(value) =>
+                    handleInputChange("genre_id", value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select genre" />
                   </SelectTrigger>
                   <SelectContent>
-                    {genres.map(genre => (
+                    {genres.map((genre) => (
                       <SelectItem key={genre.id} value={genre.id}>
                         {genre.name}
                       </SelectItem>
@@ -325,7 +353,9 @@ const EditMovie = () => {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("description", e.target.value)
+                }
                 placeholder="Enter movie description"
                 rows={4}
               />
@@ -338,7 +368,9 @@ const EditMovie = () => {
                   id="release_date"
                   type="date"
                   value={formData.release_date}
-                  onChange={(e) => handleInputChange('release_date', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("release_date", e.target.value)
+                  }
                 />
               </div>
               <div>
@@ -347,7 +379,9 @@ const EditMovie = () => {
                   id="duration"
                   type="number"
                   value={formData.duration}
-                  onChange={(e) => handleInputChange('duration', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("duration", e.target.value)
+                  }
                   placeholder="120"
                 />
               </div>
@@ -356,7 +390,9 @@ const EditMovie = () => {
                 <Input
                   id="language"
                   value={formData.language}
-                  onChange={(e) => handleInputChange('language', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("language", e.target.value)
+                  }
                   placeholder="English"
                 />
               </div>
@@ -366,18 +402,20 @@ const EditMovie = () => {
               <div>
                 <NairaInput
                   value={formData.price}
-                  onChange={(value) => handleInputChange('price', value)}
+                  onChange={(value) => handleInputChange("price", value)}
                   label="Price"
                   placeholder="1,000.00"
                   defaultPriceHint="Platform Default: ₦1,000"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="rental_expiry">Rental Expiry (hours)</Label>
-                <Select 
+                <Select
                   value={formData.rental_expiry_duration}
-                  onValueChange={(value) => handleInputChange('rental_expiry_duration', value)}
+                  onValueChange={(value) =>
+                    handleInputChange("rental_expiry_duration", value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -391,12 +429,12 @@ const EditMovie = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="status">Status</Label>
-                <Select 
+                <Select
                   value={formData.status}
-                  onValueChange={(value) => handleInputChange('status', value)}
+                  onValueChange={(value) => handleInputChange("status", value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -425,9 +463,9 @@ const EditMovie = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="rating">Rating (Optional)</Label>
-                <Select 
+                <Select
                   value={formData.rating}
-                  onValueChange={(value) => handleInputChange('rating', value)}
+                  onValueChange={(value) => handleInputChange("rating", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select rating" />
@@ -440,12 +478,16 @@ const EditMovie = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
-                <Label htmlFor="age_restriction">Age Restriction (Optional)</Label>
-                <Select 
+                <Label htmlFor="age_restriction">
+                  Age Restriction (Optional)
+                </Label>
+                <Select
                   value={formData.age_restriction}
-                  onValueChange={(value) => handleInputChange('age_restriction', value)}
+                  onValueChange={(value) =>
+                    handleInputChange("age_restriction", value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select age restriction" />
@@ -459,50 +501,62 @@ const EditMovie = () => {
                 </Select>
               </div>
             </div>
-            
+
             {/* Content Warnings */}
             <div>
               <Label>Content Warnings (Optional)</Label>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-2">
-                {['violence', 'sex', 'drugs', 'horror', 'language'].map(warning => (
-                  <div key={warning} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`warning-${warning}`}
-                      checked={formData.content_warnings?.includes(warning)}
-                      onCheckedChange={(checked) => handleWarningToggle(warning, checked as boolean)}
-                    />
-                    <Label htmlFor={`warning-${warning}`} className="capitalize cursor-pointer text-sm">
-                      {warning}
-                    </Label>
-                  </div>
-                ))}
+                {["violence", "sex", "drugs", "horror", "language"].map(
+                  (warning) => (
+                    <div key={warning} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`warning-${warning}`}
+                        checked={formData.content_warnings?.includes(warning)}
+                        onCheckedChange={(checked) =>
+                          handleWarningToggle(warning, checked as boolean)
+                        }
+                      />
+                      <Label
+                        htmlFor={`warning-${warning}`}
+                        className="capitalize cursor-pointer text-sm"
+                      >
+                        {warning}
+                      </Label>
+                    </div>
+                  )
+                )}
               </div>
             </div>
-            
+
             {/* Viewer Discretion */}
             <div>
-              <Label htmlFor="viewer_discretion">Viewer Discretion Message (Optional)</Label>
+              <Label htmlFor="viewer_discretion">
+                Viewer Discretion Message (Optional)
+              </Label>
               <Textarea
                 id="viewer_discretion"
                 value={formData.viewer_discretion}
-                onChange={(e) => handleInputChange('viewer_discretion', e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("viewer_discretion", e.target.value)
+                }
                 placeholder="Enter custom viewer discretion message (e.g., 'Contains graphic violence and strong language')"
                 rows={3}
               />
             </div>
-            
+
             {/* Cast Info */}
             <div>
               <Label htmlFor="cast_info">Cast Information (Optional)</Label>
               <Textarea
                 id="cast_info"
-                value={formData.cast_info || ''}
-                onChange={(e) => handleInputChange('cast_info', e.target.value)}
+                value={formData.cast_info || ""}
+                onChange={(e) => handleInputChange("cast_info", e.target.value)}
                 placeholder="Enter cast information (e.g., 'Starring: John Doe, Jane Smith, ...')"
                 rows={3}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Note: For detailed cast management, use the dedicated cast/crew manager
+                Note: For detailed cast management, use the dedicated cast/crew
+                manager
               </p>
             </div>
 
@@ -511,8 +565,8 @@ const EditMovie = () => {
               <Label htmlFor="director">Director (Optional)</Label>
               <Textarea
                 id="director"
-                value={(formData as any).director || ''}
-                onChange={(e) => handleInputChange('director' as any, e.target.value)}
+                value={formData.director ?? ''}
+                onChange={(e) => handleInputChange('director', e.target.value)}
                 placeholder="Enter director name(s)"
                 rows={2}
               />
@@ -520,11 +574,13 @@ const EditMovie = () => {
 
             {/* Production Company */}
             <div>
-              <Label htmlFor="production_company">Production Company (Optional)</Label>
+              <Label htmlFor="production_company">
+                Production Company (Optional)
+              </Label>
               <Textarea
                 id="production_company"
-                value={(formData as any).production_company || ''}
-                onChange={(e) => handleInputChange('production_company' as any, e.target.value)}
+                value={formData.production_company ?? ''}
+                onChange={(e) => handleInputChange('production_company', e.target.value)}
                 placeholder="Enter production company name"
                 rows={2}
               />
@@ -540,7 +596,7 @@ const EditMovie = () => {
           <CardContent className="space-y-6">
             <BackblazeUrlInput
               value={formData.video_url}
-              onChange={(url) => handleInputChange('video_url', url)}
+              onChange={(url) => handleInputChange("video_url", url)}
               label="Movie Video URL"
               required={false}
             />
@@ -549,7 +605,7 @@ const EditMovie = () => {
 
             <BackblazeUrlInput
               value={formData.trailer_url}
-              onChange={(url) => handleInputChange('trailer_url', url)}
+              onChange={(url) => handleInputChange("trailer_url", url)}
               label="Movie Trailer URL"
               required={false}
             />
@@ -572,11 +628,11 @@ const EditMovie = () => {
                     <Checkbox
                       id={`section-${section.id}`}
                       checked={formData.selectedSections.includes(section.id)}
-                      onCheckedChange={(checked) => 
+                      onCheckedChange={(checked) =>
                         handleSectionToggle(section.id, checked as boolean)
                       }
                     />
-                    <Label 
+                    <Label
                       htmlFor={`section-${section.id}`}
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
@@ -596,19 +652,16 @@ const EditMovie = () => {
 
         {/* Submit Button */}
         <div className="flex justify-end gap-4">
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => navigate(`/admin/movies/view/${id}`)}
             disabled={saving}
           >
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            disabled={saving}
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </form>

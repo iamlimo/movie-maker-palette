@@ -54,6 +54,7 @@ interface TVShow {
   content_warnings?: string[];
   viewer_discretion?: string;
   cast_info?: string;
+  director_info?: string;
 }
 
 interface Season {
