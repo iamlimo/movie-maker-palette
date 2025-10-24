@@ -206,35 +206,30 @@ const EditMovie = () => {
     setSaving(true);
 
     try {
-      const updateData = {
+      const payload = {
         title: formData.title,
-        description: formData.description || null,
-        genre_id: formData.genre_id || null,
-        release_date: formData.release_date || null,
-        duration: formData.duration ? parseInt(formData.duration) : null,
-        language: formData.language || null,
-        rating: formData.rating || null,
-        age_restriction: formData.age_restriction
-          ? parseInt(formData.age_restriction)
-          : null,
-        content_warnings:
-          formData.content_warnings.length > 0
-            ? formData.content_warnings
-            : null,
+        description: formData.description,
+        genre_id: formData.genre_id,
+        release_date: formData.release_date,
+        duration: Number(formData.duration) || null,
+        language: formData.language,
+        rating: formData.rating,
+        price: Number(formData.price) || 0,
+        rental_expiry_duration: Number(formData.rental_expiry_duration) || 48,
+        age_restriction: formData.age_restriction ? Number(formData.age_restriction) : null,
+        content_warnings: formData.content_warnings || [],
         viewer_discretion: formData.viewer_discretion || null,
         cast_info: formData.cast_info || null,
-        price: formData.price,
-        rental_expiry_duration: parseInt(formData.rental_expiry_duration),
-        status: formData.status as "pending" | "approved" | "rejected",
-        video_url: formData.video_url || null,
-        trailer_url: formData.trailer_url || null,
-        updated_at: new Date().toISOString(),
+        // <-- add these two fields to the update payload
+        director: formData.director ?? null,
+        production_company: formData.production_company ?? null,
       };
 
-      const { error } = await supabase
-        .from("movies")
-        .update(updateData)
-        .eq("id", id);
+      const { data, error } = await supabase
+        .from('movies')
+        .update(payload)
+        .eq('id', id)
+        .single();
 
       if (error) throw error;
 

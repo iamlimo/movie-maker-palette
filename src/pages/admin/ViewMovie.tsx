@@ -178,7 +178,6 @@ const ViewMovie = () => {
                           ? `${movie.duration} minutes`
                           : "Not specified"}
                       </p>
-                     
                     </div>
                     <div>
                       <p className="text-sm font-medium">Language</p>

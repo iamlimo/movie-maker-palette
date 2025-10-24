@@ -48,6 +48,8 @@ interface TVShowData {
   slider_cover_url: string;
   genres: string[];
   genre_id: string | null;
+  director?: string;               // added
+  production_company?: string;     // added
 }
 
 export default function EditTVShow() {
@@ -78,6 +80,8 @@ export default function EditTVShow() {
     slider_cover_url: '',
     genres: [],
     genre_id: null,
+    director: '',                   // added
+    production_company: ''          // added
   });
 
   useEffect(() => {
@@ -130,6 +134,8 @@ export default function EditTVShow() {
         slider_cover_url: data.slider_cover_url || '',
         genres: data.genres || [],
         genre_id: data.genre_id || null,
+        director: data.director || '',                   // added
+        production_company: data.production_company || ''// added
       });
     } catch (error) {
       console.error('Error fetching TV show:', error);
@@ -186,6 +192,8 @@ export default function EditTVShow() {
           slider_cover_url: formData.slider_cover_url || null,
           genres: formData.genres,
           genre_id: formData.genre_id || null,
+          director: formData.director || null,               // added
+          production_company: formData.production_company || null, // added
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
@@ -492,8 +500,8 @@ export default function EditTVShow() {
                 <Label htmlFor="director">Director (Optional)</Label>
                 <Textarea
                   id="director"
-                  value={(formData as any).director || ''}
-                  onChange={(e) => handleInputChange('director' as any, e.target.value)}
+                  value={formData.director ?? ''}
+                  onChange={(e) => handleInputChange('director', e.target.value)}
                   placeholder="Enter director name(s)"
                   rows={2}
                 />
@@ -503,8 +511,8 @@ export default function EditTVShow() {
                 <Label htmlFor="production_company">Production Company (Optional)</Label>
                 <Textarea
                   id="production_company"
-                  value={(formData as any).production_company || ''}
-                  onChange={(e) => handleInputChange('production_company' as any, e.target.value)}
+                  value={formData.production_company ?? ''}
+                  onChange={(e) => handleInputChange('production_company', e.target.value)}
                   placeholder="Enter production company name"
                   rows={2}
                 />
