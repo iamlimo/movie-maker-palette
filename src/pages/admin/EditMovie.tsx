@@ -20,6 +20,7 @@ import { useSections } from "@/hooks/useSections";
 import { Checkbox } from "@/components/ui/checkbox";
 import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
 import { Separator } from "@/components/ui/separator";
+import { UnifiedContentUploader } from '@/components/admin/UnifiedContentUploader';
 
 interface Genre {
   id: string;
@@ -44,8 +45,11 @@ interface FormData {
   video_url: string;
   trailer_url: string;
   selectedSections: string[];
-  director?: string;              // added
-  production_company?: string;    // added
+  director?: string;
+  production_company?: string;
+  thumbnail_url: string;
+  landscape_poster_url: string;
+  slider_cover_url: string;
 }
 
 const EditMovie = () => {
@@ -71,8 +75,11 @@ const EditMovie = () => {
     video_url: "",
     trailer_url: "",
     selectedSections: [],
-    director: "",               // added
-    production_company: ""      // added
+    director: "",
+    production_company: "",
+    thumbnail_url: "",
+    landscape_poster_url: "",
+    slider_cover_url: "",
   });
 
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -115,8 +122,11 @@ const EditMovie = () => {
         video_url: data.video_url || "",
         trailer_url: data.trailer_url || "",
         selectedSections: [],
-        director: data.director || "",                   // added
-        production_company: data.production_company || ""// added
+        director: data.director || "",
+        production_company: data.production_company || "",
+        thumbnail_url: data.thumbnail_url || "",
+        landscape_poster_url: data.landscape_poster_url || "",
+        slider_cover_url: data.slider_cover_url || "",
       });
 
       // Fetch current section assignments
@@ -220,9 +230,11 @@ const EditMovie = () => {
         content_warnings: formData.content_warnings || [],
         viewer_discretion: formData.viewer_discretion || null,
         cast_info: formData.cast_info || null,
-        // <-- add these two fields to the update payload
         director: formData.director ?? null,
         production_company: formData.production_company ?? null,
+        thumbnail_url: formData.thumbnail_url || null,
+        landscape_poster_url: formData.landscape_poster_url || null,
+        slider_cover_url: formData.slider_cover_url || null,
       };
 
       const { data, error } = await supabase
@@ -604,6 +616,95 @@ const EditMovie = () => {
               label="Movie Trailer URL"
               required={false}
             />
+          </CardContent>
+        </Card>
+
+        {/* Movie Posters & Banners */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Movie Posters & Banners</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Upload or update images for this movie
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Portrait Thumbnail */}
+            <div className="space-y-2">
+              <Label>Portrait Poster (Thumbnail)</Label>
+              <p className="text-xs text-muted-foreground">
+                Recommended: 300x450px, vertical orientation
+              </p>
+              <UnifiedContentUploader
+                mediaType="thumbnail"
+                label="Portrait Poster"
+                description="Upload vertical poster image"
+                currentUrl={formData.thumbnail_url}
+                onUploadComplete={(url) => handleInputChange('thumbnail_url', url)}
+              />
+              {formData.thumbnail_url && (
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground">Current Image:</Label>
+                  <img 
+                    src={formData.thumbnail_url} 
+                    alt="Thumbnail preview" 
+                    className="mt-1 rounded-lg max-h-40 object-cover"
+                  />
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Landscape Poster */}
+            <div className="space-y-2">
+              <Label>Landscape Poster</Label>
+              <p className="text-xs text-muted-foreground">
+                Recommended: 1920x1080px, horizontal orientation
+              </p>
+              <UnifiedContentUploader
+                mediaType="landscape_poster"
+                label="Landscape Poster"
+                description="Upload horizontal poster image"
+                currentUrl={formData.landscape_poster_url}
+                onUploadComplete={(url) => handleInputChange('landscape_poster_url', url)}
+              />
+              {formData.landscape_poster_url && (
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground">Current Image:</Label>
+                  <img 
+                    src={formData.landscape_poster_url} 
+                    alt="Landscape poster preview" 
+                    className="mt-1 rounded-lg max-h-40 object-cover"
+                  />
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Slider Cover Banner */}
+            <div className="space-y-2">
+              <Label htmlFor="slider_cover_url">Slider Cover/Banner (Landscape - 1920x1080)</Label>
+              <BackblazeUrlInput
+                value={formData.slider_cover_url}
+                onChange={(url) => handleInputChange('slider_cover_url', url)}
+                label=""
+                required={false}
+              />
+              <p className="text-xs text-muted-foreground">
+                This image will be used in the main hero slider
+              </p>
+              {formData.slider_cover_url && (
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground">Current Banner:</Label>
+                  <img 
+                    src={formData.slider_cover_url} 
+                    alt="Banner preview" 
+                    className="mt-1 rounded-lg max-h-40 object-cover"
+                  />
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
