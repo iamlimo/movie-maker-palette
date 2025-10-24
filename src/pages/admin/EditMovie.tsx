@@ -43,12 +43,9 @@ interface FormData {
   status: string;
   video_url: string;
   trailer_url: string;
-  thumbnail_url: string;
-  landscape_poster_url: string;
-  slider_cover_url: string;
   selectedSections: string[];
-  director?: string;
-  production_company?: string;
+  director?: string;              // added
+  production_company?: string;    // added
 }
 
 const EditMovie = () => {
@@ -73,12 +70,9 @@ const EditMovie = () => {
     status: "pending",
     video_url: "",
     trailer_url: "",
-    thumbnail_url: "",
-    landscape_poster_url: "",
-    slider_cover_url: "",
     selectedSections: [],
-    director: "",
-    production_company: ""
+    director: "",               // added
+    production_company: ""      // added
   });
 
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -120,12 +114,9 @@ const EditMovie = () => {
         status: data.status || "pending",
         video_url: data.video_url || "",
         trailer_url: data.trailer_url || "",
-        thumbnail_url: data.thumbnail_url || "",
-        landscape_poster_url: data.landscape_poster_url || "",
-        slider_cover_url: data.slider_cover_url || "",
         selectedSections: [],
-        director: data.director || "",
-        production_company: data.production_company || ""
+        director: data.director || "",                   // added
+        production_company: data.production_company || ""// added
       });
 
       // Fetch current section assignments
@@ -229,13 +220,9 @@ const EditMovie = () => {
         content_warnings: formData.content_warnings || [],
         viewer_discretion: formData.viewer_discretion || null,
         cast_info: formData.cast_info || null,
+        // <-- add these two fields to the update payload
         director: formData.director ?? null,
         production_company: formData.production_company ?? null,
-        thumbnail_url: formData.thumbnail_url || null,
-        landscape_poster_url: formData.landscape_poster_url || null,
-        slider_cover_url: formData.slider_cover_url || null,
-        video_url: formData.video_url || null,
-        trailer_url: formData.trailer_url || null,
       };
 
       const { data, error } = await supabase
@@ -591,47 +578,6 @@ const EditMovie = () => {
                 onChange={(e) => handleInputChange('production_company', e.target.value)}
                 placeholder="Enter production company name"
                 rows={2}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Banner & Poster Images */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Banner & Poster Images</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Upload different image formats for various display contexts
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <BackblazeUrlInput
-                value={formData.slider_cover_url}
-                onChange={(value) => handleInputChange("slider_cover_url", value)}
-                label="Slider Cover/Banner (Landscape - 1920x1080)"
-                required={false}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                This image will be used in the main hero slider
-              </p>
-            </div>
-
-            <div>
-              <BackblazeUrlInput
-                value={formData.landscape_poster_url}
-                onChange={(value) => handleInputChange("landscape_poster_url", value)}
-                label="Landscape Poster (16:9 format)"
-                required={false}
-              />
-            </div>
-
-            <div>
-              <BackblazeUrlInput
-                value={formData.thumbnail_url}
-                onChange={(value) => handleInputChange("thumbnail_url", value)}
-                label="Thumbnail (Portrait - 2:3 format)"
-                required={false}
               />
             </div>
           </CardContent>
