@@ -255,3 +255,42 @@
     left: 100%;
   }
 }
+
+@layer utilities {
+  /* Mobile-first touch targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .mobile-safe-padding {
+    padding-left: max(env(safe-area-inset-left), 1rem);
+    padding-right: max(env(safe-area-inset-right), 1rem);
+  }
+
+  .mobile-safe-padding-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+  
+  /* Remove hover effects on touch devices */
+  @media (hover: none) and (pointer: coarse) {
+    .hover-scale:hover {
+      transform: none;
+    }
+    
+    .hover\:bg-secondary:hover {
+      background-color: transparent;
+    }
+  }
+
+  /* Touch-friendly spacing */
+  .touch-spacing-y {
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .touch-spacing-x {
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+  }
+}

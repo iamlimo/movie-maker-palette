@@ -683,7 +683,28 @@ const EditMovie = () => {
             <Separator />
 
             {/* Slider Cover Banner */}
-            
+            <div className="space-y-2">
+              <Label htmlFor="slider_cover_url">Slider Cover/Banner (Landscape - 1920x1080)</Label>
+              <BackblazeUrlInput
+                value={formData.slider_cover_url}
+                onChange={(url) => handleInputChange('slider_cover_url', url)}
+                label=""
+                required={false}
+              />
+              <p className="text-xs text-muted-foreground">
+                This image will be used in the main hero slider
+              </p>
+              {formData.slider_cover_url && (
+                <div className="mt-2">
+                  <Label className="text-xs text-muted-foreground">Current Banner:</Label>
+                  <img 
+                    src={formData.slider_cover_url} 
+                    alt="Banner preview" 
+                    className="mt-1 rounded-lg max-h-40 object-cover"
+                  />
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
