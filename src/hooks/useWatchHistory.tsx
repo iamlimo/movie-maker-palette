@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { dbCache } from '@/utils/indexedDBCache';
 
 export interface WatchHistoryItem {
   id: string;
@@ -113,6 +114,24 @@ export const useWatchHistory = () => {
       
       setContinueWatching(continuing);
       setCompletedItems(completed);
+
+      // Cache watched content for offline access
+      try {
+        for (const item of typedHistory) {
+          await dbCache.set(`content_${item.content_id}`, {
+            id: item.content_id,
+            contentType: item.content_type,
+            title: item.title || 'Unknown',
+            thumbnail_url: item.thumbnail_url,
+            duration: item.duration,
+            progress: item.progress,
+            cachedAt: Date.now(),
+            metadata: item
+          });
+        }
+      } catch (error) {
+        console.error('Failed to cache content to IndexedDB:', error);
+      }
     } catch (error) {
       console.error('Error fetching watch history:', error);
       toast({
