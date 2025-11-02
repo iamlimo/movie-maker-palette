@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { checkRateLimit } from "../_shared/auth.ts";
+import { validatePaymentAmount } from "../_shared/validation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,17 +31,20 @@ serve(async (req) => {
       });
     }
 
-    const { amount } = await req.json();
-
-    if (!amount || amount < 100) {
-      return new Response(JSON.stringify({ error: 'Amount must be at least ₦1 (100 kobo)' }), {
-        status: 400,
+    // Rate limiting: 10 requests per minute per user
+    if (!checkRateLimit(user.id, 10, 60000)) {
+      return new Response(JSON.stringify({ error: 'Too many funding requests. Please try again later.' }), {
+        status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    if (amount > 50000000) {
-      return new Response(JSON.stringify({ error: 'Amount exceeds maximum limit of ₦500,000' }), {
+    const { amount } = await req.json();
+
+    // Validate amount using shared validation utility
+    const amountValidation = validatePaymentAmount(amount);
+    if (!amountValidation.isValid) {
+      return new Response(JSON.stringify({ error: amountValidation.errors[0] }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -118,7 +123,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Wallet funding error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'An error occurred processing your request' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

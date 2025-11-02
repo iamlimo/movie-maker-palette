@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { checkRateLimit } from "../_shared/auth.ts";
+import { validatePaymentAmount, sanitizeInput } from "../_shared/validation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +31,26 @@ serve(async (req) => {
       });
     }
 
-    const { contentId, contentType, price, useWallet } = await req.json();
+    // Rate limiting: 5 requests per minute per user
+    if (!checkRateLimit(user.id, 5, 60000)) {
+      return new Response(JSON.stringify({ error: 'Too many payment requests. Please try again later.' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const requestBody = await req.json();
+    const sanitized = sanitizeInput(requestBody);
+    const { contentId, contentType, price, useWallet } = sanitized;
+
+    // Validate inputs
+    const amountValidation = validatePaymentAmount(price);
+    if (!amountValidation.isValid) {
+      return new Response(JSON.stringify({ error: amountValidation.errors[0] }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     if (!contentId || !contentType || !price) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -244,7 +265,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Wallet payment error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'An error occurred processing your payment' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

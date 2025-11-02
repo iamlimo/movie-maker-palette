@@ -24,14 +24,42 @@ function checkWebhookRateLimit(identifier: string, maxRequests = 100, windowMs =
   return true;
 }
 
-// Webhook signature verification
-function verifyPaystackSignature(body: string, signature: string, secret: string): boolean {
-  const crypto = new TextEncoder().encode(secret);
-  const data = new TextEncoder().encode(body);
-  
-  // For demonstration - in production, use proper HMAC-SHA512 verification
-  // This is a simplified version
-  return Boolean(signature && signature.length > 0);
+// Webhook signature verification with proper HMAC-SHA512
+async function verifyPaystackSignature(body: string, signature: string, secret: string): Promise<boolean> {
+  try {
+    // Remove '0x' prefix if present and convert hex to bytes
+    const hexSignature = signature.startsWith('0x') ? signature.slice(2) : signature;
+    
+    // Convert hex string to Uint8Array
+    const signatureBytes = new Uint8Array(
+      hexSignature.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+    );
+    
+    // Import the secret key for HMAC
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-512' },
+      false,
+      ['verify']
+    );
+    
+    // Verify the signature
+    const dataBytes = encoder.encode(body);
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signatureBytes,
+      dataBytes
+    );
+    
+    return isValid;
+  } catch (error) {
+    console.error('Signature verification error:', error);
+    return false;
+  }
 }
 
 // Webhook event deduplication
@@ -83,7 +111,8 @@ serve(async (req) => {
       throw new Error("Paystack secret key not configured");
     }
 
-    if (!verifyPaystackSignature(body, signature, paystackSecret)) {
+    const isValidSignature = await verifyPaystackSignature(body, signature, paystackSecret);
+    if (!isValidSignature) {
       console.warn(`Invalid webhook signature from IP: ${clientIP}`);
       return jsonResponse({ error: "Invalid signature" }, 401);
     }

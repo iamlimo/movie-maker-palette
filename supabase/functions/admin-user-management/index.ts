@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit } from "../_shared/auth.ts";
+import { validateEmail, sanitizeInput } from "../_shared/validation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,12 +43,31 @@ serve(async (req) => {
       throw new Error('Insufficient permissions. Super admin access required.');
     }
 
-    const { action, email, name, password, role, user_id } = await req.json();
+    // Rate limiting: 20 requests per minute per admin
+    if (!checkRateLimit(user.id, 20, 60000)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Too many requests. Please try again later.' }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const requestBody = await req.json();
+    const sanitized = sanitizeInput(requestBody);
+    const { action, email, name, password, role, user_id } = sanitized;
 
     // CREATE USER
     if (action === 'create') {
       if (!email || !name) {
         throw new Error('Email and name are required');
+      }
+
+      // Validate email format
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.isValid) {
+        throw new Error(emailValidation.errors[0]);
       }
 
       const generatedPassword = password || `${Math.random().toString(36).slice(-8)}${Math.random().toString(36).slice(-8)}`;
@@ -181,7 +202,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('Error in admin-user-management:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: 'An error occurred processing your request' }),
       {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
