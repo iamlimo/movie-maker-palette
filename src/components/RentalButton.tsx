@@ -31,6 +31,8 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
 
   const hasAccess = checkAccess(contentId, contentType);
   const isNative = Capacitor.isNativePlatform();
+  const isMobileBrowser = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
+  const shouldUseRedirect = isNative || isMobileBrowser;
 
   // Find active rental for countdown
   const activeRental = activeRentals.find(
@@ -171,7 +173,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
         const paymentId = data.payment_id || data.id;
         
         // On mobile, redirect instead of popup
-        if (isNative) {
+        if (shouldUseRedirect) {
           window.location.href = authUrl;
         } else {
           window.open(authUrl, '_blank', 'width=500,height=700');
@@ -180,7 +182,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
         setShowBottomSheet(false);
         toast({
           title: "Payment Initiated",
-          description: isNative ? "Redirecting to payment..." : "Complete your payment in the popup window",
+          description: shouldUseRedirect ? "Redirecting to payment..." : "Complete your payment in the popup window",
         });
 
         // Poll for payment completion
@@ -282,7 +284,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
         )}
 
         {/* Main Rent Button - Opens bottom sheet on mobile, inline on desktop */}
-        {isNative ? (
+        {(isNative || isMobileBrowser) ? (
           <Button
             onClick={handleOpenSheet}
             disabled={isLoading}
