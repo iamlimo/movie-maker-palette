@@ -1,5 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import { Capacitor } from '@capacitor/core'
 import App from './App.tsx'
 import './index.css'
 
@@ -78,8 +79,10 @@ if (!checkBrowserCompatibility()) {
     } else {
       createRoot(rootElement).render(<App />);
 
-      // Register service worker after successful render
-      if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
+      // Register service worker after successful render (web only, not needed on native)
+      if ('serviceWorker' in navigator && 
+          location.hostname !== 'localhost' && 
+          !Capacitor.isNativePlatform()) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then(registration => console.log('SW registered:', registration))

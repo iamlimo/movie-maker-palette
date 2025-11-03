@@ -387,7 +387,7 @@ const ViewTVShow = () => {
                                   size="sm" 
                                   variant="ghost"
                                   title="Preview Episode"
-                                  onClick={() => window.open(`/tvshow/${tvShow.id}?episode=${episode.id}`, '_blank')}
+                                  onClick={() => navigate(`/tvshow/${tvShow.id}?episode=${episode.id}`)}
                                 >
                                   <Play className="h-4 w-4" />
                                 </Button>

@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SecureVideoPlayerProps {
   contentId: string;
@@ -30,13 +31,21 @@ const SecureVideoPlayer = ({
       setLoading(true);
       setError(null);
 
+      // Get the current session token (works on both native and web)
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch(
         `https://tsfwlereofjlxhjsarap.supabase.co/functions/v1/generate-b2-signed-url`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             contentId,

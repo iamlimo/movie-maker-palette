@@ -4,6 +4,8 @@ const config: CapacitorConfig = {
   appId: 'app.lovable.35c19387a3ec428da8fc4ab933986941',
   appName: 'Signature TV',
   webDir: 'dist',
+  // IMPORTANT: For production builds, comment out or remove the 'server' section below
+  // This enables hot-reload during development but should be removed for release builds
   server: {
     url: 'https://35c19387-a3ec-428d-a8fc-4ab933986941.lovableproject.com?forceHideBadge=true',
     cleartext: true

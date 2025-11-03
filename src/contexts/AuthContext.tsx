@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -47,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [navigationCallback, setNavigationCallback] = useState<(() => void) | null>(null);
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -163,13 +165,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       await supabase.auth.signOut();
       // State will be cleared by the auth state change listener
-      // Force navigation to home page
-      window.location.href = '/';
+      // Set navigation callback to navigate after state is cleared
+      setNavigationCallback(() => () => {
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
+        }
+      });
     } catch (error) {
       console.error('Sign out error:', error);
       setLoading(false);
     }
   };
+
+  // Execute navigation callback after state updates
+  useEffect(() => {
+    if (navigationCallback && !loading) {
+      navigationCallback();
+      setNavigationCallback(null);
+    }
+  }, [navigationCallback, loading]);
 
   const value = {
     user,

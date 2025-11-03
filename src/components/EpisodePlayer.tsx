@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ const EpisodePlayer = ({
   const { toast } = useToast();
   const { updateWatchProgress, markAsCompleted } = useWatchHistory();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const navigate = useNavigate();
   
   const [hasAccess, setHasAccess] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -161,15 +163,14 @@ const EpisodePlayer = ({
       });
       
       setTimeout(() => {
-        // Navigate to next episode (this would be handled by parent component)
-        window.location.href = `/episodes/${nextEpisodeId}`;
+        navigate(`/episodes/${nextEpisodeId}`);
       }, 5000);
     }
   };
 
   const handleNextEpisode = () => {
     if (nextEpisodeId) {
-      window.location.href = `/episodes/${nextEpisodeId}`;
+      navigate(`/episodes/${nextEpisodeId}`);
     }
   };
 
