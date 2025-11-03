@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Wallet, CreditCard } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
+import { Capacitor } from '@capacitor/core';
 
 interface FundWalletModalProps {
   isOpen: boolean;
@@ -19,6 +20,10 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { refreshWallet } = useWallet();
+
+  const isNative = Capacitor.isNativePlatform();
+  const isMobileBrowser = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
+  const shouldUseRedirect = isNative || isMobileBrowser;
 
   const handleFund = async () => {
     if (amount < 100) {
@@ -48,11 +53,17 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
       if (error) throw error;
 
       if (data.success) {
-        window.open(data.authorization_url, '_blank', 'width=500,height=700');
+        const authUrl = data.authorization_url;
+        
+        if (shouldUseRedirect) {
+          window.location.href = authUrl;
+        } else {
+          window.open(authUrl, '_blank', 'width=500,height=700');
+        }
         
         toast({
           title: 'Payment Initiated',
-          description: 'Complete your payment in the popup window',
+          description: shouldUseRedirect ? "Redirecting to payment..." : "Complete your payment in the popup window",
         });
 
         // Poll for payment completion
