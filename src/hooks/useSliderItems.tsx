@@ -17,6 +17,12 @@ export interface SliderItem {
   status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
+  promotion_type: 'standard' | 'promoted' | 'coming_soon';
+  release_date: string | null;
+  promotion_badge_text: string | null;
+  promotion_priority: number;
+  promotion_starts_at: string | null;
+  promotion_ends_at: string | null;
 }
 
 export const useSliderItems = () => {

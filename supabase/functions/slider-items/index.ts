@@ -25,10 +25,15 @@ serve(async (req) => {
         Deno.env.get("SUPABASE_ANON_KEY") ?? ""
       );
 
+      const now = new Date().toISOString();
+      
       const { data, error } = await publicSupabase
         .from("slider_items")
         .select("*")
         .eq("status", "active")
+        .or(`promotion_starts_at.is.null,promotion_starts_at.lte.${now}`)
+        .or(`promotion_ends_at.is.null,promotion_ends_at.gte.${now}`)
+        .order("promotion_priority", { ascending: false })
         .order("sort_order", { ascending: true });
 
       if (error) throw error;

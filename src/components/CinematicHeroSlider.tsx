@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Plus, Star, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Plus, Star, Clock, ChevronLeft, ChevronRight, Sparkles, Bell } from 'lucide-react';
 import { useSliderItems, SliderItem } from '@/hooks/useSliderItems';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import FavoriteButton from '@/components/FavoriteButton';
 import { formatNaira } from '@/lib/priceUtils';
+import { differenceInDays, differenceInHours, differenceInMinutes, format, isPast } from 'date-fns';
 
 const CinematicHeroSlider = () => {
   const navigate = useNavigate();
@@ -47,8 +48,6 @@ const CinematicHeroSlider = () => {
     setIsAutoPlaying(false);
   }, []);
 
-  // Rental functionality removed - use movie/TV preview pages for rentals
-
   const handleAddToWatchlist = async (item: SliderItem) => {
     if (!user) {
       toast({
@@ -74,6 +73,28 @@ const CinematicHeroSlider = () => {
     }
   };
 
+  const getCountdown = (releaseDate: string | null) => {
+    if (!releaseDate) return null;
+    
+    const release = new Date(releaseDate);
+    if (isPast(release)) return null;
+
+    const days = differenceInDays(release, new Date());
+    const hours = differenceInHours(release, new Date()) % 24;
+    const minutes = differenceInMinutes(release, new Date()) % 60;
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const handleNotifyMe = (item: SliderItem) => {
+    toast({
+      title: "Notification Set",
+      description: `We'll notify you when ${item.title} is released!`,
+    });
+  };
+
   if (loading) {
     return (
       <section className="relative min-h-screen flex items-center justify-center bg-background">
@@ -87,6 +108,9 @@ const CinematicHeroSlider = () => {
   }
 
   const currentItem = sliderItems[currentIndex];
+  const isComingSoon = currentItem.promotion_type === 'coming_soon';
+  const isPromoted = currentItem.promotion_type === 'promoted';
+  const countdown = getCountdown(currentItem.release_date);
 
   return (
     <section 
@@ -108,13 +132,18 @@ const CinematicHeroSlider = () => {
             <img 
               src={currentItem.poster_url || moviePlaceholder} 
               alt={currentItem.title}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover transition-all ${isComingSoon ? 'opacity-60 blur-sm' : ''}`}
               onError={(e) => {
                 (e.target as HTMLImageElement).src = moviePlaceholder;
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+            
+            {/* Promoted overlay effect */}
+            {isPromoted && (
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-orange-500/10 animate-pulse" />
+            )}
           </div>
         </motion.div>
       </AnimatePresence>
@@ -152,32 +181,66 @@ const CinematicHeroSlider = () => {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              {/* Movie Badge */}
+              {/* Badges */}
               <div className="flex items-center gap-4 mb-6">
+                {isPromoted && (
+                  <Badge className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-600 animate-pulse">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    {currentItem.promotion_badge_text || 'PROMOTED'}
+                  </Badge>
+                )}
+                {isComingSoon && (
+                  <Badge className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600">
+                    <Clock className="mr-1 h-3 w-3" />
+                    COMING SOON
+                  </Badge>
+                )}
                 <Badge variant="secondary" className="px-3 py-1">
                   {currentItem.is_featured ? 'Featured' : 'Premium'} {currentItem.content_type === 'movie' ? 'Movie' : 'TV Show'}
                 </Badge>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  {currentItem.rating && (
-                    <>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 fill-primary text-primary" />
-                        <span>{currentItem.rating}</span>
-                      </div>
-                      <span>•</span>
-                    </>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>48h rental</span>
+                
+                {!isComingSoon && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {currentItem.rating && (
+                      <>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 fill-primary text-primary" />
+                          <span>{currentItem.rating}</span>
+                        </div>
+                        <span>•</span>
+                      </>
+                    )}
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>48h rental</span>
+                    </div>
+                    <span>•</span>
+                    <span>{formatNaira(currentItem.price)}</span>
                   </div>
-                  <span>•</span>
-                  <span>{formatNaira(currentItem.price)}</span>
-                </div>
+                )}
               </div>
 
+              {/* Coming Soon Release Info */}
+              {isComingSoon && currentItem.release_date && (
+                <div className="mb-4 flex items-center gap-3">
+                  <Badge variant="outline" className="text-base px-4 py-2">
+                    Releases: {format(new Date(currentItem.release_date), 'MMMM d, yyyy')}
+                  </Badge>
+                  {countdown && (
+                    <Badge variant="outline" className="text-base px-4 py-2 animate-pulse">
+                      <Clock className="mr-1 h-4 w-4" />
+                      {countdown} remaining
+                    </Badge>
+                  )}
+                </div>
+              )}
+
               {/* Title */}
-              <h1 className="text-6xl md:text-7xl font-bold mb-4 bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+              <h1 className={`text-6xl md:text-7xl font-bold mb-4 bg-gradient-to-r ${
+                isPromoted ? 'from-amber-500 via-orange-500 to-primary' :
+                isComingSoon ? 'from-blue-500 via-purple-500 to-primary' :
+                'from-foreground to-primary'
+              } bg-clip-text text-transparent`}>
                 {currentItem.title}
               </h1>
 
@@ -192,25 +255,41 @@ const CinematicHeroSlider = () => {
               {currentItem.genre && (
                 <div className="flex items-center gap-2 mb-8">
                   <Badge variant="outline">{currentItem.genre}</Badge>
+                  {!isComingSoon && <Badge variant="outline">{formatNaira(currentItem.price)}</Badge>}
                 </div>
               )}
 
               {/* Action Buttons */}
               <div className="flex items-center gap-4">
-                <Button 
-                  variant="default" 
-                  size="lg" 
-                  className="shadow-glow hover:scale-105 transition-transform"
-                  onClick={() => {
-                    const route = currentItem.content_type === 'movie' 
-                      ? `/movie/${currentItem.content_id}` 
-                      : `/tvshow/${currentItem.content_id}`;
-                    navigate(route);
-                  }}
-                >
-                  <Play className="h-5 w-5 mr-2" />
-                  View Details
-                </Button>
+                {isComingSoon ? (
+                  <Button 
+                    variant="default" 
+                    size="lg" 
+                    className="shadow-glow hover:scale-105 transition-transform bg-gradient-to-r from-blue-500 to-purple-600"
+                    onClick={() => handleNotifyMe(currentItem)}
+                  >
+                    <Bell className="h-5 w-5 mr-2" />
+                    Notify Me
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="default" 
+                    size="lg" 
+                    className={`shadow-glow hover:scale-105 transition-transform ${
+                      isPromoted ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700' : ''
+                    }`}
+                    onClick={() => {
+                      const route = currentItem.content_type === 'movie' 
+                        ? `/movie/${currentItem.content_id}` 
+                        : `/tvshow/${currentItem.content_id}`;
+                      navigate(route);
+                    }}
+                  >
+                    <Play className="h-5 w-5 mr-2" />
+                    {isPromoted ? 'Watch Now' : 'View Details'}
+                  </Button>
+                )}
+                
                 <div className="flex items-center gap-2">
                   <FavoriteButton
                     contentType={currentItem.content_type}
@@ -218,20 +297,26 @@ const CinematicHeroSlider = () => {
                     size="lg"
                     className="bg-white/20 hover:bg-white/30"
                   />
-                  <Button 
-                    variant="cinema" 
-                    size="lg"
-                    onClick={() => handleAddToWatchlist(currentItem)}
-                  >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Add to Watchlist
-                  </Button>
+                  {!isComingSoon && (
+                    <Button 
+                      variant="cinema" 
+                      size="lg"
+                      onClick={() => handleAddToWatchlist(currentItem)}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add to Watchlist
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* Rental Info */}
+              {/* Info Footer */}
               <div className="mt-6 text-sm text-muted-foreground">
-                <p>48-hour rental period • HD & 4K available • Instant streaming</p>
+                {isComingSoon ? (
+                  <p>We'll notify you when this becomes available</p>
+                ) : (
+                  <p>48-hour rental period • HD & 4K available • Instant streaming</p>
+                )}
               </div>
             </motion.div>
           </AnimatePresence>
@@ -241,17 +326,26 @@ const CinematicHeroSlider = () => {
       {/* Slide Indicators */}
       {sliderItems.length > 1 && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-          {sliderItems.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                index === currentIndex 
-                  ? 'bg-primary scale-125' 
-                  : 'bg-white/40 hover:bg-white/60'
-              }`}
-            />
-          ))}
+          {sliderItems.map((item, index) => {
+            const isPromotedSlide = item.promotion_type === 'promoted';
+            const isComingSoonSlide = item.promotion_type === 'coming_soon';
+            
+            return (
+              <button
+                key={index}
+                onClick={() => goToSlide(index)}
+                className={`h-3 rounded-full transition-all duration-300 ${
+                  index === currentIndex 
+                    ? isPromotedSlide 
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-600 scale-125 w-8' 
+                      : isComingSoonSlide
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 scale-125 w-8'
+                      : 'bg-primary scale-125 w-8'
+                    : 'bg-white/40 hover:bg-white/60 w-3'
+                }`}
+              />
+            );
+          })}
         </div>
       )}
     </section>

@@ -798,7 +798,13 @@ export type Database = {
           is_rentable: boolean
           poster_url: string | null
           price: number
+          promotion_badge_text: string | null
+          promotion_ends_at: string | null
+          promotion_priority: number
+          promotion_starts_at: string | null
+          promotion_type: Database["public"]["Enums"]["promotion_type"]
           rating: string | null
+          release_date: string | null
           sort_order: number
           status: string
           title: string
@@ -815,7 +821,13 @@ export type Database = {
           is_rentable?: boolean
           poster_url?: string | null
           price?: number
+          promotion_badge_text?: string | null
+          promotion_ends_at?: string | null
+          promotion_priority?: number
+          promotion_starts_at?: string | null
+          promotion_type?: Database["public"]["Enums"]["promotion_type"]
           rating?: string | null
+          release_date?: string | null
           sort_order?: number
           status?: string
           title: string
@@ -832,7 +844,13 @@ export type Database = {
           is_rentable?: boolean
           poster_url?: string | null
           price?: number
+          promotion_badge_text?: string | null
+          promotion_ends_at?: string | null
+          promotion_priority?: number
+          promotion_starts_at?: string | null
+          promotion_type?: Database["public"]["Enums"]["promotion_type"]
           rating?: string | null
+          release_date?: string | null
           sort_order?: number
           status?: string
           title?: string
@@ -1353,6 +1371,7 @@ export type Database = {
         | "success"
       payment_status: "pending" | "completed" | "failed" | "refunded"
       producer_status: "pending" | "approved" | "rejected"
+      promotion_type: "standard" | "promoted" | "coming_soon"
       rental_status: "active" | "expired"
       submission_status: "pending" | "under_review" | "approved" | "rejected"
       submission_type: "movie" | "tv_show"
@@ -1497,6 +1516,7 @@ export const Constants = {
       ],
       payment_status: ["pending", "completed", "failed", "refunded"],
       producer_status: ["pending", "approved", "rejected"],
+      promotion_type: ["standard", "promoted", "coming_soon"],
       rental_status: ["active", "expired"],
       submission_status: ["pending", "under_review", "approved", "rejected"],
       submission_type: ["movie", "tv_show"],
