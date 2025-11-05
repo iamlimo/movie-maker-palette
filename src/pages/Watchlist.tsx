@@ -3,14 +3,24 @@ import { useFavorites } from '@/hooks/useFavorites';
 import Header from '@/components/Header';
 import MovieCard from '@/components/MovieCard';
 import { Button } from '@/components/ui/button';
-import { Heart, Film, Tv, Trash2 } from 'lucide-react';
+import { Heart, Film, Tv, Trash2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Watchlist = () => {
   const { user } = useAuth();
-  const { favorites, loading, removeFromFavorites } = useFavorites();
+  const { favorites, loading, removeFromFavorites, refetch } = useFavorites();
   const [filter, setFilter] = useState<'all' | 'movie' | 'tv_show'>('all');
+  const isMobile = useIsMobile();
+
+  const { isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      if (refetch) await refetch();
+    },
+    enabled: isMobile && !!user,
+  });
 
   const filteredFavorites = favorites?.filter(fav => 
     filter === 'all' || fav.content_type === filter
@@ -51,6 +61,14 @@ const Watchlist = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      
+      {/* Pull-to-refresh indicator */}
+      {isRefreshing && isMobile && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-primary/90 backdrop-blur-sm text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <span className="text-sm font-medium">Refreshing...</span>
+        </div>
+      )}
       
       <main className="pt-24 pb-12">
         <div className="container mx-auto px-4">

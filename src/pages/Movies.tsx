@@ -3,15 +3,25 @@ import { useMovies } from '@/hooks/useMovies';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Search, Filter, Grid, List } from 'lucide-react';
+import { Search, Filter, Grid, List, RefreshCw } from 'lucide-react';
 import MovieCard from '@/components/MovieCard';
 import Header from '@/components/Header';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Movies = () => {
-  const { movies, loading } = useMovies();
+  const { movies, loading, refetch } = useMovies();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
+  const isMobile = useIsMobile();
+
+  const { isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await refetch();
+    },
+    enabled: isMobile,
+  });
 
   const filteredMovies = movies
     ?.filter(movie => 
@@ -38,6 +48,14 @@ const Movies = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      
+      {/* Pull-to-refresh indicator */}
+      {isRefreshing && isMobile && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-primary/90 backdrop-blur-sm text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <span className="text-sm font-medium">Refreshing...</span>
+        </div>
+      )}
       
       <main className="pt-24 pb-12">
         <div className="container mx-auto px-4">

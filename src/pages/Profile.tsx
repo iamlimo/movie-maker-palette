@@ -12,6 +12,8 @@ import { Progress } from '@/components/ui/progress';
 import { ProfileSidebar } from '@/components/ui/sidebar-profile';
 import { PinnedContent } from '@/components/PinnedContent';
 import { WalletWidget } from '@/components/wallet/WalletWidget';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   CalendarIcon, 
   Camera, 
@@ -28,6 +30,7 @@ import {
   Eye,
   Star,
   TrendingUp,
+  RefreshCw,
   Wallet,
   Menu
 } from 'lucide-react';
@@ -44,13 +47,25 @@ import { Link } from 'react-router-dom';
 
 const Profile = () => {
   const { user } = useAuth();
-  const { profile, preferences, loading: profileLoading, updateProfile, updatePreferences, uploadProfileImage } = useProfile();
-  const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted } = useWatchHistory();
-  const { favorites, loading: favoritesLoading } = useFavorites();
+  const { profile, preferences, loading: profileLoading, updateProfile, updatePreferences, uploadProfileImage, refetch: refetchProfile } = useProfile();
+  const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
+  const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+
+  const { isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await Promise.all([
+        refetchProfile?.(),
+        refetchHistory?.(),
+        refetchFavorites?.(),
+      ]);
+    },
+    enabled: isMobile,
+  });
   
   // Form states
   const [formData, setFormData] = useState({
@@ -165,6 +180,14 @@ const Profile = () => {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
+        {/* Pull-to-refresh indicator */}
+        {isRefreshing && isMobile && (
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-primary/90 backdrop-blur-sm text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span className="text-sm font-medium">Refreshing...</span>
+          </div>
+        )}
+        
         {/* Enhanced Header */}
         <div className="gradient-hero py-12">
           <div className="container mx-auto px-4">

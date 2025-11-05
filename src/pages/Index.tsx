@@ -6,12 +6,23 @@ import BrandStrip from "@/components/BrandStrip";
 import MovieSection from "@/components/MovieSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSectionsWithContent } from "@/hooks/useContentSections";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { RefreshCw } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { sectionsWithContent, loading } = useSectionsWithContent();
+  const { sectionsWithContent, loading, refetch } = useSectionsWithContent();
   const currentYear = new Date().getFullYear();
+  const isMobile = useIsMobile();
+
+  const { isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await refetch();
+    },
+    enabled: isMobile,
+  });
 
   // Redirect authenticated users away from auth page
   useEffect(() => {
@@ -34,6 +45,15 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <Header />
+      
+      {/* Pull-to-refresh indicator */}
+      {isRefreshing && isMobile && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-primary/90 backdrop-blur-sm text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <span className="text-sm font-medium">Refreshing...</span>
+        </div>
+      )}
+      
       <CinematicHeroSlider />
       <BrandStrip />
 
