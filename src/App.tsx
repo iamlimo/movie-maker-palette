@@ -5,6 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { BottomNav } from "@/components/mobile/BottomNav";
+import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
+import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -49,15 +52,14 @@ import Docs from "./pages/Docs";
 
 const queryClient = new QueryClient();
 
-const App: React.FC = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <OfflineBanner />
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
+function AppContent() {
+  useDeepLinking();
+  
+  return (
+    <>
+      <OfflineBanner />
+      <MobileRouteAnimator>
+        <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
@@ -106,6 +108,20 @@ const App: React.FC = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+        </MobileRouteAnimator>
+        <BottomNav />
+      </>
+  );
+}
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppContent />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

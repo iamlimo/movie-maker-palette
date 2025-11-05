@@ -257,6 +257,23 @@
 }
 
 @layer utilities {
+  /* Bottom navigation safe area support */
+  .bottom-nav-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Page content padding when bottom nav is visible */
+  .mobile-content-padding {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
+  /* Active tab indicator animation */
+  @keyframes tab-active {
+    0% { transform: scale(0.95); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
   /* Mobile-first touch targets */
   .touch-target {
     min-height: 44px;

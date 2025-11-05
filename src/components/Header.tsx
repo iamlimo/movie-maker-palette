@@ -1,9 +1,11 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Search, User, Menu, LogOut, Settings, X, Wallet } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
 import { useWallet } from "@/hooks/useWallet";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isBottomNavRoute } from "@/lib/navigationUtils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +25,10 @@ const Header = () => {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const location = useLocation();
+  
+  const showBottomNav = isMobile && isBottomNavRoute(location.pathname);
 
   const handleSignOut = async () => {
     if (isSigningOut) return; // Prevent multiple clicks
@@ -46,7 +52,7 @@ const Header = () => {
     }
   };
   return (
-    <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <header className={`fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border ${showBottomNav ? 'md:block hidden' : ''}`}>
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2">
