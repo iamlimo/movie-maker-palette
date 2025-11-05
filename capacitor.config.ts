@@ -4,10 +4,10 @@ const config: CapacitorConfig = {
   appId: "co.signature.tv",
   appName: "Signature TV",
   webDir: "dist",
-  server: {
-    url: "https://35c19387-a3ec-428d-a8fc-4ab933986941.lovableproject.com?forceHideBadge=true",
-    cleartext: true
-  },
+  // server: {
+  //   url: "https://35c19387-a3ec-428d-a8fc-4ab933986941.lovableproject.com?forceHideBadge=true",
+  //   cleartext: true
+  // },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,

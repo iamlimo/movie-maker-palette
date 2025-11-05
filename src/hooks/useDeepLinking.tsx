@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { parseDeepLink } from "@/lib/navigationUtils";
 
@@ -13,6 +12,10 @@ export function useDeepLinking() {
     let listener: any = null;
 
     const setupListener = async () => {
+      // Import @capacitor/app at runtime only on native platforms so Vite/Rollup
+      // doesn't attempt to resolve it during web build.
+      const { App: CapacitorApp } = await import("@capacitor/app");
+
       listener = await CapacitorApp.addListener("appUrlOpen", (data) => {
         const route = parseDeepLink(data.url);
         if (route) {
