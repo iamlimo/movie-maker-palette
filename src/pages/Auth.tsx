@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -17,26 +23,26 @@ const Auth = () => {
   // Redirect authenticated users to home
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate("/");
     }
   }, [user, navigate]);
   const { toast } = useToast();
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Login form state
   const [loginData, setLoginData] = useState({
-    email: '',
-    password: ''
+    email: "",
+    password: "",
   });
 
   // Signup form state
   const [signupData, setSignupData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -45,33 +51,34 @@ const Auth = () => {
 
     try {
       const { error } = await signIn(loginData.email, loginData.password);
-      
+
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
+        if (error.message.includes("Invalid login credentials")) {
           toast({
             title: "Login Failed",
-            description: "Invalid email or password. Please check your credentials and try again.",
-            variant: "destructive"
+            description:
+              "Invalid email or password. Please check your credentials and try again.",
+            variant: "destructive",
           });
         } else {
           toast({
             title: "Login Failed",
             description: error.message,
-            variant: "destructive"
+            variant: "destructive",
           });
         }
       } else {
         toast({
           title: "Welcome back!",
-          description: "You have successfully logged in."
+          description: "You have successfully logged in.",
         });
-        navigate('/');
+        navigate("/");
       }
     } catch (error) {
       toast({
         title: "Login Failed",
         description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -80,12 +87,12 @@ const Auth = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (signupData.password !== signupData.confirmPassword) {
       toast({
         title: "Password Mismatch",
         description: "Passwords do not match. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -94,7 +101,7 @@ const Auth = () => {
       toast({
         title: "Weak Password",
         description: "Password must be at least 6 characters long.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -102,35 +109,46 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await signUp(signupData.email, signupData.password, signupData.name);
-      
+      const { error } = await signUp(
+        signupData.email,
+        signupData.password,
+        signupData.name
+      );
+
       if (error) {
-        if (error.message.includes('User already registered')) {
+        if (error.message.includes("User already registered")) {
           toast({
             title: "Account Exists",
-            description: "An account with this email already exists. Please try logging in instead.",
-            variant: "destructive"
+            description:
+              "An account with this email already exists. Please try logging in instead.",
+            variant: "destructive",
           });
         } else {
           toast({
             title: "Registration Failed",
             description: error.message,
-            variant: "destructive"
+            variant: "destructive",
           });
         }
       } else {
         toast({
           title: "Account Created!",
-          description: "Please check your email to verify your account before logging in."
+          description:
+            "Please check your email to verify your account before logging in.",
         });
         // Reset form and switch to login tab
-        setSignupData({ name: '', email: '', password: '', confirmPassword: '' });
+        setSignupData({
+          name: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
+        });
       }
     } catch (error) {
       toast({
         title: "Registration Failed",
         description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -142,7 +160,10 @@ const Auth = () => {
       <div className="w-full max-w-md">
         {/* Header with back button */}
         <div className="flex items-center mb-8">
-          <Link to="/" className="flex items-center text-muted-foreground hover:text-primary transition-smooth">
+          <Link
+            to="/"
+            className="flex items-center text-muted-foreground hover:text-primary transition-smooth"
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Link>
@@ -151,11 +172,13 @@ const Auth = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-12 h-12 gradient-accent rounded-xl flex items-center justify-center shadow-glow">
-              <span className="text-primary-foreground font-bold text-2xl">S</span>
-            </div>
+            {/* <div className="w-12 h-12 gradient-accent rounded-xl flex items-center justify-center shadow-glow">
+              <span className="text-primary-foreground font-bold text-2xl">
+                S
+              </span>
+            </div> */}
             <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Signature TV
+              <img src="/signature-tv-logo.png" alt="" />{" "}
             </span>
           </div>
           <p className="text-muted-foreground">Premium movie rental platform</p>
@@ -163,7 +186,9 @@ const Auth = () => {
 
         <Card className="gradient-card border-border/50 shadow-premium">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-foreground">Welcome</CardTitle>
+            <CardTitle className="text-2xl font-bold text-foreground">
+              Welcome
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
               Sign in to your account or create a new one
             </CardDescription>
@@ -171,10 +196,16 @@ const Auth = () => {
           <CardContent>
             <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-8 bg-secondary">
-                <TabsTrigger value="login" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger
+                  value="login"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
                   Sign In
                 </TabsTrigger>
-                <TabsTrigger value="signup" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger
+                  value="signup"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
                   Sign Up
                 </TabsTrigger>
               </TabsList>
@@ -182,7 +213,9 @@ const Auth = () => {
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-foreground">Email</Label>
+                    <Label htmlFor="login-email" className="text-foreground">
+                      Email
+                    </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -190,7 +223,9 @@ const Auth = () => {
                         type="email"
                         placeholder="Enter your email"
                         value={loginData.email}
-                        onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                        onChange={(e) =>
+                          setLoginData({ ...loginData, email: e.target.value })
+                        }
                         className="pl-10 bg-background/50 border-border focus:border-primary"
                         required
                       />
@@ -198,7 +233,9 @@ const Auth = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-foreground">Password</Label>
+                    <Label htmlFor="login-password" className="text-foreground">
+                      Password
+                    </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -206,7 +243,12 @@ const Auth = () => {
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         value={loginData.password}
-                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                        onChange={(e) =>
+                          setLoginData({
+                            ...loginData,
+                            password: e.target.value,
+                          })
+                        }
                         className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
                         required
                       />
@@ -215,7 +257,11 @@ const Auth = () => {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -233,7 +279,9 @@ const Auth = () => {
               <TabsContent value="signup">
                 <form onSubmit={handleSignup} className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-name" className="text-foreground">Full Name</Label>
+                    <Label htmlFor="signup-name" className="text-foreground">
+                      Full Name
+                    </Label>
                     <div className="relative">
                       <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -241,7 +289,9 @@ const Auth = () => {
                         type="text"
                         placeholder="Enter your full name"
                         value={signupData.name}
-                        onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
+                        onChange={(e) =>
+                          setSignupData({ ...signupData, name: e.target.value })
+                        }
                         className="pl-10 bg-background/50 border-border focus:border-primary"
                         required
                       />
@@ -249,7 +299,9 @@ const Auth = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-foreground">Email</Label>
+                    <Label htmlFor="signup-email" className="text-foreground">
+                      Email
+                    </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -257,7 +309,12 @@ const Auth = () => {
                         type="email"
                         placeholder="Enter your email"
                         value={signupData.email}
-                        onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
+                        onChange={(e) =>
+                          setSignupData({
+                            ...signupData,
+                            email: e.target.value,
+                          })
+                        }
                         className="pl-10 bg-background/50 border-border focus:border-primary"
                         required
                       />
@@ -265,7 +322,12 @@ const Auth = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-foreground">Password</Label>
+                    <Label
+                      htmlFor="signup-password"
+                      className="text-foreground"
+                    >
+                      Password
+                    </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -273,7 +335,12 @@ const Auth = () => {
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
                         value={signupData.password}
-                        onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
+                        onChange={(e) =>
+                          setSignupData({
+                            ...signupData,
+                            password: e.target.value,
+                          })
+                        }
                         className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
                         required
                         minLength={6}
@@ -283,13 +350,22 @@ const Auth = () => {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-confirm-password" className="text-foreground">Confirm Password</Label>
+                    <Label
+                      htmlFor="signup-confirm-password"
+                      className="text-foreground"
+                    >
+                      Confirm Password
+                    </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -297,7 +373,12 @@ const Auth = () => {
                         type={showPassword ? "text" : "password"}
                         placeholder="Confirm your password"
                         value={signupData.confirmPassword}
-                        onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
+                        onChange={(e) =>
+                          setSignupData({
+                            ...signupData,
+                            confirmPassword: e.target.value,
+                          })
+                        }
                         className="pl-10 bg-background/50 border-border focus:border-primary"
                         required
                       />
