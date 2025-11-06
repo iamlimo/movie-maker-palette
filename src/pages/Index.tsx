@@ -46,7 +46,7 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      
+
       {/* Pull-to-refresh indicator */}
       {isRefreshing && isMobile && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-primary/90 backdrop-blur-sm text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
@@ -54,7 +54,7 @@ const Index = () => {
           <span className="text-sm font-medium">Refreshing...</span>
         </div>
       )}
-      
+
       <CinematicHeroSlider />
       <BrandStrip />
 
@@ -97,13 +97,8 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               <div>
                 <div className="flex items-center space-x-2 mb-4">
-                  <div className="w-8 h-8 gradient-accent rounded-lg flex items-center justify-center">
-                    <span className="text-primary-foreground font-bold text-lg">
-                      S
-                    </span>
-                  </div>
                   <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    Signature TV
+                    <img src="/signature-tv-logo.png" alt="" />
                   </span>
                 </div>
                 <p className="text-muted-foreground">
@@ -116,22 +111,34 @@ const Index = () => {
                 <h3 className="font-semibold text-foreground mb-4">Browse</h3>
                 <ul className="space-y-2 text-muted-foreground">
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       New Releases
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Popular
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Action
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Drama
                     </a>
                   </li>
@@ -142,22 +149,34 @@ const Index = () => {
                 <h3 className="font-semibold text-foreground mb-4">Support</h3>
                 <ul className="space-y-2 text-muted-foreground">
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Help Center
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Contact Us
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Rental Terms
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="/privacy-policy"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Privacy Policy
                     </a>
                   </li>
@@ -168,22 +187,34 @@ const Index = () => {
                 <h3 className="font-semibold text-foreground mb-4">Connect</h3>
                 <ul className="space-y-2 text-muted-foreground">
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Twitter
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Facebook
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       Instagram
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-primary transition-smooth">
+                    <a
+                      href="#"
+                      className="hover:text-primary transition-smooth"
+                    >
                       YouTube
                     </a>
                   </li>

@@ -48,69 +48,82 @@ import Help from "./pages/Help";
 import Contact from "./pages/Contact";
 import Terms from "./pages/Terms";
 import Docs from "./pages/Docs";
-
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   useDeepLinking();
-  
+
   return (
     <>
       <OfflineBanner />
       <MobileRouteAnimator>
         <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/movie/:id" element={<MoviePreview />} />
-            <Route path="/tvshow/:id" element={<TVShowPreview />} />
-            <Route path="/movies" element={<Movies />} />
-            <Route path="/tvshows" element={<TVShows />} />
-            <Route path="/genres" element={<Genres />} />
-            <Route path="/watchlist" element={<Watchlist />} />
-            <Route path="/wallet" element={<Wallet />} />
-            <Route path="/help" element={<Help />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/docs" element={<Docs />} />
-            
-            {/* Super Admin Routes */}
-            <Route path="/admin" element={
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/movie/:id" element={<MoviePreview />} />
+          <Route path="/tvshow/:id" element={<TVShowPreview />} />
+          <Route path="/movies" element={<Movies />} />
+          <Route path="/tvshows" element={<TVShows />} />
+          <Route path="/genres" element={<Genres />} />
+          <Route path="/watchlist" element={<Watchlist />} />
+          <Route path="/wallet" element={<Wallet />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/docs" element={<Docs />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+
+          {/* Super Admin Routes */}
+          <Route
+            path="/admin"
+            element={
               <SuperAdminRoute>
                 <AdminLayout />
               </SuperAdminRoute>
-            }>
-              <Route index element={<AdminDashboard />} />
-              <Route path="movies" element={<AdminMovies />} />
-              <Route path="movies/add" element={<AddMovieNew />} />
-              <Route path="movies/view/:id" element={<ViewMovie />} />
-              <Route path="movies/edit/:id" element={<EditMovie />} />
-              <Route path="tv-shows" element={<AdminTVShows />} />
-              <Route path="tv-shows/add" element={<AddTVShow />} />
-                <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
-                <Route path="tv-shows/:showId/seasons/:seasonId/add-episode" element={<AddEpisode />} />
-                <Route path="tv-shows/:showId/seasons/:seasonId/edit" element={<EditSeason />} />
-                <Route path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit" element={<EditEpisode />} />
-              <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
-              <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
-              <Route path="submissions" element={<Submissions />} />
-              <Route path="users" element={<Users />} />
-              <Route path="finance" element={<Finance />} />
-              <Route path="producers" element={<Producers />} />
-              <Route path="sections" element={<Sections />} />
-              <Route path="hero-slider" element={<HeroSlider />} />
-              <Route path="banners" element={<Banners />} />
-              <Route path="wallets" element={<Wallets />} />
-              <Route path="settings" element={<Settings />} />
-            </Route>
-            
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </MobileRouteAnimator>
-        <BottomNav />
-      </>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="movies" element={<AdminMovies />} />
+            <Route path="movies/add" element={<AddMovieNew />} />
+            <Route path="movies/view/:id" element={<ViewMovie />} />
+            <Route path="movies/edit/:id" element={<EditMovie />} />
+            <Route path="tv-shows" element={<AdminTVShows />} />
+            <Route path="tv-shows/add" element={<AddTVShow />} />
+            <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
+            <Route
+              path="tv-shows/:showId/seasons/:seasonId/add-episode"
+              element={<AddEpisode />}
+            />
+            <Route
+              path="tv-shows/:showId/seasons/:seasonId/edit"
+              element={<EditSeason />}
+            />
+            <Route
+              path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
+              element={<EditEpisode />}
+            />
+            <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
+            <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
+            <Route path="submissions" element={<Submissions />} />
+            <Route path="users" element={<Users />} />
+            <Route path="finance" element={<Finance />} />
+            <Route path="producers" element={<Producers />} />
+            <Route path="sections" element={<Sections />} />
+            <Route path="hero-slider" element={<HeroSlider />} />
+            <Route path="banners" element={<Banners />} />
+            <Route path="wallets" element={<Wallets />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </MobileRouteAnimator>
+      <BottomNav />
+    </>
   );
 }
 
