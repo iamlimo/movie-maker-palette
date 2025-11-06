@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "co.signature.tv",
+  appId: "com.leoblueprints.signaturetv",
   appName: "Signature TV",
   webDir: "dist",
   // server: {
