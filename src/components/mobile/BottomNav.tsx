@@ -29,26 +29,26 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border bottom-nav-safe">
-      <div className="flex items-center justify-around h-14 px-2">
+      <div className="flex items-center justify-around h-16 px-2 pb-1">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             onClick={handleTabPress}
-            className="flex-1 flex flex-col items-center justify-center gap-1 py-2 px-3 min-h-[56px] relative"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-h-[60px] relative"
           >
             {({ isActive }) => (
               <>
                 <motion.div
                   animate={{
-                    scale: isActive ? 1 : 0.95,
+                    scale: isActive ? 1.1 : 0.95,
                     opacity: isActive ? 1 : 0.6,
                   }}
                   transition={{ duration: 0.2 }}
                   className="relative"
                 >
                   <item.icon
-                    className={`w-6 h-6 ${
+                    className={`w-7 h-7 ${
                       isActive
                         ? "text-primary"
                         : "text-muted-foreground"
@@ -63,7 +63,7 @@ export function BottomNav() {
                   )}
                 </motion.div>
                 <span
-                  className={`text-[10px] font-medium ${
+                  className={`text-xs font-medium ${
                     isActive ? "text-primary" : "text-muted-foreground"
                   }`}
                 >

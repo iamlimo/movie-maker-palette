@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -156,8 +157,8 @@ export const VideoPlayer = ({ movieId, className = '' }: VideoPlayerProps) => {
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center bg-black rounded-lg ${className}`}>
-        <div className="text-white">Loading video...</div>
+      <div className={`bg-black rounded-lg overflow-hidden ${className}`}>
+        <Skeleton className="w-full aspect-video rounded-none" />
       </div>
     );
   }

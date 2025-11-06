@@ -3,6 +3,7 @@ import { Play, Lock, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -157,9 +158,9 @@ export const PaymentGatedVideoPlayer: React.FC<PaymentGatedVideoPlayerProps> = (
 
   if (loading) {
     return (
-      <Card className="w-full aspect-video bg-muted animate-pulse">
-        <CardContent className="flex items-center justify-center h-full">
-          <div className="text-muted-foreground">Loading...</div>
+      <Card className="w-full aspect-video bg-muted overflow-hidden">
+        <CardContent className="flex items-center justify-center h-full p-0">
+          <Skeleton className="w-full h-full rounded-none" />
         </CardContent>
       </Card>
     );

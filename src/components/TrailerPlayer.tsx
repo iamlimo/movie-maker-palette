@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Play, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -146,8 +147,8 @@ const TrailerPlayer = ({
       : className || "relative w-full h-full"
     }>
       {isLoadingUrl ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-secondary/80">
-          <p className="text-muted-foreground">Loading trailer...</p>
+        <div className="absolute inset-0 bg-secondary/80">
+          <Skeleton className="w-full h-full rounded-none" />
         </div>
       ) : signedUrl ? (
         <video

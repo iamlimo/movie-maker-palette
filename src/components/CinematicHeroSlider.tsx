@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Play, Plus, Star, Clock, ChevronLeft, ChevronRight, Sparkles, Bell } from 'lucide-react';
 import { useSliderItems, SliderItem } from '@/hooks/useSliderItems';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -97,8 +98,18 @@ const CinematicHeroSlider = () => {
 
   if (loading) {
     return (
-      <section className="relative min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <section className="relative min-h-screen flex items-center justify-center bg-background overflow-hidden">
+        <div className="container mx-auto px-4">
+          <div className="max-w-2xl space-y-6">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-12 w-3/4" />
+            <div className="flex gap-4">
+              <Skeleton className="h-12 w-32" />
+              <Skeleton className="h-12 w-32" />
+            </div>
+          </div>
+        </div>
       </section>
     );
   }

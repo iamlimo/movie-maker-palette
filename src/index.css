@@ -264,7 +264,12 @@
 
   /* Page content padding when bottom nav is visible */
   .mobile-content-padding {
-    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  /* iOS safe area bottom padding utility */
+  .ios-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 8px);
   }
 
   /* Active tab indicator animation */
