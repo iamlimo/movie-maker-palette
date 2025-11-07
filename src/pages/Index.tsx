@@ -158,7 +158,7 @@ const Index = () => {
                   </li>
                   <li>
                     <a
-                      href="#"
+                      href="/contact"
                       className="hover:text-primary transition-smooth"
                     >
                       Contact Us
