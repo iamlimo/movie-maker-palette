@@ -166,12 +166,21 @@ const Index = () => {
                   </li>
                   <li>
                     <a
-                      href="#"
+                      href="/terms"
                       className="hover:text-primary transition-smooth"
                     >
                       Rental Terms
                     </a>
                   </li>
+                  <li>
+                    <a
+                      href="/general-terms"
+                      className="hover:text-primary transition-smooth"
+                    >
+                      General T&C
+                    </a>
+                  </li>
+
                   <li>
                     <a
                       href="/privacy-policy"
@@ -188,15 +197,15 @@ const Index = () => {
                 <ul className="space-y-2 text-muted-foreground">
                   <li>
                     <a
-                      href="#"
+                      href="https://x.com/signaturetvapp?s=21&t=wyKWyV_QNX8UM7ZSMUfKng"
                       className="hover:text-primary transition-smooth"
                     >
-                      Twitter
+                      X formerly Twitter
                     </a>
                   </li>
                   <li>
                     <a
-                      href="#"
+                      href="https://www.facebook.com/share/19qNut6WKf/?mibextid=wwXIfr"
                       className="hover:text-primary transition-smooth"
                     >
                       Facebook
@@ -204,7 +213,7 @@ const Index = () => {
                   </li>
                   <li>
                     <a
-                      href="#"
+                      href="https://www.instagram.com/signaturetvapp?igsh=NHZ0enljdnM5ZGZy&utm_source=qr"
                       className="hover:text-primary transition-smooth"
                     >
                       Instagram
@@ -212,7 +221,15 @@ const Index = () => {
                   </li>
                   <li>
                     <a
-                      href="#"
+                      href="https://www.tiktok.com/@signaturetvapp?_t=ZS-905b5iqXdzu&_r=1"
+                      className="hover:text-primary transition-smooth"
+                    >
+                      TikTok
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="https://www.youtube.com/@spicturesnetwork"
                       className="hover:text-primary transition-smooth"
                     >
                       YouTube

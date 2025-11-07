@@ -49,6 +49,7 @@ import Contact from "./pages/Contact";
 import Terms from "./pages/Terms";
 import Docs from "./pages/Docs";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsAndConditions from "./pages/GeneralTerms";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ function AppContent() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/general-terms" element={<TermsAndConditions />} />
 
           {/* Super Admin Routes */}
           <Route
