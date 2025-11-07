@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Lock, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { VideoPlayer } from './VideoPlayer';
+import { OfflineVideoPlayer } from './OfflineVideoPlayer';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +35,8 @@ export const PaymentGatedVideoPlayer: React.FC<PaymentGatedVideoPlayerProps> = (
   const navigate = useNavigate();
   const [hasAccess, setHasAccess] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [rentalExpiresAt, setRentalExpiresAt] = useState<string | null>(null);
+  const [rentalId, setRentalId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -49,20 +53,33 @@ export const PaymentGatedVideoPlayer: React.FC<PaymentGatedVideoPlayerProps> = (
   const checkAccess = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('get-episode-access', {
+      // Check rental access
+      const { data: rentalData } = await supabase.functions.invoke('rental-access', {
         body: { 
-          episode_id: episodeId,
-          user_id: user?.id || null
+          content_id: episodeId,
+          content_type: 'episode'
         }
       });
 
-      if (error) {
-        console.error('Error checking access:', error);
-        return;
+      if (rentalData?.has_access) {
+        setHasAccess(true);
+        setRentalExpiresAt(rentalData.expires_at);
+        setRentalId(rentalData.rental?.id);
       }
 
-      setHasAccess(data.hasAccess);
-      setVideoUrl(data.episode?.video_url || null);
+      // Get video URL if has access
+      if (rentalData?.has_access) {
+        const { data, error } = await supabase.functions.invoke('get-episode-access', {
+          body: { 
+            episode_id: episodeId,
+            user_id: user?.id || null
+          }
+        });
+
+        if (!error) {
+          setVideoUrl(data.episode?.video_url || null);
+        }
+      }
     } catch (error) {
       console.error('Access check failed:', error);
     } finally {
@@ -166,20 +183,18 @@ export const PaymentGatedVideoPlayer: React.FC<PaymentGatedVideoPlayerProps> = (
     );
   }
 
-  // Full episode player (for paid users)
+  // Full episode player with offline support
   if (isPlaying && hasAccess && videoUrl) {
     return (
-      <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
-        <video
-          src={videoUrl}
-          controls
-          className="w-full h-full"
-          autoPlay
-          onError={() => toast.error('Failed to load video')}
-        >
-          Your browser does not support video playback.
-        </video>
-      </div>
+      <OfflineVideoPlayer
+        contentId={episodeId}
+        contentType="episode"
+        rentalExpiresAt={rentalExpiresAt || undefined}
+        rentalId={rentalId || undefined}
+        onlineVideoUrl={videoUrl}
+        posterUrl={thumbnailUrl}
+        className="w-full"
+      />
     );
   }
 
