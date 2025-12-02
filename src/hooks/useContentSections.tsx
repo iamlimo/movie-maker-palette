@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -35,32 +35,27 @@ export interface SectionWithContent {
 }
 
 export const useContentSections = () => {
-  const [contentSections, setContentSections] = useState<ContentSection[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchContentSections = async () => {
-    try {
-      setLoading(true);
+  const queryClient = useQueryClient();
+  
+  const { data: contentSections = [], isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['contentSections'],
+    queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('content-sections', {
         method: 'GET'
       });
 
-      if (error) throw error;
-      setContentSections(data || []);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching content sections:', err);
-      setError(err.message);
-      toast({
-        title: "Error",
-        description: "Failed to fetch content sections",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch content sections",
+          variant: "destructive",
+        });
+        throw error;
+      }
+      
+      return data || [];
     }
-  };
+  });
 
   const assignContentToSection = async (assignments: Array<{
     content_id: string;
@@ -76,7 +71,7 @@ export const useContentSections = () => {
 
       if (error) throw error;
       
-      await fetchContentSections();
+      await queryClient.invalidateQueries({ queryKey: ['contentSections'] });
       toast({
         title: "Success",
         description: "Content assigned to section successfully",
@@ -103,7 +98,7 @@ export const useContentSections = () => {
 
       if (error) throw error;
       
-      await fetchContentSections();
+      await queryClient.invalidateQueries({ queryKey: ['contentSections'] });
       toast({
         title: "Success",
         description: "Content removed from section successfully",
@@ -128,7 +123,7 @@ export const useContentSections = () => {
 
       if (error) throw error;
       
-      await fetchContentSections();
+      await queryClient.invalidateQueries({ queryKey: ['contentSections'] });
       toast({
         title: "Success",
         description: "Content reordered successfully",
@@ -144,30 +139,21 @@ export const useContentSections = () => {
     }
   };
 
-  useEffect(() => {
-    fetchContentSections();
-  }, []);
-
   return {
     contentSections,
     loading,
-    error,
+    error: error ? (error as Error).message : null,
     assignContentToSection,
     removeContentFromSection,
     reorderContent,
-    refetch: fetchContentSections
+    refetch
   };
 };
 
 export const useSectionsWithContent = () => {
-  const [sectionsWithContent, setSectionsWithContent] = useState<SectionWithContent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchSectionsWithContent = async () => {
-    try {
-      setLoading(true);
-      
+  const { data: sectionsWithContent = [], isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['sectionsWithContent'],
+    queryFn: async () => {
       // First get all visible sections
       const { data: sections, error: sectionsError } = await supabase
         .from('sections')
@@ -294,29 +280,14 @@ export const useSectionsWithContent = () => {
         });
       }
 
-      setSectionsWithContent(sectionsWithContent);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching sections with content:', err);
-      setError(err.message);
-      toast({
-        title: "Error",
-        description: "Failed to fetch sections with content",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      return sectionsWithContent;
     }
-  };
-
-  useEffect(() => {
-    fetchSectionsWithContent();
-  }, []);
+  });
 
   return {
     sectionsWithContent,
     loading,
-    error,
-    refetch: fetchSectionsWithContent
+    error: error ? (error as Error).message : null,
+    refetch
   };
 };

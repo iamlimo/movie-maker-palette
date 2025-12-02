@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -52,13 +52,9 @@ export type Content = (Movie | TVShow) & {
 };
 
 export const useMovies = (includeApprovedOnly = true) => {
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchMovies = async () => {
-    try {
-      setLoading(true);
+  const { data: movies = [], isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['movies', includeApprovedOnly],
+    queryFn: async () => {
       let query = supabase
         .from('movies')
         .select(`
@@ -73,52 +69,38 @@ export const useMovies = (includeApprovedOnly = true) => {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch movies",
+          variant: "destructive",
+        });
+        throw error;
+      }
       
       // Ensure data consistency with proper mapping
-      const mappedMovies = (data || []).map(movie => ({
+      return (data || []).map(movie => ({
         ...movie,
         genre: movie.genre ? {
           id: movie.genre.id,
           name: movie.genre.name
         } : undefined
       }));
-      
-      setMovies(mappedMovies);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching movies:', err);
-      setError(err.message);
-      toast({
-        title: "Error",
-        description: "Failed to fetch movies",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchMovies();
-  }, [includeApprovedOnly]);
+  });
 
   return {
     movies,
     loading,
-    error,
-    refetch: fetchMovies
+    error: error ? (error as Error).message : null,
+    refetch
   };
 };
 
 export const useTVShows = (includeApprovedOnly = true) => {
-  const [tvShows, setTVShows] = useState<TVShow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchTVShows = async () => {
-    try {
-      setLoading(true);
+  const { data: tvShows = [], isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['tvShows', includeApprovedOnly],
+    queryFn: async () => {
       let query = supabase
         .from('tv_shows')
         .select(`
@@ -133,31 +115,24 @@ export const useTVShows = (includeApprovedOnly = true) => {
 
       const { data, error } = await query;
 
-      if (error) throw error;
-      setTVShows(data || []);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching TV shows:', err);
-      setError(err.message);
-      toast({
-        title: "Error",
-        description: "Failed to fetch TV shows",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch TV shows",
+          variant: "destructive",
+        });
+        throw error;
+      }
+      
+      return data || [];
     }
-  };
-
-  useEffect(() => {
-    fetchTVShows();
-  }, [includeApprovedOnly]);
+  });
 
   return {
     tvShows,
     loading,
-    error,
-    refetch: fetchTVShows
+    error: error ? (error as Error).message : null,
+    refetch
   };
 };
 

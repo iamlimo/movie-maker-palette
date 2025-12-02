@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface SliderItem {
@@ -26,37 +26,26 @@ export interface SliderItem {
 }
 
 export const useSliderItems = () => {
-  const [sliderItems, setSliderItems] = useState<SliderItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchSliderItems = async () => {
-    try {
-      setLoading(true);
+  const { data: sliderItems = [], isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['sliderItems'],
+    queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('slider-items', {
         method: 'GET'
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching slider items:', error);
+        throw error;
+      }
 
-      setSliderItems(data || []);
-      setError(null);
-    } catch (err: any) {
-      console.error('Error fetching slider items:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      return data || [];
     }
-  };
-
-  useEffect(() => {
-    fetchSliderItems();
-  }, []);
+  });
 
   return {
     sliderItems,
     loading,
-    error,
-    refetch: fetchSliderItems
+    error: error ? (error as Error).message : null,
+    refetch
   };
 };

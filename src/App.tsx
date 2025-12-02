@@ -51,7 +51,18 @@ import Docs from "./pages/Docs";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsAndConditions from "./pages/GeneralTerms";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // Data stays fresh for 5 minutes
+      gcTime: 30 * 60 * 1000, // Cache kept for 30 minutes
+      refetchOnMount: false, // Don't refetch when component mounts
+      refetchOnWindowFocus: false, // Don't refetch when app regains focus
+      refetchOnReconnect: false, // Don't auto-refetch on reconnect
+      retry: 1, // Only retry once on failure
+    },
+  },
+});
 
 function AppContent() {
   useDeepLinking();

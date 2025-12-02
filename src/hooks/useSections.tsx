@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -13,30 +13,28 @@ export interface Section {
 }
 
 export const useSections = () => {
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchSections = async () => {
-    try {
-      setLoading(true);
+  const queryClient = useQueryClient();
+  
+  const { data: sections = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ['sections'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('sections')
         .select('*')
         .order('display_order');
 
-      if (error) throw error;
-      setSections(data || []);
-    } catch (error) {
-      console.error('Error fetching sections:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch sections",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch sections",
+          variant: "destructive",
+        });
+        throw error;
+      }
+      
+      return data || [];
     }
-  };
+  });
 
   const createSection = async (section: Omit<Section, 'id' | 'created_at' | 'updated_at'>) => {
     try {
@@ -46,7 +44,7 @@ export const useSections = () => {
 
       if (error) throw error;
       
-      await fetchSections();
+      await queryClient.invalidateQueries({ queryKey: ['sections'] });
       toast({
         title: "Success",
         description: "Section created successfully",
@@ -71,7 +69,7 @@ export const useSections = () => {
 
       if (error) throw error;
       
-      await fetchSections();
+      await queryClient.invalidateQueries({ queryKey: ['sections'] });
       toast({
         title: "Success",
         description: "Section updated successfully",
@@ -96,7 +94,7 @@ export const useSections = () => {
 
       if (error) throw error;
       
-      await fetchSections();
+      await queryClient.invalidateQueries({ queryKey: ['sections'] });
       toast({
         title: "Success",
         description: "Section deleted successfully",
@@ -112,16 +110,12 @@ export const useSections = () => {
     }
   };
 
-  useEffect(() => {
-    fetchSections();
-  }, []);
-
   return {
     sections,
     loading,
     createSection,
     updateSection,
     deleteSection,
-    refetch: fetchSections
+    refetch
   };
 };

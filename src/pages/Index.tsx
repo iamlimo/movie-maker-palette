@@ -10,6 +10,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { RefreshCw } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Capacitor } from "@capacitor/core";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -36,8 +37,33 @@ const Index = () => {
     return (
       <div className="min-h-screen">
         <Header />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="w-8 h-8 border-4 border-primary border-l-transparent rounded-full animate-spin"></div>
+        
+        {/* Hero Skeleton */}
+        <div className="relative w-full">
+          <Skeleton className="w-full h-[70vh] rounded-none" />
+        </div>
+
+        {/* Brand Strip Skeleton */}
+        <div className="container mx-auto px-4 py-6">
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+
+        {/* Content Sections Skeleton */}
+        <div className="container mx-auto px-4 space-y-12 pb-24">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-4">
+              <Skeleton className="h-8 w-48" />
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {[1, 2, 3, 4, 5, 6].map((j) => (
+                  <div key={j} className="space-y-2">
+                    <Skeleton className="aspect-[2/3] w-full rounded-lg" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
