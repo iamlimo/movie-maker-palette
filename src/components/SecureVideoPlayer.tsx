@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SecureVideoPlayerProps {
   contentId: string;
@@ -120,12 +121,7 @@ const SecureVideoPlayer = ({
 
   if (loading) {
     return (
-      <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground">Loading secure video...</p>
-        </div>
-      </div>
+      <Skeleton className="aspect-video w-full rounded-lg" />
     );
   }
 
