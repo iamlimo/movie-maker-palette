@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -21,19 +21,13 @@ export interface FavoriteItem {
 export const useFavorites = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchFavorites = async () => {
-    if (!user) {
-      setFavorites([]);
-      setLoading(false);
-      return;
-    }
+  const { data: favorites = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ['favorites', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
 
-    try {
-      setLoading(true);
-      
       const { data, error } = await supabase
         .from('favorites')
         .select('*')
@@ -41,119 +35,37 @@ export const useFavorites = () => {
         .order('added_at', { ascending: false });
 
       if (error) throw error;
+      if (!data?.length) return [];
 
-      // Enrich with content details
-      const enrichedFavorites = await Promise.all(
-        (data || []).map(async (item) => {
-          let contentDetails = {};
-          
-          if (item.content_type === 'movie') {
-            const { data: movieData } = await supabase
-              .from('movies')
-              .select('title, thumbnail_url, duration, price, description, genre_id, genres(name)')
-              .eq('id', item.content_id)
-              .single();
-            
-            if (movieData) {
-              contentDetails = {
-                title: movieData.title,
-                thumbnail_url: movieData.thumbnail_url,
-                duration: movieData.duration,
-                price: movieData.price,
-                description: movieData.description,
-                genre: movieData.genres?.name
-              };
-            }
-          } else if (item.content_type === 'tv_show') {
-            const { data: showData } = await supabase
-              .from('tv_shows')
-              .select('title, thumbnail_url, price, description, genre_id, genres(name)')
-              .eq('id', item.content_id)
-              .single();
-            
-            if (showData) {
-              contentDetails = {
-                title: showData.title,
-                thumbnail_url: showData.thumbnail_url,
-                price: showData.price,
-                description: showData.description,
-                genre: showData.genres?.name
-              };
-            }
-          } else if (item.content_type === 'season') {
-            const { data: seasonData } = await supabase
-              .from('seasons')
-              .select(`
-                season_number,
-                description,
-                price,
-                tv_shows!inner(
-                  title,
-                  thumbnail_url,
-                  genre_id,
-                  genres(name)
-                )
-              `)
-              .eq('id', item.content_id)
-              .single();
-            
-            if (seasonData) {
-              contentDetails = {
-                title: `${seasonData.tv_shows.title} - Season ${seasonData.season_number}`,
-                thumbnail_url: seasonData.tv_shows.thumbnail_url,
-                price: seasonData.price,
-                description: seasonData.description,
-                genre: seasonData.tv_shows.genres?.name
-              };
-            }
-          } else if (item.content_type === 'episode') {
-            const { data: episodeData } = await supabase
-              .from('episodes')
-              .select(`
-                title, 
-                duration, 
-                price,
-                seasons!inner(
-                  season_number,
-                  tv_shows!inner(
-                    title,
-                    thumbnail_url,
-                    genre_id,
-                    genres(name)
-                  )
-                )
-              `)
-              .eq('id', item.content_id)
-              .single();
-            
-            if (episodeData) {
-              contentDetails = {
-                title: `${episodeData.seasons.tv_shows.title} S${episodeData.seasons.season_number} - ${episodeData.title}`,
-                thumbnail_url: episodeData.seasons.tv_shows.thumbnail_url,
-                duration: episodeData.duration,
-                price: episodeData.price,
-                genre: episodeData.seasons.tv_shows.genres?.name
-              };
-            }
-          }
+      // OPTIMIZED: Group by content type for batched queries
+      const movieIds = data.filter(f => f.content_type === 'movie').map(f => f.content_id);
+      const tvShowIds = data.filter(f => f.content_type === 'tv_show').map(f => f.content_id);
+      const seasonIds = data.filter(f => f.content_type === 'season').map(f => f.content_id);
+      const episodeIds = data.filter(f => f.content_type === 'episode').map(f => f.content_id);
 
-          return { ...item, ...contentDetails };
-        })
-      );
+      // OPTIMIZED: Parallel batched queries instead of N individual queries
+      const [movies, tvShows, seasons, episodes] = await Promise.all([
+        movieIds.length ? supabase.from('movies').select('id, title, thumbnail_url, duration, price, description, genres(name)').in('id', movieIds) : { data: [] },
+        tvShowIds.length ? supabase.from('tv_shows').select('id, title, thumbnail_url, price, description, genres(name)').in('id', tvShowIds) : { data: [] },
+        seasonIds.length ? supabase.from('seasons').select('id, season_number, description, price, tv_shows(title, thumbnail_url, genres(name))').in('id', seasonIds) : { data: [] },
+        episodeIds.length ? supabase.from('episodes').select('id, title, duration, price, thumbnail_url, seasons(season_number, tv_shows(title, thumbnail_url, genres(name)))').in('id', episodeIds) : { data: [] }
+      ]);
 
-      const typedFavorites = enrichedFavorites as FavoriteItem[];
-      setFavorites(typedFavorites);
-    } catch (error) {
-      console.error('Error fetching favorites:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load favorites",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Create lookup maps for O(1) access
+      const contentMaps = {
+        movie: new Map((movies.data || []).map(m => [m.id, { title: m.title, thumbnail_url: m.thumbnail_url, duration: m.duration, price: m.price, description: m.description, genre: m.genres?.name }])),
+        tv_show: new Map((tvShows.data || []).map(t => [t.id, { title: t.title, thumbnail_url: t.thumbnail_url, price: t.price, description: t.description, genre: t.genres?.name }])),
+        season: new Map((seasons.data || []).map(s => [s.id, { title: `${s.tv_shows.title} - Season ${s.season_number}`, thumbnail_url: s.tv_shows.thumbnail_url, price: s.price, description: s.description, genre: s.tv_shows.genres?.name }])),
+        episode: new Map((episodes.data || []).map(e => [e.id, { title: `${e.seasons.tv_shows.title} S${e.seasons.season_number} - ${e.title}`, thumbnail_url: e.thumbnail_url || e.seasons.tv_shows.thumbnail_url, duration: e.duration, price: e.price, genre: e.seasons.tv_shows.genres?.name }]))
+      };
+
+      return data.map(item => ({
+        ...item,
+        ...(contentMaps[item.content_type]?.get(item.content_id) || {})
+      })) as FavoriteItem[];
+    },
+    enabled: !!user,
+  });
 
   const addToFavorites = async (
     contentType: 'movie' | 'episode' | 'season' | 'tv_show',
@@ -181,7 +93,7 @@ export const useFavorites = () => {
         throw error;
       }
 
-      await fetchFavorites();
+      await queryClient.invalidateQueries({ queryKey: ['favorites', user.id] });
       toast({
         title: "Added to favorites",
         description: "Item added to your favorites successfully"
@@ -210,7 +122,7 @@ export const useFavorites = () => {
 
       if (error) throw error;
 
-      await fetchFavorites();
+      await queryClient.invalidateQueries({ queryKey: ['favorites', user.id] });
       toast({
         title: "Removed from favorites",
         description: "Item removed from favorites successfully"
@@ -243,7 +155,7 @@ export const useFavorites = () => {
 
       if (error) throw error;
 
-      await fetchFavorites();
+      await queryClient.invalidateQueries({ queryKey: ['favorites', user.id] });
       toast({
         title: "Removed from favorites",
         description: "Item removed from favorites successfully"
@@ -288,7 +200,7 @@ export const useFavorites = () => {
 
       if (error) throw error;
 
-      await fetchFavorites();
+      await queryClient.invalidateQueries({ queryKey: ['favorites', user.id] });
       toast({
         title: "Favorites cleared",
         description: "All favorites have been removed"
@@ -305,35 +217,6 @@ export const useFavorites = () => {
     }
   };
 
-  useEffect(() => {
-    fetchFavorites();
-  }, [user]);
-
-  // Set up real-time subscription for favorites updates
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('favorites_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'favorites',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          fetchFavorites();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
-
   return {
     favorites,
     loading,
@@ -343,6 +226,6 @@ export const useFavorites = () => {
     isFavorite,
     toggleFavorite,
     clearFavorites,
-    refetch: fetchFavorites
+    refetch
   };
 };
