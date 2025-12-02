@@ -8,7 +8,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
 import { useDeepLinking } from "@/hooks/useDeepLinking";
+import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
 import Index from "./pages/Index";
@@ -70,6 +72,7 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   useDeepLinking();
+  useServiceWorker();
 
   return (
     <>
@@ -142,6 +145,7 @@ function AppContent() {
         </Suspense>
       </MobileRouteAnimator>
       <BottomNav />
+      <OfflineSyncStatus />
     </>
   );
 }
