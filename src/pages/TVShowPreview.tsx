@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,9 @@ interface Episode {
 const TVShowPreview = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const preloadedData = location.state?.preloadedData;
+  
   const { user } = useAuth();
   const {
     favorites,
@@ -92,12 +95,12 @@ const TVShowPreview = () => {
   } = useFavorites();
   const { checkAccess } = useRentals();
   const isMobile = useIsMobile();
-  const [tvShow, setTVShow] = useState<TVShow | null>(null);
+  const [tvShow, setTVShow] = useState<TVShow | null>(preloadedData || null);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [episodes, setEpisodes] = useState<{ [seasonId: string]: Episode[] }>(
     {}
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!preloadedData);
   const [error, setError] = useState<string | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);

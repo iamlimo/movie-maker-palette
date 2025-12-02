@@ -34,7 +34,20 @@ const MovieCard = ({
 
   const handlePreview = () => {
     const route = contentType === "movie" ? `/movie/${id}` : `/tvshow/${id}`;
-    navigate(route);
+    navigate(route, {
+      state: {
+        preloadedData: {
+          id,
+          title,
+          thumbnail_url: imageUrl,
+          genre: { name: genre },
+          rating: rating?.toString(),
+          price: typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, "")) : price,
+          duration,
+          release_date: year ? `${year}-01-01` : undefined,
+        }
+      }
+    });
   };
 
   const getFormattedPrice = () => {
