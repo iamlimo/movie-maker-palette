@@ -154,7 +154,7 @@ export const useSectionsWithContent = () => {
   const { data: sectionsWithContent = [], isLoading: loading, error, refetch } = useQuery({
     queryKey: ['sectionsWithContent'],
     queryFn: async () => {
-      // First get all visible sections
+      // OPTIMIZED: Single query for all sections
       const { data: sections, error: sectionsError } = await supabase
         .from('sections')
         .select('*')
@@ -162,125 +162,58 @@ export const useSectionsWithContent = () => {
         .order('display_order');
 
       if (sectionsError) throw sectionsError;
+      if (!sections?.length) return [];
 
-      const sectionsWithContent: SectionWithContent[] = [];
+      const sectionIds = sections.map(s => s.id);
 
-      // For each section, get its content
-      for (const section of sections || []) {
-        // Get movies for this section
-        const { data: movieSections, error: movieError } = await supabase
-          .from('content_sections')
-          .select(`
-            id,
-            content_id,
-            content_type,
-            display_order
-          `)
-          .eq('section_id', section.id)
-          .eq('content_type', 'movie')
-          .order('display_order');
+      // OPTIMIZED: Single query for all content sections across all sections
+      const { data: allContentSections, error: csError } = await supabase
+        .from('content_sections')
+        .select('*')
+        .in('section_id', sectionIds)
+        .order('display_order');
 
-        // Get TV shows for this section
-        const { data: tvShowSections, error: tvError } = await supabase
-          .from('content_sections')
-          .select(`
-            id,
-            content_id,
-            content_type,
-            display_order
-          `)
-          .eq('section_id', section.id)
-          .eq('content_type', 'tv_show')
-          .order('display_order');
+      if (csError) throw csError;
+      if (!allContentSections?.length) return sections.map(s => ({ ...s, content: [] }));
 
-        if (movieError || tvError) {
-          console.error('Error fetching content for section:', section.id, { movieError, tvError });
-          continue;
-        }
+      // Get unique content IDs by type
+      const movieIds = [...new Set(allContentSections.filter(cs => cs.content_type === 'movie').map(cs => cs.content_id))];
+      const tvShowIds = [...new Set(allContentSections.filter(cs => cs.content_type === 'tv_show').map(cs => cs.content_id))];
 
-        const content = [];
+      // OPTIMIZED: Parallel queries for all movies and TV shows at once
+      const [moviesResult, tvShowsResult] = await Promise.all([
+        movieIds.length > 0 
+          ? supabase.from('movies').select('id, title, description, thumbnail_url, price, rating, release_date, duration, genre:genres(name)').in('id', movieIds).eq('status', 'approved')
+          : Promise.resolve({ data: [] }),
+        tvShowIds.length > 0
+          ? supabase.from('tv_shows').select('id, title, description, thumbnail_url, price, rating, release_date, genre:genres(name)').in('id', tvShowIds).eq('status', 'approved')
+          : Promise.resolve({ data: [] })
+      ]);
 
-        // Fetch movie details
-        if (movieSections && movieSections.length > 0) {
-          const movieIds = movieSections.map(ms => ms.content_id);
-          const { data: movies } = await supabase
-            .from('movies')
-            .select(`
-              id,
-              title,
-              description,
-              thumbnail_url,
-              price,
-              rating,
-              release_date,
-              duration,
-              genre:genres(name)
-            `)
-            .in('id', movieIds)
-            .eq('status', 'approved');
+      // Create lookup maps for O(1) access
+      const moviesMap = new Map((moviesResult.data || []).map(m => [m.id, m]));
+      const tvShowsMap = new Map((tvShowsResult.data || []).map(t => [t.id, t]));
 
-          if (movies) {
-            movies.forEach(movie => {
-              const movieSection = movieSections.find(ms => ms.content_id === movie.id);
-              if (movieSection) {
-                content.push({
-                  ...movie,
-                  content_type: 'movie' as const,
-                  display_order: movieSection.display_order,
-                  genre: movie.genre?.name,
-                  release_date: movie.release_date,
-                  duration: movie.duration
-                });
-              }
-            });
-          }
-        }
-
-        // Fetch TV show details
-        if (tvShowSections && tvShowSections.length > 0) {
-          const tvShowIds = tvShowSections.map(ts => ts.content_id);
-          const { data: tvShows } = await supabase
-            .from('tv_shows')
-            .select(`
-              id,
-              title,
-              description,
-              thumbnail_url,
-              price,
-              rating,
-              release_date,
-              genre:genres(name)
-            `)
-            .in('id', tvShowIds)
-            .eq('status', 'approved');
-
-          if (tvShows) {
-            tvShows.forEach(show => {
-              const showSection = tvShowSections.find(ts => ts.content_id === show.id);
-              if (showSection) {
-                content.push({
-                  ...show,
-                  content_type: 'tv_show' as const,
-                  display_order: showSection.display_order,
-                  genre: show.genre?.name,
-                  release_date: show.release_date,
-                  duration: undefined // TV shows don't have duration at show level
-                });
-              }
-            });
-          }
-        }
-
-        // Sort content by display order
-        content.sort((a, b) => a.display_order - b.display_order);
-
-        sectionsWithContent.push({
-          ...section,
-          content
-        });
-      }
-
-      return sectionsWithContent;
+      // Build final result efficiently
+      return sections.map(section => ({
+        ...section,
+        content: allContentSections
+          .filter(cs => cs.section_id === section.id)
+          .map(cs => {
+            const item = cs.content_type === 'movie' 
+              ? moviesMap.get(cs.content_id)
+              : tvShowsMap.get(cs.content_id);
+            if (!item) return null;
+            return {
+              ...item,
+              content_type: cs.content_type,
+              display_order: cs.display_order,
+              genre: item.genre?.name
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.display_order - b.display_order)
+      }));
     }
   });
 

@@ -23,6 +23,25 @@ const CinematicHeroSlider = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
+  // Preload first slide image for LCP optimization
+  useEffect(() => {
+    if (sliderItems.length > 0 && sliderItems[0].poster_url) {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = sliderItems[0].poster_url;
+      link.fetchPriority = 'high';
+      document.head.appendChild(link);
+      return () => {
+        try {
+          document.head.removeChild(link);
+        } catch (e) {
+          // Link already removed
+        }
+      };
+    }
+  }, [sliderItems]);
+
   // Auto-advance slides
   useEffect(() => {
     if (!isAutoPlaying || sliderItems.length <= 1) return;
@@ -143,6 +162,9 @@ const CinematicHeroSlider = () => {
             <img 
               src={currentItem.poster_url || moviePlaceholder} 
               alt={currentItem.title}
+              fetchPriority={currentIndex === 0 ? 'high' : 'auto'}
+              loading={currentIndex === 0 ? 'eager' : 'lazy'}
+              decoding="async"
               className={`w-full h-full object-cover transition-all ${isComingSoon ? 'opacity-60 blur-sm' : ''}`}
               onError={(e) => {
                 (e.target as HTMLImageElement).src = moviePlaceholder;

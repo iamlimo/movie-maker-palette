@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,45 +11,49 @@ import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
-import AdminDashboard from "@/pages/admin/Dashboard";
-import AdminMovies from "@/pages/admin/Movies";
-import AddMovieNew from "@/pages/admin/AddMovieNew";
-import ViewMovie from "@/pages/admin/ViewMovie";
-import EditMovie from "@/pages/admin/EditMovie";
-import AdminTVShows from "@/pages/admin/TVShows";
-import AddTVShow from "@/pages/admin/AddTVShow";
-import AddSeason from "@/pages/admin/AddSeason";
-import AddEpisode from "@/pages/admin/AddEpisode";
-import EditSeason from "@/pages/admin/EditSeason";
-import EditEpisode from "@/pages/admin/EditEpisode";
-import ViewTVShow from "@/pages/admin/ViewTVShow";
-import EditTVShow from "@/pages/admin/EditTVShow";
-import Submissions from "@/pages/admin/Submissions";
-import Users from "@/pages/admin/Users";
-import Finance from "@/pages/admin/Finance";
-import Producers from "@/pages/admin/Producers";
-import Sections from "@/pages/admin/Sections";
-import HeroSlider from "@/pages/admin/HeroSlider";
-import Banners from "@/pages/admin/Banners";
-import Wallets from "@/pages/admin/Wallets";
-import Settings from "@/pages/admin/Settings";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import Profile from "./pages/Profile";
-import MoviePreview from "./pages/MoviePreview";
-import TVShowPreview from "./pages/TVShowPreview";
-import Movies from "./pages/Movies";
-import TVShows from "./pages/TVShows";
-import Genres from "./pages/Genres";
-import Watchlist from "./pages/Watchlist";
-import Wallet from "./pages/Wallet";
-import Help from "./pages/Help";
-import Contact from "./pages/Contact";
-import Terms from "./pages/Terms";
-import Docs from "./pages/Docs";
-import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
-import TermsAndConditions from "./pages/GeneralTerms";
+
+// Lazy load non-critical routes for faster initial load
+const Profile = lazy(() => import('./pages/Profile'));
+const MoviePreview = lazy(() => import('./pages/MoviePreview'));
+const TVShowPreview = lazy(() => import('./pages/TVShowPreview'));
+const Movies = lazy(() => import('./pages/Movies'));
+const TVShows = lazy(() => import('./pages/TVShows'));
+const Genres = lazy(() => import('./pages/Genres'));
+const Watchlist = lazy(() => import('./pages/Watchlist'));
+const Wallet = lazy(() => import('./pages/Wallet'));
+const Help = lazy(() => import('./pages/Help'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Docs = lazy(() => import('./pages/Docs'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsAndConditions = lazy(() => import('./pages/GeneralTerms'));
+
+// Lazy load ALL admin routes
+const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
+const AdminMovies = lazy(() => import('@/pages/admin/Movies'));
+const AddMovieNew = lazy(() => import('@/pages/admin/AddMovieNew'));
+const ViewMovie = lazy(() => import('@/pages/admin/ViewMovie'));
+const EditMovie = lazy(() => import('@/pages/admin/EditMovie'));
+const AdminTVShows = lazy(() => import('@/pages/admin/TVShows'));
+const AddTVShow = lazy(() => import('@/pages/admin/AddTVShow'));
+const AddSeason = lazy(() => import('@/pages/admin/AddSeason'));
+const AddEpisode = lazy(() => import('@/pages/admin/AddEpisode'));
+const EditSeason = lazy(() => import('@/pages/admin/EditSeason'));
+const EditEpisode = lazy(() => import('@/pages/admin/EditEpisode'));
+const ViewTVShow = lazy(() => import('@/pages/admin/ViewTVShow'));
+const EditTVShow = lazy(() => import('@/pages/admin/EditTVShow'));
+const Submissions = lazy(() => import('@/pages/admin/Submissions'));
+const Users = lazy(() => import('@/pages/admin/Users'));
+const Finance = lazy(() => import('@/pages/admin/Finance'));
+const Producers = lazy(() => import('@/pages/admin/Producers'));
+const Sections = lazy(() => import('@/pages/admin/Sections'));
+const HeroSlider = lazy(() => import('@/pages/admin/HeroSlider'));
+const Banners = lazy(() => import('@/pages/admin/Banners'));
+const Wallets = lazy(() => import('@/pages/admin/Wallets'));
+const Settings = lazy(() => import('@/pages/admin/Settings'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,23 +75,24 @@ function AppContent() {
     <>
       <OfflineBanner />
       <MobileRouteAnimator>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/movie/:id" element={<MoviePreview />} />
-          <Route path="/tvshow/:id" element={<TVShowPreview />} />
-          <Route path="/movies" element={<Movies />} />
-          <Route path="/tvshows" element={<TVShows />} />
-          <Route path="/genres" element={<Genres />} />
-          <Route path="/watchlist" element={<Watchlist />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/help" element={<Help />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/docs" element={<Docs />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="/general-terms" element={<TermsAndConditions />} />
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/movie/:id" element={<MoviePreview />} />
+            <Route path="/tvshow/:id" element={<TVShowPreview />} />
+            <Route path="/movies" element={<Movies />} />
+            <Route path="/tvshows" element={<TVShows />} />
+            <Route path="/genres" element={<Genres />} />
+            <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/help" element={<Help />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/docs" element={<Docs />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/general-terms" element={<TermsAndConditions />} />
 
           {/* Super Admin Routes */}
           <Route
@@ -131,9 +136,10 @@ function AppContent() {
             <Route path="settings" element={<Settings />} />
           </Route>
 
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </MobileRouteAnimator>
       <BottomNav />
     </>
