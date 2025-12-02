@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -40,14 +40,17 @@ interface Movie {
 const MoviePreview = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const preloadedData = location.state?.preloadedData;
+  
   const { user } = useAuth();
   const {
     favorites,
     toggleFavorite,
     loading: favoritesLoading,
   } = useFavorites();
-  const [movie, setMovie] = useState<Movie | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [movie, setMovie] = useState<Movie | null>(preloadedData || null);
+  const [loading, setLoading] = useState(!preloadedData);
   const [error, setError] = useState<string | null>(null);
 
   const isFavorite = movie
