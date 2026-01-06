@@ -2,12 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, Play, Clock, Eye, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useRef, useCallback, memo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
 import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import { formatNaira } from "@/lib/priceUtils";
+import { Capacitor } from "@capacitor/core";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 interface EnhancedContentCardProps {
   id: string;
@@ -123,12 +125,52 @@ const EnhancedContentCard = ({
     }
   };
 
+  // Long-press gesture handling
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+
+  const handleTouchStart = useCallback(() => {
+    longPressTimer.current = setTimeout(async () => {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await Haptics.impact({ style: ImpactStyle.Heavy });
+        } catch (e) {
+          // Haptics not available
+        }
+      }
+      setShowQuickActions(true);
+    }, 500);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleContextMenu = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Haptics.impact({ style: ImpactStyle.Medium });
+      } catch (err) {
+        // Haptics not available
+      }
+    }
+    setShowQuickActions(true);
+  }, []);
+
   return (
     <div
       className={`group relative flex flex-col overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
         featured ? "ring-1 ring-primary/20" : ""
       } ${className}`}
       onClick={handlePreview}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onContextMenu={handleContextMenu}
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] overflow-hidden bg-muted/30">
@@ -236,8 +278,49 @@ const EnhancedContentCard = ({
           </p>
         )}
       </div>
+
+      {/* Quick Actions Modal */}
+      {showQuickActions && (
+        <div 
+          className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowQuickActions(false);
+          }}
+        >
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3 min-w-[200px] animate-scale-in">
+            <h4 className="font-semibold text-sm text-center">{title}</h4>
+            <Button 
+              className="w-full" 
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowQuickActions(false);
+                handlePreview();
+              }}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {price > 0 ? "Rent Now" : "Watch Now"}
+            </Button>
+            <Button 
+              variant="secondary" 
+              className="w-full" 
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowQuickActions(false);
+                handleToggleFavorite(e);
+              }}
+            >
+              <Heart className={`h-4 w-4 mr-2 ${isFavorite ? "fill-rose-500 text-rose-500" : ""}`} />
+              {isFavorite ? "Remove from Watchlist" : "Add to Watchlist"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default EnhancedContentCard;
+export default memo(EnhancedContentCard);
+

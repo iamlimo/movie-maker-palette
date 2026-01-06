@@ -6,6 +6,7 @@ import { useRole } from "@/hooks/useRole";
 import { useWallet } from "@/hooks/useWallet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isBottomNavRoute } from "@/lib/navigationUtils";
+import { usePlatform } from "@/hooks/usePlatform";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import SearchModal from "./SearchModal";
+import { cn } from "@/lib/utils";
 
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
@@ -27,6 +29,7 @@ const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
+  const { isIOS, isAndroid, isNative } = usePlatform();
   
   const showBottomNav = isMobile && isBottomNavRoute(location.pathname);
 
@@ -52,7 +55,12 @@ const Header = () => {
     }
   };
   return (
-    <header className={`fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border ${showBottomNav ? 'md:block hidden' : ''}`}>
+    <header className={cn(
+      "fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border",
+      showBottomNav && "md:block hidden",
+      isNative && isIOS && "pt-[env(safe-area-inset-top)]",
+      isNative && isAndroid && "pt-1"
+    )}>
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2">
