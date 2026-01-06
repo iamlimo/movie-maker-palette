@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Play, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import RentalButton from './RentalButton';
-import SecureVideoPlayer from './SecureVideoPlayer';
+import NativeVideoPlayer from './NativeVideoPlayer';
 
 interface VideoPlayerWithValidationProps {
   contentId: string;
@@ -143,7 +143,7 @@ const VideoPlayerWithValidation = ({
 
   if (isPlaying && hasAccess) {
     return (
-      <SecureVideoPlayer
+      <NativeVideoPlayer
         contentId={contentId}
         contentType={contentType}
         posterUrl={posterUrl}
