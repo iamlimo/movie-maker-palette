@@ -28,7 +28,10 @@ export function BottomNav() {
   if (!isMobile) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border bottom-nav-safe">
+    <nav 
+      className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border bottom-nav-safe will-change-transform"
+      style={{ transform: 'translateZ(0)' }}
+    >
       <div className="flex items-center justify-around h-16 px-2 pb-1">
         {navItems.map((item) => (
           <NavLink

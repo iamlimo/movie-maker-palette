@@ -148,6 +148,12 @@
     @apply border-border;
   }
 
+  /* Enable iOS rubber-band overscroll */
+  html, body {
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   body {
     @apply bg-background text-foreground overflow-x-hidden;
     background: var(--gradient-hero);
@@ -294,7 +300,7 @@
     padding-bottom: max(env(safe-area-inset-bottom), 1rem);
   }
   
-  /* Remove hover effects on touch devices */
+  /* Remove hover effects on touch devices for 60fps performance */
   @media (hover: none) and (pointer: coarse) {
     .hover-scale:hover {
       transform: none;
@@ -302,6 +308,33 @@
     
     .hover\:bg-secondary:hover {
       background-color: transparent;
+    }
+
+    /* Disable expensive effects on mobile */
+    .card-hover-effect:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .card-hover:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Disable floating/pulsing animations on mobile for performance */
+    .animate-float,
+    .animate-pulse-glow {
+      animation: none;
+    }
+
+    /* Ensure 60fps scrolling */
+    * {
+      will-change: auto !important;
+    }
+
+    .scroll-container {
+      will-change: scroll-position;
+      contain: layout style paint;
     }
   }
 
@@ -314,5 +347,18 @@
   .touch-spacing-x {
     margin-left: 0.75rem;
     margin-right: 0.75rem;
+  }
+
+  /* iOS momentum scrolling utility */
+  .scroll-momentum {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* GPU acceleration for fixed elements */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
   }
 }
