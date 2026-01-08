@@ -97,6 +97,9 @@ verify_jwt = true
 [functions.content-upload]
 verify_jwt = true
 
+[functions.delete-own-account]
+verify_jwt = false
+
 [edge-runtime]
 enabled = true
 ip_version = "ipv4"

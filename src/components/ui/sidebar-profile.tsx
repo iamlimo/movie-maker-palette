@@ -10,7 +10,8 @@ import {
   BarChart3, 
   ChevronLeft,
   Menu,
-  X
+  X,
+  Shield
 } from 'lucide-react';
 
 interface ProfileSidebarProps {
@@ -27,6 +28,7 @@ const tabs = [
   { id: 'preferences', label: 'Preferences', icon: Settings, description: 'App settings' },
   { id: 'favorites', label: 'My List', icon: Heart, description: 'Favorites & pinned' },
   { id: 'history', label: 'Watch History', icon: History, description: 'Your viewing activity' },
+  { id: 'account', label: 'Account', icon: Shield, description: 'Security & deletion' },
 ];
 
 export function ProfileSidebar({ 
