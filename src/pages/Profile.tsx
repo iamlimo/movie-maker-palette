@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { ProfileSidebar } from '@/components/ui/sidebar-profile';
 import { PinnedContent } from '@/components/PinnedContent';
 import { WalletWidget } from '@/components/wallet/WalletWidget';
+import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { 
@@ -32,7 +33,9 @@ import {
   TrendingUp,
   RefreshCw,
   Wallet,
-  Menu
+  Menu,
+  Shield,
+  AlertTriangle
 } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -824,6 +827,67 @@ const Profile = () => {
                   )}
                 </CardContent>
               </Card>
+              </div>
+            )}
+
+            {/* Account Tab */}
+            {activeTab === 'account' && (
+              <div className="space-y-6 animate-slide-in-up">
+                {/* Account Security */}
+                <Card className="card-hover">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Shield size={20} />
+                      <span>Account Security</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
+                      <div>
+                        <p className="font-medium">Email Address</p>
+                        <p className="text-sm text-muted-foreground">{user?.email}</p>
+                      </div>
+                      <Badge variant="outline">Verified</Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
+                      <div>
+                        <p className="font-medium">Password</p>
+                        <p className="text-sm text-muted-foreground">Last changed: Unknown</p>
+                      </div>
+                      <Button variant="outline" size="sm" disabled>
+                        Change Password
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
+                      <div>
+                        <p className="font-medium">Two-Factor Authentication</p>
+                        <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
+                      </div>
+                      <Badge variant="secondary">Coming Soon</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Danger Zone */}
+                <Card className="border-destructive/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-destructive">
+                      <AlertTriangle size={20} />
+                      <span>Danger Zone</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <h4 className="font-medium text-destructive mb-2">Delete Account</h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Permanently delete your account and all associated data. This action cannot be undone.
+                      </p>
+                      <DeleteAccountDialog walletBalance={profile?.wallet_balance || 0} />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
             </div>
