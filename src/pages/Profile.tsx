@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Calendar } from '@/components/ui/calendar';
@@ -13,11 +12,11 @@ import { ProfileSidebar } from '@/components/ui/sidebar-profile';
 import { PinnedContent } from '@/components/PinnedContent';
 import { WalletWidget } from '@/components/wallet/WalletWidget';
 import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
+import { ProfileImagePicker } from '@/components/ProfileImagePicker';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   CalendarIcon, 
-  Camera, 
   Edit, 
   Save, 
   X, 
@@ -129,13 +128,11 @@ const Profile = () => {
     await updatePreferences(preferencesData);
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setIsUploadingImage(true);
-      await uploadProfileImage(file);
-      setIsUploadingImage(false);
-    }
+  const handleImageUpload = async (file: File) => {
+    setIsUploadingImage(true);
+    const result = await uploadProfileImage(file);
+    setIsUploadingImage(false);
+    return result;
   };
 
   const getDashboardStats = () => {
@@ -196,30 +193,14 @@ const Profile = () => {
           <div className="container mx-auto px-4">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between space-y-6 lg:space-y-0">
               <div className="flex items-center space-x-6">
-                <div className="relative group">
-                  <Avatar className="w-20 h-20 border-4 border-white/20 transition-transform group-hover:scale-105">
-                    <AvatarImage src={profile?.profile_image_url} />
-                    <AvatarFallback className="text-xl">
-                      {profile?.first_name?.[0] || profile?.name?.[0] || user?.email?.[0] || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <label htmlFor="avatar-upload" className="absolute -bottom-1 -right-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-2 cursor-pointer transition-all hover:scale-110 shadow-glow">
-                    <Camera size={14} />
-                    <input
-                      id="avatar-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={isUploadingImage}
-                    />
-                  </label>
-                  {isUploadingImage && (
-                    <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
-                      <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                </div>
+                <ProfileImagePicker
+                  currentImageUrl={profile?.profile_image_url}
+                  userName={profile?.first_name && profile?.last_name 
+                    ? `${profile.first_name} ${profile.last_name}`
+                    : profile?.name || user?.email}
+                  onImageSelected={handleImageUpload}
+                  isUploading={isUploadingImage}
+                />
                 <div className="text-white">
                   <h1 className="text-2xl lg:text-3xl font-bold">
                     {profile?.first_name && profile?.last_name 
