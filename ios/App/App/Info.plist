@@ -54,5 +54,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Signature TV needs access to your camera to take profile photos</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Signature TV needs access to your photo library to select a profile photo</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Signature TV needs permission to save photos to your library</string>
 </dict>
 </plist>

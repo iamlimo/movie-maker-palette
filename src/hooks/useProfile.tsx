@@ -175,28 +175,37 @@ export const useProfile = () => {
     if (!user || !profile) return null;
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/profile.${fileExt}`;
+      // Use jpg extension for consistency (images are compressed to JPEG)
+      const fileExt = file.type === 'image/png' ? 'png' : 'jpg';
+      const fileName = `${user.id}/profile-${Date.now()}.${fileExt}`;
+
+      console.log('Uploading profile image:', { fileName, fileSize: file.size, fileType: file.type });
 
       const { error: uploadError } = await supabase.storage
-        .from('thumbnails')
+        .from('profile-images')
         .upload(fileName, file, {
-          upsert: true
+          upsert: true,
+          contentType: file.type
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
-        .from('thumbnails')
+        .from('profile-images')
         .getPublicUrl(fileName);
+
+      console.log('Profile image uploaded successfully:', publicUrl);
 
       await updateProfile({ profile_image_url: publicUrl });
       return publicUrl;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading profile image:', error);
       toast({
         title: "Error",
-        description: "Failed to upload profile image",
+        description: error?.message || "Failed to upload profile image",
         variant: "destructive"
       });
       return null;
