@@ -188,7 +188,11 @@ export const ProfileImagePicker = ({
   return (
     <div className="relative inline-block">
       <Avatar className="h-24 w-24 cursor-pointer border-4 border-primary/20" onClick={handleClick}>
-        <AvatarImage src={currentImageUrl} alt={userName || 'Profile'} />
+        <AvatarImage 
+          src={currentImageUrl} 
+          alt={userName || 'Profile'} 
+          className="object-cover"
+        />
         <AvatarFallback className="bg-primary/10 text-primary text-xl">
           {initials || <User className="h-8 w-8" />}
         </AvatarFallback>
