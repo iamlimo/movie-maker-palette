@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, Play, Eye, Heart } from "lucide-react";
+import { Star, Play, Clock, Eye, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useCallback, memo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,8 +48,6 @@ const EnhancedContentCard = ({
     loading: favoritesLoading,
   } = useFavorites();
   const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [isPressed, setIsPressed] = useState(false);
 
   const isFavorite = favorites.some(
     (fav) => fav.content_id === id && fav.content_type === contentType
@@ -103,6 +101,17 @@ const EnhancedContentCard = ({
     }
   };
 
+  const formatDuration = (dur?: string | number) => {
+    if (!dur) return "";
+    if (typeof dur === "string") return dur;
+    return `${dur}min`;
+  };
+
+  const displayRating = rating
+    ? typeof rating === "string"
+      ? rating
+      : rating.toFixed(1)
+    : "0.0";
   const displayImage = imageError || !imageUrl ? moviePlaceholder : imageUrl;
 
   const getFormattedPrice = () => {
@@ -111,6 +120,7 @@ const EnhancedContentCard = ({
     if (contentType === "movie") {
       return `${formatNaira(price)} • Rent`;
     } else {
+      // TV Show pricing
       return "₦3,000.00 • Season";
     }
   };
@@ -120,7 +130,6 @@ const EnhancedContentCard = ({
   const [showQuickActions, setShowQuickActions] = useState(false);
 
   const handleTouchStart = useCallback(() => {
-    setIsPressed(true);
     longPressTimer.current = setTimeout(async () => {
       if (Capacitor.isNativePlatform()) {
         try {
@@ -134,7 +143,6 @@ const EnhancedContentCard = ({
   }, []);
 
   const handleTouchEnd = useCallback(() => {
-    setIsPressed(false);
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
@@ -155,12 +163,9 @@ const EnhancedContentCard = ({
 
   return (
     <div
-      className={`group/card relative flex flex-col overflow-hidden rounded-lg bg-card border border-border/40 
-        transition-all duration-300 ease-out cursor-pointer
-        md:hover:scale-105 md:hover:z-10 md:hover:shadow-2xl md:hover:border-primary/40
-        ${isPressed ? 'scale-[0.98]' : ''}
-        ${featured ? "ring-1 ring-primary/20" : ""} 
-        ${className}`}
+      className={`group relative flex flex-col overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
+        featured ? "ring-1 ring-primary/20" : ""
+      } ${className}`}
       onClick={handlePreview}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -169,31 +174,21 @@ const EnhancedContentCard = ({
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] overflow-hidden bg-muted/30">
-        {/* Shimmer loading placeholder */}
-        {!imageLoaded && (
-          <div className="absolute inset-0 bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%] animate-shimmer" />
-        )}
         <img
           src={displayImage}
           alt={title}
-          className={`w-full h-full object-cover transition-all duration-500 ease-out
-            ${imageLoaded ? 'opacity-100' : 'opacity-0'}
-            group-hover/card:scale-110`}
-          onLoad={() => setImageLoaded(true)}
-          onError={() => {
-            setImageError(true);
-            setImageLoaded(true);
-          }}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          onError={() => setImageError(true)}
           loading="lazy"
         />
 
-        {/* Hover Overlay - Desktop only */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 md:group-hover/card:opacity-100 transition-opacity duration-300">
-          <div className="absolute inset-x-3 bottom-3 space-y-2">
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-x-4 bottom-4 space-y-2">
             <div className="flex gap-2">
               <Button
                 size="sm"
-                className="flex-1 h-9 text-xs font-medium shadow-lg"
+                className="flex-1 h-8 text-xs font-medium shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePreview();
@@ -205,7 +200,7 @@ const EnhancedContentCard = ({
               <Button
                 variant="secondary"
                 size="sm"
-                className="flex-1 h-9 text-xs font-medium shadow-lg"
+                className="flex-1 h-8 text-xs font-medium shadow-lg"
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePreview();
@@ -222,7 +217,7 @@ const EnhancedContentCard = ({
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 left-2 h-8 w-8 backdrop-blur-sm bg-background/80 hover:bg-background/90 border-0 opacity-0 md:group-hover/card:opacity-100 transition-all duration-300 shadow-sm"
+          className="absolute top-2 left-2 h-8 w-8 backdrop-blur-sm bg-background/80 hover:bg-background/90 border-0 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm"
           onClick={handleToggleFavorite}
           disabled={favoritesLoading}
         >
@@ -239,24 +234,31 @@ const EnhancedContentCard = ({
         <div className="absolute top-2 right-2">
           <Badge
             variant={price > 0 ? "default" : "secondary"}
-            className="text-[10px] sm:text-xs font-semibold backdrop-blur-md bg-background/95 border-0 shadow-md"
+            className="text-xs font-semibold backdrop-blur-md bg-background/95 border-0 shadow-md"
           >
-            <span className="text-muted-foreground">{getFormattedPrice()}</span>
+            <span className="text-gray-400">{getFormattedPrice()}</span>
           </Badge>
         </div>
       </div>
 
       {/* Info */}
-      <div className="p-2.5 sm:p-3 space-y-1.5 sm:space-y-2 flex-1 flex flex-col">
-        <h3 className="font-semibold text-xs sm:text-sm leading-tight text-foreground md:group-hover/card:text-primary transition-colors line-clamp-2 min-h-[2rem] sm:min-h-[2.5rem]">
+      <div className="p-3 space-y-2 flex-1 flex flex-col">
+        <h3 className="font-semibold text-sm leading-tight text-white group-hover:text-primary transition-colors line-clamp-2 min-h-[2.5rem]">
           {title}
         </h3>
 
-        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           {year && <span className="font-medium">{year}</span>}
           {rating && (
             <div className="flex items-center gap-1">
-              <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-amber-400 text-amber-400" />
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              {/* <span className="font-medium">{displayRating}</span> */}
+            </div>
+          )}
+          {duration && (
+            <div className="flex items-center gap-1">
+              {/* <Clock className="h-3 w-3" /> */}
+              {/* <span>{formatDuration(duration)}</span> */}
             </div>
           )}
         </div>
@@ -264,14 +266,14 @@ const EnhancedContentCard = ({
         {genre && (
           <Badge
             variant="outline"
-            className="text-[10px] sm:text-xs font-normal border-border/60 w-fit"
+            className="text-xs font-normal border-border/60"
           >
             {genre}
           </Badge>
         )}
 
         {description && (
-          <p className="hidden sm:block text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
+          <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
             {description}
           </p>
         )}
@@ -280,16 +282,16 @@ const EnhancedContentCard = ({
       {/* Quick Actions Modal */}
       {showQuickActions && (
         <div 
-          className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center"
           onClick={(e) => {
             e.stopPropagation();
             setShowQuickActions(false);
           }}
         >
-          <div className="bg-card border border-border rounded-xl p-4 space-y-3 min-w-[240px] max-w-[90vw] animate-scale-in">
-            <h4 className="font-semibold text-sm text-center line-clamp-2">{title}</h4>
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3 min-w-[200px] animate-scale-in">
+            <h4 className="font-semibold text-sm text-center">{title}</h4>
             <Button 
-              className="w-full h-11" 
+              className="w-full" 
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
@@ -302,7 +304,7 @@ const EnhancedContentCard = ({
             </Button>
             <Button 
               variant="secondary" 
-              className="w-full h-11" 
+              className="w-full" 
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
