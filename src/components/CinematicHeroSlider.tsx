@@ -13,6 +13,7 @@ import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import FavoriteButton from '@/components/FavoriteButton';
 import { formatNaira } from '@/lib/priceUtils';
 import { differenceInDays, differenceInHours, differenceInMinutes, format, isPast } from 'date-fns';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 
 const CinematicHeroSlider = () => {
   const navigate = useNavigate();
@@ -22,6 +23,14 @@ const CinematicHeroSlider = () => {
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Swipe gesture handling for mobile
+  const swipeHandlers = useSwipeGesture({
+    onSwipeLeft: () => nextSlide(),
+    onSwipeRight: () => prevSlide(),
+    threshold: 50,
+  });
 
   // Preload first slide image for LCP optimization
   useEffect(() => {
@@ -52,6 +61,11 @@ const CinematicHeroSlider = () => {
 
     return () => clearInterval(interval);
   }, [isAutoPlaying, sliderItems.length]);
+
+  // Reset image loaded state when slide changes
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [currentIndex]);
 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % sliderItems.length);
@@ -117,15 +131,15 @@ const CinematicHeroSlider = () => {
 
   if (loading) {
     return (
-      <section className="relative min-h-screen flex items-center justify-center bg-background overflow-hidden">
+      <section className="relative min-h-[80vh] sm:min-h-screen flex items-center justify-center bg-background overflow-hidden">
         <div className="container mx-auto px-4">
-          <div className="max-w-2xl space-y-6">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-12 w-3/4" />
-            <div className="flex gap-4">
-              <Skeleton className="h-12 w-32" />
-              <Skeleton className="h-12 w-32" />
+          <div className="max-w-2xl space-y-4 sm:space-y-6">
+            <Skeleton className="h-6 sm:h-8 w-32 sm:w-48" />
+            <Skeleton className="h-12 sm:h-20 w-full" />
+            <Skeleton className="h-8 sm:h-12 w-3/4" />
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <Skeleton className="h-12 w-full sm:w-32" />
+              <Skeleton className="h-12 w-full sm:w-32" />
             </div>
           </div>
         </div>
@@ -144,9 +158,10 @@ const CinematicHeroSlider = () => {
 
   return (
     <section 
-      className="relative min-h-screen flex items-center overflow-hidden"
+      className="relative min-h-[80vh] sm:min-h-screen flex items-center overflow-hidden"
       onMouseEnter={() => setIsAutoPlaying(false)}
       onMouseLeave={() => setIsAutoPlaying(true)}
+      {...swipeHandlers}
     >
       <AnimatePresence mode="wait">
         <motion.div
@@ -157,17 +172,25 @@ const CinematicHeroSlider = () => {
           transition={{ duration: 0.8 }}
           className="absolute inset-0"
         >
-          {/* Background Image */}
+          {/* Background Image with smooth loading */}
           <div className="absolute inset-0">
+            {/* Shimmer placeholder */}
+            {!imageLoaded && (
+              <div className="absolute inset-0 bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%] animate-shimmer" />
+            )}
             <img 
               src={currentItem.poster_url || moviePlaceholder} 
               alt={currentItem.title}
               fetchPriority={currentIndex === 0 ? 'high' : 'auto'}
               loading={currentIndex === 0 ? 'eager' : 'lazy'}
               decoding="async"
-              className={`w-full h-full object-cover transition-all ${isComingSoon ? 'opacity-60 blur-sm' : ''}`}
+              onLoad={() => setImageLoaded(true)}
+              className={`w-full h-full object-cover transition-all duration-700 ${
+                isComingSoon ? 'opacity-60 blur-sm' : ''
+              } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onError={(e) => {
                 (e.target as HTMLImageElement).src = moviePlaceholder;
+                setImageLoaded(true);
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
@@ -181,30 +204,30 @@ const CinematicHeroSlider = () => {
         </motion.div>
       </AnimatePresence>
 
-      {/* Navigation Arrows */}
+      {/* Navigation Arrows - Hidden on mobile, visible on tablet+ */}
       {sliderItems.length > 1 && (
         <>
           <Button
             variant="ghost"
             size="icon"
             onClick={prevSlide}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/20 hover:bg-background/40 text-white border-white/20"
+            className="hidden sm:flex absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-background/20 hover:bg-background/40 text-foreground border-border/20 backdrop-blur-sm transition-all duration-300 hover:scale-110"
           >
-            <ChevronLeft className="h-6 w-6" />
+            <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={nextSlide}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-background/20 hover:bg-background/40 text-white border-white/20"
+            className="hidden sm:flex absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-background/20 hover:bg-background/40 text-foreground border-border/20 backdrop-blur-sm transition-all duration-300 hover:scale-110"
           >
-            <ChevronRight className="h-6 w-6" />
+            <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
         </>
       )}
 
       {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 pt-16">
+      <div className="relative z-10 container mx-auto px-4 pt-16 sm:pt-20">
         <div className="max-w-2xl">
           <AnimatePresence mode="wait">
             <motion.div
@@ -214,26 +237,26 @@ const CinematicHeroSlider = () => {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              {/* Badges */}
-              <div className="flex items-center gap-4 mb-6">
+              {/* Badges - Responsive wrap */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4 sm:mb-6">
                 {isPromoted && (
-                  <Badge className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-600 animate-pulse">
+                  <Badge className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-orange-600 animate-pulse">
                     <Sparkles className="mr-1 h-3 w-3" />
                     {currentItem.promotion_badge_text || 'PROMOTED'}
                   </Badge>
                 )}
                 {isComingSoon && (
-                  <Badge className="px-3 py-1 bg-gradient-to-r from-blue-500 to-purple-600">
+                  <Badge className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-gradient-to-r from-blue-500 to-purple-600">
                     <Clock className="mr-1 h-3 w-3" />
                     COMING SOON
                   </Badge>
                 )}
-                <Badge variant="secondary" className="px-3 py-1">
+                <Badge variant="secondary" className="px-2 sm:px-3 py-1 text-xs sm:text-sm">
                   {currentItem.is_featured ? 'Featured' : 'Premium'} {currentItem.content_type === 'movie' ? 'Movie' : 'TV Show'}
                 </Badge>
                 
                 {!isComingSoon && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
                     {currentItem.rating && (
                       <>
                         <div className="flex items-center gap-1">
@@ -255,50 +278,52 @@ const CinematicHeroSlider = () => {
 
               {/* Coming Soon Release Info */}
               {isComingSoon && currentItem.release_date && (
-                <div className="mb-4 flex items-center gap-3">
-                  <Badge variant="outline" className="text-base px-4 py-2">
-                    Releases: {format(new Date(currentItem.release_date), 'MMMM d, yyyy')}
+                <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+                  <Badge variant="outline" className="text-xs sm:text-base px-3 sm:px-4 py-1.5 sm:py-2">
+                    Releases: {format(new Date(currentItem.release_date), 'MMM d, yyyy')}
                   </Badge>
                   {countdown && (
-                    <Badge variant="outline" className="text-base px-4 py-2 animate-pulse">
-                      <Clock className="mr-1 h-4 w-4" />
+                    <Badge variant="outline" className="text-xs sm:text-base px-3 sm:px-4 py-1.5 sm:py-2 animate-pulse">
+                      <Clock className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                       {countdown} remaining
                     </Badge>
                   )}
                 </div>
               )}
 
-              {/* Title */}
-              <h1 className={`text-6xl md:text-7xl font-bold mb-4 bg-gradient-to-r ${
+              {/* Title - Responsive sizing */}
+              <h1 className={`text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold mb-3 sm:mb-4 bg-gradient-to-r ${
                 isPromoted ? 'from-amber-500 via-orange-500 to-primary' :
                 isComingSoon ? 'from-blue-500 via-purple-500 to-primary' :
                 'from-foreground to-primary'
-              } bg-clip-text text-transparent`}>
+              } bg-clip-text text-transparent leading-tight`}>
                 {currentItem.title}
               </h1>
 
-              {/* Description */}
+              {/* Description - Responsive */}
               {currentItem.description && (
-                <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                <p className="text-sm sm:text-base md:text-lg text-muted-foreground mb-6 sm:mb-8 leading-relaxed line-clamp-3 sm:line-clamp-none">
                   {currentItem.description}
                 </p>
               )}
 
-              {/* Genres */}
-              {currentItem.genre && (
-                <div className="flex items-center gap-2 mb-8">
-                  <Badge variant="outline">{currentItem.genre}</Badge>
-                  {!isComingSoon && <Badge variant="outline">{formatNaira(currentItem.price)}</Badge>}
-                </div>
-              )}
+              {/* Genres & Price on mobile */}
+              <div className="flex flex-wrap items-center gap-2 mb-6 sm:mb-8">
+                {currentItem.genre && (
+                  <Badge variant="outline" className="text-xs sm:text-sm">{currentItem.genre}</Badge>
+                )}
+                {!isComingSoon && (
+                  <Badge variant="outline" className="text-xs sm:text-sm sm:hidden">{formatNaira(currentItem.price)}</Badge>
+                )}
+              </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-4">
+              {/* Action Buttons - Responsive stacking */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                 {isComingSoon ? (
                   <Button 
                     variant="default" 
                     size="lg" 
-                    className="shadow-glow hover:scale-105 transition-transform bg-gradient-to-r from-blue-500 to-purple-600"
+                    className="w-full sm:w-auto shadow-glow hover:scale-105 transition-transform bg-gradient-to-r from-blue-500 to-purple-600 h-12 sm:h-11 text-base"
                     onClick={() => handleNotifyMe(currentItem)}
                   >
                     <Bell className="h-5 w-5 mr-2" />
@@ -308,7 +333,7 @@ const CinematicHeroSlider = () => {
                   <Button 
                     variant="default" 
                     size="lg" 
-                    className={`shadow-glow hover:scale-105 transition-transform ${
+                    className={`w-full sm:w-auto shadow-glow hover:scale-105 transition-transform h-12 sm:h-11 text-base ${
                       isPromoted ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700' : ''
                     }`}
                     onClick={() => {
@@ -323,32 +348,33 @@ const CinematicHeroSlider = () => {
                   </Button>
                 )}
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <FavoriteButton
                     contentType={currentItem.content_type}
                     contentId={currentItem.content_id}
                     size="lg"
-                    className="bg-white/20 hover:bg-white/30"
+                    className="flex-1 sm:flex-none bg-background/20 hover:bg-background/30 h-12 sm:h-11"
                   />
                   {!isComingSoon && (
                     <Button 
                       variant="cinema" 
                       size="lg"
+                      className="flex-1 sm:flex-none h-12 sm:h-11 text-sm sm:text-base"
                       onClick={() => handleAddToWatchlist(currentItem)}
                     >
                       <Plus className="h-5 w-5 mr-2" />
-                      Add to Watchlist
+                      <span className="hidden xs:inline">Add to</span> Watchlist
                     </Button>
                   )}
                 </div>
               </div>
 
               {/* Info Footer */}
-              <div className="mt-6 text-sm text-muted-foreground">
+              <div className="mt-4 sm:mt-6 text-xs sm:text-sm text-muted-foreground">
                 {isComingSoon ? (
                   <p>We'll notify you when this becomes available</p>
                 ) : (
-                  <p>48-hour rental period • HD & 4K available • Instant streaming</p>
+                  <p className="hidden sm:block">48-hour rental period • HD & 4K available • Instant streaming</p>
                 )}
               </div>
             </motion.div>
@@ -356,9 +382,9 @@ const CinematicHeroSlider = () => {
         </div>
       </div>
 
-      {/* Slide Indicators */}
+      {/* Slide Indicators - Larger touch targets on mobile */}
       {sliderItems.length > 1 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+        <div className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 sm:gap-2">
           {sliderItems.map((item, index) => {
             const isPromotedSlide = item.promotion_type === 'promoted';
             const isComingSoonSlide = item.promotion_type === 'coming_soon';
@@ -367,16 +393,23 @@ const CinematicHeroSlider = () => {
               <button
                 key={index}
                 onClick={() => goToSlide(index)}
-                className={`h-3 rounded-full transition-all duration-300 ${
+                className={`h-2 sm:h-3 rounded-full transition-all duration-300 touch-target min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                  index === currentIndex 
+                    ? ''
+                    : ''
+                }`}
+                aria-label={`Go to slide ${index + 1}`}
+              >
+                <span className={`block rounded-full transition-all duration-300 ${
                   index === currentIndex 
                     ? isPromotedSlide 
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-600 scale-125 w-8' 
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-600 h-2.5 sm:h-3 w-6 sm:w-8' 
                       : isComingSoonSlide
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 scale-125 w-8'
-                      : 'bg-primary scale-125 w-8'
-                    : 'bg-white/40 hover:bg-white/60 w-3'
-                }`}
-              />
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 h-2.5 sm:h-3 w-6 sm:w-8'
+                      : 'bg-primary h-2.5 sm:h-3 w-6 sm:w-8'
+                    : 'bg-foreground/40 hover:bg-foreground/60 h-2 sm:h-3 w-2 sm:w-3'
+                }`} />
+              </button>
             );
           })}
         </div>
