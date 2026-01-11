@@ -1249,9 +1249,11 @@ export type Database = {
           created_at: string
           id: string
           last_watched_at: string
+          playback_position: number | null
           progress: number | null
           updated_at: string
           user_id: string
+          video_duration: number | null
         }
         Insert: {
           completed?: boolean | null
@@ -1260,9 +1262,11 @@ export type Database = {
           created_at?: string
           id?: string
           last_watched_at?: string
+          playback_position?: number | null
           progress?: number | null
           updated_at?: string
           user_id: string
+          video_duration?: number | null
         }
         Update: {
           completed?: boolean | null
@@ -1271,9 +1275,11 @@ export type Database = {
           created_at?: string
           id?: string
           last_watched_at?: string
+          playback_position?: number | null
           progress?: number | null
           updated_at?: string
           user_id?: string
+          video_duration?: number | null
         }
         Relationships: []
       }

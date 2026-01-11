@@ -14,6 +14,9 @@ export interface WatchHistoryItem {
   last_watched_at: string;
   created_at: string;
   updated_at: string;
+  // Playback position tracking (in seconds)
+  playback_position?: number;
+  video_duration?: number;
   // Joined data from content tables
   title?: string;
   thumbnail_url?: string;

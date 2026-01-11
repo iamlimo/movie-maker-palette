@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
 
 interface SecureVideoPlayerProps {
   contentId: string;
@@ -26,6 +27,9 @@ const SecureVideoPlayer = ({
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const { toast } = useToast();
   const refreshTimerRef = useRef<number | null>(null);
+  const lastPositionLoaded = useRef(false);
+  
+  const { saveProgress, getLastPosition, startAutoSave, stopAutoSave } = useVideoProgress(contentId, contentType);
 
   const fetchSignedUrl = async () => {
     try {
@@ -119,6 +123,51 @@ const SecureVideoPlayer = ({
     return false;
   };
 
+  // Handle video loaded - seek to last position
+  const handleLoadedMetadata = useCallback(async () => {
+    if (!lastPositionLoaded.current && videoRef.current) {
+      const lastPosition = await getLastPosition();
+      if (lastPosition > 5) { // Only resume if >5 seconds in
+        videoRef.current.currentTime = lastPosition;
+        toast({
+          title: "Resuming playback",
+          description: `Continuing from where you left off`
+        });
+      }
+      lastPositionLoaded.current = true;
+    }
+  }, [getLastPosition, toast]);
+
+  // Handle play event - start auto-save
+  const handlePlay = useCallback(() => {
+    if (videoRef.current) {
+      startAutoSave(videoRef.current);
+    }
+  }, [startAutoSave]);
+
+  // Handle pause event - save progress
+  const handlePause = useCallback(() => {
+    if (videoRef.current) {
+      saveProgress(videoRef.current.currentTime, videoRef.current.duration);
+    }
+    stopAutoSave();
+  }, [saveProgress, stopAutoSave]);
+
+  // Handle video end
+  const handleEnded = useCallback(() => {
+    if (videoRef.current) {
+      saveProgress(videoRef.current.duration, videoRef.current.duration);
+    }
+    stopAutoSave();
+  }, [saveProgress, stopAutoSave]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAutoSave();
+    };
+  }, [stopAutoSave]);
+
   if (loading) {
     return (
       <Skeleton className="aspect-video w-full rounded-lg" />
@@ -160,6 +209,10 @@ const SecureVideoPlayer = ({
             controlsList="nodownload noplaybackrate"
             disablePictureInPicture
             onContextMenu={handleContextMenu}
+            onLoadedMetadata={handleLoadedMetadata}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onEnded={handleEnded}
             className="w-full h-full"
             style={{ pointerEvents: 'auto' }}
           >

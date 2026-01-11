@@ -17,10 +17,24 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
   onPlay,
   onRemove,
 }) => {
-  const formatTimeRemaining = (duration: number, progress: number) => {
-    if (!duration) return '';
-    const watchedMinutes = (duration * progress) / 100;
-    const remainingMinutes = Math.round(duration - watchedMinutes);
+  // Use playback_position and video_duration if available, otherwise fall back to progress-based calculation
+  const formatTimeRemaining = (item: WatchHistoryItem) => {
+    // Use seconds-based calculation if available
+    if (item.playback_position !== undefined && item.video_duration && item.video_duration > 0) {
+      const remainingSeconds = item.video_duration - item.playback_position;
+      const remainingMinutes = Math.round(remainingSeconds / 60);
+      if (remainingMinutes >= 60) {
+        const hours = Math.floor(remainingMinutes / 60);
+        const mins = remainingMinutes % 60;
+        return `${hours}h ${mins}m remaining`;
+      }
+      return `${remainingMinutes}m remaining`;
+    }
+    
+    // Fall back to progress-based calculation
+    if (!item.duration) return '';
+    const watchedMinutes = (item.duration * item.progress) / 100;
+    const remainingMinutes = Math.round(item.duration - watchedMinutes);
     if (remainingMinutes >= 60) {
       const hours = Math.floor(remainingMinutes / 60);
       const mins = remainingMinutes % 60;
@@ -87,9 +101,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
               />
               <div className="flex items-center justify-between text-xs text-white/70">
                 <span>{Math.round(item.progress)}% watched</span>
-                {item.duration && (
-                  <span>{formatTimeRemaining(item.duration, item.progress)}</span>
-                )}
+                <span>{formatTimeRemaining(item)}</span>
               </div>
             </div>
           </div>
