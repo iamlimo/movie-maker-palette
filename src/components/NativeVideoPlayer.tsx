@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw, Play } from 'lucide-react';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
+import { useToast } from '@/hooks/use-toast';
 
 interface NativeVideoPlayerProps {
   contentId: string;
@@ -44,8 +46,12 @@ const NativeVideoPlayer = ({
   const [nativePlayerReady, setNativePlayerReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerIdRef = useRef(`video-${contentId}-${Date.now()}`);
+  const lastPositionLoaded = useRef(false);
+  const { toast } = useToast();
 
   const isNative = Capacitor.isNativePlatform();
+  
+  const { saveProgress, getLastPosition, startAutoSave, stopAutoSave } = useVideoProgress(contentId, contentType);
 
   // Initialize native player on mount
   useEffect(() => {
@@ -153,25 +159,58 @@ const NativeVideoPlayer = ({
     }
   };
 
-  const playWebVideo = (url: string) => {
+  const playWebVideo = async (url: string) => {
     if (videoRef.current) {
       videoRef.current.src = url;
+      
+      // Restore last position
+      if (!lastPositionLoaded.current) {
+        const lastPosition = await getLastPosition();
+        if (lastPosition > 5) {
+          videoRef.current.currentTime = lastPosition;
+          toast({
+            title: "Resuming playback",
+            description: "Continuing from where you left off"
+          });
+        }
+        lastPositionLoaded.current = true;
+      }
+      
       videoRef.current.play();
       setIsPlaying(true);
+      startAutoSave(videoRef.current);
     }
   };
+
+  // Handle pause event
+  const handlePause = useCallback(() => {
+    if (videoRef.current) {
+      saveProgress(videoRef.current.currentTime, videoRef.current.duration);
+    }
+    stopAutoSave();
+  }, [saveProgress, stopAutoSave]);
+
+  // Handle video end
+  const handleEnded = useCallback(() => {
+    if (videoRef.current) {
+      saveProgress(videoRef.current.duration, videoRef.current.duration);
+    }
+    stopAutoSave();
+    setIsPlaying(false);
+  }, [saveProgress, stopAutoSave]);
 
   useEffect(() => {
     fetchSignedUrl();
 
     return () => {
       // Cleanup native player on unmount
+      stopAutoSave();
       if (isNative && CapacitorVideoPlayer) {
         CapacitorVideoPlayer.stopAllPlayers?.().catch(() => {});
         CapacitorVideoPlayer.removeAllListeners?.();
       }
     };
-  }, [contentId, contentType]);
+  }, [contentId, contentType, stopAutoSave]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -232,9 +271,10 @@ const NativeVideoPlayer = ({
             disablePictureInPicture
             playsInline
             onContextMenu={handleContextMenu}
+            onPause={handlePause}
+            onEnded={handleEnded}
             className="w-full h-full"
             style={{ pointerEvents: 'auto' }}
-            onEnded={() => setIsPlaying(false)}
           >
             Your browser does not support the video tag.
           </video>

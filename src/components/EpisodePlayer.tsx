@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Play, Lock, SkipForward, Pause } from 'lucide-react';
+import { Play, Lock, SkipForward } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
 import RentalButton from './RentalButton';
 
 interface EpisodePlayerProps {
@@ -35,9 +36,10 @@ const EpisodePlayer = ({
 }: EpisodePlayerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { updateWatchProgress, markAsCompleted } = useWatchHistory();
+  const { markAsCompleted } = useWatchHistory();
   const videoRef = useRef<HTMLVideoElement>(null);
   const navigate = useNavigate();
+  const lastPositionLoaded = useRef(false);
   
   const [hasAccess, setHasAccess] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -45,6 +47,8 @@ const EpisodePlayer = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
+
+  const { saveProgress, getLastPosition, startAutoSave, stopAutoSave } = useVideoProgress(episodeId, 'episode');
 
   useEffect(() => {
     if (user) {
@@ -106,7 +110,7 @@ const EpisodePlayer = ({
     }
   };
 
-  const handlePlay = () => {
+  const handlePlayClick = () => {
     if (!hasAccess) {
       toast({
         title: "Access Required",
@@ -128,8 +132,23 @@ const EpisodePlayer = ({
     setIsPlaying(true);
   };
 
+  // Handle video loaded - seek to last position
+  const handleLoadedMetadata = useCallback(async () => {
+    if (!lastPositionLoaded.current && videoRef.current) {
+      const lastPosition = await getLastPosition();
+      if (lastPosition > 5) {
+        videoRef.current.currentTime = lastPosition;
+        toast({
+          title: "Resuming playback",
+          description: "Continuing from where you left off"
+        });
+      }
+      lastPositionLoaded.current = true;
+    }
+  }, [getLastPosition, toast]);
+
   const handleTimeUpdate = () => {
-    if (!videoRef.current || !user) return;
+    if (!videoRef.current) return;
     
     const currentTime = videoRef.current.currentTime;
     const duration = videoRef.current.duration;
@@ -137,11 +156,6 @@ const EpisodePlayer = ({
     if (duration > 0) {
       const progressPercent = (currentTime / duration) * 100;
       setProgress(progressPercent);
-      
-      // Update watch progress every 10 seconds
-      if (Math.floor(currentTime) % 10 === 0) {
-        updateWatchProgress('episode', episodeId, progressPercent, progressPercent >= 90);
-      }
 
       // Show next episode button when 85% complete
       if (progressPercent >= 85 && nextEpisodeId && !showNextEpisode) {
@@ -150,7 +164,25 @@ const EpisodePlayer = ({
     }
   };
 
-  const handleVideoEnd = () => {
+  const handlePlay = useCallback(() => {
+    if (videoRef.current) {
+      startAutoSave(videoRef.current);
+    }
+  }, [startAutoSave]);
+
+  const handlePause = useCallback(() => {
+    if (videoRef.current) {
+      saveProgress(videoRef.current.currentTime, videoRef.current.duration);
+    }
+    stopAutoSave();
+  }, [saveProgress, stopAutoSave]);
+
+  const handleVideoEnd = useCallback(() => {
+    if (videoRef.current) {
+      saveProgress(videoRef.current.duration, videoRef.current.duration);
+    }
+    stopAutoSave();
+    
     if (user) {
       markAsCompleted('episode', episodeId);
     }
@@ -166,7 +198,14 @@ const EpisodePlayer = ({
         navigate(`/episodes/${nextEpisodeId}`);
       }, 5000);
     }
-  };
+  }, [saveProgress, stopAutoSave, user, episodeId, markAsCompleted, autoPlay, nextEpisodeId, toast, navigate]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAutoSave();
+    };
+  }, [stopAutoSave]);
 
   const handleNextEpisode = () => {
     if (nextEpisodeId) {
@@ -227,7 +266,10 @@ const EpisodePlayer = ({
             autoPlay
             className="w-full h-full"
             poster={posterUrl}
+            onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={handleTimeUpdate}
+            onPlay={handlePlay}
+            onPause={handlePause}
             onEnded={handleVideoEnd}
             onError={(e) => {
               console.error('Video playback error:', e);
@@ -265,7 +307,7 @@ const EpisodePlayer = ({
   return (
     <div 
       className="aspect-video bg-muted rounded-lg flex items-center justify-center cursor-pointer group relative overflow-hidden"
-      onClick={handlePlay}
+      onClick={handlePlayClick}
       style={posterUrl ? { backgroundImage: `url(${posterUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
     >
       {posterUrl && <div className="absolute inset-0 bg-black/30" />}

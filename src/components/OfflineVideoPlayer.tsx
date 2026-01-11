@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Download, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useOfflineVideo } from '@/hooks/useOfflineVideo';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { useToast } from '@/hooks/use-toast';
 
 interface OfflineVideoPlayerProps {
@@ -34,6 +35,7 @@ export const OfflineVideoPlayer = ({
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const lastPositionLoaded = useRef(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,6 +50,8 @@ export const OfflineVideoPlayer = ({
     downloadForOffline,
     removeFromOffline
   } = useOfflineVideo({ contentId, contentType, rentalId });
+
+  const { saveProgress, getLastPosition, startAutoSave, stopAutoSave } = useVideoProgress(contentId, contentType);
 
   useEffect(() => {
     loadVideo();
@@ -93,8 +97,11 @@ export const OfflineVideoPlayer = ({
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
+      saveProgress(videoRef.current.currentTime, videoRef.current.duration);
+      stopAutoSave();
     } else {
       videoRef.current.play();
+      startAutoSave(videoRef.current);
     }
     setIsPlaying(!isPlaying);
   };
@@ -124,10 +131,31 @@ export const OfflineVideoPlayer = ({
     setCurrentTime(videoRef.current.currentTime);
   };
 
-  const handleLoadedMetadata = () => {
+  const handleLoadedMetadata = useCallback(async () => {
     if (!videoRef.current) return;
     setDuration(videoRef.current.duration);
-  };
+    
+    // Restore last position
+    if (!lastPositionLoaded.current) {
+      const lastPosition = await getLastPosition();
+      if (lastPosition > 5) {
+        videoRef.current.currentTime = lastPosition;
+        toast({
+          title: "Resuming playback",
+          description: "Continuing from where you left off"
+        });
+      }
+      lastPositionLoaded.current = true;
+    }
+  }, [getLastPosition, toast]);
+
+  const handleVideoEnd = useCallback(() => {
+    if (videoRef.current) {
+      saveProgress(videoRef.current.duration, videoRef.current.duration);
+    }
+    stopAutoSave();
+    setIsPlaying(false);
+  }, [saveProgress, stopAutoSave]);
 
   const handleSeek = (value: number[]) => {
     if (!videoRef.current) return;
@@ -166,8 +194,9 @@ export const OfflineVideoPlayer = ({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      stopAutoSave();
     };
-  }, []);
+  }, [stopAutoSave]);
 
   if (loading) {
     return (
@@ -231,6 +260,7 @@ export const OfflineVideoPlayer = ({
           onLoadedMetadata={handleLoadedMetadata}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
+          onEnded={handleVideoEnd}
           preload="metadata"
           controlsList="nodownload"
           disablePictureInPicture
