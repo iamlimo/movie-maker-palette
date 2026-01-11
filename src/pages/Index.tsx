@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import CinematicHeroSlider from "@/components/CinematicHeroSlider";
 import BrandStrip from "@/components/BrandStrip";
 import MovieSection from "@/components/MovieSection";
+import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSectionsWithContent } from "@/hooks/useContentSections";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -83,6 +84,9 @@ const Index = () => {
 
       <CinematicHeroSlider />
       <BrandStrip />
+
+      {/* Continue Watching Section - Only shows for logged in users with watch history */}
+      <ContinueWatchingSection />
 
       {sectionsWithContent.map((section) => (
         <MovieSection
