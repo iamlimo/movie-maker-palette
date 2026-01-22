@@ -9,6 +9,7 @@ import {
   Heart,
   Share2,
 } from "lucide-react";
+import { usePlatform } from "@/hooks/usePlatform";
 
 interface ContentHeroProps {
   title: string;
@@ -47,6 +48,8 @@ const ContentHero = ({
   viewer_discretion,
   cast_info,
 }: ContentHeroProps) => {
+  const { isIOS } = usePlatform();
+  
   return (
     <section className="relative min-h-[70vh] flex items-center overflow-hidden">
       {/* Background Image */}
@@ -141,7 +144,8 @@ const ContentHero = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-4 flex-wrap">
-            {onRent && price && (
+            {/* Hide rent button on iOS - users must rent via website */}
+            {!isIOS && onRent && price && (
               <Button
                 variant="default"
                 size="lg"
@@ -168,24 +172,27 @@ const ContentHero = ({
             </Button>
           </div>
 
-          {/* Rental Info */}
+          {/* Rental Info - Show external rental message on iOS */}
           <div className="mt-6 text-sm text-muted-foreground">
-            <p>
-              {/* {contentType === "movie"
-                ? "48-hour rental period • HD & 4K available • Instant streaming • ⚠️  `{view_descirption}`"
-                : "Multiple seasons available • Rent per episode or season"} */}
-              {contentType === "movie" ? (
-                <>
-                  48-hour rental period • HD & 4K available • Instant streaming
-                  • ⚠️ {viewer_discretion}
-                </>
-              ) : (
-                <>
-                  Multiple seasons available • Rent per episode or season • ⚠️{" "}
-                  {viewer_discretion}
-                </>
-              )}
-            </p>
+            {isIOS ? (
+              <p>
+                To rent this content, visit signaturetv.com in your browser • ⚠️ {viewer_discretion}
+              </p>
+            ) : (
+              <p>
+                {contentType === "movie" ? (
+                  <>
+                    48-hour rental period • HD & 4K available • Instant streaming
+                    • ⚠️ {viewer_discretion}
+                  </>
+                ) : (
+                  <>
+                    Multiple seasons available • Rent per episode or season • ⚠️{" "}
+                    {viewer_discretion}
+                  </>
+                )}
+              </p>
+            )}
             <br />
           </div>
         </div>

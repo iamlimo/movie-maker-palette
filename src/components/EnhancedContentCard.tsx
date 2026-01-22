@@ -10,6 +10,7 @@ import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import { formatNaira } from "@/lib/priceUtils";
 import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { usePlatform } from "@/hooks/usePlatform";
 
 interface EnhancedContentCardProps {
   id: string;
@@ -42,6 +43,7 @@ const EnhancedContentCard = ({
 }: EnhancedContentCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isIOS } = usePlatform();
   const {
     favorites,
     toggleFavorite,
@@ -115,6 +117,9 @@ const EnhancedContentCard = ({
   const displayImage = imageError || !imageUrl ? moviePlaceholder : imageUrl;
 
   const getFormattedPrice = () => {
+    // iOS: Hide pricing to comply with App Store guidelines
+    if (isIOS) return "Available";
+    
     if (price === 0) return "Free";
 
     if (contentType === "movie") {
@@ -182,36 +187,38 @@ const EnhancedContentCard = ({
           loading="lazy"
         />
 
-        {/* Hover Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div className="absolute inset-x-4 bottom-4 space-y-2">
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                className="flex-1 h-8 text-xs font-medium shadow-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePreview();
-                }}
-              >
-                <Play className="h-3 w-3 mr-1.5" />
-                {price > 0 ? "Rent" : "Watch"}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="flex-1 h-8 text-xs font-medium shadow-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePreview();
-                }}
-              >
-                <Eye className="h-3 w-3 mr-1.5" />
-                Info
-              </Button>
+        {/* Hover Overlay - Hide Rent/Info buttons on iOS */}
+        {!isIOS && (
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="absolute inset-x-4 bottom-4 space-y-2">
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 h-8 text-xs font-medium shadow-lg"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreview();
+                  }}
+                >
+                  <Play className="h-3 w-3 mr-1.5" />
+                  {price > 0 ? "Rent" : "Watch"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="flex-1 h-8 text-xs font-medium shadow-lg"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreview();
+                  }}
+                >
+                  <Eye className="h-3 w-3 mr-1.5" />
+                  Info
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Favorite Button */}
         <Button
@@ -300,7 +307,7 @@ const EnhancedContentCard = ({
               }}
             >
               <Play className="h-4 w-4 mr-2" />
-              {price > 0 ? "Rent Now" : "Watch Now"}
+              {isIOS ? "View Details" : (price > 0 ? "Rent Now" : "Watch Now")}
             </Button>
             <Button 
               variant="secondary" 
