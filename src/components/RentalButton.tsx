@@ -260,7 +260,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
   // iOS without access: Show external website button instead of payment options
   if (isIOS) {
     const handleOpenExternalSite = () => {
-      const baseUrl = 'https://signaturetv.com';
+      const baseUrl = 'https://signaturetv.co';
       const path = contentType === 'movie' ? `/movie/${contentId}` : 
                    contentType === 'episode' ? `/episode/${contentId}` :
                    contentType === 'season' ? `/season/${contentId}` : `/content/${contentId}`;
@@ -270,7 +270,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
     return (
       <div className="space-y-4">
         <div className="text-center text-sm text-muted-foreground">
-          <p>To rent this content, visit our website</p>
+          <p>To unlock this content, visit our website</p>
         </div>
         <Button
           variant="default"
@@ -279,7 +279,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
           onClick={handleOpenExternalSite}
         >
           <ExternalLink className="h-5 w-5 mr-2" />
-          Rent on Website
+          Unlock
         </Button>
       </div>
     );
