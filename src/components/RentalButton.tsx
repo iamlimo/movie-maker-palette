@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Loader2, Wallet, Clock } from "lucide-react";
+import { Play, Loader2, Wallet, Clock, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRentals } from "@/hooks/useRentals";
@@ -11,6 +11,7 @@ import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { RentalBottomSheet } from "./RentalBottomSheet";
 import { PaymentSuccessAnimation } from "./PaymentSuccessAnimation";
+import { usePlatform } from "@/hooks/usePlatform";
 
 interface RentalButtonProps {
   contentId: string;
@@ -23,6 +24,7 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
   const { user } = useAuth();
   const { checkAccess, fetchRentals, activeRentals } = useRentals();
   const { balance, canAfford, formatBalance, refreshWallet } = useWallet();
+  const { isIOS } = usePlatform();
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card' | null>(null);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -244,12 +246,41 @@ const RentalButton = ({ contentId, contentType, price, title }: RentalButtonProp
           <Play className="h-5 w-5 mr-2" />
           Watch Now
         </Button>
-        {timeRemaining && (
+        {/* Hide rental time remaining on iOS */}
+        {!isIOS && timeRemaining && (
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
             {timeRemaining}
           </div>
         )}
+      </div>
+    );
+  }
+
+  // iOS without access: Show external website button instead of payment options
+  if (isIOS) {
+    const handleOpenExternalSite = () => {
+      const baseUrl = 'https://signaturetv.com';
+      const path = contentType === 'movie' ? `/movie/${contentId}` : 
+                   contentType === 'episode' ? `/episode/${contentId}` :
+                   contentType === 'season' ? `/season/${contentId}` : `/content/${contentId}`;
+      window.open(`${baseUrl}${path}`, '_blank');
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="text-center text-sm text-muted-foreground">
+          <p>To rent this content, visit our website</p>
+        </div>
+        <Button
+          variant="default"
+          size="lg"
+          className="w-full touch-target"
+          onClick={handleOpenExternalSite}
+        >
+          <ExternalLink className="h-5 w-5 mr-2" />
+          Rent on Website
+        </Button>
       </div>
     );
   }

@@ -12,6 +12,7 @@ import RentalButton from "@/components/RentalButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
+import { usePlatform } from "@/hooks/usePlatform";
 
 interface Movie {
   id: string;
@@ -44,6 +45,7 @@ const MoviePreview = () => {
   const preloadedData = location.state?.preloadedData;
   
   const { user } = useAuth();
+  const { isIOS } = usePlatform();
   const {
     favorites,
     toggleFavorite,
@@ -182,7 +184,7 @@ const MoviePreview = () => {
         genre={movie.genre?.name}
         viewer_discretion={movie.viewer_discretion || undefined}
         cast_info={movie.cast_info || undefined}
-        price={movie.price / 100} // Convert kobo to Naira for display
+        price={isIOS ? undefined : movie.price / 100} // Hide price on iOS
         language={movie.language || undefined}
         onBack={() => navigate("/")}
       />

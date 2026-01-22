@@ -33,6 +33,7 @@ import EpisodePlayer from "@/components/EpisodePlayer";
 import RentalButton from "@/components/RentalButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatNaira } from "@/lib/priceUtils";
+import { usePlatform } from "@/hooks/usePlatform";
 
 interface TVShow {
   id: string;
@@ -88,6 +89,7 @@ const TVShowPreview = () => {
   const preloadedData = location.state?.preloadedData;
   
   const { user } = useAuth();
+  const { isIOS } = usePlatform();
   const {
     favorites,
     toggleFavorite,
@@ -338,7 +340,7 @@ const TVShowPreview = () => {
             : undefined
         }
         genre={tvShow.genre?.name}
-        price={tvShow.price}
+        price={isIOS ? undefined : tvShow.price} // Hide price on iOS
         language={tvShow.language || undefined}
         onBack={() => navigate("/")}
         onToggleFavorite={handleToggleFavorite}
@@ -484,59 +486,61 @@ const TVShowPreview = () => {
             )}
           </div>
 
-          {/* Sidebar - Desktop Only */}
-          <div className="hidden lg:block space-y-6">
-            <div className="p-6 rounded-xl border bg-card">
-              <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
-              {currentSeason && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <Badge variant="default" className="mb-2">
-                      Best Value
-                    </Badge>
-                    <p className="text-sm font-semibold mb-1">Full Season</p>
-                    <p className="text-2xl font-bold text-primary mb-2">
-                      {formatNaira(currentSeason.price)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      {currentEpisodes.length} episodes •{" "}
-                      {currentSeason.rental_expiry_duration}h access
-                    </p>
-                    <RentalButton
-                      contentId={currentSeason.id}
-                      contentType="season"
-                      price={currentSeason.price}
-                      title={`${tvShow.title} - Season ${selectedSeason}`}
-                    />
+          {/* Sidebar - Desktop Only - Hide pricing on iOS */}
+          {!isIOS && (
+            <div className="hidden lg:block space-y-6">
+              <div className="p-6 rounded-xl border bg-card">
+                <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
+                {currentSeason && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                      <Badge variant="default" className="mb-2">
+                        Best Value
+                      </Badge>
+                      <p className="text-sm font-semibold mb-1">Full Season</p>
+                      <p className="text-2xl font-bold text-primary mb-2">
+                        {formatNaira(currentSeason.price)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        {currentEpisodes.length} episodes •{" "}
+                        {currentSeason.rental_expiry_duration}h access
+                      </p>
+                      <RentalButton
+                        contentId={currentSeason.id}
+                        contentType="season"
+                        price={currentSeason.price}
+                        title={`${tvShow.title} - Season ${selectedSeason}`}
+                      />
+                    </div>
+                    <div className="p-4 rounded-lg border">
+                      <p className="text-sm font-semibold mb-1">
+                        Individual Episodes
+                      </p>
+                      <p className="text-xl font-bold mb-2">
+                        From{" "}
+                        {formatNaira(
+                          currentEpisodes.length > 0
+                            ? Math.min(...currentEpisodes.map((e) => e.price))
+                            : 0
+                        )}
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => scrollToSection("episodes-section")}
+                      >
+                        Browse Episodes
+                      </Button>
+                    </div>
                   </div>
-                  <div className="p-4 rounded-lg border">
-                    <p className="text-sm font-semibold mb-1">
-                      Individual Episodes
-                    </p>
-                    <p className="text-xl font-bold mb-2">
-                      From{" "}
-                      {formatNaira(
-                        currentEpisodes.length > 0
-                          ? Math.min(...currentEpisodes.map((e) => e.price))
-                          : 0
-                      )}
-                    </p>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => scrollToSection("episodes-section")}
-                    >
-                      Browse Episodes
-                    </Button>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Mobile Pricing - Below Overview */}
-        {currentSeason && (
+        {/* Mobile Pricing - Below Overview - Hide on iOS */}
+        {!isIOS && currentSeason && (
           <div className="lg:hidden mt-8 p-4 rounded-xl border bg-card">
             <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
             <div className="space-y-3">
@@ -658,10 +662,15 @@ const TVShowPreview = () => {
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                                       <Clock className="h-3 w-3" />
                                       <span>{episode.duration}m</span>
-                                      <span>•</span>
-                                      <span className="font-semibold text-foreground">
-                                        {formatNaira(episode.price)}
-                                      </span>
+                                      {/* Hide episode price on iOS */}
+                                      {!isIOS && (
+                                        <>
+                                          <span>•</span>
+                                          <span className="font-semibold text-foreground">
+                                            {formatNaira(episode.price)}
+                                          </span>
+                                        </>
+                                      )}
                                     </div>
                                     {episode.description && (
                                       <p className="text-sm text-muted-foreground line-clamp-2">
