@@ -8,7 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Search, label: "Search", path: "/movies" },
-  { icon: Film, label: "Rentals", path: "/watchlist" },
+  { icon: Film, label: "Contents", path: "/watchlist" },
   { icon: User, label: "Profile", path: "/profile" },
 ];
 

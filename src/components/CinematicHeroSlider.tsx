@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Play, Plus, Star, Clock, ChevronLeft, ChevronRight, Sparkles, Bell } from 'lucide-react';
 import { useSliderItems, SliderItem } from '@/hooks/useSliderItems';
+import { usePlatform } from '@/hooks/usePlatform';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -19,6 +20,7 @@ const CinematicHeroSlider = () => {
   const { sliderItems, loading } = useSliderItems();
   const { toggleFavorite } = useFavorites();
   const { user } = useAuth();
+  const { isIOS } = usePlatform();
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -240,15 +242,19 @@ const CinematicHeroSlider = () => {
                           <Star className="h-4 w-4 fill-primary text-primary" />
                           <span>{currentItem.rating}</span>
                         </div>
-                        <span>•</span>
+                        {!isIOS && <span>•</span>}
                       </>
                     )}
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>48h rental</span>
-                    </div>
-                    <span>•</span>
-                    <span>{formatNaira(currentItem.price)}</span>
+                    {!isIOS && (
+                      <>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>48h rental</span>
+                        </div>
+                        <span>•</span>
+                        <span>{formatNaira(currentItem.price)}</span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -288,7 +294,7 @@ const CinematicHeroSlider = () => {
               {currentItem.genre && (
                 <div className="flex items-center gap-2 mb-8">
                   <Badge variant="outline">{currentItem.genre}</Badge>
-                  {!isComingSoon && <Badge variant="outline">{formatNaira(currentItem.price)}</Badge>}
+                  {!isComingSoon && !isIOS && <Badge variant="outline">{formatNaira(currentItem.price)}</Badge>}
                 </div>
               )}
 
@@ -347,6 +353,8 @@ const CinematicHeroSlider = () => {
               <div className="mt-6 text-sm text-muted-foreground">
                 {isComingSoon ? (
                   <p>We'll notify you when this becomes available</p>
+                ) : isIOS ? (
+                  <p>HD & 4K available • Instant streaming</p>
                 ) : (
                   <p>48-hour rental period • HD & 4K available • Instant streaming</p>
                 )}
