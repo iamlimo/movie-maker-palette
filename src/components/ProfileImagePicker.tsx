@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { Capacitor } from '@capacitor/core';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Camera as CameraIcon, Loader2, User } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useRef } from "react";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
+import { Capacitor } from "@capacitor/core";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Camera as CameraIcon, Loader2, User } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProfileImagePickerProps {
   currentImageUrl?: string;
@@ -15,9 +15,9 @@ interface ProfileImagePickerProps {
 
 // Helper to convert base64 to File
 const base64ToFile = (base64: string, filename: string): File => {
-  const arr = base64.split(',');
+  const arr = base64.split(",");
   const mimeMatch = arr[0].match(/:(.*?);/);
-  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
   const bstr = atob(arr[1]);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
@@ -28,7 +28,12 @@ const base64ToFile = (base64: string, filename: string): File => {
 };
 
 // Helper to compress image
-const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<File> => {
+const compressImage = (
+  file: File,
+  maxWidth = 800,
+  maxHeight = 800,
+  quality = 0.8,
+): Promise<File> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -36,7 +41,7 @@ const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.
       const img = new Image();
       img.src = event.target?.result as string;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         let { width, height } = img;
 
         if (width > maxWidth || height > maxHeight) {
@@ -47,19 +52,23 @@ const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.
 
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+              resolve(
+                new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                  type: "image/jpeg",
+                }),
+              );
             } else {
-              reject(new Error('Failed to compress image'));
+              reject(new Error("Failed to compress image"));
             }
           },
-          'image/jpeg',
-          quality
+          "image/jpeg",
+          quality,
         );
       };
       img.onerror = reject;
@@ -84,53 +93,106 @@ export const ProfileImagePicker = ({
     try {
       setLocalUploading(true);
 
-      const photo = await Camera.getPhoto({
-        quality: 80,
-        allowEditing: true,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Prompt,
-        promptLabelHeader: 'Profile Photo',
-        promptLabelPhoto: 'Choose from Gallery',
-        promptLabelPicture: 'Take Photo',
-      });
+      // Check and request camera permissions first
+      const permissions = await Camera.checkPermissions();
+      console.log("Camera permissions:", permissions);
+
+      if (permissions.camera === "denied" || permissions.photos === "denied") {
+        const requestedPermissions = await Camera.requestPermissions();
+        console.log("Requested permissions:", requestedPermissions);
+
+        if (
+          requestedPermissions.camera === "denied" ||
+          requestedPermissions.photos === "denied"
+        ) {
+          toast({
+            title: "Permissions Required",
+            description:
+              "Camera and photo library access is required to change your profile picture.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      console.log("Permissions granted, calling Camera.getPhoto...");
+
+      // On iOS, CameraSource.Prompt might not work reliably, so let's try a different approach
+      let photo;
+      try {
+        photo = await Camera.getPhoto({
+          quality: 80,
+          allowEditing: true,
+          resultType: CameraResultType.Base64,
+          source: CameraSource.Prompt,
+          promptLabelHeader: "Profile Photo",
+          promptLabelPhoto: "Choose from Gallery",
+          promptLabelPicture: "Take Photo",
+        });
+      } catch (promptError) {
+        console.log(
+          "CameraSource.Prompt failed, trying CameraSource.Photos:",
+          promptError,
+        );
+        // Fallback to photo library if prompt fails
+        photo = await Camera.getPhoto({
+          quality: 80,
+          allowEditing: true,
+          resultType: CameraResultType.Base64,
+          source: CameraSource.Photos,
+        });
+      }
+
+      console.log("Camera.getPhoto completed, photo received:", !!photo);
 
       if (photo.base64String) {
-        const base64Data = `data:image/${photo.format || 'jpeg'};base64,${photo.base64String}`;
-        const file = base64ToFile(base64Data, `profile.${photo.format || 'jpg'}`);
-        
+        const base64Data = `data:image/${photo.format || "jpeg"};base64,${
+          photo.base64String
+        }`;
+        const file = base64ToFile(
+          base64Data,
+          `profile.${photo.format || "jpg"}`,
+        );
+
         // Compress if larger than 1MB
-        const finalFile = file.size > 1024 * 1024 ? await compressImage(file) : file;
-        
+        const finalFile =
+          file.size > 1024 * 1024 ? await compressImage(file) : file;
+
         await onImageSelected(finalFile);
       }
     } catch (error: any) {
       // User cancelled - don't show error
-      if (error?.message?.includes('User cancelled') || error?.message?.includes('cancelled')) {
-        console.log('User cancelled image selection');
+      if (
+        error?.message?.includes("User cancelled") ||
+        error?.message?.includes("cancelled")
+      ) {
+        console.log("User cancelled image selection");
         return;
       }
-      
-      console.error('Error picking image:', error);
+
+      console.error("Error picking image:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to select image. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to select image. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setLocalUploading(false);
     }
   };
 
-  const handleWebImagePick = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWebImagePick = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast({
-        title: 'Invalid file type',
-        description: 'Please select an image file',
-        variant: 'destructive',
+        title: "Invalid file type",
+        description: "Please select an image file",
+        variant: "destructive",
       });
       return;
     }
@@ -138,38 +200,46 @@ export const ProfileImagePicker = ({
     // Validate file size (max 10MB before compression)
     if (file.size > 10 * 1024 * 1024) {
       toast({
-        title: 'File too large',
-        description: 'Please select an image under 10MB',
-        variant: 'destructive',
+        title: "File too large",
+        description: "Please select an image under 10MB",
+        variant: "destructive",
       });
       return;
     }
 
     try {
       setLocalUploading(true);
-      
+
       // Compress if larger than 1MB
-      const finalFile = file.size > 1024 * 1024 ? await compressImage(file) : file;
-      
+      const finalFile =
+        file.size > 1024 * 1024 ? await compressImage(file) : file;
+
       await onImageSelected(finalFile);
     } catch (error) {
-      console.error('Error processing image:', error);
+      console.error("Error processing image:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to process image. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to process image. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setLocalUploading(false);
       // Reset input so same file can be selected again
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
 
   const handleClick = () => {
     if (uploading) return;
+
+    console.log(
+      "ProfileImagePicker clicked, isNativePlatform:",
+      Capacitor.isNativePlatform(),
+      "platform:",
+      Capacitor.getPlatform(),
+    );
 
     if (Capacitor.isNativePlatform()) {
       handleNativeImagePick();
@@ -179,18 +249,21 @@ export const ProfileImagePicker = ({
   };
 
   const initials = userName
-    ?.split(' ')
+    ?.split(" ")
     .map((n) => n[0])
-    .join('')
+    .join("")
     .toUpperCase()
     .slice(0, 2);
 
   return (
     <div className="relative inline-block">
-      <Avatar className="h-24 w-24 cursor-pointer border-4 border-primary/20" onClick={handleClick}>
-        <AvatarImage 
-          src={currentImageUrl} 
-          alt={userName || 'Profile'} 
+      <Avatar
+        className="h-24 w-24 cursor-pointer border-4 border-primary/20"
+        onClick={handleClick}
+      >
+        <AvatarImage
+          src={currentImageUrl}
+          alt={userName || "Profile"}
           className="object-cover"
         />
         <AvatarFallback className="bg-primary/10 text-primary text-xl">

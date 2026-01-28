@@ -12,6 +12,14 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { RentalBottomSheet } from "./RentalBottomSheet";
 import { PaymentSuccessAnimation } from "./PaymentSuccessAnimation";
 import { usePlatform } from "@/hooks/usePlatform";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface RentalButtonProps {
   contentId: string;
@@ -37,6 +45,7 @@ const RentalButton = ({
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
+  const [showIOSDialog, setShowIOSDialog] = useState(false);
 
   const hasAccess = checkAccess(contentId, contentType);
   const isNative = Capacitor.isNativePlatform();
@@ -291,20 +300,65 @@ const RentalButton = ({
     };
 
     return (
-      <div className="space-y-4">
-        <div className="text-center text-sm text-muted-foreground">
-          <p>To unlock this content, visit our website</p>
-        </div>
+      <>
         <Button
           variant="default"
           size="lg"
           className="w-full touch-target"
-          onClick={handleOpenExternalSite}
+          onClick={() => setShowIOSDialog(true)}
         >
           <ExternalLink className="h-5 w-5 mr-2" />
-          Unlock
+          Access
         </Button>
-      </div>
+
+        {/* iOS Access Explanation Dialog */}
+        <Dialog open={showIOSDialog} onOpenChange={setShowIOSDialog}>
+          <DialogContent className="w-[90%] max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Access Content</DialogTitle>
+              <DialogDescription className="text-base leading-relaxed pt-2">
+                To unlock and rent {contentType === "movie" ? "this movie" : "this TV show"}, you'll need to complete your purchase on our website.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 py-4">
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-900 dark:text-blue-100">
+                  ✓ Quick and secure checkout
+                </p>
+              </div>
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-900 dark:text-blue-100">
+                  ✓ Multiple payment options
+                </p>
+              </div>
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-900 dark:text-blue-100">
+                  ✓ Access will sync automatically to your app
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 flex flex-col-reverse sm:flex-row">
+              <Button
+                variant="outline"
+                onClick={() => setShowIOSDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => {
+                  setShowIOSDialog(false);
+                  handleOpenExternalSite();
+                }}
+              >
+                Continue to Website
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 

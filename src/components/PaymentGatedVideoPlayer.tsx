@@ -105,7 +105,7 @@ export const PaymentGatedVideoPlayer: React.FC<PaymentGatedVideoPlayerProps> = (
 
   const handlePurchaseAccess = async () => {
     if (!user) {
-      toast.error('Please sign in to purchase access');
+      toast.error('Please sign in to unlock access');
       navigate('/auth');
       return;
     }
