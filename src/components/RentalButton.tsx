@@ -312,7 +312,7 @@ const RentalButton = ({
               <DialogDescription className="text-base leading-relaxed pt-2">
                 This {contentType === "movie" ? "movie" : "TV show"} is not
                 available for access within this app. Access is managed through
-                your account.
+                your account on signaturetv.co 
               </DialogDescription>
             </DialogHeader>
 
