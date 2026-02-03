@@ -123,16 +123,18 @@ const Header = () => {
 
           {user ? (
             <div className="flex items-center space-x-3">
-              {/* Wallet Widget */}
-              <Link to="/wallet">
-                <Button
-                  variant="outline"
-                  className="hidden md:flex items-center space-x-2 text-foreground hover:border-primary"
-                >
-                  <Wallet className="h-4 w-4" />
-                  <span className="text-sm font-medium">{formatBalance()}</span>
-                </Button>
-              </Link>
+              {/* Wallet Widget - Hide on iOS */}
+              {!isIOS && (
+                <Link to="/wallet">
+                  <Button
+                    variant="outline"
+                    className="hidden md:flex items-center space-x-2 text-foreground hover:border-primary"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    <span className="text-sm font-medium">{formatBalance()}</span>
+                  </Button>
+                </Link>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -216,14 +218,16 @@ const Header = () => {
                   Log In
                 </Button>
               </Link>
-              <Link to="/auth?mode=signup">
-                <Button
-                  variant="premium"
-                  className="hidden md:flex gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
-                >
-                  Create Account
-                </Button>
-              </Link>
+          {!isIOS && (
+                <Link to="/auth?mode=signup">
+                  <Button
+                    variant="premium"
+                    className="hidden md:flex gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
+                  >
+                    Create Account
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
 
@@ -282,7 +286,8 @@ const Header = () => {
             >
               Watchlist
             </Link>
-            {user && (
+            {/* Hide Wallet link on iOS */}
+            {user && !isIOS && (
               <Link
                 to="/wallet"
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -319,14 +324,16 @@ const Header = () => {
                     Log In
                   </Button>
                 </Link>
-                <Link
-                  to="/auth?mode=signup"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Button className="w-full gradient-accent text-primary-foreground shadow-glow">
-                    Create Account
-                  </Button>
-                </Link>
+                {!isIOS && (
+                  <Link
+                    to="/auth?mode=signup"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Button className="w-full gradient-accent text-primary-foreground shadow-glow">
+                      Create Account
+                    </Button>
+                  </Link>
+                )}
               </div>
             )}
           </nav>

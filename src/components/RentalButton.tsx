@@ -304,25 +304,40 @@ const RentalButton = ({
           More Information
         </Button>
 
-        {/* iOS Access Information Dialog - Compliant with App Store IAP Guidelines */}
+        {/* iOS Rental Required Dialog - Compliant with App Store 3.1.3(a) */}
         <Dialog open={showIOSDialog} onOpenChange={setShowIOSDialog}>
           <DialogContent className="w-[90%] max-w-sm">
             <DialogHeader>
-              <DialogTitle>Access Information</DialogTitle>
+              <DialogTitle>Rental Required</DialogTitle>
               <DialogDescription className="text-base leading-relaxed pt-2">
-                This {contentType === "movie" ? "movie" : "TV show"} is not
-                available for access within this app. Access is managed through
-                your account on signaturetv.co 
+                This content is available to users who have already rented it.
+                {user ? (
+                  " Your current account does not have access to this content."
+                ) : (
+                  " Please log in with your existing Signature TV account."
+                )}
               </DialogDescription>
             </DialogHeader>
 
-            <DialogFooter>
+            <DialogFooter className="flex flex-col gap-2">
+              {!user && (
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setShowIOSDialog(false);
+                    window.location.href = '/auth';
+                  }}
+                  className="w-full"
+                >
+                  Log In
+                </Button>
+              )}
               <Button
-                variant="default"
+                variant="outline"
                 onClick={() => setShowIOSDialog(false)}
                 className="w-full"
               >
-                OK
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>
