@@ -15,6 +15,7 @@ import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
 import { ProfileImagePicker } from '@/components/ProfileImagePicker';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { usePlatform } from '@/hooks/usePlatform';
 import { 
   CalendarIcon, 
   Edit, 
@@ -34,7 +35,8 @@ import {
   Wallet,
   Menu,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,6 +54,7 @@ const Profile = () => {
   const { profile, preferences, loading: profileLoading, updateProfile, updatePreferences, uploadProfileImage, refetch: refetchProfile } = useProfile();
   const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
   const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
+  const { isIOS } = usePlatform();
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -850,6 +853,24 @@ const Profile = () => {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Apple Disclosure - iOS Only */}
+                {isIOS && (
+                  <Card className="card-hover border-primary/20 bg-primary/5">
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2 text-sm">
+                        <Info size={16} />
+                        <span>About This App</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Video rentals are purchased outside of the iOS app. 
+                        This app provides access to content already rented by users.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Danger Zone */}
                 <Card className="border-destructive/50">

@@ -172,11 +172,11 @@ const ContentHero = ({
             </Button>
           </div>
 
-          {/* Rental Info - Show external rental message on iOS */}
+          {/* Rental Info - Show reader app message on iOS */}
           <div className="mt-6 text-sm text-muted-foreground">
             {isIOS ? (
               <p>
-                To rent this content, visit signaturetv.com in your browser • ⚠️ {viewer_discretion}
+                Access is managed through your Signature TV account. • ⚠️ {viewer_discretion}
               </p>
             ) : (
               <p>
