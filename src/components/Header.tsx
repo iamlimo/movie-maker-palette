@@ -61,77 +61,72 @@ const Header = () => {
       isNative && isIOS && "pt-[env(safe-area-inset-top)]",
       isNative && isAndroid && "pt-1"
     )}>
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-3 sm:px-4 lg:px-6 h-14 md:h-16 flex items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 flex-shrink-0">
           <Link to="/">
-            <img src="/signature-tv-logo.png" alt="Logo" className="h-12" />
+            <img src="/signature-tv-logo.png" alt="Logo" className="h-10 md:h-12" />
           </Link>
-          {/* <div className="w-8 h-8 gradient-accent rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">S</span>
-          </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Signature TV
-          </span> */}
         </div>
 
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center space-x-8">
+        {/* Navigation - Tablet and Desktop */}
+        <nav className="hidden md:flex items-center space-x-3 lg:space-x-6 xl:space-x-8">
           <Link
             to="/"
-            className="text-foreground hover:text-primary transition-smooth"
+            className="text-sm lg:text-base text-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             Home
           </Link>
           <Link
             to="/movies"
-            className="text-muted-foreground hover:text-primary transition-smooth"
+            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             Movies
           </Link>
           <Link
             to="/tvshows"
-            className="text-muted-foreground hover:text-primary transition-smooth"
+            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             TV Shows
           </Link>
           <Link
             to="/genres"
-            className="text-muted-foreground hover:text-primary transition-smooth"
+            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             Genres
           </Link>
           <Link
             to="/watchlist"
-            className="text-muted-foreground hover:text-primary transition-smooth"
+            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             Watchlist
           </Link>
         </nav>
 
         {/* Right side */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-3 lg:space-x-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsSearchOpen(true)}
-            className="hidden md:flex text-muted-foreground hover:text-primary"
+            className="hidden md:flex text-muted-foreground hover:text-primary h-9 w-9 lg:h-10 lg:w-10"
             aria-label="Search"
           >
-            <Search className="h-5 w-5" />
+            <Search className="h-4 w-4 lg:h-5 lg:w-5" />
           </Button>
 
           {user ? (
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 md:space-x-3">
               {/* Wallet Widget - Hide on iOS */}
               {!isIOS && (
                 <Link to="/wallet">
                   <Button
                     variant="outline"
-                    className="hidden md:flex items-center space-x-2 text-foreground hover:border-primary"
+                    size="sm"
+                    className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
                   >
-                    <Wallet className="h-4 w-4" />
-                    <span className="text-sm font-medium">{formatBalance()}</span>
+                    <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                    <span className="text-xs lg:text-sm font-medium">{formatBalance()}</span>
                   </Button>
                 </Link>
               )}
@@ -140,10 +135,11 @@ const Header = () => {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="hidden md:flex items-center space-x-2 text-foreground hover:bg-secondary"
+                    size="sm"
+                    className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:bg-secondary h-8 lg:h-9 px-2 lg:px-3"
                   >
-                    <User className="h-5 w-5" />
-                    <span className="hidden lg:inline">
+                    <User className="h-4 w-4 lg:h-5 lg:w-5" />
+                    <span className="hidden lg:inline text-sm truncate max-w-[120px]">
                       {profile?.name || user?.email || "Account"}
                     </span>
                   </Button>
@@ -196,33 +192,35 @@ const Header = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Quick Sign Out Button */}
+              {/* Quick Sign Out Button - Only on large screens */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleSignOut}
                 disabled={isSigningOut}
-                className="hidden lg:flex text-muted-foreground hover:text-destructive"
+                className="hidden xl:flex text-muted-foreground hover:text-destructive h-8 px-2"
               >
-                <LogOut className="h-4 w-4 mr-2" />
-                {isSigningOut ? "Signing Out..." : "Sign Out"}
+                <LogOut className="h-4 w-4 mr-1.5" />
+                <span className="text-sm">{isSigningOut ? "Signing Out..." : "Sign Out"}</span>
               </Button>
             </div>
           ) : (
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 md:space-x-3">
               <Link to="/auth?mode=login">
                 <Button
                   variant="ghost"
-                  className="hidden md:flex text-foreground hover:text-primary"
+                  size="sm"
+                  className="hidden md:flex text-foreground hover:text-primary h-8 lg:h-9 px-2.5 lg:px-3 text-sm"
                 >
                   Log In
                 </Button>
               </Link>
-          {!isIOS && (
+              {!isIOS && (
                 <Link to="/auth?mode=signup">
                   <Button
                     variant="premium"
-                    className="hidden md:flex gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
+                    size="sm"
+                    className="hidden md:flex gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce h-8 lg:h-9 px-3 lg:px-4 text-xs lg:text-sm"
                   >
                     Create Account
                   </Button>
