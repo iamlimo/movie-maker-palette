@@ -28,6 +28,7 @@ import {
   BarChart3,
   Clock,
   Play,
+  LogOut,
   Eye,
   Star,
   TrendingUp,
@@ -41,6 +42,7 @@ import {
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
+import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -50,17 +52,39 @@ import WatchProgressCard from '@/components/WatchProgressCard';
 import { Link } from 'react-router-dom';
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
   const { profile, preferences, loading: profileLoading, updateProfile, updatePreferences, uploadProfileImage, refetch: refetchProfile } = useProfile();
   const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
   const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
   const { isIOS } = usePlatform();
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isMobile = useIsMobile();
 
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account.",
+      });
+    } catch (error) {
+      console.error("Sign out failed:", error);
+      toast({
+        title: "Sign out failed",
+        description: "There was an error signing you out. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
   const { isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
       await Promise.all([
@@ -854,7 +878,33 @@ const Profile = () => {
                   </CardContent>
                 </Card>
 
-                {/* Apple Disclosure - iOS Only */}
+                {/* Sign Out Section */}
+                <Card className="card-hover">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <LogOut size={20} />
+                      <span>Sign Out</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
+                      <div>
+                        <p className="font-medium">Log out of your account</p>
+                        <p className="text-sm text-muted-foreground">You will need to sign in again to access your content.</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        onClick={handleSignOut}
+                        disabled={isSigningOut}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <LogOut size={16} className="mr-2" />
+                        {isSigningOut ? "Signing Out..." : "Sign Out"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {isIOS && (
                   <Card className="card-hover border-primary/20 bg-primary/5">
                     <CardHeader>
