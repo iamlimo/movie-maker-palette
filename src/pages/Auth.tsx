@@ -255,7 +255,7 @@ const Auth = () => {
             </CardTitle>
             <CardDescription className="text-muted-foreground">
               {isIOS 
-                ? "Log in with your existing Signature TV account to access videos you have already rented."
+                ? "Log in to access your content."
                 : "Sign in to your account or create a new one"
               }
             </CardDescription>
@@ -471,17 +471,8 @@ const Auth = () => {
           </CardContent>
         </Card>
 
-        {/* Footer text - different for iOS */}
-        {isIOS ? (
-          <div className="text-center mt-6 space-y-2">
-            <p className="text-sm font-medium text-foreground">
-              Don't have an account?
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Accounts are created on the Signature TV website.
-            </p>
-          </div>
-        ) : (
+        {/* Footer text - only for Web/Android */}
+        {!isIOS && (
           <p className="text-center text-sm text-muted-foreground mt-6">
             By signing up, you agree to our Terms of Service and Privacy Policy
           </p>

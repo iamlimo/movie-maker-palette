@@ -12,10 +12,13 @@ import { RefreshCw } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Capacitor } from "@capacitor/core";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePlatform } from "@/hooks/usePlatform";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { isIOS } = usePlatform();
   const { sectionsWithContent, loading, refetch } = useSectionsWithContent();
   const currentYear = new Date().getFullYear();
   const isMobile = useIsMobile();
@@ -33,6 +36,42 @@ const Index = () => {
       navigate("/");
     }
   }, [user, navigate]);
+
+  // iOS Onboarding: Show login-gate for unauthenticated users
+  if (isIOS && !user && !authLoading) {
+    return (
+      <div className="min-h-screen gradient-hero flex flex-col items-center justify-center p-6 safe-area-inset">
+        {/* Logo */}
+        <div className="mb-8">
+          <img 
+            src="/signature-tv-logo.png" 
+            alt="Signature TV" 
+            className="h-20 w-auto"
+          />
+        </div>
+        
+        {/* Title */}
+        <h1 className="text-3xl font-bold text-foreground text-center mb-4">
+          Watch Premium Movies & Shows
+        </h1>
+        
+        {/* Description */}
+        <p className="text-muted-foreground text-center max-w-sm mb-8 leading-relaxed">
+          Stream exclusive content from your favorite creators. 
+          Access your rented videos anytime, anywhere.
+        </p>
+        
+        {/* Login CTA */}
+        <Button 
+          onClick={() => navigate('/auth')}
+          className="gradient-accent text-primary-foreground font-semibold px-8 py-6 text-lg shadow-glow hover:scale-105 transition-bounce"
+          size="lg"
+        >
+          Log In to Continue
+        </Button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
