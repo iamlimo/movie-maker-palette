@@ -1,9 +1,11 @@
 import { Home, Search, Film, User } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Capacitor } from "@capacitor/core";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePlatform } from "@/hooks/usePlatform";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
@@ -14,6 +16,16 @@ const navItems = [
 
 export function BottomNav() {
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const { user, loading: authLoading } = useAuth();
+  const { isIOS } = usePlatform();
+
+  // Hide bottom nav on iOS onboarding screen (unauthenticated users on home page)
+  if (isIOS && !user && !authLoading && location.pathname === "/") {
+    return null;
+  }
+
+  if (!isMobile) return null;
 
   const handleTabPress = async () => {
     if (Capacitor.isNativePlatform()) {
@@ -24,8 +36,6 @@ export function BottomNav() {
       }
     }
   };
-
-  if (!isMobile) return null;
 
   return (
     <nav 
