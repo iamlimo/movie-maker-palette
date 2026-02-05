@@ -114,7 +114,7 @@ const Auth = () => {
       const { error } = await signUp(
         signupData.email,
         signupData.password,
-        signupData.name
+        signupData.name,
       );
 
       if (error) {
@@ -229,13 +229,13 @@ const Auth = () => {
       <div className="w-full max-w-md">
         {/* Header with back button */}
         <div className="flex items-center mb-8">
-          <Link
+          {/* <Link
             to="/"
             className="flex items-center text-muted-foreground hover:text-primary transition-smooth"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
-          </Link>
+          </Link> */}
         </div>
 
         {/* Logo */}
@@ -245,7 +245,9 @@ const Auth = () => {
               <img src="/signature-tv-logo.png" alt="" />{" "}
             </span>
           </div>
-          <p className="text-muted-foreground">Premium movie rental platform</p>
+          <p className="text-muted-foreground">
+            Premium blockbusters and TV shows!
+          </p>
         </div>
 
         <Card className="gradient-card border-border/50 shadow-premium">
@@ -254,10 +256,9 @@ const Auth = () => {
               {isIOS ? "Welcome to Signature TV" : "Welcome"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              {isIOS 
+              {isIOS
                 ? "Log in to access your content."
-                : "Sign in to your account or create a new one"
-              }
+                : "Sign in to your account or create a new one"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -296,7 +297,10 @@ const Auth = () => {
                           placeholder="Enter your email"
                           value={loginData.email}
                           onChange={(e) =>
-                            setLoginData({ ...loginData, email: e.target.value })
+                            setLoginData({
+                              ...loginData,
+                              email: e.target.value,
+                            })
                           }
                           className="pl-10 bg-background/50 border-border focus:border-primary"
                           required
@@ -305,7 +309,10 @@ const Auth = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="login-password" className="text-foreground">
+                      <Label
+                        htmlFor="login-password"
+                        className="text-foreground"
+                      >
                         Password
                       </Label>
                       <div className="relative">
@@ -362,7 +369,10 @@ const Auth = () => {
                           placeholder="Enter your full name"
                           value={signupData.name}
                           onChange={(e) =>
-                            setSignupData({ ...signupData, name: e.target.value })
+                            setSignupData({
+                              ...signupData,
+                              name: e.target.value,
+                            })
                           }
                           className="pl-10 bg-background/50 border-border focus:border-primary"
                           required
