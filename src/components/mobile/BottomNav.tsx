@@ -20,8 +20,8 @@ export function BottomNav() {
   const { user, loading: authLoading } = useAuth();
   const { isIOS } = usePlatform();
 
-  // Hide bottom nav on iOS onboarding screen (unauthenticated users on home page)
-  if (isIOS && !user && !authLoading && location.pathname === "/") {
+  // Hide bottom nav on iOS onboarding and login screens for unauthenticated users
+  if (isIOS && !user && !authLoading && (location.pathname === "/" || location.pathname === "/auth")) {
     return null;
   }
 
