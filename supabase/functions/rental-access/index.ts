@@ -34,7 +34,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("Error in rental-access:", error);
-    return errorResponse(error.message || 'Internal server error', 500);
+    return errorResponse('An unexpected error occurred', 500);
   }
 });
 
