@@ -54,8 +54,7 @@ serve(async (req) => {
     console.error('Rental management failed:', error)
     return new Response(
       JSON.stringify({ 
-        error: 'Rental management failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'An unexpected error occurred'
       }),
       { status: 500, headers: corsHeaders }
     )

@@ -210,7 +210,7 @@ serve(async (req) => {
 
     return jsonResponse({
       status: "error",
-      message: error.message
+      message: "An unexpected error occurred"
     }, 500);
   }
 });

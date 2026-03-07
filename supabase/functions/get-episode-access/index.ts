@@ -10,10 +10,10 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { episode_id, user_id } = await req.json();
+    const { episode_id } = await req.json();
 
     if (!episode_id) {
       return new Response(
@@ -48,28 +48,33 @@ serve(async (req) => {
     let hasAccess = false;
     let videoUrl = null;
 
-    // Check if user is authenticated and has payment
-    if (user_id) {
-      const { data: payment } = await supabase
-        .from('user_payments')
-        .select('*')
-        .eq('user_id', user_id)
-        .eq('payment_status', 'success')
-        .gt('access_expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+    // Derive user identity from JWT, not from request body
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-      hasAccess = !!payment;
+      if (!authError && user) {
+        const { data: payment } = await supabase
+          .from('user_payments')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('payment_status', 'success')
+          .gt('access_expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
 
-      if (hasAccess && episode.video_url) {
-        // Create signed URL for private video access
-        const videoPath = episode.video_url.split('/').pop();
-        const { data: signedUrlData } = await supabase.storage
-          .from('tv-episodes')
-          .createSignedUrl(videoPath, 3600); // 1 hour expiry
-        
-        videoUrl = signedUrlData?.signedUrl || null;
+        hasAccess = !!payment;
+
+        if (hasAccess && episode.video_url) {
+          const videoPath = episode.video_url.split('/').pop();
+          const { data: signedUrlData } = await supabase.storage
+            .from('tv-episodes')
+            .createSignedUrl(videoPath, 3600);
+          
+          videoUrl = signedUrlData?.signedUrl || null;
+        }
       }
     }
 
@@ -80,7 +85,7 @@ serve(async (req) => {
       JSON.stringify({ 
         episode: {
           ...episode,
-          video_url: hasAccess ? videoUrl : null // Only return video URL if user has access
+          video_url: hasAccess ? videoUrl : null
         },
         hasAccess,
         trailerUrl,
@@ -95,7 +100,7 @@ serve(async (req) => {
       JSON.stringify({ 
         hasAccess: false,
         videoUrl: null,
-        error: 'Internal server error' 
+        error: 'An unexpected error occurred' 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

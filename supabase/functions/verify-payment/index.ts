@@ -118,6 +118,6 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("Error in verify-payment:", error);
-    return errorResponse(error.message || 'Internal server error', 500);
+    return errorResponse('An unexpected error occurred', 500);
   }
 });

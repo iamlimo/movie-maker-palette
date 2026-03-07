@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error generating signed URL:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: 'An unexpected error occurred' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
