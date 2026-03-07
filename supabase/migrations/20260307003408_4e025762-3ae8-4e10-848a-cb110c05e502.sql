@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Videos are viewable by authenticated users" ON storage.objects;
