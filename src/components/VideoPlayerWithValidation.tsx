@@ -149,6 +149,7 @@ const VideoPlayerWithValidation = ({
         contentId={contentId}
         contentType={contentType}
         posterUrl={posterUrl}
+        subtitleUrl={subtitleUrl}
         onError={(error) => {
           console.error('Video playback error:', error);
           toast({

@@ -714,6 +714,7 @@ const TVShowPreview = () => {
                                 title={episode.title}
                                 price={episode.price}
                                 posterUrl={episode.thumbnail_url}
+                                subtitleUrl={episode.subtitle_url}
                                 nextEpisodeId={nextEpisode?.id}
                                 autoPlay={true}
                               />
