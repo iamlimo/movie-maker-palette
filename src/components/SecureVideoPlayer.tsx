@@ -19,6 +19,7 @@ const SecureVideoPlayer = ({
   contentId, 
   contentType, 
   posterUrl,
+  subtitleUrl,
   onError 
 }: SecureVideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
