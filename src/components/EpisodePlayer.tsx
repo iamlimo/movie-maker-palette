@@ -15,6 +15,7 @@ interface EpisodePlayerProps {
   title: string;
   price: number;
   posterUrl?: string;
+  subtitleUrl?: string;
   nextEpisodeId?: string;
   autoPlay?: boolean;
 }
