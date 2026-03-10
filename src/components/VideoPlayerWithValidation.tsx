@@ -21,7 +21,8 @@ const VideoPlayerWithValidation = ({
   contentType, 
   title, 
   price = 0,
-  posterUrl 
+  posterUrl,
+  subtitleUrl
 }: VideoPlayerWithValidationProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
