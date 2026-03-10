@@ -12,6 +12,7 @@ interface NativeVideoPlayerProps {
   contentId: string;
   contentType: 'movie' | 'episode';
   posterUrl?: string;
+  subtitleUrl?: string;
   onError?: (error: string) => void;
   autoPlay?: boolean;
 }
