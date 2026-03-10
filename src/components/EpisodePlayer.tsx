@@ -32,6 +32,7 @@ const EpisodePlayer = ({
   title, 
   price,
   posterUrl,
+  subtitleUrl,
   nextEpisodeId,
   autoPlay = false
 }: EpisodePlayerProps) => {
