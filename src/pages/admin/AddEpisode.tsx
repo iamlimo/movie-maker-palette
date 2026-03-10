@@ -65,6 +65,7 @@ const AddEpisode = () => {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [trailerUrl, setTrailerUrl] = useState<string>("");
+  const [subtitleUrl, setSubtitleUrl] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
