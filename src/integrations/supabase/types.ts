@@ -164,6 +164,7 @@ export type Database = {
           rental_expiry_duration: number
           season_id: string
           status: Database["public"]["Enums"]["content_status"]
+          subtitle_url: string | null
           thumbnail_url: string | null
           title: string
           trailer_url: string | null
@@ -181,6 +182,7 @@ export type Database = {
           rental_expiry_duration?: number
           season_id: string
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title: string
           trailer_url?: string | null
@@ -198,6 +200,7 @@ export type Database = {
           rental_expiry_duration?: number
           season_id?: string
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title?: string
           trailer_url?: string | null
@@ -330,6 +333,7 @@ export type Database = {
           rental_expiry_duration: number | null
           slider_cover_url: string | null
           status: Database["public"]["Enums"]["content_status"]
+          subtitle_url: string | null
           thumbnail_url: string | null
           title: string
           trailer_url: string | null
@@ -358,6 +362,7 @@ export type Database = {
           rental_expiry_duration?: number | null
           slider_cover_url?: string | null
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title: string
           trailer_url?: string | null
@@ -386,6 +391,7 @@ export type Database = {
           rental_expiry_duration?: number | null
           slider_cover_url?: string | null
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title?: string
           trailer_url?: string | null

@@ -13,6 +13,7 @@ interface VideoPlayerWithValidationProps {
   title: string;
   price?: number;
   posterUrl?: string;
+  subtitleUrl?: string;
 }
 
 const VideoPlayerWithValidation = ({ 
@@ -20,7 +21,8 @@ const VideoPlayerWithValidation = ({
   contentType, 
   title, 
   price = 0,
-  posterUrl 
+  posterUrl,
+  subtitleUrl
 }: VideoPlayerWithValidationProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -147,6 +149,7 @@ const VideoPlayerWithValidation = ({
         contentId={contentId}
         contentType={contentType}
         posterUrl={posterUrl}
+        subtitleUrl={subtitleUrl}
         onError={(error) => {
           console.error('Video playback error:', error);
           toast({

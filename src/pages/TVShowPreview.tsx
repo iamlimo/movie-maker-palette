@@ -79,6 +79,7 @@ interface Episode {
   price: number;
   video_url: string;
   thumbnail_url?: string;
+  subtitle_url?: string;
   status: string;
 }
 
@@ -713,6 +714,7 @@ const TVShowPreview = () => {
                                 title={episode.title}
                                 price={episode.price}
                                 posterUrl={episode.thumbnail_url}
+                                subtitleUrl={episode.subtitle_url}
                                 nextEpisodeId={nextEpisode?.id}
                                 autoPlay={true}
                               />

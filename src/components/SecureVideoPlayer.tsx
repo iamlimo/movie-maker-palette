@@ -11,6 +11,7 @@ interface SecureVideoPlayerProps {
   contentId: string;
   contentType: 'movie' | 'episode';
   posterUrl?: string;
+  subtitleUrl?: string;
   onError?: (error: string) => void;
 }
 
@@ -18,6 +19,7 @@ const SecureVideoPlayer = ({
   contentId, 
   contentType, 
   posterUrl,
+  subtitleUrl,
   onError 
 }: SecureVideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -216,6 +218,9 @@ const SecureVideoPlayer = ({
             className="w-full h-full"
             style={{ pointerEvents: 'auto' }}
           >
+            {subtitleUrl && (
+              <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
+            )}
             Your browser does not support the video tag.
           </video>
         )}

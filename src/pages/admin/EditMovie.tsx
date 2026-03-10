@@ -50,6 +50,7 @@ interface FormData {
   thumbnail_url: string;
   landscape_poster_url: string;
   slider_cover_url: string;
+  subtitle_url: string;
 }
 
 const EditMovie = () => {
@@ -80,6 +81,7 @@ const EditMovie = () => {
     thumbnail_url: "",
     landscape_poster_url: "",
     slider_cover_url: "",
+    subtitle_url: "",
   });
 
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -127,6 +129,7 @@ const EditMovie = () => {
         thumbnail_url: data.thumbnail_url || "",
         landscape_poster_url: data.landscape_poster_url || "",
         slider_cover_url: data.slider_cover_url || "",
+        subtitle_url: (data as any).subtitle_url || "",
       });
 
       // Fetch current section assignments
@@ -235,6 +238,7 @@ const EditMovie = () => {
         thumbnail_url: formData.thumbnail_url || null,
         landscape_poster_url: formData.landscape_poster_url || null,
         slider_cover_url: formData.slider_cover_url || null,
+        subtitle_url: formData.subtitle_url || null,
       };
 
       const { data, error } = await supabase
@@ -616,6 +620,31 @@ const EditMovie = () => {
               label="Movie Trailer URL"
               required={false}
             />
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>Subtitle File (VTT/SRT) - Optional</Label>
+              <Input
+                type="file"
+                accept=".vtt,.srt"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const filePath = `movies/${id}-${file.name}`;
+                  const { error } = await supabase.storage.from('subtitles').upload(filePath, file, { upsert: true });
+                  if (error) {
+                    toast({ title: "Error", description: "Failed to upload subtitle file", variant: "destructive" });
+                    return;
+                  }
+                  const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
+                  handleInputChange("subtitle_url", urlData.publicUrl);
+                  toast({ title: "Success", description: "Subtitle file uploaded" });
+                }}
+              />
+              {formData.subtitle_url && (
+                <p className="text-xs text-primary">Current subtitle: {formData.subtitle_url.split('/').pop()}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 

@@ -28,6 +28,7 @@ interface Movie {
   thumbnail_url: string;
   video_url: string;
   trailer_url: string;
+  subtitle_url?: string;
   status: string;
   cast_crew?: any[];
   age_restriction?: number;
