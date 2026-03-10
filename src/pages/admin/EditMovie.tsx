@@ -50,6 +50,7 @@ interface FormData {
   thumbnail_url: string;
   landscape_poster_url: string;
   slider_cover_url: string;
+  subtitle_url: string;
 }
 
 const EditMovie = () => {
