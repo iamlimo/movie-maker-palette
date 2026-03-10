@@ -619,6 +619,31 @@ const EditMovie = () => {
               label="Movie Trailer URL"
               required={false}
             />
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>Subtitle File (VTT/SRT) - Optional</Label>
+              <Input
+                type="file"
+                accept=".vtt,.srt"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const filePath = `movies/${id}-${file.name}`;
+                  const { error } = await supabase.storage.from('subtitles').upload(filePath, file, { upsert: true });
+                  if (error) {
+                    toast({ title: "Error", description: "Failed to upload subtitle file", variant: "destructive" });
+                    return;
+                  }
+                  const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
+                  handleInputChange("subtitle_url", urlData.publicUrl);
+                  toast({ title: "Success", description: "Subtitle file uploaded" });
+                }}
+              />
+              {formData.subtitle_url && (
+                <p className="text-xs text-primary">Current subtitle: {formData.subtitle_url.split('/').pop()}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 

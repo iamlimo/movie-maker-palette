@@ -284,6 +284,9 @@ const EpisodePlayer = ({
             }}
           >
             <source src={videoUrl} type="video/mp4" />
+            {subtitleUrl && (
+              <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
+            )}
             Your browser does not support the video tag.
           </video>
         </div>

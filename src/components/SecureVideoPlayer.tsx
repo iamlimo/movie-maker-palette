@@ -218,6 +218,9 @@ const SecureVideoPlayer = ({
             className="w-full h-full"
             style={{ pointerEvents: 'auto' }}
           >
+            {subtitleUrl && (
+              <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
+            )}
             Your browser does not support the video tag.
           </video>
         )}

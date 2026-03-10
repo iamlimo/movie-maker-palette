@@ -478,6 +478,29 @@ const EditEpisode = () => {
                   </div>
                 )}
               </div>
+
+              {/* Subtitle Upload Section */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Subtitle File (VTT/SRT) - Optional</Label>
+                <Input
+                  type="file"
+                  accept=".vtt,.srt"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const filePath = `episodes/${episodeId}-${file.name}`;
+                    const { error } = await supabase.storage.from('subtitles').upload(filePath, file, { upsert: true });
+                    if (error) {
+                      toast({ title: "Error", description: "Failed to upload subtitle file", variant: "destructive" });
+                      return;
+                    }
+                    const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
+                    // Will be saved on submit
+                    (window as any).__subtitleUrl = urlData.publicUrl;
+                    toast({ title: "Success", description: "Subtitle file uploaded" });
+                  }}
+                />
+              </div>
             </CardContent>
           </Card>
 

@@ -129,6 +129,7 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
         slider_cover_url: formData.slider_cover_url || null,
         video_url: formData.video_url || null,
         trailer_url: formData.trailer_url || null,
+        subtitle_url: formData.subtitle_url || null,
         status: 'approved' as const,
         rental_expiry_duration: parseInt(formData.rental_expiry_duration),
         uploaded_by: (await supabase.auth.getUser()).data.user?.id,
