@@ -191,6 +191,7 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         preload="metadata"
+        crossOrigin="anonymous"
       />
       
       {/* Video Controls Overlay */}
