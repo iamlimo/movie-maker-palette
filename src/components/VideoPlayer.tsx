@@ -12,7 +12,7 @@ interface VideoPlayerProps {
   subtitleUrl?: string;
 }
 
-export const VideoPlayer = ({ movieId, className = '' }: VideoPlayerProps) => {
+export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlayerProps) => {
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
