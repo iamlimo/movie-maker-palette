@@ -13,6 +13,7 @@ interface VideoPlayerWithValidationProps {
   title: string;
   price?: number;
   posterUrl?: string;
+  subtitleUrl?: string;
 }
 
 const VideoPlayerWithValidation = ({ 
