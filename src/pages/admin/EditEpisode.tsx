@@ -195,6 +195,7 @@ const EditEpisode = () => {
           video_url: videoUrl,
           thumbnail_url: thumbnailUrl || null,
           trailer_url: trailerUrl || null,
+          subtitle_url: subtitleUrl || null,
           status: formData.status,
           release_date: formData.release_date || null,
           published_at: formData.status === 'approved' ? new Date().toISOString() : null

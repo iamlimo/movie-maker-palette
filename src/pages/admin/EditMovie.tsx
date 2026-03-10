@@ -238,6 +238,7 @@ const EditMovie = () => {
         thumbnail_url: formData.thumbnail_url || null,
         landscape_poster_url: formData.landscape_poster_url || null,
         slider_cover_url: formData.slider_cover_url || null,
+        subtitle_url: formData.subtitle_url || null,
       };
 
       const { data, error } = await supabase
