@@ -129,6 +129,7 @@ const EditEpisode = () => {
       setVideoUrl(episodeData.video_url || "");
       setThumbnailUrl(episodeData.thumbnail_url || "");
       setTrailerUrl(episodeData.trailer_url || "");
+      setSubtitleUrl((episodeData as any).subtitle_url || "");
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
