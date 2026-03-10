@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 interface VideoPlayerProps {
   movieId: string;
   className?: string;
+  subtitleUrl?: string;
 }
 
 export const VideoPlayer = ({ movieId, className = '' }: VideoPlayerProps) => {
