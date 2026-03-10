@@ -37,6 +37,7 @@ const NativeVideoPlayer = ({
   contentId,
   contentType,
   posterUrl,
+  subtitleUrl,
   onError,
   autoPlay = false
 }: NativeVideoPlayerProps) => {
