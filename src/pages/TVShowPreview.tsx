@@ -79,6 +79,7 @@ interface Episode {
   price: number;
   video_url: string;
   thumbnail_url?: string;
+  subtitle_url?: string;
   status: string;
 }
 
