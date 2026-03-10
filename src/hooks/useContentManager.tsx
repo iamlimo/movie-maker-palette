@@ -55,6 +55,7 @@ export interface ContentFormData {
   slider_cover_url?: string;
   video_url?: string;
   trailer_url?: string;
+  subtitle_url?: string;
 }
 
 export const useContentManager = (contentType: ContentType, includeApprovedOnly = true) => {
