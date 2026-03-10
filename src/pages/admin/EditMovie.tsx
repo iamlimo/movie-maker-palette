@@ -129,6 +129,7 @@ const EditMovie = () => {
         thumbnail_url: data.thumbnail_url || "",
         landscape_poster_url: data.landscape_poster_url || "",
         slider_cover_url: data.slider_cover_url || "",
+        subtitle_url: (data as any).subtitle_url || "",
       });
 
       // Fetch current section assignments
