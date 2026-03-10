@@ -81,6 +81,7 @@ const EditMovie = () => {
     thumbnail_url: "",
     landscape_poster_url: "",
     slider_cover_url: "",
+    subtitle_url: "",
   });
 
   const [genres, setGenres] = useState<Genre[]>([]);
