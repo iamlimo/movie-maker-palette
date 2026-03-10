@@ -496,8 +496,7 @@ const EditEpisode = () => {
                       return;
                     }
                     const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
-                    // Will be saved on submit
-                    (window as any).__subtitleUrl = urlData.publicUrl;
+                    setSubtitleUrl(urlData.publicUrl);
                     toast({ title: "Success", description: "Subtitle file uploaded" });
                   }}
                 />

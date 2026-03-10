@@ -475,8 +475,7 @@ const AddEpisode = () => {
                       return;
                     }
                     const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
-                    // Store subtitle URL - will be included in the insert
-                    (window as any).__subtitleUrl = urlData.publicUrl;
+                    setSubtitleUrl(urlData.publicUrl);
                     toast({ title: "Success", description: "Subtitle file uploaded" });
                   }}
                 />
