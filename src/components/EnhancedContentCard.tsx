@@ -131,7 +131,7 @@ const EnhancedContentCard = ({
   };
 
   // Long-press gesture handling
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showQuickActions, setShowQuickActions] = useState(false);
 
   const handleTouchStart = useCallback(() => {
