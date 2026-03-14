@@ -12,8 +12,19 @@ serve(async (req) => {
     const { user, supabase } = await authenticateUser(req);
     
     const url = new URL(req.url);
-    const paymentId = url.searchParams.get('payment_id');
-    const reference = url.searchParams.get('reference');
+    let paymentId = url.searchParams.get('payment_id');
+    let reference = url.searchParams.get('reference');
+    
+    // Fallback: read from request body (clients may send as body)
+    if (!paymentId && !reference) {
+      try {
+        const body = await req.clone().json();
+        paymentId = body.payment_id || null;
+        reference = body.reference || null;
+      } catch (_) {
+        // No body or invalid JSON
+      }
+    }
     
     if (!paymentId && !reference) {
       return errorResponse("payment_id or reference is required", 400);

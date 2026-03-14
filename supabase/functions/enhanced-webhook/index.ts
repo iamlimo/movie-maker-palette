@@ -321,8 +321,35 @@ async function fulfillRental(supabase: any, payment: any) {
     throw new Error("Missing rental metadata");
   }
 
-  const expirationDate = new Date();
-  expirationDate.setHours(expirationDate.getHours() + (metadata.rental_duration || 48));
+  // Fetch content-specific rental expiry duration
+  let expiryHours = 48;
+  const contentType = metadata.content_type;
+  const contentId = metadata.content_id;
+
+  if (contentType === 'movie') {
+    const { data: movieData } = await supabase
+      .from('movies')
+      .select('rental_expiry_duration')
+      .eq('id', contentId)
+      .single();
+    expiryHours = movieData?.rental_expiry_duration || 48;
+  } else if (contentType === 'season') {
+    const { data: seasonData } = await supabase
+      .from('seasons')
+      .select('rental_expiry_duration')
+      .eq('id', contentId)
+      .single();
+    expiryHours = seasonData?.rental_expiry_duration || 336;
+  } else if (contentType === 'episode') {
+    const { data: episodeData } = await supabase
+      .from('episodes')
+      .select('rental_expiry_duration')
+      .eq('id', contentId)
+      .single();
+    expiryHours = episodeData?.rental_expiry_duration || 48;
+  }
+
+  const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString();
 
   await supabase
     .from("rentals")
@@ -330,8 +357,8 @@ async function fulfillRental(supabase: any, payment: any) {
       user_id: payment.user_id,
       content_id: metadata.content_id,
       content_type: metadata.content_type,
-      price_paid: payment.amount,
-      expiration_date: expirationDate.toISOString(),
+      amount: payment.amount,
+      expires_at: expiresAt,
       status: "active"
     });
 }

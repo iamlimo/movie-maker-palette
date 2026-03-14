@@ -229,7 +229,7 @@ serve(async (req) => {
         email: profile?.email || user.email,
         amount: price, // price is already in kobo from database
         reference: payment.intent_id,
-        callback_url: `${new URL(req.url).origin}/${contentType}/${contentId}?payment=success`,
+        callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${contentType}/${contentId}?payment=success`,
         metadata: {
           payment_id: payment.id,
           user_id: user.id,

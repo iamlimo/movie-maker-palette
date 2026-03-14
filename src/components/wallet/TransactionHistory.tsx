@@ -166,7 +166,7 @@ export default function TransactionHistory() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      ₦{tx.balance_after.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                      ₦{(tx.balance_after / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
                 ))}
