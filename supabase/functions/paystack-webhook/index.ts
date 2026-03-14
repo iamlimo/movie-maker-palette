@@ -67,20 +67,25 @@ Deno.serve(async (req) => {
     // Handle charge.success event
     if (event.event === 'charge.success') {
       const { data } = event;
-      const paymentId = data.reference;
+      const paymentReference = data.reference;
 
-      // Check if already processed to prevent duplicates
-      const { data: existingRental } = await supabase
-        .from('rentals')
-        .select('id')
-        .eq('user_id', data.metadata.user_id)
-        .eq('content_id', data.metadata.content_id)
-        .eq('content_type', data.metadata.content_type)
-        .eq('amount', data.amount / 100) // Convert back from kobo
+      // Find payment by intent_id (reference sent to Paystack is the intent_id)
+      const { data: payment, error: paymentLookupError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('intent_id', paymentReference)
         .single();
 
-      if (existingRental) {
-        console.log('Rental already exists, skipping');
+      if (paymentLookupError || !payment) {
+        console.error('Payment not found for reference:', paymentReference);
+        return new Response(JSON.stringify({ received: true, message: 'Payment not found' }), {
+          headers: corsHeaders
+        });
+      }
+
+      // Check if already processed
+      if (payment.enhanced_status === 'completed') {
+        console.log('Payment already completed, skipping');
         return new Response(JSON.stringify({ received: true, message: 'Already processed' }), {
           headers: corsHeaders
         });
@@ -90,39 +95,74 @@ Deno.serve(async (req) => {
       const { error: paymentUpdateError } = await supabase
         .from('payments')
         .update({ 
-          status: 'success',
-          enhanced_status: 'completed'
+          status: 'completed',
+          enhanced_status: 'completed',
+          updated_at: new Date().toISOString()
         })
-        .eq('id', paymentId);
+        .eq('id', payment.id);
 
       if (paymentUpdateError) {
         console.error('Payment update error:', paymentUpdateError);
       }
 
-      // Create rental record - 48 hours from now
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 48);
+      // Process based on purpose
+      if (payment.purpose === 'rental') {
+        const metadata = payment.metadata as any;
+        
+        // Fetch content-specific rental duration
+        let expiryHours = 48;
+        const contentType = metadata?.content_type;
+        const contentId = metadata?.content_id;
 
-      const { error: rentalError } = await supabase
-        .from('rentals')
-        .insert({
-          user_id: data.metadata.user_id,
-          content_id: data.metadata.content_id,
-          content_type: data.metadata.content_type,
-          amount: data.amount / 100, // Convert from kobo to naira
-          status: 'active',
-          expires_at: expiresAt.toISOString()
-        });
+        if (contentType === 'movie') {
+          const { data: movieData } = await supabase.from('movies').select('rental_expiry_duration').eq('id', contentId).single();
+          expiryHours = movieData?.rental_expiry_duration || 48;
+        } else if (contentType === 'season') {
+          const { data: seasonData } = await supabase.from('seasons').select('rental_expiry_duration').eq('id', contentId).single();
+          expiryHours = seasonData?.rental_expiry_duration || 336;
+        } else if (contentType === 'episode') {
+          const { data: episodeData } = await supabase.from('episodes').select('rental_expiry_duration').eq('id', contentId).single();
+          expiryHours = episodeData?.rental_expiry_duration || 48;
+        }
 
-      if (rentalError) {
-        console.error('Rental creation error:', rentalError);
-        return new Response(JSON.stringify({ error: 'Failed to create rental' }), {
-          status: 500,
-          headers: corsHeaders
-        });
+        const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString();
+
+        const { error: rentalError } = await supabase
+          .from('rentals')
+          .insert({
+            user_id: payment.user_id,
+            content_id: contentId,
+            content_type: contentType,
+            amount: payment.amount, // stored in kobo, matching DB
+            status: 'active',
+            expires_at: expiresAt
+          });
+
+        if (rentalError) {
+          console.error('Rental creation error:', rentalError);
+        } else {
+          console.log('Rental created successfully for payment:', payment.id);
+        }
+      } else if (payment.purpose === 'wallet_topup') {
+        // Credit wallet with the payment amount (in kobo)
+        const { data: wallet } = await supabase
+          .from('wallets')
+          .select('wallet_id')
+          .eq('user_id', payment.user_id)
+          .single();
+
+        if (wallet) {
+          await supabase.rpc('process_wallet_transaction', {
+            p_wallet_id: wallet.wallet_id,
+            p_amount: payment.amount,
+            p_type: 'credit',
+            p_description: 'Wallet top-up via Paystack',
+            p_payment_id: payment.id,
+            p_metadata: { source: 'paystack_webhook' }
+          });
+          console.log('Wallet topped up for payment:', payment.id);
+        }
       }
-
-      console.log('Rental created successfully for payment:', paymentId);
     }
 
     return new Response(JSON.stringify({ received: true }), {
