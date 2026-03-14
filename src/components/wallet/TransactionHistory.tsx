@@ -162,7 +162,7 @@ export default function TransactionHistory() {
                         tx.transaction_type === 'credit' && "text-green-500",
                         tx.transaction_type === 'debit' && "text-red-500"
                       )}>
-                        {tx.transaction_type === 'credit' ? '+' : '-'}₦{tx.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        {tx.transaction_type === 'credit' ? '+' : '-'}₦{(tx.amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-medium">
