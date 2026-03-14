@@ -273,7 +273,7 @@ async function processFailedCharge(supabase: any, eventData: any) {
         error_message: eventData.gateway_response || "Payment failed",
         updated_at: new Date().toISOString()
       })
-      .eq("id", reference);
+      .eq("intent_id", reference);
 
     return { success: true, message: "Failed charge processed" };
   } catch (error: any) {
