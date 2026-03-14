@@ -219,11 +219,11 @@ async function processSuccessfulCharge(supabase: any, eventData: any) {
   try {
     const { reference, amount, metadata } = eventData;
 
-    // Find the payment record
+    // Find the payment record by intent_id (reference is the intent_id we sent to Paystack)
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
       .select("*")
-      .eq("id", reference)
+      .eq("intent_id", reference)
       .single();
 
     if (paymentError || !payment) {
@@ -235,7 +235,7 @@ async function processSuccessfulCharge(supabase: any, eventData: any) {
       .from("payments")
       .update({
         enhanced_status: "completed",
-        status: "success",
+        status: "completed",
         provider_reference: eventData.reference,
         updated_at: new Date().toISOString()
       })
@@ -244,7 +244,8 @@ async function processSuccessfulCharge(supabase: any, eventData: any) {
     // Process payment fulfillment based on purpose
     switch (payment.purpose) {
       case "wallet_topup":
-        await fulfillWalletTopup(supabase, payment, amount / 100);
+        // amount from Paystack is in kobo, wallet stores in kobo — pass as-is
+        await fulfillWalletTopup(supabase, payment, amount);
         break;
       case "rental":
         await fulfillRental(supabase, payment);
