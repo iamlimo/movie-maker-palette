@@ -3,6 +3,7 @@ import { useAllContent } from './useMovies';
 
 export type SearchResult = {
   id: string;
+  slug?: string;
   title: string;
   content_type: 'movie' | 'tv_show';
   thumbnail_url?: string;
