@@ -186,7 +186,7 @@ const TVShowPreview = () => {
       const { data: seasonsData, error: seasonsError } = await supabase
         .from("seasons")
         .select("*")
-        .eq("tv_show_id", showId)
+        .eq("tv_show_id", showData.id)
         .eq("status", "approved")
         .order("season_number");
 
