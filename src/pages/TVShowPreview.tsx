@@ -124,11 +124,11 @@ const TVShowPreview = () => {
     : false;
 
   useEffect(() => {
-    if (id) {
+    if (slug) {
       window.scrollTo({ top: 0, behavior: "smooth" });
-      fetchTVShowData(id);
+      fetchTVShowData(slug);
     }
-  }, [id]);
+  }, [slug]);
 
   // Sticky nav on scroll
   useEffect(() => {
