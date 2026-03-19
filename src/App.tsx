@@ -83,8 +83,8 @@ function AppContent() {
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/movie/:id" element={<MoviePreview />} />
-            <Route path="/tvshow/:id" element={<TVShowPreview />} />
+            <Route path="/movie/:slug" element={<MoviePreview />} />
+            <Route path="/tvshow/:slug" element={<TVShowPreview />} />
             <Route path="/movies" element={<Movies />} />
             <Route path="/tvshows" element={<TVShows />} />
             <Route path="/genres" element={<Genres />} />

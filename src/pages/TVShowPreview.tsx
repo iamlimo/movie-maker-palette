@@ -153,10 +153,12 @@ const TVShowPreview = () => {
     }
   };
 
-  const fetchTVShowData = async (showId: string) => {
+  const fetchTVShowData = async (slugOrId: string) => {
     try {
       setLoading(true);
       setError(null);
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
 
       // Fetch TV show details
       const { data: showData, error: showError } = await supabase
@@ -171,7 +173,7 @@ const TVShowPreview = () => {
           trailer_url
         `
         )
-        .eq("id", showId)
+        .eq(isUUID ? "id" : "slug", slugOrId)
         .eq("status", "approved")
         .single();
 

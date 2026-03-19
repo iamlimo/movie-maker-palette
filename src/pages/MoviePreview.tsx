@@ -68,12 +68,13 @@ const MoviePreview = () => {
     }
   }, [slug]);
 
-  const fetchMovie = async (movieId: string) => {
+  const fetchMovie = async (slugOrId: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
+      // Try slug first, fall back to id (UUID)
+      let query = supabase
         .from("movies")
         .select(
           `
@@ -86,8 +87,11 @@ const MoviePreview = () => {
           slider_cover_url
         `
         )
-        .eq("id", movieId)
-        .eq("status", "approved")
+        .eq("status", "approved");
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+      const { data, error } = await query
+        .eq(isUUID ? "id" : "slug", slugOrId)
         .single();
 
       if (error) {
