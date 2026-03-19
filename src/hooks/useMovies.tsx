@@ -29,6 +29,7 @@ export interface Movie {
 
 export interface TVShow {
   id: string;
+  slug?: string;
   title: string;
   description?: string;
   thumbnail_url?: string;
