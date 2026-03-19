@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface RentedContent {
   id: string;
+  slug?: string;
   title: string;
   thumbnail_url?: string;
   content_type: 'movie' | 'tv';
