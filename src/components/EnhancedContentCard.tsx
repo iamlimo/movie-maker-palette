@@ -14,6 +14,7 @@ import { usePlatform } from "@/hooks/usePlatform";
 
 interface EnhancedContentCardProps {
   id: string;
+  slug?: string;
   title: string;
   year?: number;
   rating?: number | string;
