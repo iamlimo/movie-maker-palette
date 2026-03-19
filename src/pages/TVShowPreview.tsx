@@ -84,7 +84,7 @@ interface Episode {
 }
 
 const TVShowPreview = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const preloadedData = location.state?.preloadedData;
