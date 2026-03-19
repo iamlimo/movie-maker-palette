@@ -8,6 +8,7 @@ interface MovieSectionProps {
   subtitle?: string;
   movies: Array<{
     id: string;
+    slug?: string;
     title: string;
     year?: number;
     rating?: number;
@@ -87,6 +88,7 @@ const MovieSection = memo(({ title, subtitle, movies }: MovieSectionProps) => {
             >
               <EnhancedContentCard
                 id={movie.id}
+                slug={movie.slug}
                 title={movie.title}
                 year={movie.year}
                 rating={movie.rating}

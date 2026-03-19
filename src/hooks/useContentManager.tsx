@@ -111,6 +111,7 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
       
       const contentData = {
         title: formData.title,
+        slug: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         description: formData.description || null,
         genre_id: formData.genre_id || null,
         release_date: formData.release_date || null,

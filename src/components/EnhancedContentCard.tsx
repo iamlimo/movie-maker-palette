@@ -14,6 +14,7 @@ import { usePlatform } from "@/hooks/usePlatform";
 
 interface EnhancedContentCardProps {
   id: string;
+  slug?: string;
   title: string;
   year?: number;
   rating?: number | string;
@@ -29,6 +30,7 @@ interface EnhancedContentCardProps {
 
 const EnhancedContentCard = ({
   id,
+  slug,
   title,
   year,
   rating,
@@ -56,7 +58,8 @@ const EnhancedContentCard = ({
   );
 
   const handlePreview = () => {
-    const route = contentType === "movie" ? `/movie/${id}` : `/tvshow/${id}`;
+    const urlParam = slug || id;
+    const route = contentType === "movie" ? `/movie/${urlParam}` : `/tvshow/${urlParam}`;
     navigate(route, {
       state: {
         preloadedData: {

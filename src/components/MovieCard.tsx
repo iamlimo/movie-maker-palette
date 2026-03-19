@@ -8,6 +8,7 @@ import { usePlatform } from "@/hooks/usePlatform";
 
 interface MovieCardProps {
   id: string;
+  slug?: string;
   title: string;
   year: number;
   rating: number;
@@ -21,6 +22,7 @@ interface MovieCardProps {
 
 const MovieCard = ({
   id,
+  slug,
   title,
   year,
   rating,
@@ -35,7 +37,8 @@ const MovieCard = ({
   const { isIOS } = usePlatform();
 
   const handlePreview = () => {
-    const route = contentType === "movie" ? `/movie/${id}` : `/tvshow/${id}`;
+    const urlParam = slug || id;
+    const route = contentType === "movie" ? `/movie/${urlParam}` : `/tvshow/${urlParam}`;
     navigate(route, {
       state: {
         preloadedData: {

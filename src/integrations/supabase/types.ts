@@ -332,6 +332,7 @@ export type Database = {
           release_date: string | null
           rental_expiry_duration: number | null
           slider_cover_url: string | null
+          slug: string
           status: Database["public"]["Enums"]["content_status"]
           subtitle_url: string | null
           thumbnail_url: string | null
@@ -361,6 +362,7 @@ export type Database = {
           release_date?: string | null
           rental_expiry_duration?: number | null
           slider_cover_url?: string | null
+          slug: string
           status?: Database["public"]["Enums"]["content_status"]
           subtitle_url?: string | null
           thumbnail_url?: string | null
@@ -390,6 +392,7 @@ export type Database = {
           release_date?: string | null
           rental_expiry_duration?: number | null
           slider_cover_url?: string | null
+          slug?: string
           status?: Database["public"]["Enums"]["content_status"]
           subtitle_url?: string | null
           thumbnail_url?: string | null
@@ -1004,6 +1007,7 @@ export type Database = {
           rating: string | null
           release_date: string | null
           slider_cover_url: string | null
+          slug: string
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
@@ -1030,6 +1034,7 @@ export type Database = {
           rating?: string | null
           release_date?: string | null
           slider_cover_url?: string | null
+          slug: string
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
@@ -1056,6 +1061,7 @@ export type Database = {
           rating?: string | null
           release_date?: string | null
           slider_cover_url?: string | null
+          slug?: string
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string

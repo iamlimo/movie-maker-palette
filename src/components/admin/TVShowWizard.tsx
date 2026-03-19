@@ -250,6 +250,7 @@ export const TVShowWizard = () => {
         .from('tv_shows')
         .insert([{
           ...tvShowData,
+          slug: tvShowData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
           status: 'pending'
         }])
         .select()
