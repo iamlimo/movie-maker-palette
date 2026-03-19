@@ -30,6 +30,7 @@ interface EnhancedContentCardProps {
 
 const EnhancedContentCard = ({
   id,
+  slug,
   title,
   year,
   rating,
