@@ -12,6 +12,7 @@ import { formatNaira } from "@/lib/priceUtils";
 
 interface TVShow {
   id: string;
+  slug?: string;
   title: string;
   description?: string;
   genre_id?: string;
