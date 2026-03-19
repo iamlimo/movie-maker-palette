@@ -22,6 +22,7 @@ interface MovieCardProps {
 
 const MovieCard = ({
   id,
+  slug,
   title,
   year,
   rating,
