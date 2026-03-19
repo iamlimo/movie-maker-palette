@@ -21,6 +21,7 @@ export interface SectionWithContent {
   updated_at: string;
   content: Array<{
     id: string;
+    slug?: string;
     title: string;
     description?: string;
     thumbnail_url?: string;
