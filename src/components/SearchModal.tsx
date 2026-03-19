@@ -27,9 +27,10 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   }, [localSearch, search]);
 
   const handleResultClick = (result: any) => {
+    const urlParam = result.slug || result.id;
     const path = result.content_type === 'movie' 
-      ? `/movie/${result.id}` 
-      : `/tvshow/${result.id}`;
+      ? `/movie/${urlParam}` 
+      : `/tvshow/${urlParam}`;
     navigate(path);
     onClose();
     setLocalSearch('');

@@ -58,7 +58,8 @@ const EnhancedContentCard = ({
   );
 
   const handlePreview = () => {
-    const route = contentType === "movie" ? `/movie/${id}` : `/tvshow/${id}`;
+    const urlParam = slug || id;
+    const route = contentType === "movie" ? `/movie/${urlParam}` : `/tvshow/${urlParam}`;
     navigate(route, {
       state: {
         preloadedData: {

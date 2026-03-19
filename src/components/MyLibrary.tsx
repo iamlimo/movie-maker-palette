@@ -85,9 +85,10 @@ const MyLibrary = () => {
   };
 
   const handleWatchClick = (content: RentedContent) => {
+    const urlParam = content.slug || content.id;
     const route = content.content_type === 'movie' 
-      ? `/movie/${content.id}` 
-      : `/tvshow/${content.id}`;
+      ? `/movie/${urlParam}` 
+      : `/tvshow/${urlParam}`;
     navigate(route);
   };
 
