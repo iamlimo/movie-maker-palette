@@ -134,6 +134,7 @@ const Index = () => {
           subtitle={section.subtitle || ""}
           movies={section.content.map((item) => ({
             id: item.id,
+            slug: item.slug,
             title: item.title,
             year: item.release_date
               ? new Date(item.release_date).getFullYear()

@@ -184,10 +184,10 @@ export const useSectionsWithContent = () => {
       // OPTIMIZED: Parallel queries for all movies and TV shows at once
       const [moviesResult, tvShowsResult] = await Promise.all([
         movieIds.length > 0 
-          ? supabase.from('movies').select('id, title, description, thumbnail_url, price, rating, release_date, duration, genre:genres(name)').in('id', movieIds).eq('status', 'approved')
+          ? supabase.from('movies').select('id, title, slug, description, thumbnail_url, price, rating, release_date, duration, genre:genres(name)').in('id', movieIds).eq('status', 'approved')
           : Promise.resolve({ data: [] }),
         tvShowIds.length > 0
-          ? supabase.from('tv_shows').select('id, title, description, thumbnail_url, price, rating, release_date, genre:genres(name)').in('id', tvShowIds).eq('status', 'approved')
+          ? supabase.from('tv_shows').select('id, title, slug, description, thumbnail_url, price, rating, release_date, genre:genres(name)').in('id', tvShowIds).eq('status', 'approved')
           : Promise.resolve({ data: [] })
       ]);
 
