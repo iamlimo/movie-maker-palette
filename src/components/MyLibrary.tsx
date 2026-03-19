@@ -49,6 +49,7 @@ const MyLibrary = () => {
           if (error || !data) return null;
           return {
             id: data.id,
+            slug: data.slug,
             title: data.title,
             thumbnail_url: data.thumbnail_url,
             content_type: 'movie' as const,
