@@ -27,6 +27,7 @@ export const useSearch = () => {
       )
       .map(item => ({
         id: item.id,
+        slug: (item as any).slug,
         title: item.title,
         content_type: item.content_type,
         thumbnail_url: item.thumbnail_url,
