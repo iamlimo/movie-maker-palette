@@ -8,6 +8,7 @@ import { usePlatform } from "@/hooks/usePlatform";
 
 interface MovieCardProps {
   id: string;
+  slug?: string;
   title: string;
   year: number;
   rating: number;
