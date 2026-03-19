@@ -42,7 +42,7 @@ const MyLibrary = () => {
         if (rental.content_type === 'movie') {
           const { data, error } = await supabase
             .from('movies')
-            .select('id, title, thumbnail_url')
+            .select('id, title, thumbnail_url, slug')
             .eq('id', rental.content_id)
             .single();
 
