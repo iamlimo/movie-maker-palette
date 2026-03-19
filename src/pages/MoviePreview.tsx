@@ -63,10 +63,10 @@ const MoviePreview = () => {
     : false;
 
   useEffect(() => {
-    if (id) {
-      fetchMovie(id);
+    if (slug) {
+      fetchMovie(slug);
     }
-  }, [id]);
+  }, [slug]);
 
   const fetchMovie = async (movieId: string) => {
     try {
