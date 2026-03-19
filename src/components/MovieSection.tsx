@@ -8,6 +8,7 @@ interface MovieSectionProps {
   subtitle?: string;
   movies: Array<{
     id: string;
+    slug?: string;
     title: string;
     year?: number;
     rating?: number;
