@@ -62,10 +62,10 @@ export function parseDeepLink(url: string): string | null {
         "profile": "/profile",
       };
 
-      // Handle watch/:id pattern
+      // Handle watch/:slug pattern
       if (path.startsWith("watch/")) {
-        const id = path.split("/")[1];
-        return `/movie-preview/${id}`;
+        const slug = path.split("/")[1];
+        return `/movie/${slug}`;
       }
 
       // Handle search with query

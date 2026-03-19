@@ -387,7 +387,7 @@ const ViewTVShow = () => {
                                   size="sm" 
                                   variant="ghost"
                                   title="Preview Episode"
-                                  onClick={() => navigate(`/tvshow/${tvShow.id}?episode=${episode.id}`)}
+                                  onClick={() => navigate(`/tvshow/${tvShow.slug || tvShow.id}?episode=${episode.id}`)}
                                 >
                                   <Play className="h-4 w-4" />
                                 </Button>
