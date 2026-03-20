@@ -100,6 +100,8 @@ function AppContent() {
             <Route path="/docs" element={<Docs />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/general-terms" element={<TermsAndConditions />} />
+            <Route path="/careers" element={<Careers />} />
+            <Route path="/careers/apply/:jobId" element={<JobApplication />} />
 
           {/* Super Admin Routes */}
           <Route
