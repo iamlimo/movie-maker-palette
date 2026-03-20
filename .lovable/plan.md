@@ -1,57 +1,93 @@
 
 
-# Readable URLs for Movies & TV Shows
+# Career Page & Hiring System
 
-## Approach
+## Overview
+Build a public career page for Signature TV and a backend hiring system. Public users browse openings and apply; super admins create/manage job listings and review applications.
 
-Add a `slug` column to both `movies` and `tv_shows` tables. Generate slugs from titles (e.g., "The Last Dance" → `the-last-dance`). Routes change from `/movie/:id` to `/movie/:slug` and `/tvshow/:id` to `/tvshow/:slug`. The preview pages will query by slug instead of UUID. A migration will backfill slugs for all existing content.
+## Database
 
-## Database Changes
+### New Tables
 
-**Migration:**
-- Add `slug text UNIQUE` column to `movies` and `tv_shows`
-- Backfill existing rows: `slug = lower(regexp_replace(title, '[^a-zA-Z0-9]+', '-', 'g'))` with deduplication via appending a short ID suffix for collisions
-- Add unique index on slug for fast lookups
+**`job_listings`**
+- `id` uuid PK
+- `title` text NOT NULL
+- `department` text (e.g. Engineering, Content, Marketing)
+- `location` text (e.g. Remote, Lagos)
+- `type` text (Full-time, Part-time, Contract)
+- `description` text (rich job description)
+- `requirements` text
+- `benefits` text
+- `salary_range` text (optional, nullable)
+- `status` text DEFAULT 'active' (active, closed, draft)
+- `created_by` uuid (references auth.users)
+- `created_at`, `updated_at` timestamps
 
-## Files to Modify
+**`job_applications`**
+- `id` uuid PK
+- `job_listing_id` uuid FK → job_listings
+- `full_name` text NOT NULL
+- `email` text NOT NULL
+- `phone` text
+- `cover_letter` text
+- `resume_url` text (file in storage)
+- `portfolio_url` text (optional)
+- `linkedin_url` text (optional)
+- `years_of_experience` integer
+- `status` text DEFAULT 'new' (new, reviewed, shortlisted, rejected)
+- `notes` text (admin notes)
+- `created_at` timestamp
 
-### Route definition
-- **`src/App.tsx`** — Change `/movie/:id` to `/movie/:slug` and `/tvshow/:id` to `/tvshow/:slug`
+### Storage Bucket
+- `resumes` (private bucket) — applicants upload resumes (PDF)
+- RLS: insert for anyone, select for super_admins
 
-### Preview pages (query by slug instead of id)
-- **`src/pages/MoviePreview.tsx`** — Use `useParams<{ slug }>`, query `.eq("slug", slug)` instead of `.eq("id", movieId)`
-- **`src/pages/TVShowPreview.tsx`** — Same slug-based query
+### RLS Policies
+- `job_listings`: SELECT for public where status='active'; ALL for super_admins
+- `job_applications`: INSERT for public (no auth required for applying); SELECT/UPDATE/ALL for super_admins
 
-### All navigation links (pass slug instead of id)
-- **`src/components/EnhancedContentCard.tsx`** — Navigate to `/movie/${slug}` or `/tvshow/${slug}`
-- **`src/components/MovieCard.tsx`** — Same
-- **`src/components/SearchModal.tsx`** — Same
-- **`src/components/CinematicHeroSlider.tsx`** — Same
-- **`src/components/MyLibrary.tsx`** — Same
-- **`src/components/ContinueWatchingSection.tsx`** — Same
-- **`src/pages/admin/ViewTVShow.tsx`** — Same
+## New Edge Function
 
-### Admin content creation
-- **`src/pages/admin/AddMovie.tsx`** / **`AddMovieNew.tsx`** — Auto-generate slug from title on save
-- **`src/pages/admin/AddTVShow.tsx`** — Same
-- **`src/hooks/useContentManager.tsx`** — Include slug generation in content creation/update logic
+**`forward-application`** — Called by admin to email new applications to careers@signaturepicture.co. Uses Supabase's built-in email or a simple fetch to an email endpoint. Actually, to keep it minimal, the admin panel will show a "mailto:" link that opens their email client with pre-filled details, avoiding needing a new email service. Alternatively, we'll just display a "Copy email" and "Open in email" action.
 
-### Deep linking
-- **`src/lib/navigationUtils.ts`** — Update `parseDeepLink` for slug-based routes
+Wait — the requirement says "forward new applications to careers@signaturepicture.co." To avoid needing a new email service, the admin UI will have a button that opens a `mailto:` link with the application details pre-filled. No new edge function needed.
 
-### Supabase types
-- Types file will auto-update after migration
+## Files
 
-## Slug Generation Logic
+### New Pages
+1. **`src/pages/Careers.tsx`** — Public career page with:
+   - Hero section with brand messaging about working at Signature TV
+   - Team/culture highlights (cards with icons)
+   - Active job listings section (fetched from DB)
+   - Each listing expandable or clickable to see details + "Apply" button
 
-```typescript
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-```
+2. **`src/pages/JobApplication.tsx`** — Application form page for a specific job:
+   - Fields: Full name, Email, Phone, Resume (file upload), Cover letter, Portfolio URL, LinkedIn URL, Years of experience
+   - Submits to `job_applications` table + uploads resume to `resumes` bucket
 
-The database migration handles backfill with collision resolution by appending a 4-char ID suffix when duplicates exist.
+3. **`src/pages/admin/JobListings.tsx`** — Admin CRUD for job listings:
+   - Table of all listings with status badges
+   - Create/edit job listing form (dialog or inline)
+   - Toggle status (active/closed/draft)
+
+4. **`src/pages/admin/JobApplications.tsx`** — Admin view of applications:
+   - Table with applicant name, job title, date, status
+   - Click to expand details, download resume, update status
+   - "Forward to email" button (mailto: link to careers@signaturepicture.co)
+
+### Modified Files
+5. **`src/App.tsx`** — Add routes: `/careers`, `/careers/apply/:id`, `/admin/job-listings`, `/admin/applications`
+6. **`src/components/admin/AdminLayout.tsx`** — Add "Careers" section to sidebar with Job Listings and Applications sub-items
+7. **`src/integrations/supabase/types.ts`** — Auto-updated after migration
+
+## Design Approach
+- Career page: dark cinematic theme matching existing site, gradient hero, card-based layout for culture section, clean job listing cards
+- Application form: clean form with file upload, validation with toast feedback
+- Admin pages: consistent with existing admin table/card patterns
+
+## Route Structure
+- `/careers` — Public career page
+- `/careers/apply/:jobId` — Application form
+- `/admin/job-listings` — Admin job management
+- `/admin/applications` — Admin applications review
 
