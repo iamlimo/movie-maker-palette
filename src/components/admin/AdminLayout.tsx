@@ -74,6 +74,14 @@ const sidebarItems = [
   },
   { title: 'Finance', url: '/admin/finance', icon: DollarSign },
   { title: 'Wallets', url: '/admin/wallets', icon: Wallet },
+  { 
+    title: 'Careers', 
+    icon: Briefcase, 
+    submenu: [
+      { title: 'Job Listings', url: '/admin/job-listings', icon: Briefcase },
+      { title: 'Applications', url: '/admin/applications', icon: ClipboardList },
+    ]
+  },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
