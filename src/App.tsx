@@ -32,6 +32,8 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Docs = lazy(() => import('./pages/Docs'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsAndConditions = lazy(() => import('./pages/GeneralTerms'));
+const Careers = lazy(() => import('./pages/Careers'));
+const JobApplication = lazy(() => import('./pages/JobApplication'));
 
 // Lazy load ALL admin routes
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
