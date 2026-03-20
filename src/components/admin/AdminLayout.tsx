@@ -16,7 +16,9 @@ import {
   Image,
   Megaphone,
   Settings,
-  Wallet
+  Wallet,
+  Briefcase,
+  ClipboardList
 } from 'lucide-react';
 import {
   Sidebar,
