@@ -58,6 +58,8 @@ const HeroSlider = lazy(() => import('@/pages/admin/HeroSlider'));
 const Banners = lazy(() => import('@/pages/admin/Banners'));
 const Wallets = lazy(() => import('@/pages/admin/Wallets'));
 const Settings = lazy(() => import('@/pages/admin/Settings'));
+const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
+const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
