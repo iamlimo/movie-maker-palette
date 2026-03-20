@@ -143,6 +143,8 @@ function AppContent() {
             <Route path="banners" element={<Banners />} />
             <Route path="wallets" element={<Wallets />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="job-listings" element={<JobListingsAdmin />} />
+            <Route path="applications" element={<JobApplicationsAdmin />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
