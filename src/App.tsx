@@ -32,6 +32,8 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Docs = lazy(() => import('./pages/Docs'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsAndConditions = lazy(() => import('./pages/GeneralTerms'));
+const Careers = lazy(() => import('./pages/Careers'));
+const JobApplication = lazy(() => import('./pages/JobApplication'));
 
 // Lazy load ALL admin routes
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -56,6 +58,8 @@ const HeroSlider = lazy(() => import('@/pages/admin/HeroSlider'));
 const Banners = lazy(() => import('@/pages/admin/Banners'));
 const Wallets = lazy(() => import('@/pages/admin/Wallets'));
 const Settings = lazy(() => import('@/pages/admin/Settings'));
+const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
+const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,6 +100,8 @@ function AppContent() {
             <Route path="/docs" element={<Docs />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/general-terms" element={<TermsAndConditions />} />
+            <Route path="/careers" element={<Careers />} />
+            <Route path="/careers/apply/:jobId" element={<JobApplication />} />
 
           {/* Super Admin Routes */}
           <Route
@@ -137,6 +143,8 @@ function AppContent() {
             <Route path="banners" element={<Banners />} />
             <Route path="wallets" element={<Wallets />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="job-listings" element={<JobListingsAdmin />} />
+            <Route path="applications" element={<JobApplicationsAdmin />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

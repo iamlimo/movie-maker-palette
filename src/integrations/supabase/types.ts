@@ -282,6 +282,110 @@ export type Database = {
         }
         Relationships: []
       }
+      job_applications: {
+        Row: {
+          cover_letter: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          job_listing_id: string
+          linkedin_url: string | null
+          notes: string | null
+          phone: string | null
+          portfolio_url: string | null
+          resume_url: string | null
+          status: string
+          years_of_experience: number | null
+        }
+        Insert: {
+          cover_letter?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          job_listing_id: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          status?: string
+          years_of_experience?: number | null
+        }
+        Update: {
+          cover_letter?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          job_listing_id?: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          status?: string
+          years_of_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_job_listing_id_fkey"
+            columns: ["job_listing_id"]
+            isOneToOne: false
+            referencedRelation: "job_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_listings: {
+        Row: {
+          benefits: string | null
+          created_at: string
+          created_by: string | null
+          department: string | null
+          description: string | null
+          id: string
+          location: string | null
+          requirements: string | null
+          salary_range: string | null
+          status: string
+          title: string
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          benefits?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          requirements?: string | null
+          salary_range?: string | null
+          status?: string
+          title: string
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          benefits?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          requirements?: string | null
+          salary_range?: string | null
+          status?: string
+          title?: string
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       movie_cast: {
         Row: {
           cast_crew_id: string
