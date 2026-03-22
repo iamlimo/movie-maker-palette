@@ -5,10 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Download, Mail, ExternalLink } from "lucide-react";
+import { Loader2, Download, Mail, ExternalLink, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface Application {
@@ -35,6 +36,8 @@ export default function JobApplications() {
   const [selected, setSelected] = useState<Application | null>(null);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchApplications = async () => {
     const { data } = await supabase
@@ -70,8 +73,27 @@ export default function JobApplications() {
     setSaving(false);
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    // Delete resume from storage if exists
+    if (deleteTarget.resume_url) {
+      const path = deleteTarget.resume_url.replace("resumes/", "");
+      await supabase.storage.from("resumes").remove([path]);
+    }
+    const { error } = await supabase.from("job_applications").delete().eq("id", deleteTarget.id);
+    if (error) {
+      toast({ title: "Error deleting", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Application deleted" });
+      setApplications((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      if (selected?.id === deleteTarget.id) setSelected(null);
+    }
+    setDeleteTarget(null);
+    setDeleting(false);
+  };
+
   const downloadResume = async (resumeUrl: string) => {
-    // resumeUrl is like "resumes/jobId/filename.pdf" — we need just the path after bucket
     const path = resumeUrl.replace("resumes/", "");
     const { data, error } = await supabase.storage.from("resumes").createSignedUrl(path, 60);
     if (error || !data?.signedUrl) {
@@ -115,7 +137,7 @@ export default function JobApplications() {
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead className="w-28">Actions</TableHead>
+                <TableHead className="w-32">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,6 +165,9 @@ export default function JobApplications() {
                       )}
                       <Button variant="ghost" size="icon" onClick={() => forwardToEmail(app)}>
                         <Mail className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(app)}>
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -231,12 +256,32 @@ export default function JobApplications() {
                   <Button variant="outline" size="sm" onClick={() => forwardToEmail(selected)}>
                     <Mail className="w-4 h-4 mr-1" />Forward
                   </Button>
+                  <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setSelected(null); setDeleteTarget(selected); }}>
+                    <Trash2 className="w-4 h-4 mr-1" />Delete
+                  </Button>
                 </div>
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete application from {deleteTarget?.full_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this application and its resume. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
