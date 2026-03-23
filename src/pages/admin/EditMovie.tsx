@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { generateSlug } from "@/lib/slugUtils";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -221,6 +222,7 @@ const EditMovie = () => {
     try {
       const payload = {
         title: formData.title,
+        slug: generateSlug(formData.title),
         description: formData.description,
         genre_id: formData.genre_id,
         release_date: formData.release_date,
@@ -239,6 +241,9 @@ const EditMovie = () => {
         landscape_poster_url: formData.landscape_poster_url || null,
         slider_cover_url: formData.slider_cover_url || null,
         subtitle_url: formData.subtitle_url || null,
+        status: formData.status as "pending" | "approved" | "rejected",
+        video_url: formData.video_url || null,
+        trailer_url: formData.trailer_url || null,
       };
 
       const { data, error } = await supabase
