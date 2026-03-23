@@ -8,6 +8,16 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatNaira } from "@/lib/priceUtils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Movie {
   id: string;
@@ -40,6 +50,8 @@ const ViewMovie = () => {
   const { toast } = useToast();
   const [movie, setMovie] = useState<Movie | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteType, setDeleteType] = useState<"soft" | "hard">("soft");
 
   useEffect(() => {
     if (id) {
@@ -69,6 +81,38 @@ const ViewMovie = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!movie) return;
+
+    try {
+      if (deleteType === "soft") {
+        const { error } = await supabase
+          .from("movies")
+          .update({ status: "rejected" as const })
+          .eq("id", movie.id);
+        if (error) throw error;
+        toast({ title: "Success", description: "Movie has been archived (status set to rejected)" });
+      } else {
+        const { error } = await supabase
+          .from("movies")
+          .delete()
+          .eq("id", movie.id);
+        if (error) throw error;
+        toast({ title: "Success", description: "Movie permanently deleted" });
+      }
+      navigate("/admin/movies");
+    } catch (error) {
+      console.error("Error deleting movie:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete movie",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -141,7 +185,13 @@ const ViewMovie = () => {
             <Edit className="h-4 w-4 mr-2" />
             Edit Movie
           </Button>
-          <Button variant="destructive">
+          <Button
+            variant="destructive"
+            onClick={() => {
+              setDeleteType("soft");
+              setDeleteDialogOpen(true);
+            }}
+          >
             <Trash2 className="h-4 w-4 mr-2" />
             Delete
           </Button>
@@ -151,7 +201,6 @@ const ViewMovie = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Movie Poster and Basic Info */}
           <Card>
             <CardContent className="p-6">
               <div className="flex gap-6">
@@ -169,14 +218,11 @@ const ViewMovie = () => {
                       {movie.description || "No description available"}
                     </p>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium">Duration</p>
                       <p className="text-muted-foreground">
-                        {movie.duration
-                          ? `${movie.duration} minutes`
-                          : "Not specified"}
+                        {movie.duration ? `${movie.duration} minutes` : "Not specified"}
                       </p>
                     </div>
                     <div>
@@ -205,7 +251,6 @@ const ViewMovie = () => {
             </CardContent>
           </Card>
 
-          {/* Cast & Crew */}
           {movie.cast_crew && movie.cast_crew.length > 0 && (
             <Card>
               <CardHeader>
@@ -246,7 +291,6 @@ const ViewMovie = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Pricing & Rental Info */}
           <Card>
             <CardHeader>
               <CardTitle>Pricing & Rental</CardTitle>
@@ -271,7 +315,6 @@ const ViewMovie = () => {
             </CardContent>
           </Card>
 
-          {/* Media Files */}
           <Card>
             <CardHeader>
               <CardTitle>Media Files</CardTitle>
@@ -307,7 +350,6 @@ const ViewMovie = () => {
             </CardContent>
           </Card>
 
-          {/* Metadata */}
           <Card>
             <CardHeader>
               <CardTitle>Metadata</CardTitle>
@@ -329,6 +371,55 @@ const ViewMovie = () => {
           </Card>
         </div>
       </div>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{movie.title}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose how to remove this movie:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <button
+              className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                deleteType === "soft"
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-muted-foreground"
+              }`}
+              onClick={() => setDeleteType("soft")}
+            >
+              <p className="font-medium">Archive (Soft Delete)</p>
+              <p className="text-sm text-muted-foreground">
+                Sets status to "rejected". Can be restored later.
+              </p>
+            </button>
+            <button
+              className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                deleteType === "hard"
+                  ? "border-destructive bg-destructive/10"
+                  : "border-border hover:border-muted-foreground"
+              }`}
+              onClick={() => setDeleteType("hard")}
+            >
+              <p className="font-medium text-destructive">Permanent Delete</p>
+              <p className="text-sm text-muted-foreground">
+                Permanently removes the movie. This cannot be undone.
+              </p>
+            </button>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className={deleteType === "hard" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+            >
+              {deleteType === "soft" ? "Archive" : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
