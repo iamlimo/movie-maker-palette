@@ -1,93 +1,64 @@
 
 
-# Career Page & Hiring System
+# Optimize Admin CRUD for Movies & TV Shows
 
-## Overview
-Build a public career page for Signature TV and a backend hiring system. Public users browse openings and apply; super admins create/manage job listings and review applications.
+## Issues Found
 
-## Database
+After thorough investigation, here are the bugs and gaps in the admin CRUD system:
 
-### New Tables
+### Critical Bugs
 
-**`job_listings`**
-- `id` uuid PK
-- `title` text NOT NULL
-- `department` text (e.g. Engineering, Content, Marketing)
-- `location` text (e.g. Remote, Lagos)
-- `type` text (Full-time, Part-time, Contract)
-- `description` text (rich job description)
-- `requirements` text
-- `benefits` text
-- `salary_range` text (optional, nullable)
-- `status` text DEFAULT 'active' (active, closed, draft)
-- `created_by` uuid (references auth.users)
-- `created_at`, `updated_at` timestamps
+1. **EditMovie -- missing fields in update payload**: `status`, `video_url`, and `trailer_url` are NOT included in the update payload (`handleSubmit`). Changing status or video URLs on edit silently does nothing.
 
-**`job_applications`**
-- `id` uuid PK
-- `job_listing_id` uuid FK → job_listings
-- `full_name` text NOT NULL
-- `email` text NOT NULL
-- `phone` text
-- `cover_letter` text
-- `resume_url` text (file in storage)
-- `portfolio_url` text (optional)
-- `linkedin_url` text (optional)
-- `years_of_experience` integer
-- `status` text DEFAULT 'new' (new, reviewed, shortlisted, rejected)
-- `notes` text (admin notes)
-- `created_at` timestamp
+2. **TVShows admin -- episodes never load or render**: The `expandedSeasons` state and UI exist, but `fetchEpisodes` is never called when a season is expanded, and there's no episode row rendering. Expanding a season shows nothing.
 
-### Storage Bucket
-- `resumes` (private bucket) — applicants upload resumes (PDF)
-- RLS: insert for anyone, select for super_admins
+3. **ViewMovie -- delete button is non-functional**: The "Delete" button in `ViewMovie.tsx` has no `onClick` handler -- it's a dead button.
 
-### RLS Policies
-- `job_listings`: SELECT for public where status='active'; ALL for super_admins
-- `job_applications`: INSERT for public (no auth required for applying); SELECT/UPDATE/ALL for super_admins
+4. **AddSeason -- creates season as `pending`**: The insert omits `status`, so it defaults to `'pending'`. The RLS policy only shows seasons of approved TV shows, but seasons themselves need `status: 'approved'` to be usable in the content flow.
 
-## New Edge Function
+5. **EditMovie/EditTVShow -- slug not updated on title change**: When the title is edited, the slug column is not recalculated, leading to stale URLs.
 
-**`forward-application`** — Called by admin to email new applications to careers@signaturepicture.co. Uses Supabase's built-in email or a simple fetch to an email endpoint. Actually, to keep it minimal, the admin panel will show a "mailto:" link that opens their email client with pre-filled details, avoiding needing a new email service. Alternatively, we'll just display a "Copy email" and "Open in email" action.
+### UX Issues
 
-Wait — the requirement says "forward new applications to careers@signaturepicture.co." To avoid needing a new email service, the admin UI will have a button that opens a `mailto:` link with the application details pre-filled. No new edge function needed.
+6. **TVShows admin -- uses browser `confirm()` for deletes**: Movies uses proper `AlertDialog` with soft/hard delete options. TV Shows uses raw `confirm()` with only hard delete.
 
-## Files
+7. **TVShows admin -- missing React key on fragment**: The `<>` wrapping each show + seasons lacks a key, causing React warnings.
 
-### New Pages
-1. **`src/pages/Careers.tsx`** — Public career page with:
-   - Hero section with brand messaging about working at Signature TV
-   - Team/culture highlights (cards with icons)
-   - Active job listings section (fetched from DB)
-   - Each listing expandable or clickable to see details + "Apply" button
+---
 
-2. **`src/pages/JobApplication.tsx`** — Application form page for a specific job:
-   - Fields: Full name, Email, Phone, Resume (file upload), Cover letter, Portfolio URL, LinkedIn URL, Years of experience
-   - Submits to `job_applications` table + uploads resume to `resumes` bucket
+## Files to Modify
 
-3. **`src/pages/admin/JobListings.tsx`** — Admin CRUD for job listings:
-   - Table of all listings with status badges
-   - Create/edit job listing form (dialog or inline)
-   - Toggle status (active/closed/draft)
+### 1. `src/pages/admin/EditMovie.tsx`
+- Add `status`, `video_url`, `trailer_url` to the update payload in `handleSubmit`
+- Recalculate and include `slug` when title changes
 
-4. **`src/pages/admin/JobApplications.tsx`** — Admin view of applications:
-   - Table with applicant name, job title, date, status
-   - Click to expand details, download resume, update status
-   - "Forward to email" button (mailto: link to careers@signaturepicture.co)
+### 2. `src/pages/admin/TVShows.tsx`
+- Add `fetchEpisodes` call when a season is expanded
+- Render episode rows under expanded seasons (episode number, title, status, price, actions)
+- Replace `confirm()` with `AlertDialog` for TV show and season deletion (soft + hard delete options)
+- Add proper `key` to React fragments
 
-### Modified Files
-5. **`src/App.tsx`** — Add routes: `/careers`, `/careers/apply/:id`, `/admin/job-listings`, `/admin/applications`
-6. **`src/components/admin/AdminLayout.tsx`** — Add "Careers" section to sidebar with Job Listings and Applications sub-items
-7. **`src/integrations/supabase/types.ts`** — Auto-updated after migration
+### 3. `src/pages/admin/ViewMovie.tsx`
+- Wire up the Delete button with an `AlertDialog` offering soft/hard delete, matching Movies.tsx pattern
 
-## Design Approach
-- Career page: dark cinematic theme matching existing site, gradient hero, card-based layout for culture section, clean job listing cards
-- Application form: clean form with file upload, validation with toast feedback
-- Admin pages: consistent with existing admin table/card patterns
+### 4. `src/pages/admin/AddSeason.tsx`
+- Add `status: 'approved'` to the season insert payload so new seasons are immediately available
 
-## Route Structure
-- `/careers` — Public career page
-- `/careers/apply/:jobId` — Application form
-- `/admin/job-listings` — Admin job management
-- `/admin/applications` — Admin applications review
+### 5. `src/pages/admin/EditTVShow.tsx`
+- Recalculate and include `slug` when title changes in the update payload
+
+### 6. `src/pages/admin/EditSeason.tsx`
+- No changes needed (already handles status)
+
+---
+
+## Implementation Details
+
+**Slug recalculation** uses existing `generateSlug()` from `src/lib/slugUtils.ts`.
+
+**Episode rows in TVShows.tsx** will show: episode number, title, duration, status badge, price, and action buttons (edit, delete) -- matching the pattern already used in `ViewTVShow.tsx`.
+
+**Delete dialogs** will follow the existing Movies.tsx pattern with soft delete (set status to `rejected`) and hard delete (permanent removal) options.
+
+No new components, edge functions, or database changes required.
 
