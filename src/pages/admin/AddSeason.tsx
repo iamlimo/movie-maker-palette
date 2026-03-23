@@ -145,7 +145,8 @@ const AddSeason = () => {
             season_number: formData.season_number,
             description: formData.description || null,
             price: formData.price || 0,
-            rental_expiry_duration: formData.rental_expiry_duration || 336
+            rental_expiry_duration: formData.rental_expiry_duration || 336,
+            status: 'approved'
           }
         ])
         .select()

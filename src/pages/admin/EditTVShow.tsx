@@ -177,6 +177,7 @@ export default function EditTVShow() {
         .from('tv_shows')
         .update({
           title: formData.title,
+          slug: generateSlug(formData.title),
           description: formData.description,
           language: formData.language,
           rating: formData.rating,
