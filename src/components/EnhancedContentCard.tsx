@@ -125,12 +125,7 @@ const EnhancedContentCard = ({
     
     if (price === 0) return "Free";
 
-    if (contentType === "movie") {
-      return `${formatNaira(price)} • Rent`;
-    } else {
-      // TV Show pricing
-      return "₦3,000.00 • Season";
-    }
+    return `${formatNaira(price)} • ${contentType === "movie" ? "Rent" : "Season"}`;
   };
 
   // Long-press gesture handling
