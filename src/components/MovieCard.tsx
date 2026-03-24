@@ -66,12 +66,7 @@ const MovieCard = ({
 
     if (numPrice === 0) return "Free";
 
-    if (contentType === "movie") {
-      return `${formatNaira(numPrice)} • Rent`;
-    } else {
-      // TV Show pricing
-      return "₦3000 • Season";
-    }
+    return `${formatNaira(numPrice)} • ${contentType === "movie" ? "Rent" : "Season"}`;
   };
 
   return (
