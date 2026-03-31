@@ -12,6 +12,7 @@ interface NativeVideoPlayerProps {
   contentId: string;
   contentType: 'movie' | 'episode';
   posterUrl?: string;
+  subtitleUrl?: string;
   onError?: (error: string) => void;
   autoPlay?: boolean;
 }
@@ -36,6 +37,7 @@ const NativeVideoPlayer = ({
   contentId,
   contentType,
   posterUrl,
+  subtitleUrl,
   onError,
   autoPlay = false
 }: NativeVideoPlayerProps) => {
@@ -276,6 +278,9 @@ const NativeVideoPlayer = ({
             className="w-full h-full"
             style={{ pointerEvents: 'auto' }}
           >
+            {subtitleUrl && (
+              <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
+            )}
             Your browser does not support the video tag.
           </video>
         </div>

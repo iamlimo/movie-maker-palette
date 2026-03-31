@@ -15,10 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
+import { usePlatform } from "@/hooks/usePlatform";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { user, signIn, signUp } = useAuth();
+  const { isIOS } = usePlatform();
 
   // Redirect authenticated users to home
   useEffect(() => {
@@ -112,7 +114,7 @@ const Auth = () => {
       const { error } = await signUp(
         signupData.email,
         signupData.password,
-        signupData.name
+        signupData.name,
       );
 
       if (error) {
@@ -155,252 +157,336 @@ const Auth = () => {
     }
   };
 
+  // iOS-only login form (no signup)
+  const renderIOSLoginForm = () => (
+    <form onSubmit={handleLogin} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="login-email" className="text-foreground">
+          Email
+        </Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="login-email"
+            type="email"
+            placeholder="Enter your email"
+            value={loginData.email}
+            onChange={(e) =>
+              setLoginData({ ...loginData, email: e.target.value })
+            }
+            className="pl-10 bg-background/50 border-border focus:border-primary"
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="login-password" className="text-foreground">
+          Password
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="login-password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Enter your password"
+            value={loginData.password}
+            onChange={(e) =>
+              setLoginData({
+                ...loginData,
+                password: e.target.value,
+              })
+            }
+            className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <Button
+        type="submit"
+        className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
+        disabled={loading}
+      >
+        {loading ? "Logging In..." : "Log In"}
+      </Button>
+    </form>
+  );
+
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header with back button */}
         <div className="flex items-center mb-8">
-          <Link
+          {/* <Link
             to="/"
             className="flex items-center text-muted-foreground hover:text-primary transition-smooth"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
-          </Link>
+          </Link> */}
         </div>
 
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            {/* <div className="w-12 h-12 gradient-accent rounded-xl flex items-center justify-center shadow-glow">
-              <span className="text-primary-foreground font-bold text-2xl">
-                S
-              </span>
-            </div> */}
             <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               <img src="/signature-tv-logo.png" alt="" />{" "}
             </span>
           </div>
-          <p className="text-muted-foreground">Premium movie rental platform</p>
+          <p className="text-muted-foreground">
+            Premium blockbusters and TV shows!
+          </p>
         </div>
 
         <Card className="gradient-card border-border/50 shadow-premium">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-foreground">
-              Welcome
+              {isIOS ? "Welcome to Signature TV" : "Welcome"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              Sign in to your account or create a new one
+              {isIOS
+                ? "Log in to access your content."
+                : "Sign in to your account or create a new one"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-8 bg-secondary">
-                <TabsTrigger
-                  value="login"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  Sign In
-                </TabsTrigger>
-                <TabsTrigger
-                  value="signup"
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  Sign Up
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-foreground">
-                      Email
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={loginData.email}
-                        onChange={(e) =>
-                          setLoginData({ ...loginData, email: e.target.value })
-                        }
-                        className="pl-10 bg-background/50 border-border focus:border-primary"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-foreground">
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter your password"
-                        value={loginData.password}
-                        onChange={(e) =>
-                          setLoginData({
-                            ...loginData,
-                            password: e.target.value,
-                          })
-                        }
-                        className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
-                    disabled={loading}
+            {isIOS ? (
+              // iOS: Login-only form (no tabs, no signup)
+              renderIOSLoginForm()
+            ) : (
+              // Web/Android: Full tabs with login and signup
+              <Tabs defaultValue="login" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-8 bg-secondary">
+                  <TabsTrigger
+                    value="login"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                   >
-                    {loading ? "Signing In..." : "Sign In"}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <form onSubmit={handleSignup} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name" className="text-foreground">
-                      Full Name
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={signupData.name}
-                        onChange={(e) =>
-                          setSignupData({ ...signupData, name: e.target.value })
-                        }
-                        className="pl-10 bg-background/50 border-border focus:border-primary"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-foreground">
-                      Email
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={signupData.email}
-                        onChange={(e) =>
-                          setSignupData({
-                            ...signupData,
-                            email: e.target.value,
-                          })
-                        }
-                        className="pl-10 bg-background/50 border-border focus:border-primary"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="signup-password"
-                      className="text-foreground"
-                    >
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Create a password"
-                        value={signupData.password}
-                        onChange={(e) =>
-                          setSignupData({
-                            ...signupData,
-                            password: e.target.value,
-                          })
-                        }
-                        className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
-                        required
-                        minLength={6}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="signup-confirm-password"
-                      className="text-foreground"
-                    >
-                      Confirm Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-confirm-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Confirm your password"
-                        value={signupData.confirmPassword}
-                        onChange={(e) =>
-                          setSignupData({
-                            ...signupData,
-                            confirmPassword: e.target.value,
-                          })
-                        }
-                        className="pl-10 bg-background/50 border-border focus:border-primary"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
-                    disabled={loading}
+                    Sign In
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="signup"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                   >
-                    {loading ? "Creating Account..." : "Create Account"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+                    Sign Up
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="login">
+                  <form onSubmit={handleLogin} className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-email" className="text-foreground">
+                        Email
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="login-email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={loginData.email}
+                          onChange={(e) =>
+                            setLoginData({
+                              ...loginData,
+                              email: e.target.value,
+                            })
+                          }
+                          className="pl-10 bg-background/50 border-border focus:border-primary"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="login-password"
+                        className="text-foreground"
+                      >
+                        Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="login-password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          value={loginData.password}
+                          onChange={(e) =>
+                            setLoginData({
+                              ...loginData,
+                              password: e.target.value,
+                            })
+                          }
+                          className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
+                      disabled={loading}
+                    >
+                      {loading ? "Signing In..." : "Sign In"}
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="signup">
+                  <form onSubmit={handleSignup} className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-name" className="text-foreground">
+                        Full Name
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="signup-name"
+                          type="text"
+                          placeholder="Enter your full name"
+                          value={signupData.name}
+                          onChange={(e) =>
+                            setSignupData({
+                              ...signupData,
+                              name: e.target.value,
+                            })
+                          }
+                          className="pl-10 bg-background/50 border-border focus:border-primary"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-email" className="text-foreground">
+                        Email
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="signup-email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={signupData.email}
+                          onChange={(e) =>
+                            setSignupData({
+                              ...signupData,
+                              email: e.target.value,
+                            })
+                          }
+                          className="pl-10 bg-background/50 border-border focus:border-primary"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="signup-password"
+                        className="text-foreground"
+                      >
+                        Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="signup-password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Create a password"
+                          value={signupData.password}
+                          onChange={(e) =>
+                            setSignupData({
+                              ...signupData,
+                              password: e.target.value,
+                            })
+                          }
+                          className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
+                          required
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="signup-confirm-password"
+                        className="text-foreground"
+                      >
+                        Confirm Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="signup-confirm-password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Confirm your password"
+                          value={signupData.confirmPassword}
+                          onChange={(e) =>
+                            setSignupData({
+                              ...signupData,
+                              confirmPassword: e.target.value,
+                            })
+                          }
+                          className="pl-10 bg-background/50 border-border focus:border-primary"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
+                      disabled={loading}
+                    >
+                      {loading ? "Creating Account..." : "Create Account"}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            )}
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          By signing up, you agree to our Terms of Service and Privacy Policy
-        </p>
+        {/* Footer text - only for Web/Android */}
+        {!isIOS && (
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            By signing up, you agree to our Terms of Service and Privacy Policy
+          </p>
+        )}
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import { usePlatform } from "@/hooks/usePlatform";
 
 interface EnhancedContentCardProps {
   id: string;
+  slug?: string;
   title: string;
   year?: number;
   rating?: number | string;
@@ -29,6 +30,7 @@ interface EnhancedContentCardProps {
 
 const EnhancedContentCard = ({
   id,
+  slug,
   title,
   year,
   rating,
@@ -56,7 +58,8 @@ const EnhancedContentCard = ({
   );
 
   const handlePreview = () => {
-    const route = contentType === "movie" ? `/movie/${id}` : `/tvshow/${id}`;
+    const urlParam = slug || id;
+    const route = contentType === "movie" ? `/movie/${urlParam}` : `/tvshow/${urlParam}`;
     navigate(route, {
       state: {
         preloadedData: {
@@ -122,16 +125,11 @@ const EnhancedContentCard = ({
     
     if (price === 0) return "Free";
 
-    if (contentType === "movie") {
-      return `${formatNaira(price)} • Rent`;
-    } else {
-      // TV Show pricing
-      return "₦3,000.00 • Season";
-    }
+    return `${formatNaira(price)} • ${contentType === "movie" ? "Rent" : "Season"}`;
   };
 
   // Long-press gesture handling
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showQuickActions, setShowQuickActions] = useState(false);
 
   const handleTouchStart = useCallback(() => {

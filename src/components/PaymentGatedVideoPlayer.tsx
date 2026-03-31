@@ -71,8 +71,7 @@ export const PaymentGatedVideoPlayer: React.FC<PaymentGatedVideoPlayerProps> = (
       if (rentalData?.has_access) {
         const { data, error } = await supabase.functions.invoke('get-episode-access', {
           body: { 
-            episode_id: episodeId,
-            user_id: user?.id || null
+            episode_id: episodeId
           }
         });
 

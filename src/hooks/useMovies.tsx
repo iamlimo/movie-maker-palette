@@ -4,6 +4,7 @@ import { toast } from '@/hooks/use-toast';
 
 export interface Movie {
   id: string;
+  slug?: string;
   title: string;
   description?: string;
   thumbnail_url?: string;
@@ -28,6 +29,7 @@ export interface Movie {
 
 export interface TVShow {
   id: string;
+  slug?: string;
   title: string;
   description?: string;
   thumbnail_url?: string;

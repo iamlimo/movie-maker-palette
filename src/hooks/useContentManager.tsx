@@ -55,6 +55,7 @@ export interface ContentFormData {
   slider_cover_url?: string;
   video_url?: string;
   trailer_url?: string;
+  subtitle_url?: string;
 }
 
 export const useContentManager = (contentType: ContentType, includeApprovedOnly = true) => {
@@ -110,6 +111,7 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
       
       const contentData = {
         title: formData.title,
+        slug: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         description: formData.description || null,
         genre_id: formData.genre_id || null,
         release_date: formData.release_date || null,
@@ -128,6 +130,7 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
         slider_cover_url: formData.slider_cover_url || null,
         video_url: formData.video_url || null,
         trailer_url: formData.trailer_url || null,
+        subtitle_url: formData.subtitle_url || null,
         status: 'approved' as const,
         rental_expiry_duration: parseInt(formData.rental_expiry_duration),
         uploaded_by: (await supabase.auth.getUser()).data.user?.id,

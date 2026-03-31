@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface RentedContent {
   id: string;
+  slug?: string;
   title: string;
   thumbnail_url?: string;
   content_type: 'movie' | 'tv';
@@ -42,13 +43,14 @@ const MyLibrary = () => {
         if (rental.content_type === 'movie') {
           const { data, error } = await supabase
             .from('movies')
-            .select('id, title, thumbnail_url')
+            .select('id, title, thumbnail_url, slug')
             .eq('id', rental.content_id)
             .single();
 
           if (error || !data) return null;
           return {
             id: data.id,
+            slug: data.slug,
             title: data.title,
             thumbnail_url: data.thumbnail_url,
             content_type: 'movie' as const,
@@ -83,9 +85,10 @@ const MyLibrary = () => {
   };
 
   const handleWatchClick = (content: RentedContent) => {
+    const urlParam = content.slug || content.id;
     const route = content.content_type === 'movie' 
-      ? `/movie/${content.id}` 
-      : `/tvshow/${content.id}`;
+      ? `/movie/${urlParam}` 
+      : `/tvshow/${urlParam}`;
     navigate(route);
   };
 

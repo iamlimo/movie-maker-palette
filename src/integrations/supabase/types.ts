@@ -164,6 +164,7 @@ export type Database = {
           rental_expiry_duration: number
           season_id: string
           status: Database["public"]["Enums"]["content_status"]
+          subtitle_url: string | null
           thumbnail_url: string | null
           title: string
           trailer_url: string | null
@@ -181,6 +182,7 @@ export type Database = {
           rental_expiry_duration?: number
           season_id: string
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title: string
           trailer_url?: string | null
@@ -198,6 +200,7 @@ export type Database = {
           rental_expiry_duration?: number
           season_id?: string
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title?: string
           trailer_url?: string | null
@@ -279,6 +282,110 @@ export type Database = {
         }
         Relationships: []
       }
+      job_applications: {
+        Row: {
+          cover_letter: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          job_listing_id: string
+          linkedin_url: string | null
+          notes: string | null
+          phone: string | null
+          portfolio_url: string | null
+          resume_url: string | null
+          status: string
+          years_of_experience: number | null
+        }
+        Insert: {
+          cover_letter?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          job_listing_id: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          status?: string
+          years_of_experience?: number | null
+        }
+        Update: {
+          cover_letter?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          job_listing_id?: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          resume_url?: string | null
+          status?: string
+          years_of_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_job_listing_id_fkey"
+            columns: ["job_listing_id"]
+            isOneToOne: false
+            referencedRelation: "job_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_listings: {
+        Row: {
+          benefits: string | null
+          created_at: string
+          created_by: string | null
+          department: string | null
+          description: string | null
+          id: string
+          location: string | null
+          requirements: string | null
+          salary_range: string | null
+          status: string
+          title: string
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          benefits?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          requirements?: string | null
+          salary_range?: string | null
+          status?: string
+          title: string
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          benefits?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          requirements?: string | null
+          salary_range?: string | null
+          status?: string
+          title?: string
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       movie_cast: {
         Row: {
           cast_crew_id: string
@@ -329,7 +436,9 @@ export type Database = {
           release_date: string | null
           rental_expiry_duration: number | null
           slider_cover_url: string | null
+          slug: string
           status: Database["public"]["Enums"]["content_status"]
+          subtitle_url: string | null
           thumbnail_url: string | null
           title: string
           trailer_url: string | null
@@ -357,7 +466,9 @@ export type Database = {
           release_date?: string | null
           rental_expiry_duration?: number | null
           slider_cover_url?: string | null
+          slug: string
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title: string
           trailer_url?: string | null
@@ -385,7 +496,9 @@ export type Database = {
           release_date?: string | null
           rental_expiry_duration?: number | null
           slider_cover_url?: string | null
+          slug?: string
           status?: Database["public"]["Enums"]["content_status"]
+          subtitle_url?: string | null
           thumbnail_url?: string | null
           title?: string
           trailer_url?: string | null
@@ -998,6 +1111,7 @@ export type Database = {
           rating: string | null
           release_date: string | null
           slider_cover_url: string | null
+          slug: string
           status: Database["public"]["Enums"]["content_status"]
           thumbnail_url: string | null
           title: string
@@ -1024,6 +1138,7 @@ export type Database = {
           rating?: string | null
           release_date?: string | null
           slider_cover_url?: string | null
+          slug: string
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title: string
@@ -1050,6 +1165,7 @@ export type Database = {
           rating?: string | null
           release_date?: string | null
           slider_cover_url?: string | null
+          slug?: string
           status?: Database["public"]["Enums"]["content_status"]
           thumbnail_url?: string | null
           title?: string

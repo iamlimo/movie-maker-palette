@@ -15,6 +15,7 @@ interface EpisodePlayerProps {
   title: string;
   price: number;
   posterUrl?: string;
+  subtitleUrl?: string;
   nextEpisodeId?: string;
   autoPlay?: boolean;
 }
@@ -31,6 +32,7 @@ const EpisodePlayer = ({
   title, 
   price,
   posterUrl,
+  subtitleUrl,
   nextEpisodeId,
   autoPlay = false
 }: EpisodePlayerProps) => {
@@ -282,6 +284,9 @@ const EpisodePlayer = ({
             }}
           >
             <source src={videoUrl} type="video/mp4" />
+            {subtitleUrl && (
+              <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
+            )}
             Your browser does not support the video tag.
           </video>
         </div>

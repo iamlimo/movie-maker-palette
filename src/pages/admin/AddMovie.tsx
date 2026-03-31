@@ -426,6 +426,33 @@ const AddMovie = () => {
                 required={false}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="subtitle_url">Subtitle File (VTT/SRT) - Optional</Label>
+              <Input
+                id="subtitle_url"
+                type="file"
+                accept=".vtt,.srt"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const filePath = `movies/${Date.now()}-${file.name}`;
+                  const { data, error } = await supabase.storage
+                    .from('subtitles')
+                    .upload(filePath, file);
+                  if (error) {
+                    toast({ title: "Error", description: "Failed to upload subtitle file", variant: "destructive" });
+                    return;
+                  }
+                  const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
+                  handleInputChange('subtitle_url', urlData.publicUrl);
+                  toast({ title: "Success", description: "Subtitle file uploaded" });
+                }}
+              />
+              {formData.subtitle_url && (
+                <p className="text-xs text-muted-foreground">Subtitle uploaded ✓</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 

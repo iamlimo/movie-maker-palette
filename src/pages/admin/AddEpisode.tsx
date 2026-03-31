@@ -65,6 +65,7 @@ const AddEpisode = () => {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [trailerUrl, setTrailerUrl] = useState<string>("");
+  const [subtitleUrl, setSubtitleUrl] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -185,6 +186,7 @@ const AddEpisode = () => {
             video_url: videoUrl,
             thumbnail_url: thumbnailUrl || null,
             trailer_url: trailerUrl || null,
+            subtitle_url: subtitleUrl || null,
             status: formData.status,
             release_date: formData.release_date || null,
             published_at: formData.status === 'approved' ? new Date().toISOString() : null
@@ -456,6 +458,28 @@ const AddEpisode = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Subtitle Upload Section */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Subtitle File (VTT/SRT) - Optional</Label>
+                <Input
+                  type="file"
+                  accept=".vtt,.srt"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const filePath = `episodes/${Date.now()}-${file.name}`;
+                    const { error } = await supabase.storage.from('subtitles').upload(filePath, file);
+                    if (error) {
+                      toast({ title: "Error", description: "Failed to upload subtitle file", variant: "destructive" });
+                      return;
+                    }
+                    const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
+                    setSubtitleUrl(urlData.publicUrl);
+                    toast({ title: "Success", description: "Subtitle file uploaded" });
+                  }}
+                />
               </div>
             </CardContent>
           </Card>

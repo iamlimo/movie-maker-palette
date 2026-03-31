@@ -28,6 +28,7 @@ interface Movie {
   thumbnail_url: string;
   video_url: string;
   trailer_url: string;
+  subtitle_url?: string;
   status: string;
   cast_crew?: any[];
   age_restriction?: number;
@@ -39,7 +40,7 @@ interface Movie {
 }
 
 const MoviePreview = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const preloadedData = location.state?.preloadedData;
@@ -62,17 +63,18 @@ const MoviePreview = () => {
     : false;
 
   useEffect(() => {
-    if (id) {
-      fetchMovie(id);
+    if (slug) {
+      fetchMovie(slug);
     }
-  }, [id]);
+  }, [slug]);
 
-  const fetchMovie = async (movieId: string) => {
+  const fetchMovie = async (slugOrId: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
+      // Try slug first, fall back to id (UUID)
+      let query = supabase
         .from("movies")
         .select(
           `
@@ -85,8 +87,11 @@ const MoviePreview = () => {
           slider_cover_url
         `
         )
-        .eq("id", movieId)
-        .eq("status", "approved")
+        .eq("status", "approved");
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+      const { data, error } = await query
+        .eq(isUUID ? "id" : "slug", slugOrId)
         .single();
 
       if (error) {

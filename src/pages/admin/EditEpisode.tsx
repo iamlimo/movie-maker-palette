@@ -77,6 +77,7 @@ const EditEpisode = () => {
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [trailerUrl, setTrailerUrl] = useState<string>("");
+  const [subtitleUrl, setSubtitleUrl] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -128,6 +129,7 @@ const EditEpisode = () => {
       setVideoUrl(episodeData.video_url || "");
       setThumbnailUrl(episodeData.thumbnail_url || "");
       setTrailerUrl(episodeData.trailer_url || "");
+      setSubtitleUrl((episodeData as any).subtitle_url || "");
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -194,6 +196,7 @@ const EditEpisode = () => {
           video_url: videoUrl,
           thumbnail_url: thumbnailUrl || null,
           trailer_url: trailerUrl || null,
+          subtitle_url: subtitleUrl || null,
           status: formData.status,
           release_date: formData.release_date || null,
           published_at: formData.status === 'approved' ? new Date().toISOString() : null
@@ -477,6 +480,28 @@ const EditEpisode = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Subtitle Upload Section */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Subtitle File (VTT/SRT) - Optional</Label>
+                <Input
+                  type="file"
+                  accept=".vtt,.srt"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const filePath = `episodes/${episodeId}-${file.name}`;
+                    const { error } = await supabase.storage.from('subtitles').upload(filePath, file, { upsert: true });
+                    if (error) {
+                      toast({ title: "Error", description: "Failed to upload subtitle file", variant: "destructive" });
+                      return;
+                    }
+                    const { data: urlData } = supabase.storage.from('subtitles').getPublicUrl(filePath);
+                    setSubtitleUrl(urlData.publicUrl);
+                    toast({ title: "Success", description: "Subtitle file uploaded" });
+                  }}
+                />
               </div>
             </CardContent>
           </Card>

@@ -8,11 +8,13 @@ import FundWalletModal from '@/components/wallet/FundWalletModal';
 import TransactionHistory from '@/components/wallet/TransactionHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { usePlatform } from '@/hooks/usePlatform';
 
 export default function Wallet() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { balance, formatBalance, isLoading } = useWallet();
+  const { isIOS } = usePlatform();
   const [isFundModalOpen, setIsFundModalOpen] = useState(false);
 
   if (!user) {
@@ -55,13 +57,19 @@ export default function Wallet() {
               </div>
             </CardHeader>
             <CardContent className="relative">
-              <Button 
-                onClick={() => setIsFundModalOpen(true)}
-                className="w-full sm:w-auto gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Fund Wallet
-              </Button>
+              {!isIOS ? (
+                <Button 
+                  onClick={() => setIsFundModalOpen(true)}
+                  className="w-full sm:w-auto gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Fund Wallet
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Wallet funding is available on the Signature TV website.
+                </p>
+              )}
             </CardContent>
           </Card>
 

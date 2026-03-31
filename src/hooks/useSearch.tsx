@@ -3,6 +3,7 @@ import { useAllContent } from './useMovies';
 
 export type SearchResult = {
   id: string;
+  slug?: string;
   title: string;
   content_type: 'movie' | 'tv_show';
   thumbnail_url?: string;
@@ -27,6 +28,7 @@ export const useSearch = () => {
       )
       .map(item => ({
         id: item.id,
+        slug: (item as any).slug,
         title: item.title,
         content_type: item.content_type,
         thumbnail_url: item.thumbnail_url,

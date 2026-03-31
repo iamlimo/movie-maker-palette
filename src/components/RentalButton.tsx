@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Loader2, Wallet, Clock, ExternalLink } from "lucide-react";
+import { Play, Loader2, Wallet, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRentals } from "@/hooks/useRentals";
@@ -290,15 +290,8 @@ const RentalButton = ({
     );
   }
 
-  // iOS without access: Show external website button instead of payment options
+  // iOS without access: Show informational dialog per Apple App Store IAP guidelines (3.1.1)
   if (isIOS) {
-    const handleOpenExternalSite = () => {
-      const baseUrl = "https://signaturetv.co";
-      // Redirect to collection pages since individual content pages don't exist
-      const path = contentType === "movie" ? "/movies" : "/tvshows";
-      window.open(`${baseUrl}${path}`, "_blank");
-    };
-
     return (
       <>
         <Button
@@ -307,53 +300,44 @@ const RentalButton = ({
           className="w-full touch-target"
           onClick={() => setShowIOSDialog(true)}
         >
-          <ExternalLink className="h-5 w-5 mr-2" />
-          Access
+          <Play className="h-5 w-5 mr-2" />
+          More Information
         </Button>
 
-        {/* iOS Access Explanation Dialog */}
+        {/* iOS Rental Required Dialog - Compliant with App Store 3.1.3(a) */}
         <Dialog open={showIOSDialog} onOpenChange={setShowIOSDialog}>
           <DialogContent className="w-[90%] max-w-sm">
             <DialogHeader>
-              <DialogTitle>Access Content</DialogTitle>
+              <DialogTitle>Rental Required</DialogTitle>
               <DialogDescription className="text-base leading-relaxed pt-2">
-                To unlock and rent {contentType === "movie" ? "this movie" : "this TV show"}, you'll need to complete your purchase on our website.
+                This content is available to users who have already rented it.
+                {user ? (
+                  " Your current account does not have access to this content."
+                ) : (
+                  " Please log in with your existing Signature TV account."
+                )}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-4">
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  ✓ Quick and secure checkout
-                </p>
-              </div>
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  ✓ Multiple payment options
-                </p>
-              </div>
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  ✓ Access will sync automatically to your app
-                </p>
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 flex flex-col-reverse sm:flex-row">
+            <DialogFooter className="flex flex-col gap-2">
+              {!user && (
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setShowIOSDialog(false);
+                    window.location.href = '/auth';
+                  }}
+                  className="w-full"
+                >
+                  Log In
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => setShowIOSDialog(false)}
+                className="w-full"
               >
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                onClick={() => {
-                  setShowIOSDialog(false);
-                  handleOpenExternalSite();
-                }}
-              >
-                Continue to Website
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

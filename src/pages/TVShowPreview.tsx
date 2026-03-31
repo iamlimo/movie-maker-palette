@@ -79,11 +79,12 @@ interface Episode {
   price: number;
   video_url: string;
   thumbnail_url?: string;
+  subtitle_url?: string;
   status: string;
 }
 
 const TVShowPreview = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const preloadedData = location.state?.preloadedData;
@@ -123,11 +124,11 @@ const TVShowPreview = () => {
     : false;
 
   useEffect(() => {
-    if (id) {
+    if (slug) {
       window.scrollTo({ top: 0, behavior: "smooth" });
-      fetchTVShowData(id);
+      fetchTVShowData(slug);
     }
-  }, [id]);
+  }, [slug]);
 
   // Sticky nav on scroll
   useEffect(() => {
@@ -152,10 +153,12 @@ const TVShowPreview = () => {
     }
   };
 
-  const fetchTVShowData = async (showId: string) => {
+  const fetchTVShowData = async (slugOrId: string) => {
     try {
       setLoading(true);
       setError(null);
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
 
       // Fetch TV show details
       const { data: showData, error: showError } = await supabase
@@ -170,7 +173,7 @@ const TVShowPreview = () => {
           trailer_url
         `
         )
-        .eq("id", showId)
+        .eq(isUUID ? "id" : "slug", slugOrId)
         .eq("status", "approved")
         .single();
 
@@ -183,7 +186,7 @@ const TVShowPreview = () => {
       const { data: seasonsData, error: seasonsError } = await supabase
         .from("seasons")
         .select("*")
-        .eq("tv_show_id", showId)
+        .eq("tv_show_id", showData.id)
         .eq("status", "approved")
         .order("season_number");
 
@@ -713,6 +716,7 @@ const TVShowPreview = () => {
                                 title={episode.title}
                                 price={episode.price}
                                 posterUrl={episode.thumbnail_url}
+                                subtitleUrl={episode.subtitle_url}
                                 nextEpisodeId={nextEpisode?.id}
                                 autoPlay={true}
                               />

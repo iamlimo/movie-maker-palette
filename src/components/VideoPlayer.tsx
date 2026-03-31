@@ -9,9 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 interface VideoPlayerProps {
   movieId: string;
   className?: string;
+  subtitleUrl?: string;
 }
 
-export const VideoPlayer = ({ movieId, className = '' }: VideoPlayerProps) => {
+export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlayerProps) => {
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -190,7 +191,12 @@ export const VideoPlayer = ({ movieId, className = '' }: VideoPlayerProps) => {
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         preload="metadata"
-      />
+        crossOrigin="anonymous"
+      >
+        {subtitleUrl && (
+          <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
+        )}
+      </video>
       
       {/* Video Controls Overlay */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
