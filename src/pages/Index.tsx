@@ -39,16 +39,31 @@ const Index = () => {
 
   // iOS Onboarding: Show login-gate for unauthenticated users
   if (isIOS && !user && !authLoading) {
+    const onboardingBg = "/netflix-onboarding-bg.jpg"; // Add your attached image to public folder at this path
+
     return (
-      <div className="min-h-screen gradient-hero flex flex-col items-center justify-center p-6 safe-area-inset">
-        {/* Logo */}
-        <div className="mb-8">
-          <img 
-            src="/signature-tv-logo.png" 
-            alt="Signature TV" 
-            className="h-20 w-auto"
-          />
+      <div className="relative min-h-screen overflow-hidden safe-area-inset">
+        {/* Background image skewed/offset for Netflix-like style */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 -skew-y-8 rotate-1 scale-[1.12] origin-top-left">
+            <img
+              src={onboardingBg}
+              alt="Onboarding hero background"
+              className="h-full w-full object-cover opacity-80"
+            />
+            <div className="absolute inset-0 bg-black/55" />
+          </div>
         </div>
+
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6">
+          {/* Logo */}
+          <div className="mb-8">
+            <img 
+              src="/signature-tv-logo.png" 
+              alt="Signature TV" 
+              className="h-20 w-auto"
+            />
+          </div>
         
         {/* Title */}
         <h1 className="text-3xl font-bold text-foreground text-center mb-4">
@@ -70,6 +85,7 @@ const Index = () => {
           Log In to Continue
         </Button>
       </div>
+    </div>
     );
   }
 
