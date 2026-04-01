@@ -259,6 +259,90 @@ const Auth = () => {
     </form>
   );
 
+  // iOS Onboarding Screen
+  if (isIOS && !showIOSLogin) {
+    return (
+      <div
+        className="fixed inset-0 flex flex-col"
+        onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+        onTouchEnd={(e) => {
+          if (touchStart === null) return;
+          const diff = touchStart - e.changedTouches[0].clientX;
+          if (Math.abs(diff) > 50) handleSwipe(diff > 0 ? "left" : "right");
+          setTouchStart(null);
+        }}
+      >
+        {/* Background image */}
+        <div className="absolute inset-0">
+          <img
+            src="/ios_bg.png"
+            alt=""
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
+        </div>
+
+        {/* Logo at top */}
+        <div className="relative z-10 pt-16 px-6 flex justify-center">
+          <img
+            src="/signature-tv-logo.png"
+            alt="Signature TV"
+            className="h-10 object-contain"
+          />
+        </div>
+
+        {/* Bottom content */}
+        <div className="relative z-10 mt-auto px-6 pb-12 flex flex-col items-center text-center">
+          {/* Slide content with fade transition */}
+          <div className="min-h-[120px] flex flex-col items-center justify-end mb-8">
+            <h2
+              key={`title-${activeSlide}`}
+              className="text-3xl font-bold text-foreground mb-3 animate-fade-in"
+            >
+              {onboardingSlides[activeSlide].title}
+            </h2>
+            <p
+              key={`sub-${activeSlide}`}
+              className="text-base text-muted-foreground max-w-xs animate-fade-in"
+            >
+              {onboardingSlides[activeSlide].subtitle}
+            </p>
+          </div>
+
+          {/* Dots indicator */}
+          <div className="flex gap-2 mb-8">
+            {onboardingSlides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveSlide(i)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  i === activeSlide
+                    ? "w-6 bg-primary"
+                    : "w-2 bg-muted-foreground/40"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* CTA Buttons */}
+          <Button
+            onClick={() => setShowIOSLogin(true)}
+            className="w-full max-w-xs gradient-accent text-primary-foreground font-semibold shadow-glow h-12 text-base mb-3"
+          >
+            Get Started
+            <ChevronRight className="h-5 w-5 ml-1" />
+          </Button>
+          <button
+            onClick={() => setShowIOSLogin(true)}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Already have an account? <span className="text-primary font-medium">Sign In</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
       <div className="w-full max-w-md">
