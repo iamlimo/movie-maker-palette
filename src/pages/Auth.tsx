@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -13,14 +13,32 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { usePlatform } from "@/hooks/usePlatform";
+
+const onboardingSlides = [
+  {
+    title: "Unlimited African Stories",
+    subtitle: "Watch blockbuster Nollywood movies and exclusive TV shows anywhere, anytime.",
+  },
+  {
+    title: "Download & Watch Offline",
+    subtitle: "Save your favourites and watch them on the go — no internet needed.",
+  },
+  {
+    title: "Start Watching Now",
+    subtitle: "Sign in to access your personalised library and continue where you left off.",
+  },
+];
 
 const Auth = () => {
   const navigate = useNavigate();
   const { user, signIn, signUp } = useAuth();
   const { isIOS } = usePlatform();
+  const [showIOSLogin, setShowIOSLogin] = useState(false);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
 
   // Redirect authenticated users to home
   useEffect(() => {
@@ -28,6 +46,23 @@ const Auth = () => {
       navigate("/");
     }
   }, [user, navigate]);
+
+  // Auto-advance slides
+  useEffect(() => {
+    if (showIOSLogin || !isIOS) return;
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % onboardingSlides.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [showIOSLogin, isIOS]);
+
+  const handleSwipe = useCallback((direction: "left" | "right") => {
+    if (direction === "left") {
+      setActiveSlide((prev) => Math.min(prev + 1, onboardingSlides.length - 1));
+    } else {
+      setActiveSlide((prev) => Math.max(prev - 1, 0));
+    }
+  }, []);
   const { toast } = useToast();
 
   const [showPassword, setShowPassword] = useState(false);
