@@ -348,13 +348,15 @@ const Auth = () => {
       <div className="w-full max-w-md">
         {/* Header with back button */}
         <div className="flex items-center mb-8">
-          {/* <Link
-            to="/"
-            className="flex items-center text-muted-foreground hover:text-primary transition-smooth"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Link> */}
+          {isIOS && (
+            <button
+              onClick={() => setShowIOSLogin(false)}
+              className="flex items-center text-muted-foreground hover:text-primary transition-smooth"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </button>
+          )}
         </div>
 
         {/* Logo */}
