@@ -1,64 +1,60 @@
 
 
-# Optimize Admin CRUD for Movies & TV Shows
+# iOS Netflix-Style Onboarding Screen
 
-## Issues Found
-
-After thorough investigation, here are the bugs and gaps in the admin CRUD system:
-
-### Critical Bugs
-
-1. **EditMovie -- missing fields in update payload**: `status`, `video_url`, and `trailer_url` are NOT included in the update payload (`handleSubmit`). Changing status or video URLs on edit silently does nothing.
-
-2. **TVShows admin -- episodes never load or render**: The `expandedSeasons` state and UI exist, but `fetchEpisodes` is never called when a season is expanded, and there's no episode row rendering. Expanding a season shows nothing.
-
-3. **ViewMovie -- delete button is non-functional**: The "Delete" button in `ViewMovie.tsx` has no `onClick` handler -- it's a dead button.
-
-4. **AddSeason -- creates season as `pending`**: The insert omits `status`, so it defaults to `'pending'`. The RLS policy only shows seasons of approved TV shows, but seasons themselves need `status: 'approved'` to be usable in the content flow.
-
-5. **EditMovie/EditTVShow -- slug not updated on title change**: When the title is edited, the slug column is not recalculated, leading to stale URLs.
-
-### UX Issues
-
-6. **TVShows admin -- uses browser `confirm()` for deletes**: Movies uses proper `AlertDialog` with soft/hard delete options. TV Shows uses raw `confirm()` with only hard delete.
-
-7. **TVShows admin -- missing React key on fragment**: The `<>` wrapping each show + seasons lacks a key, causing React warnings.
-
----
+## Overview
+Replace the current plain iOS onboarding screen in `Index.tsx` with a Netflix-inspired design using `ios_bg.png` as a tilted poster grid background, overlaid with gradient, logo, swipeable slides with copy, dot indicators, and prominent "Log In" + "Visit signaturetv.co" CTAs.
 
 ## Files to Modify
 
-### 1. `src/pages/admin/EditMovie.tsx`
-- Add `status`, `video_url`, `trailer_url` to the update payload in `handleSubmit`
-- Recalculate and include `slug` when title changes
+### 1. Copy uploaded image to public folder
+- Copy `user-uploads://ios_bg.png` to `public/ios_bg.png`
 
-### 2. `src/pages/admin/TVShows.tsx`
-- Add `fetchEpisodes` call when a season is expanded
-- Render episode rows under expanded seasons (episode number, title, status, price, actions)
-- Replace `confirm()` with `AlertDialog` for TV show and season deletion (soft + hard delete options)
-- Add proper `key` to React fragments
+### 2. `src/pages/Index.tsx` (lines 41-73)
+Replace the current iOS onboarding block with:
 
-### 3. `src/pages/admin/ViewMovie.tsx`
-- Wire up the Delete button with an `AlertDialog` offering soft/hard delete, matching Movies.tsx pattern
+- **Full-screen background**: `ios_bg.png` as a CSS `background-image` with a slight CSS `rotate(-10deg) scale(1.3)` transform to create the Netflix diagonal poster grid effect, covered by a dark gradient overlay (`bg-gradient-to-b from-black/80 via-black/60 to-black/90`)
+- **Logo**: Signature TV logo at top-left (matching Netflix placement)
+- **Auto-advancing slides** (3 slides, 4s interval) with content:
+  1. "Premium Movies & Shows in just a few taps"
+  2. "Watch exclusive content from top creators"  
+  3. "New here? Visit signaturetv.co to create your account"
+- **Dot indicators** below slides
+- **"Log In" button**: Large, prominent, gradient-accent styled CTA navigating to `/auth`
+- **Footer text**: "New to Signature TV? Create an account at signaturetv.co" -- plain text, no clickable link (Apple compliance)
+- Use `useState` for slide index, `useEffect` for auto-advance timer
+- Swipe gesture support via touch events (`onTouchStart`/`onTouchEnd`)
 
-### 4. `src/pages/admin/AddSeason.tsx`
-- Add `status: 'approved'` to the season insert payload so new seasons are immediately available
+### 3. No new files
+All logic stays in `Index.tsx` using existing React state/effects.
 
-### 5. `src/pages/admin/EditTVShow.tsx`
-- Recalculate and include `slug` when title changes in the update payload
+## Design Details
 
-### 6. `src/pages/admin/EditSeason.tsx`
-- No changes needed (already handles status)
+```text
+┌──────────────────────────┐
+│ [Logo]          [Log In] │  <- top bar
+│                          │
+│   ╔══════════════════╗   │
+│   ║  ios_bg.png      ║   │  <- rotated poster grid
+│   ║  (tilted ~10deg) ║   │     with dark overlay
+│   ║                  ║   │
+│   ╚══════════════════╝   │
+│                          │
+│   "Premium Movies &      │  <- slide text (fades)
+│    Shows in just a       │
+│    few taps"             │
+│                          │
+│        ● ○ ○             │  <- dot indicators
+│                          │
+│   [═══ Log In ═══════]   │  <- primary CTA button
+│                          │
+│   New to Signature TV?   │  <- plain text disclosure
+│   Visit signaturetv.co   │
+└──────────────────────────┘
+```
 
----
-
-## Implementation Details
-
-**Slug recalculation** uses existing `generateSlug()` from `src/lib/slugUtils.ts`.
-
-**Episode rows in TVShows.tsx** will show: episode number, title, duration, status badge, price, and action buttons (edit, delete) -- matching the pattern already used in `ViewTVShow.tsx`.
-
-**Delete dialogs** will follow the existing Movies.tsx pattern with soft delete (set status to `rejected`) and hard delete (permanent removal) options.
-
-No new components, edge functions, or database changes required.
+- Responsive: works on iPhone and iPad
+- No external links (Apple IAP compliance) -- signaturetv.co mentioned as plain text only
+- Smooth CSS transitions between slides (opacity/transform)
+- Safe area insets respected
 
