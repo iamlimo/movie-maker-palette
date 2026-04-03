@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon } from 'lucide-react';
+import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
@@ -52,6 +52,53 @@ export default function Users() {
   const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
+
+  const exportUsers = (format: 'csv' | 'xlsx') => {
+    const dataToExport = filteredUsers.length > 0 ? filteredUsers : users;
+    if (dataToExport.length === 0) {
+      toast({ variant: "destructive", title: "No data", description: "No users to export." });
+      return;
+    }
+
+    const headers = ['Name', 'Email', 'Role', 'Status', 'Country', 'Phone', 'Wallet Balance (₦)', 'Join Date'];
+    const rows = dataToExport.map(u => [
+      u.name,
+      u.email,
+      u.role.replace('_', ' '),
+      u.status || 'active',
+      u.country || '',
+      u.phone_number || '',
+      (u.wallet_balance / 100).toFixed(2),
+      new Date(u.created_at).toLocaleDateString(),
+    ]);
+
+    if (format === 'csv') {
+      const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      // Simple XLSX via XML spreadsheet format
+      const xmlRows = rows.map(r =>
+        `<Row>${r.map(c => `<Cell><Data ss:Type="String">${String(c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Data></Cell>`).join('')}</Row>`
+      ).join('');
+      const xmlHeader = `<Row>${headers.map(h => `<Cell><Data ss:Type="String">${h}</Data></Cell>`).join('')}</Row>`;
+      const xml = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Users"><Table>${xmlHeader}${xmlRows}</Table></Worksheet></Workbook>`;
+      const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `users_export_${new Date().toISOString().split('T')[0]}.xls`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    toast({ title: "Export Complete", description: `Users exported as ${format.toUpperCase()} successfully.` });
+  };
 
   const fetchUsers = async () => {
     try {
@@ -282,13 +329,31 @@ export default function Users() {
             Manage user accounts, roles, and permissions
           </p>
         </div>
-        <Button 
-          onClick={() => setShowCreateModal(true)}
-          className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-        >
-          <UserPlus className="h-4 w-4 mr-2" />
-          Create User
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => exportUsers('csv')}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportUsers('xlsx')}>
+                Export as Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button 
+            onClick={() => setShowCreateModal(true)}
+            className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Create User
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
