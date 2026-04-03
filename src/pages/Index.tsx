@@ -83,7 +83,7 @@ const Index = () => {
             className="absolute inset-[-20%] bg-cover bg-center"
             style={{
               backgroundImage: 'url(/ios_bg.png)',
-              transform: 'rotate(-10deg) scale(1.3)',
+              animation: 'ios-bg-drift 25s ease-in-out infinite alternate',
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
