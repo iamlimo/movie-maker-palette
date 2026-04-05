@@ -107,7 +107,7 @@ const RentalButton = ({
     }
   };
 
-  const handleRent = async (useWallet: boolean = false) => {
+  const handleRent = async (useWallet: boolean = false, referralCode?: string) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -150,6 +150,7 @@ const RentalButton = ({
             contentType,
             price, // price already in kobo from database
             useWallet,
+            ...(referralCode ? { referralCode } : {}),
           },
         });
         data = response.data;
