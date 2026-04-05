@@ -459,8 +459,8 @@ const RentalButton = ({
         canAfford={canAffordRental}
         isLoading={isLoading}
         paymentMethod={paymentMethod}
-        onRentWithWallet={() => handleRent(true)}
-        onRentWithCard={() => handleRent(false)}
+        onRentWithWallet={(code) => handleRent(true, code)}
+        onRentWithCard={(code) => handleRent(false, code)}
       />
 
       {/* Success Animation */}
