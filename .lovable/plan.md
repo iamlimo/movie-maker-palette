@@ -1,53 +1,105 @@
 
 
-# Faster Animation + Parallax Effect for iOS Onboarding
+# Referral Code & Discount System
 
-## Changes
+## Overview
+Super admins create alphanumeric referral/promo codes with discount options (percentage or fixed amount). Users apply codes during checkout to get discounts on rentals.
 
-### 1. `src/index.css` — Speed up animation & add parallax layer keyframes
+## Database
 
-- Change `ios-bg-drift` duration reference from 25s to **12s** for faster movement
-- Add more dramatic transform values for snappier motion
-- Add a second `@keyframes ios-bg-parallax` for a foreground gradient layer that moves at a different speed, creating depth
+### New table: `referral_codes`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `code` | text UNIQUE NOT NULL | Alphanumeric, uppercase, e.g. "SAVE20" |
+| `discount_type` | text NOT NULL | `'percentage'` or `'fixed'` |
+| `discount_value` | numeric NOT NULL | e.g. 20 for 20%, or 5000 for ₦50 off (kobo) |
+| `max_uses` | integer | NULL = unlimited |
+| `times_used` | integer DEFAULT 0 | |
+| `max_uses_per_user` | integer DEFAULT 1 | |
+| `min_purchase_amount` | numeric DEFAULT 0 | Minimum cart value in kobo |
+| `valid_from` | timestamptz DEFAULT now() | |
+| `valid_until` | timestamptz | NULL = no expiry |
+| `is_active` | boolean DEFAULT true | |
+| `created_by` | uuid | Super admin who created it |
+| `created_at` | timestamptz DEFAULT now() | |
 
-```css
-@keyframes ios-bg-drift {
-  0%   { transform: rotate(-10deg) scale(1.3) translate(0, 0); }
-  33%  { transform: rotate(-6deg) scale(1.4) translate(-4%, 3%); }
-  66%  { transform: rotate(-12deg) scale(1.35) translate(3%, -2%); }
-  100% { transform: rotate(-8deg) scale(1.45) translate(-2%, 4%); }
-}
+RLS: Super admins full access; authenticated users SELECT on active codes only.
 
-@keyframes ios-parallax-overlay {
-  0%   { transform: translate(0, 0) scale(1); }
-  50%  { transform: translate(2%, -1.5%) scale(1.02); }
-  100% { transform: translate(-1%, 2%) scale(1.01); }
-}
+### New table: `referral_code_uses`
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `code_id` | uuid NOT NULL | References referral_codes |
+| `user_id` | uuid NOT NULL | |
+| `payment_id` | uuid | |
+| `discount_applied` | numeric NOT NULL | Actual discount in kobo |
+| `created_at` | timestamptz DEFAULT now() | |
+
+RLS: Super admins full access; users can view their own; system can insert.
+
+## Files to Modify
+
+### 1. New admin page: `src/pages/admin/ReferralCodes.tsx`
+- Table listing all codes with: code, type, value, uses/max, status, valid dates
+- Create dialog: code input (auto-generate option), discount type dropdown, value, max uses, per-user limit, min purchase, validity dates
+- Toggle active/inactive, delete codes
+- View usage history per code
+
+### 2. `src/components/admin/AdminLayout.tsx`
+- Add "Referral Codes" to sidebar under a new item or alongside Finance (icon: `Tag`)
+
+### 3. `src/App.tsx`
+- Add route `/admin/referral-codes` pointing to the new page
+
+### 4. `src/components/RentalButton.tsx`
+- Add state for referral code input and validated discount
+- Before payment, show a collapsible "Have a referral code?" input
+- On code entry, validate via `supabase.functions.invoke('validate-referral-code')` 
+- Pass `referralCode` to `wallet-payment` edge function
+- Display discounted price when valid
+
+### 5. `src/components/RentalBottomSheet.tsx`
+- Add referral code input field and apply button
+- Show original price struck through + discounted price when code applied
+- Pass referral code up to parent via callback
+
+### 6. `supabase/functions/wallet-payment/index.ts`
+- Accept optional `referralCode` in request body
+- If provided: validate code (active, not expired, usage limits, per-user limit, min purchase)
+- Calculate discounted price, use that for wallet debit or Paystack amount
+- After successful payment, increment `times_used` and insert into `referral_code_uses`
+- Include discount info in payment metadata
+
+### 7. `supabase/functions/enhanced-webhook/index.ts`
+- On successful Paystack payment, check metadata for referral code info
+- Record usage in `referral_code_uses` if not already recorded
+
+## Implementation Details
+
+- Codes stored uppercase; user input normalized to uppercase before validation
+- Discount capped so final price never goes below 0
+- For percentage discounts: `discount = Math.floor(price * value / 100)`
+- For fixed discounts: `discount = Math.min(value, price)`
+- Admin can auto-generate codes using a random 8-char alphanumeric string
+
+## UI Flow
+
+```text
+┌─────────────────────────────┐
+│  Rent "Movie Title"         │
+│  ₦1,000.00 · 48hr rental   │
+│                             │
+│  ▸ Have a referral code?    │  <- collapsible
+│  ┌─────────────┬─────────┐  │
+│  │ SAVE20      │ Apply   │  │
+│  └─────────────┴─────────┘  │
+│  ✓ 20% off applied (-₦200) │
+│                             │
+│  ~~₦1,000~~ ₦800.00        │
+│                             │
+│  [Pay with Wallet]          │
+│  [Pay with Card]            │
+└─────────────────────────────┘
 ```
-
-### 2. `src/pages/Index.tsx` — Apply faster timing + parallax overlay
-
-- Change animation duration from `25s` to `12s`
-- Add a second semi-transparent overlay div between the background image and the gradient, animated with `ios-parallax-overlay` at a different speed (18s) to create parallax depth
-
-```tsx
-{/* Background */}
-<div className="absolute inset-[-20%] bg-cover bg-center"
-  style={{
-    backgroundImage: 'url(/ios_bg.png)',
-    animation: 'ios-bg-drift 12s ease-in-out infinite alternate',
-  }}
-/>
-{/* Parallax overlay */}
-<div className="absolute inset-0"
-  style={{
-    background: 'radial-gradient(ellipse at 30% 20%, rgba(237,137,54,0.08) 0%, transparent 60%)',
-    animation: 'ios-parallax-overlay 18s ease-in-out infinite alternate',
-  }}
-/>
-{/* Dark gradient */}
-<div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
-```
-
-Two files modified. The background moves ~2x faster with more varied keyframes, and a subtle warm-toned radial gradient layer drifts at a different rate to produce a parallax depth effect.
 
