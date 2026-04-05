@@ -8,6 +8,7 @@ import {
   UserCheck, 
   DollarSign,
   FileText,
+  Tag,
   ChevronUp,
   ChevronDown,
   User2,
@@ -74,6 +75,7 @@ const sidebarItems = [
   },
   { title: 'Finance', url: '/admin/finance', icon: DollarSign },
   { title: 'Wallets', url: '/admin/wallets', icon: Wallet },
+  { title: 'Referral Codes', url: '/admin/referral-codes', icon: Tag },
   { 
     title: 'Careers', 
     icon: Briefcase, 

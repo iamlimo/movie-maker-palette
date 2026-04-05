@@ -8,6 +8,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function validateReferralCode(supabase: any, code: string, userId: string, price: number) {
+  const { data, error } = await supabase
+    .from('referral_codes')
+    .select('*')
+    .eq('code', code.toUpperCase())
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) return { valid: false, error: 'Invalid referral code' };
+  if (data.valid_until && new Date(data.valid_until) < new Date()) return { valid: false, error: 'Code expired' };
+  if (data.max_uses && data.times_used >= data.max_uses) return { valid: false, error: 'Code fully redeemed' };
+  if (data.min_purchase_amount > 0 && price < data.min_purchase_amount) return { valid: false, error: 'Minimum purchase not met' };
+
+  // Check per-user limit
+  const { count } = await supabase
+    .from('referral_code_uses')
+    .select('id', { count: 'exact', head: true })
+    .eq('code_id', data.id)
+    .eq('user_id', userId);
+
+  if (count !== null && count >= data.max_uses_per_user) return { valid: false, error: 'You have already used this code' };
+
+  const discountAmount = data.discount_type === 'percentage'
+    ? Math.floor(price * data.discount_value / 100)
+    : Math.min(data.discount_value, price);
+
+  return { valid: true, codeData: data, discountAmount };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -31,7 +60,6 @@ serve(async (req) => {
       });
     }
 
-    // Rate limiting: 5 requests per minute per user
     if (!checkRateLimit(user.id, 5, 60000)) {
       return new Response(JSON.stringify({ error: 'Too many payment requests. Please try again later.' }), {
         status: 429,
@@ -41,9 +69,8 @@ serve(async (req) => {
 
     const requestBody = await req.json();
     const sanitized = sanitizeInput(requestBody);
-    const { contentId, contentType, price, useWallet } = sanitized;
+    const { contentId, contentType, price, useWallet, referralCode } = sanitized;
 
-    // Validate inputs
     const amountValidation = validatePaymentAmount(price);
     if (!amountValidation.isValid) {
       return new Response(JSON.stringify({ error: amountValidation.errors[0] }), {
@@ -80,6 +107,23 @@ serve(async (req) => {
       });
     }
 
+    // Validate referral code if provided
+    let discountAmount = 0;
+    let validatedCode: any = null;
+    if (referralCode) {
+      const result = await validateReferralCode(supabase, referralCode, user.id, price);
+      if (!result.valid) {
+        return new Response(JSON.stringify({ error: result.error }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      discountAmount = result.discountAmount!;
+      validatedCode = result.codeData;
+    }
+
+    const finalPrice = Math.max(0, price - discountAmount);
+
     // Get user wallet
     const { data: wallet } = await supabase
       .from('wallets')
@@ -94,14 +138,27 @@ serve(async (req) => {
       });
     }
 
+    const paymentMetadata: any = { 
+      content_id: contentId, 
+      content_type: contentType,
+      original_price: price,
+    };
+    if (validatedCode) {
+      paymentMetadata.referral_code = validatedCode.code;
+      paymentMetadata.referral_code_id = validatedCode.id;
+      paymentMetadata.discount_amount = discountAmount;
+      paymentMetadata.discount_type = validatedCode.discount_type;
+      paymentMetadata.discount_value = validatedCode.discount_value;
+    }
+
     // If user wants to pay with wallet
     if (useWallet) {
-      if (wallet.balance < price) {
+      if (wallet.balance < finalPrice) {
         return new Response(JSON.stringify({ 
           error: 'Insufficient wallet balance',
           balance: wallet.balance,
-          required: price,
-          deficit: price - wallet.balance
+          required: finalPrice,
+          deficit: finalPrice - wallet.balance
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -113,37 +170,46 @@ serve(async (req) => {
         .from('payments')
         .insert({
           user_id: user.id,
-          amount: price,
+          amount: finalPrice,
           purpose: 'rental',
           currency: 'NGN',
           provider: 'wallet',
           enhanced_status: 'completed',
           status: 'completed',
-          metadata: { 
-            content_id: contentId, 
-            content_type: contentType,
-            payment_method: 'wallet'
-          }
+          metadata: { ...paymentMetadata, payment_method: 'wallet' }
         })
         .select()
         .single();
 
       if (paymentError) throw paymentError;
 
-      // Deduct from wallet
-      const { error: walletError } = await supabase.rpc('process_wallet_transaction', {
-        p_wallet_id: wallet.wallet_id,
-        p_amount: price,
-        p_type: 'debit',
-        p_description: `Rental: ${contentType}`,
-        p_payment_id: payment.id,
-        p_metadata: { content_id: contentId, content_type: contentType }
-      });
+      // Deduct from wallet (only if finalPrice > 0)
+      if (finalPrice > 0) {
+        const { error: walletError } = await supabase.rpc('process_wallet_transaction', {
+          p_wallet_id: wallet.wallet_id,
+          p_amount: finalPrice,
+          p_type: 'debit',
+          p_description: `Rental: ${contentType}${validatedCode ? ` (code: ${validatedCode.code})` : ''}`,
+          p_payment_id: payment.id,
+          p_metadata: paymentMetadata
+        });
 
-      if (walletError) throw walletError;
+        if (walletError) throw walletError;
+      }
+
+      // Record referral code usage
+      if (validatedCode) {
+        await supabase.from('referral_code_uses').insert({
+          code_id: validatedCode.id,
+          user_id: user.id,
+          payment_id: payment.id,
+          discount_applied: discountAmount,
+        });
+        await supabase.from('referral_codes').update({ times_used: validatedCode.times_used + 1 }).eq('id', validatedCode.id);
+      }
 
       // Fetch content-specific rental expiry duration
-      let expiryHours = 48; // default fallback
+      let expiryHours = 48;
       
       if (contentType === 'movie') {
         const { data: movieData } = await supabase
@@ -177,7 +243,7 @@ serve(async (req) => {
           user_id: user.id,
           content_id: contentId,
           content_type: contentType,
-          amount: price,
+          amount: finalPrice,
           expires_at: expiresAt,
           status: 'active'
         });
@@ -187,7 +253,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         payment_method: 'wallet',
-        rental_expires_at: expiresAt
+        rental_expires_at: expiresAt,
+        discount_applied: discountAmount > 0 ? discountAmount : undefined,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -206,13 +273,13 @@ serve(async (req) => {
       .from('payments')
       .insert({
         user_id: user.id,
-        amount: price,
+        amount: finalPrice,
         purpose: 'rental',
         currency: 'NGN',
         provider: 'paystack',
         enhanced_status: 'initiated',
         intent_id: intentId,
-        metadata: { content_id: contentId, content_type: contentType }
+        metadata: paymentMetadata
       })
       .select()
       .single();
@@ -227,7 +294,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email: profile?.email || user.email,
-        amount: price, // price is already in kobo from database
+        amount: finalPrice, // discounted price in kobo
         reference: payment.intent_id,
         callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${contentType}/${contentId}?payment=success`,
         metadata: {
@@ -235,7 +302,12 @@ serve(async (req) => {
           user_id: user.id,
           content_id: contentId,
           content_type: contentType,
-          purpose: 'rental'
+          purpose: 'rental',
+          ...(validatedCode ? {
+            referral_code_id: validatedCode.id,
+            referral_code: validatedCode.code,
+            discount_amount: discountAmount,
+          } : {})
         }
       }),
     });

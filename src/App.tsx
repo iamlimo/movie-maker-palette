@@ -60,6 +60,7 @@ const Wallets = lazy(() => import('@/pages/admin/Wallets'));
 const Settings = lazy(() => import('@/pages/admin/Settings'));
 const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
 const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
+const ReferralCodes = lazy(() => import('@/pages/admin/ReferralCodes'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -145,6 +146,7 @@ function AppContent() {
             <Route path="settings" element={<Settings />} />
             <Route path="job-listings" element={<JobListingsAdmin />} />
             <Route path="applications" element={<JobApplicationsAdmin />} />
+            <Route path="referral-codes" element={<ReferralCodes />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

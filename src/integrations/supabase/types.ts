@@ -792,6 +792,89 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_code_uses: {
+        Row: {
+          code_id: string
+          created_at: string
+          discount_applied: number
+          id: string
+          payment_id: string | null
+          user_id: string
+        }
+        Insert: {
+          code_id: string
+          created_at?: string
+          discount_applied: number
+          id?: string
+          payment_id?: string | null
+          user_id: string
+        }
+        Update: {
+          code_id?: string
+          created_at?: string
+          discount_applied?: number
+          id?: string
+          payment_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_code_uses_code_id_fkey"
+            columns: ["code_id"]
+            isOneToOne: false
+            referencedRelation: "referral_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          max_uses_per_user: number
+          min_purchase_amount: number
+          times_used: number
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          discount_type: string
+          discount_value: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          max_uses_per_user?: number
+          min_purchase_amount?: number
+          times_used?: number
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          max_uses_per_user?: number
+          min_purchase_amount?: number
+          times_used?: number
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       rentals: {
         Row: {
           amount: number
