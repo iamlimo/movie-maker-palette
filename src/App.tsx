@@ -60,6 +60,7 @@ const Wallets = lazy(() => import('@/pages/admin/Wallets'));
 const Settings = lazy(() => import('@/pages/admin/Settings'));
 const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
 const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
+const ReferralCodes = lazy(() => import('@/pages/admin/ReferralCodes'));
 
 const queryClient = new QueryClient({
   defaultOptions: {

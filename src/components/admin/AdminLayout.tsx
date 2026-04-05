@@ -8,6 +8,7 @@ import {
   UserCheck, 
   DollarSign,
   FileText,
+  Tag,
   ChevronUp,
   ChevronDown,
   User2,
