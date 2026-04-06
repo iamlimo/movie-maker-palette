@@ -150,6 +150,7 @@ function AppContent() {
             <Route path="job-listings" element={<JobListingsAdmin />} />
             <Route path="applications" element={<JobApplicationsAdmin />} />
             <Route path="referral-codes" element={<ReferralCodes />} />
+            <Route path="push-notifications" element={<PushNotificationsAdmin />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
