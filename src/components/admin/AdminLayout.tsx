@@ -2,6 +2,7 @@ import { NavLink, useLocation, Outlet } from 'react-router-dom';
 import { useState } from 'react';
 import { 
   BarChart3, 
+  Bell,
   Film, 
   Tv, 
   Users, 
