@@ -18,6 +18,9 @@ const config: CapacitorConfig = {
     App: {
       deepLinkScheme: "signaturetv",
     },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
   },
 };
 

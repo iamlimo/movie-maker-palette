@@ -792,6 +792,72 @@ export type Database = {
         }
         Relationships: []
       }
+      push_device_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          data: Json
+          id: string
+          sent_count: number
+          target: string
+          target_user_id: string | null
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          sent_count?: number
+          target?: string
+          target_user_id?: string | null
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          id?: string
+          sent_count?: number
+          target?: string
+          target_user_id?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       referral_code_uses: {
         Row: {
           code_id: string

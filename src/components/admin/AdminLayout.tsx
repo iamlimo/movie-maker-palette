@@ -2,6 +2,7 @@ import { NavLink, useLocation, Outlet } from 'react-router-dom';
 import { useState } from 'react';
 import { 
   BarChart3, 
+  Bell,
   Film, 
   Tv, 
   Users, 
@@ -76,6 +77,7 @@ const sidebarItems = [
   { title: 'Finance', url: '/admin/finance', icon: DollarSign },
   { title: 'Wallets', url: '/admin/wallets', icon: Wallet },
   { title: 'Referral Codes', url: '/admin/referral-codes', icon: Tag },
+  { title: 'Push Notifications', url: '/admin/push-notifications', icon: Bell },
   { 
     title: 'Careers', 
     icon: Briefcase, 

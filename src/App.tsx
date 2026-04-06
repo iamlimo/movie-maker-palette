@@ -9,6 +9,7 @@ import { BottomNav } from "@/components/mobile/BottomNav";
 import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
 import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
@@ -61,6 +62,7 @@ const Settings = lazy(() => import('@/pages/admin/Settings'));
 const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
 const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
 const ReferralCodes = lazy(() => import('@/pages/admin/ReferralCodes'));
+const PushNotificationsAdmin = lazy(() => import('@/pages/admin/PushNotifications'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,6 +80,7 @@ const queryClient = new QueryClient({
 function AppContent() {
   useDeepLinking();
   useServiceWorker();
+  usePushNotifications();
 
   return (
     <>
@@ -147,6 +150,7 @@ function AppContent() {
             <Route path="job-listings" element={<JobListingsAdmin />} />
             <Route path="applications" element={<JobApplicationsAdmin />} />
             <Route path="referral-codes" element={<ReferralCodes />} />
+            <Route path="push-notifications" element={<PushNotificationsAdmin />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
