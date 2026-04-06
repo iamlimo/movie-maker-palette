@@ -9,6 +9,7 @@ import { BottomNav } from "@/components/mobile/BottomNav";
 import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
 import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
