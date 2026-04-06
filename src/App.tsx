@@ -80,6 +80,7 @@ const queryClient = new QueryClient({
 function AppContent() {
   useDeepLinking();
   useServiceWorker();
+  usePushNotifications();
 
   return (
     <>
