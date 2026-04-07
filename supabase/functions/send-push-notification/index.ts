@@ -6,6 +6,79 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// --- FCM v1 Auth Helpers ---
+
+function base64url(data: Uint8Array): string {
+  return btoa(String.fromCharCode(...data))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function textToBase64url(text: string): string {
+  return base64url(new TextEncoder().encode(text));
+}
+
+async function importPrivateKey(pem: string): Promise<CryptoKey> {
+  const pemContents = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\n/g, "");
+  const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0));
+  return crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+}
+
+async function createSignedJwt(
+  clientEmail: string,
+  privateKey: string
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = textToBase64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const payload = textToBase64url(
+    JSON.stringify({
+      iss: clientEmail,
+      sub: clientEmail,
+      aud: "https://oauth2.googleapis.com/token",
+      scope: "https://www.googleapis.com/auth/firebase.messaging",
+      iat: now,
+      exp: now + 3600,
+    })
+  );
+  const unsignedToken = `${header}.${payload}`;
+  const key = await importPrivateKey(privateKey);
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsignedToken)
+  );
+  return `${unsignedToken}.${base64url(new Uint8Array(signature))}`;
+}
+
+async function getAccessToken(
+  clientEmail: string,
+  privateKey: string
+): Promise<string> {
+  const jwt = await createSignedJwt(clientEmail, privateKey);
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(`OAuth2 token error: ${JSON.stringify(data)}`);
+  }
+  return data.access_token;
+}
+
+// --- Main handler ---
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -14,7 +87,11 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const fcmServerKey = Deno.env.get("FCM_SERVER_KEY");
+    const serviceAccountJson = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
+
+    if (!serviceAccountJson) {
+      throw new Error("FIREBASE_SERVICE_ACCOUNT secret is not configured");
+    }
 
     // Validate caller is super_admin
     const authHeader = req.headers.get("Authorization");
@@ -38,7 +115,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check super_admin role
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
@@ -78,51 +154,62 @@ Deno.serve(async (req) => {
 
     let sentCount = 0;
 
-    if (fcmServerKey && tokens && tokens.length > 0) {
-      // Send via FCM legacy HTTP API
-      const fcmUrl = "https://fcm.googleapis.com/fcm/send";
+    if (tokens && tokens.length > 0) {
+      // Parse service account and get access token
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      const { client_email, private_key, project_id } = serviceAccount;
+      const accessToken = await getAccessToken(client_email, private_key);
 
-      // Send in batches of 1000 (FCM limit)
-      const batchSize = 1000;
+      const fcmUrl = `https://fcm.googleapis.com/v1/projects/${project_id}/messages:send`;
+
+      // Send in concurrent batches of 50
+      const batchSize = 50;
       for (let i = 0; i < tokens.length; i += batchSize) {
         const batch = tokens.slice(i, i + batchSize);
-        const registrationIds = batch.map((t: any) => t.token);
+        const results = await Promise.allSettled(
+          batch.map(async (t: any) => {
+            const message: any = {
+              message: {
+                token: t.token,
+                notification: { title, body },
+                data: Object.fromEntries(
+                  Object.entries({ ...data, title, body }).map(([k, v]) => [k, String(v)])
+                ),
+                android: { priority: "high" },
+                apns: {
+                  payload: { aps: { sound: "default", badge: 1 } },
+                },
+              },
+            };
 
-        const fcmPayload = {
-          registration_ids: registrationIds,
-          notification: { title, body },
-          data: { ...data, title, body },
-        };
+            const res = await fetch(fcmUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify(message),
+            });
 
-        const fcmRes = await fetch(fcmUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `key=${fcmServerKey}`,
-          },
-          body: JSON.stringify(fcmPayload),
-        });
+            const result = await res.json();
 
-        if (fcmRes.ok) {
-          const result = await fcmRes.json();
-          sentCount += result.success || 0;
-
-          // Clean up invalid tokens
-          if (result.results) {
-            for (let j = 0; j < result.results.length; j++) {
-              if (result.results[j].error === "InvalidRegistration" ||
-                  result.results[j].error === "NotRegistered") {
+            if (!res.ok) {
+              const errorCode = result?.error?.details?.[0]?.errorCode ||
+                result?.error?.status || "";
+              if (errorCode === "UNREGISTERED" || errorCode === "INVALID_ARGUMENT") {
                 await supabaseAdmin
                   .from("push_device_tokens")
                   .update({ is_active: false })
-                  .eq("token", registrationIds[j]);
+                  .eq("token", t.token);
               }
+              throw new Error(errorCode || "FCM send failed");
             }
-          }
-        }
+            return result;
+          })
+        );
+
+        sentCount += results.filter((r) => r.status === "fulfilled").length;
       }
-    } else {
-      sentCount = tokens?.length || 0;
     }
 
     // Record notification
