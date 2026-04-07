@@ -1,112 +1,68 @@
 
 
-# Push Notifications for iOS & Android
+# Upgrade Push Notifications to FCM v1 API
 
-## Overview
+## Problem
 
-Implement push notifications using Capacitor's `@capacitor/push-notifications` plugin with Firebase Cloud Messaging (FCM) for Android and Apple Push Notification service (APNs) for iOS. Super admins can broadcast notifications from the admin dashboard.
+The current edge function uses the **legacy FCM HTTP API** (`fcm.googleapis.com/fcm/send` with `key=SERVER_KEY`), which Google has deprecated. The `FIREBASE_SERVICE_ACCOUNT` secret is already stored -- we need to switch to the **FCM v1 HTTP API** which uses OAuth2 access tokens derived from the service account JSON.
 
-## Prerequisites (User Setup Required)
+## What Changes
 
-Before this works end-to-end, you'll need to configure:
+### 1. `supabase/functions/send-push-notification/index.ts` — Rewrite FCM sending logic
 
-1. **Firebase project** — Create a Firebase project, enable Cloud Messaging, download `google-services.json` (Android) and add your iOS app to get APNs configured
-2. **FCM Server Key** — Store as a Supabase secret (`FCM_SERVER_KEY`) for the edge function to send notifications
-3. **Apple Developer Account** — Enable Push Notifications capability and upload APNs key to Firebase
+**Remove**: Legacy `FCM_SERVER_KEY` usage, `fcm.googleapis.com/fcm/send` endpoint, `registration_ids` batch format.
 
-## Database
+**Add**:
+- Parse `FIREBASE_SERVICE_ACCOUNT` JSON secret to extract `client_email`, `private_key`, `project_id`
+- Generate a short-lived OAuth2 access token by signing a JWT with the service account's RSA private key (using Web Crypto API available in Deno)
+- JWT claims: `iss` = client_email, `sub` = client_email, `aud` = `https://oauth2.googleapis.com/token`, `scope` = `https://www.googleapis.com/auth/firebase.messaging`, `iat`/`exp` (1hr)
+- Exchange the signed JWT for an access token via `POST https://oauth2.googleapis.com/token`
+- Send individual messages to FCM v1 endpoint: `POST https://fcm.googleapis.com/v1/projects/{project_id}/messages:send`
+- FCM v1 payload format uses `message.token` (single device) instead of `registration_ids`
+- Send concurrently in batches of 50 using `Promise.allSettled` for performance
+- Handle v1 error codes: `UNREGISTERED` and `INVALID_ARGUMENT` trigger token deactivation
+- Cache the access token in-memory for the function invocation lifetime
 
-### New table: `push_device_tokens`
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid PK | |
-| `user_id` | uuid NOT NULL | |
-| `token` | text NOT NULL | FCM/APNs device token |
-| `platform` | text NOT NULL | `'ios'` or `'android'` |
-| `is_active` | boolean DEFAULT true | Soft-disable stale tokens |
-| `created_at` | timestamptz DEFAULT now() | |
-| `updated_at` | timestamptz DEFAULT now() | |
-
-Unique constraint on `(user_id, token)`. RLS: users manage own tokens; super admins can read all.
-
-### New table: `push_notifications`
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid PK | |
-| `title` | text NOT NULL | |
-| `body` | text NOT NULL | |
-| `data` | jsonb DEFAULT '{}' | Deep link info, etc. |
-| `target` | text DEFAULT 'all' | `'all'`, `'user'`, `'topic'` |
-| `target_user_id` | uuid | For targeted notifications |
-| `sent_count` | integer DEFAULT 0 | |
-| `created_by` | uuid | Super admin who sent it |
-| `created_at` | timestamptz DEFAULT now() | |
-
-RLS: super admins full access.
-
-## Files to Modify
-
-### 1. Install `@capacitor/push-notifications`
-- Add to `package.json` dependencies
-
-### 2. New hook: `src/hooks/usePushNotifications.tsx`
-- Register for push notifications on native platforms
-- Request permission, get token, listen for registration events
-- Save token to `push_device_tokens` table via Supabase client
-- Handle incoming notifications (foreground + tap)
-- Navigate to relevant content on notification tap using deep link data
-- Respect `user_preferences.push_notifications` toggle
-
-### 3. `src/App.tsx`
-- Initialize push notifications hook at app root level (inside AuthProvider)
-
-### 4. `capacitor.config.ts`
-- Add `PushNotifications` plugin config
-
-### 5. `src/pages/Profile.tsx`
-- Wire existing push notifications toggle to actually request/revoke permission
-
-### 6. New edge function: `supabase/functions/send-push-notification/index.ts`
-- Accepts `title`, `body`, `data`, `target`, `target_user_id`
-- Validates super_admin role
-- Fetches active device tokens from `push_device_tokens`
-- Sends via FCM HTTP v1 API using `FCM_SERVER_KEY`
-- Records notification in `push_notifications` table
-- Handles token cleanup (remove invalid tokens on FCM error)
-
-### 7. New admin page: `src/pages/admin/PushNotifications.tsx`
-- Form to compose notification: title, body, optional deep link URL
-- Target selector: all users, specific user (search by email)
-- Send button with confirmation dialog
-- History table showing past notifications with sent count and timestamp
-
-### 8. `src/components/admin/AdminLayout.tsx`
-- Add "Push Notifications" item with `Bell` icon
-
-### 9. Native setup files (user must do after git pull)
-- **Android**: Place `google-services.json` in `android/app/`
-- **iOS**: Enable Push Notifications capability in Xcode, upload APNs key to Firebase
-
-## Architecture Flow
-
+**FCM v1 payload structure**:
 ```text
-┌──────────────┐     ┌───────────────┐     ┌─────────────┐
-│  Admin sends  │────▸│  Edge Function │────▸│  FCM / APNs │
-│  notification │     │  send-push-    │     │  (Google)   │
-└──────────────┘     │  notification  │     └──────┬──────┘
-                     └───────────────┘            │
-                                                   ▼
-                                          ┌──────────────┐
-                                          │  User Device  │
-                                          │  (iOS/Android)│
-                                          └──────────────┘
+{
+  "message": {
+    "token": "<device_token>",
+    "notification": { "title": "...", "body": "..." },
+    "data": { "deepLink": "/movie/slug" },
+    "android": { "priority": "high" },
+    "apns": { "payload": { "aps": { "sound": "default", "badge": 1 } } }
+  }
+}
 ```
 
-## Implementation Notes
+### 2. `src/hooks/usePushNotifications.tsx` — Minor optimization
 
-- Tokens are registered on app launch when user is authenticated and push_notifications preference is enabled
-- On sign-out, tokens are soft-deactivated (`is_active = false`)
-- FCM HTTP v1 API used for sending (supports both iOS and Android via single endpoint)
-- Notification tap navigates using existing deep link infrastructure (`useDeepLinking`)
-- Web platform is excluded — push notifications are native-only
+- Add token deduplication check: before upserting, compare with a ref to skip redundant DB calls on re-registration
+- Properly deactivate token on sign-out by storing last registered token in a ref and calling update on unmount
+
+## Architecture
+
+```text
+Service Account JSON (secret)
+        │
+        ▼
+  Sign JWT with RSA key (Web Crypto)
+        │
+        ▼
+  Exchange for OAuth2 access token
+        │
+        ▼
+  POST fcm.googleapis.com/v1/projects/{id}/messages:send
+        │
+        ▼
+  Per-device delivery with platform-specific config
+```
+
+## Files Modified
+
+1. **`supabase/functions/send-push-notification/index.ts`** — Replace legacy FCM with v1 API using service account JWT auth
+2. **`src/hooks/usePushNotifications.tsx`** — Add token caching ref + sign-out deactivation
+
+No database changes needed. No new files.
 
