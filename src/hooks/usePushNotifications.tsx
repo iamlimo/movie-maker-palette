@@ -9,6 +9,7 @@ export function usePushNotifications() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const registeredRef = useRef(false);
+  const lastTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || registeredRef.current) return;
@@ -16,21 +17,21 @@ export function usePushNotifications() {
 
     const setup = async () => {
       try {
-        // Check / request permission
         let permStatus = await PushNotifications.checkPermissions();
         if (permStatus.receive === 'prompt') {
           permStatus = await PushNotifications.requestPermissions();
         }
         if (permStatus.receive !== 'granted') return;
 
-        // Register with native push service
         await PushNotifications.register();
         registeredRef.current = true;
 
-        // Listen for registration success
         PushNotifications.addListener('registration', async (token) => {
+          // Skip if same token already saved
+          if (lastTokenRef.current === token.value) return;
+          lastTokenRef.current = token.value;
+
           const platform = Capacitor.getPlatform() as 'ios' | 'android';
-          // Upsert token
           const { error } = await supabase
             .from('push_device_tokens' as any)
             .upsert(
@@ -40,17 +41,14 @@ export function usePushNotifications() {
           if (error) console.error('Failed to save push token:', error);
         });
 
-        // Listen for registration errors
         PushNotifications.addListener('registrationError', (err) => {
           console.error('Push registration error:', err);
         });
 
-        // Foreground notifications
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
           console.log('Push received in foreground:', notification);
         });
 
-        // Notification tap
         PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
           const data = action.notification.data;
           if (data?.deepLink) {
@@ -69,10 +67,21 @@ export function usePushNotifications() {
     };
   }, [user, navigate]);
 
-  // Deactivate tokens on sign out
+  // Deactivate token on sign-out
   useEffect(() => {
     if (user || !Capacitor.isNativePlatform()) return;
-    // User signed out — deactivate all tokens for this device
-    // We can't know the exact token, but the hook won't register again until user logs in
+    if (!lastTokenRef.current) return;
+
+    const token = lastTokenRef.current;
+    supabase
+      .from('push_device_tokens' as any)
+      .update({ is_active: false } as any)
+      .eq('token', token)
+      .then(({ error }) => {
+        if (error) console.error('Failed to deactivate push token:', error);
+      });
+
+    lastTokenRef.current = null;
+    registeredRef.current = false;
   }, [user]);
 }
