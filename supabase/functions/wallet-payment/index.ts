@@ -243,7 +243,7 @@ serve(async (req) => {
           user_id: user.id,
           content_id: contentId,
           content_type: contentType,
-          amount: finalPrice,
+          amount: finalPrice, // in naira
           expires_at: expiresAt,
           status: 'active'
         });
@@ -273,7 +273,7 @@ serve(async (req) => {
       .from('payments')
       .insert({
         user_id: user.id,
-        amount: finalPrice,
+        amount: finalPrice * 100, // in kobo
         purpose: 'rental',
         currency: 'NGN',
         provider: 'paystack',
@@ -294,7 +294,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email: profile?.email || user.email,
-        amount: finalPrice, // discounted price in kobo
+        amount: finalPrice * 100, // in kobo
         reference: payment.intent_id,
         callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${contentType}/${contentId}?payment=success`,
         metadata: {

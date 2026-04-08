@@ -21,23 +21,10 @@ max_client_conn = 100
 
 [realtime]
 enabled = true
-ip_version = "ipv4"
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://127.0.0.1"
-
-[inbucket]
-enabled = true
-port = 54324
-smtp_port = 54325
-pop3_port = 54326
 
 [storage]
 enabled = true
 file_size_limit = "50MiB"
-image_transformation = true
 
 [auth]
 enabled = true
@@ -45,9 +32,6 @@ site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["https://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_email_confirmations = true
-enable_email_change_confirmations = true
-enable_phone_confirmations = true
 
 [functions.unified-media-upload]
 verify_jwt = true
@@ -99,9 +83,3 @@ verify_jwt = true
 
 [functions.delete-own-account]
 verify_jwt = false
-
-[edge-runtime]
-enabled = true
-ip_version = "ipv4"
-port = 54327
-inspector_port = 54330

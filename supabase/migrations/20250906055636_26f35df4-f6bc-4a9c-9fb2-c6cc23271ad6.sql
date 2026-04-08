@@ -195,28 +195,30 @@ CREATE TRIGGER update_payouts_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION public.update_updated_at_column();
 
--- Create function to automatically create wallet for new users
-CREATE OR REPLACE FUNCTION public.create_user_wallet()
+-- Create function to sync profile wallet_balance with wallet balance
+CREATE OR REPLACE FUNCTION public.sync_profile_wallet_balance()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.wallets (user_id)
-    VALUES (NEW.user_id)
-    ON CONFLICT (user_id) DO NOTHING;
+    -- Update the profile wallet_balance when wallet balance changes
+    UPDATE public.profiles 
+    SET wallet_balance = NEW.balance / 100.0  -- Convert kobo to naira for profile field
+    WHERE user_id = NEW.user_id;
+    
     RETURN NEW;
 EXCEPTION
     WHEN OTHERS THEN
-        -- Log the error but don't block profile creation
-        RAISE WARNING 'Error creating user wallet: %', SQLERRM;
+        -- Log error but don't block the wallet update
+        RAISE WARNING 'Error syncing profile wallet balance: %', SQLERRM;
         RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Add trigger to create wallet when profile is created
-DROP TRIGGER IF EXISTS create_wallet_on_profile_creation ON public.profiles;
-CREATE TRIGGER create_wallet_on_profile_creation
-    AFTER INSERT ON public.profiles
+-- Create trigger to sync profile wallet_balance when wallet is created or updated
+DROP TRIGGER IF EXISTS sync_profile_wallet_balance_trigger ON public.wallets;
+CREATE TRIGGER sync_profile_wallet_balance_trigger
+    AFTER INSERT OR UPDATE OF balance ON public.wallets
     FOR EACH ROW
-    EXECUTE FUNCTION public.create_user_wallet();
+    EXECUTE FUNCTION public.sync_profile_wallet_balance();
 
 -- Create function for recording finance audit logs
 CREATE OR REPLACE FUNCTION public.log_finance_action(
@@ -226,9 +228,13 @@ CREATE OR REPLACE FUNCTION public.log_finance_action(
 RETURNS uuid AS $$
 DECLARE
     audit_id uuid;
+    actor_id uuid;
 BEGIN
+    -- Use auth.uid() if available, otherwise use admin_user_id from details
+    actor_id := COALESCE(auth.uid(), p_details->>'admin_user_id');
+    
     INSERT INTO public.finance_audit_logs (actor_id, action, details)
-    VALUES (auth.uid(), p_action, p_details)
+    VALUES (actor_id, p_action, p_details)
     RETURNING finance_audit_logs.audit_id INTO audit_id;
     
     RETURN audit_id;

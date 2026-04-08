@@ -14,7 +14,7 @@ export const useWallet = () => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const fetchWallet = async () => {
+  const fetchWallet = useCallback(async () => {
     if (!user) {
       setWallet(null);
       setIsLoading(false);
@@ -57,13 +57,14 @@ export const useWallet = () => {
       }
 
       setWallet(data);
-    } catch (err: any) {
-      console.error('Error fetching wallet:', err);
-      setError(err.message);
+    } catch (err) {
+      const error = err as { message: string };
+      console.error('Error fetching wallet:', error);
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   const refreshWallet = () => {
     fetchWallet();
@@ -86,7 +87,7 @@ export const useWallet = () => {
           table: 'wallets',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
+        (payload: any) => {
           console.log('Wallet updated:', payload);
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             setWallet(payload.new as WalletData);
@@ -98,7 +99,7 @@ export const useWallet = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchWallet]);
 
   const canAfford = (amount: number): boolean => {
     return wallet ? wallet.balance >= amount : false;

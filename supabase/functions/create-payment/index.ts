@@ -54,6 +54,9 @@ Deno.serve(async (req) => {
       return errorResponse('User email not found', 400);
     }
 
+    // Generate unique intent_id for idempotency
+    const intentId = crypto.randomUUID();
+
     // Create payment record
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
@@ -62,6 +65,7 @@ Deno.serve(async (req) => {
         amount: amountInKobo,
         currency: 'NGN',
         purpose: 'rental',
+        intent_id: intentId,
         metadata: {
           content_id: contentId,
           content_type: contentType
@@ -86,7 +90,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         email: profile.email,
         amount: amountInKobo,
-        reference: payment.id,
+        reference: intentId,
+        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/paystack-webhook`,
         metadata: {
           payment_id: payment.id,
           user_id: user.id,

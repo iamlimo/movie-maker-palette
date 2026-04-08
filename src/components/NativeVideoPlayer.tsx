@@ -23,7 +23,7 @@ let CapacitorVideoPlayer: any = null;
 const loadNativePlayer = async () => {
   if (Capacitor.isNativePlatform() && !CapacitorVideoPlayer) {
     try {
-      // @ts-ignore - Package installed on native builds only
+      // @ts-expect-error - Package installed on native builds only
       const module = await import(/* @vite-ignore */ '@capacitor-community/video-player');
       CapacitorVideoPlayer = module.CapacitorVideoPlayer;
     } catch (e) {

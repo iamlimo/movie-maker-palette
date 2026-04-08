@@ -359,6 +359,8 @@ const RentalButton = ({
 
   const handleOpenSheet = async () => {
     await triggerHaptic();
+    // Refresh wallet balance to ensure latest balance is used for payment options
+    await refreshWallet();
     setShowBottomSheet(true);
   };
 

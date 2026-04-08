@@ -77,7 +77,7 @@ const TrailerPlayer = ({
 
   // Check if it's a YouTube URL and extract video ID
   const getYouTubeVideoId = (url: string) => {
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const regex = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/;
     const match = url.match(regex);
     return match ? match[1] : null;
   };

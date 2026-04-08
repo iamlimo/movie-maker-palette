@@ -1,47 +1,48 @@
 import { useEffect, useState } from 'react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+// import { useRegisterSW } from 'virtual:pwa-register/react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 
 export const useServiceWorker = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  const {
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(registration) {
-      console.log('Service Worker registered:', registration);
+  // Temporarily disable PWA service worker registration
+  // const {
+  //   needRefresh: [needRefresh, setNeedRefresh],
+  //   updateServiceWorker,
+  // } = useRegisterSW({
+  //   onRegistered(registration) {
+  //     console.log('Service Worker registered:', registration);
       
-      // Check for updates every hour
-      if (registration) {
-        setInterval(() => {
-          registration.update();
-        }, 60 * 60 * 1000);
-      }
-    },
-    onRegisterError(error) {
-      console.error('Service Worker registration error:', error);
-    },
-  });
+  //     // Check for updates every hour
+  //     if (registration) {
+  //       setInterval(() => {
+  //         registration.update();
+  //       }, 60 * 60 * 1000);
+  //     }
+  //   },
+  //   onRegisterError(error) {
+  //     console.error('Service Worker registration error:', error);
+  //   },
+  // });
 
   // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast({
-        title: "Back Online",
-        description: "Your connection has been restored",
-      });
+      // toast({
+      //   title: "Back Online",
+      //   description: "Your connection has been restored",
+      // });
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      toast({
-        title: "You're Offline",
-        description: "Some features may be limited",
-        variant: "destructive",
-      });
+      // toast({
+      //   title: "You're Offline",
+      //   description: "Some features may be limited",
+      //   variant: "destructive",
+      // });
     };
 
     window.addEventListener('online', handleOnline);
