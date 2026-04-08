@@ -86,7 +86,7 @@ function AppContent() {
     <>
       <OfflineBanner />
       <MobileRouteAnimator>
-        <Suspense fallback={null}>
+        <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
