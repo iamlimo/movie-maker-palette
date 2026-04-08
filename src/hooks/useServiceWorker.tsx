@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 
 export const useServiceWorker = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [needRefresh, setNeedRefresh] = useState(false);
 
   // Temporarily disable PWA service worker registration
   // const {
@@ -61,17 +62,23 @@ export const useServiceWorker = () => {
         title: "Update Available",
         description: "A new version is available. Click to update.",
         action: (
-          <Button onClick={() => updateServiceWorker(true)} size="sm">
+          <Button onClick={() => {
+            // PWA registration is currently disabled
+            console.log('Update requested (PWA disabled)');
+          }} size="sm">
             Update Now
           </Button>
         ),
       });
     }
-  }, [needRefresh, updateServiceWorker]);
+  }, [needRefresh]);
 
   return {
     isOnline,
     needRefresh,
-    updateServiceWorker: () => updateServiceWorker(true),
+    updateServiceWorker: () => {
+      // PWA registration is currently disabled
+      console.log('Update service worker called (PWA disabled)');
+    },
   };
 };
