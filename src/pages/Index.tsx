@@ -53,7 +53,7 @@ const Index = () => {
       setSlideIndex((prev) => (prev + 1) % slides.length);
     }, 4000);
     return () => clearInterval(timer);
-  }, [isIOS, user, authLoading]);
+  }, [isNative, user, authLoading]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
