@@ -70,10 +70,19 @@ const Index = () => {
 
   // iOS Onboarding: Show login-gate for unauthenticated users
   if (isIOS && !user && !authLoading) {
+    const handleGetStarted = () => {
+      window.open('https://signaturetv.co/auth?mode=signup', '_blank');
+    };
+
     return (
       <div
         className="fixed inset-0 flex flex-col overflow-hidden"
-        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+        }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -96,7 +105,7 @@ const Index = () => {
         </div>
 
         {/* Top bar: Logo + Log In */}
-        <div className="relative z-10 flex items-center justify-between px-6 pt-4">
+        <div className="relative z-10 flex items-center justify-between px-6 pt-3">
           <img src="/signature-tv-logo.png" alt="Signature TV" className="h-10 w-auto" />
           <Button
             onClick={() => navigate('/auth')}
@@ -150,17 +159,17 @@ const Index = () => {
 
           {/* CTA Button */}
           <Button
-            onClick={() => navigate('/auth')}
+            onClick={handleGetStarted}
             variant="premium"
             size="lg"
             className="w-full py-6 text-lg rounded-md"
           >
-            Log In
+            Get Started
           </Button>
 
           {/* Plain text disclosure */}
           <p className="text-muted-foreground/60 text-xs text-center mt-4 pb-2">
-            New to Signature TV? Create an account at signaturetv.co
+            Already have an account? Tap "Log In" above
           </p>
         </div>
       </div>
