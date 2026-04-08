@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { isIOS } = usePlatform();
+  const { isIOS, isAndroid, isNative } = usePlatform();
   const { sectionsWithContent, loading, refetch } = useSectionsWithContent();
   const currentYear = new Date().getFullYear();
   const isMobile = useIsMobile();
@@ -48,12 +48,12 @@ const Index = () => {
   ];
 
   useEffect(() => {
-    if (!(isIOS && !user && !authLoading)) return;
+    if (!(isNative && !user && !authLoading)) return;
     const timer = setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % slides.length);
     }, 4000);
     return () => clearInterval(timer);
-  }, [isIOS, user, authLoading]);
+  }, [isNative, user, authLoading]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
@@ -69,7 +69,7 @@ const Index = () => {
   }, [touchStart, slides.length]);
 
   // iOS Onboarding: Show login-gate for unauthenticated users
-  if (isIOS && !user && !authLoading) {
+  if (isNative && !user && !authLoading) {
     const handleGetStarted = () => {
       window.open('https://signaturetv.co/auth?mode=signup', '_blank');
     };
