@@ -69,7 +69,7 @@ const Index = () => {
   }, [touchStart, slides.length]);
 
   // iOS Onboarding: Show login-gate for unauthenticated users
-  if (isIOS && !user && !authLoading) {
+  if (isNative && !user && !authLoading) {
     const handleGetStarted = () => {
       window.open('https://signaturetv.co/auth?mode=signup', '_blank');
     };
