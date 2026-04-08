@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { isIOS } = usePlatform();
+  const { isIOS, isAndroid, isNative } = usePlatform();
   const { sectionsWithContent, loading, refetch } = useSectionsWithContent();
   const currentYear = new Date().getFullYear();
   const isMobile = useIsMobile();
