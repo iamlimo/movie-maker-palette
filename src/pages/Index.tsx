@@ -48,7 +48,7 @@ const Index = () => {
   ];
 
   useEffect(() => {
-    if (!(isIOS && !user && !authLoading)) return;
+    if (!(isNative && !user && !authLoading)) return;
     const timer = setInterval(() => {
       setSlideIndex((prev) => (prev + 1) % slides.length);
     }, 4000);
