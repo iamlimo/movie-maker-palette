@@ -68,6 +68,6 @@ async function checkAccess(user: any, supabase: any, contentId: string, contentT
     access_type: rental ? 'rental' : purchase ? 'purchase' : null,
     rental: rental || null,
     purchase: purchase || null,
-    expires_at: rental?.expiration_date || null
+    expires_at: rental?.expires_at || null
   });
 }
