@@ -96,6 +96,14 @@ Deno.serve(async (req) => {
       .eq('id', movieId)
       .single();
 
+    console.log('Movie lookup:', {
+      movieId,
+      found: !!movie,
+      status: movie?.status,
+      hasVideoUrl: !!movie?.video_url,
+      movieError: movieError ? { code: movieError.code, message: movieError.message } : null
+    });
+
     if (movieError || !movie) {
       return new Response(
         JSON.stringify({ error: 'Movie not found' }),
@@ -105,44 +113,83 @@ Deno.serve(async (req) => {
 
     if (movie.status !== 'approved') {
       return new Response(
-        JSON.stringify({ error: 'Movie not available' }),
+        JSON.stringify({ error: 'Movie not available', status: movie.status }),
         { status: 403, headers: corsHeaders }
       );
     }
 
     // Check user access - super admin has full access
-    const { data: roleData } = await supabase
+    const { data: roleData, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (roleError && roleError.code !== 'PGRST116') {
+      console.error('Role check error:', roleError);
+    }
 
     const isSuperAdmin = roleData?.role === 'super_admin';
 
     if (!isSuperAdmin) {
       // Check if user has purchased the movie
-      const { data: purchase } = await supabase
+      const { data: purchase, error: purchaseError } = await supabase
         .from('purchases')
         .select('id')
         .eq('user_id', user.id)
         .eq('content_id', movieId)
         .eq('content_type', 'movie')
-        .single();
+        .maybeSingle();
+
+      if (purchaseError && purchaseError.code !== 'PGRST116') {
+        console.error('Purchase check error:', purchaseError);
+      }
 
       // Check if user has active rental
-      const { data: rental } = await supabase
+      // Use maybeSingle() which returns null if no result instead of throwing an error
+      const { data: rental, error: rentalError } = await supabase
         .from('rentals')
-        .select('id, expires_at')
+        .select('id, expires_at, user_id, content_id, content_type, status')
         .eq('user_id', user.id)
         .eq('content_id', movieId)
         .eq('content_type', 'movie')
         .eq('status', 'active')
         .gte('expires_at', new Date().toISOString())
-        .single();
+        .maybeSingle();
+
+      console.log('Rental check for user:', {
+        userId: user.id,
+        movieId,
+        hasRental: !!rental,
+        rentalData: rental,
+        rentalError: rentalError ? { code: rentalError.code, message: rentalError.message } : null,
+        hasPurchase: !!purchase,
+        currentTime: new Date().toISOString()
+      });
 
       if (!purchase && !rental) {
+        console.error('Access denied:', {
+          userId: user.id,
+          movieId,
+          hasPurchase: !!purchase,
+          hasRental: !!rental,
+          rentalError: rentalError?.message,
+          purchaseError: purchaseError?.message
+        });
+        
+        // Build a more informative error message
+        let errorDetails = {
+          error: 'Access denied. Purchase or rent this movie to watch.',
+          debug: {
+            movieId,
+            hasPurchase: !!purchase,
+            hasRental: !!rental,
+            movieStatus: movie?.status
+          }
+        };
+        
         return new Response(
-          JSON.stringify({ error: 'Access denied. Purchase or rent this movie to watch.' }),
+          JSON.stringify(errorDetails),
           { status: 403, headers: corsHeaders }
         );
       }
