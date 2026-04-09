@@ -1,5 +1,6 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Star, Play, Clock, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import moviePlaceholder from "@/assets/movie-placeholder.jpg";
