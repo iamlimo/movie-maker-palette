@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatNaira } from '@/lib/priceUtils';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
 import { UserDetailModal } from '@/components/admin/UserDetailModal';
@@ -68,7 +69,7 @@ export default function Users() {
       u.status || 'active',
       u.country || '',
       u.phone_number || '',
-      (u.wallet_balance / 100).toFixed(2),
+      formatNaira(u.wallet_balance),
       new Date(u.created_at).toLocaleDateString(),
     ]);
 
@@ -507,7 +508,7 @@ export default function Users() {
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">
-                        ₦{user.wallet_balance.toFixed(2)}
+                        {formatNaira(user.wallet_balance)}
                       </div>
                     </TableCell>
                     <TableCell>

@@ -21,7 +21,10 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Missing Authorization header' }),
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -33,112 +36,323 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: corsHeaders }
+      );
     }
 
-    const { contentId, contentType } = await req.json();
+    // Support both 'movieId' and 'contentId' parameters for backward compatibility
+    const { contentId, movieId, contentType = 'movie' } = await req.json();
+    const id = contentId || movieId;
 
-    if (!contentId || !contentType) {
-      throw new Error('Missing contentId or contentType');
+    if (!id) {
+      return new Response(
+        JSON.stringify({ error: 'Content ID is required' }),
+        { status: 400, headers: corsHeaders }
+      );
     }
 
-    // Verify user has access to this content (rental/purchase check)
-    const { data: rental, error: rentalError } = await supabase
-      .from('rentals')
-      .select('*')
+    // Check user access (rental, purchase, or super admin)
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
       .eq('user_id', user.id)
-      .eq('content_id', contentId)
-      .eq('content_type', contentType)
-      .eq('status', 'active')
-      .gt('expires_at', new Date().toISOString())
       .single();
 
-    if (rentalError || !rental) {
-      throw new Error('No active rental found for this content');
+    const isSuperAdmin = roleData?.role === 'super_admin';
+
+    if (!isSuperAdmin) {
+      // Check for purchase
+      const { data: purchase } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('content_id', id)
+        .eq('content_type', contentType)
+        .single();
+
+      // Check for active rental
+      const { data: rental } = await supabase
+        .from('rentals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('content_id', id)
+        .eq('content_type', contentType)
+        .eq('status', 'active')
+        .or(
+          `expires_at.gte.${new Date().toISOString()},expiration_date.gte.${new Date().toISOString()}`
+        )
+        .single();
+
+      if (!purchase && !rental) {
+        return new Response(
+          JSON.stringify({ error: 'Access denied. Purchase or rent this content to watch.' }),
+          { status: 403, headers: corsHeaders }
+        );
+      }
     }
 
     // Get content video URL
-    const tableName = contentType === 'movie' ? 'movies' : 'episodes';
+    const tableName = contentType === 'movie' ? 'movies' : (contentType === 'episode' ? 'episodes' : 'seasons');
     const { data: content, error: contentError } = await supabase
       .from(tableName)
-      .select('video_url')
-      .eq('id', contentId)
+      .select('video_url, status')
+      .eq('id', id)
       .single();
 
-    if (contentError || !content || !content.video_url) {
-      throw new Error('Content not found or no video URL');
+    if (contentError || !content) {
+      return new Response(
+        JSON.stringify({ error: 'Content not found' }),
+        { status: 404, headers: corsHeaders }
+      );
     }
 
-    // Extract Backblaze file path from video_url
-    const videoPath = content.video_url;
-
-    // Get Backblaze credentials
-    const b2KeyId = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY_ID');
-    const b2AppKey = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY');
-    const b2BucketName = Deno.env.get('BACKBLAZE_B2_BUCKET_NAME');
-
-    if (!b2KeyId || !b2AppKey || !b2BucketName) {
-      throw new Error('Backblaze credentials not configured');
+    if (content.status !== 'approved') {
+      return new Response(
+        JSON.stringify({ error: 'Content not available' }),
+        { status: 403, headers: corsHeaders }
+      );
     }
 
-    // Authorize with Backblaze B2
-    const authResponse = await fetch(`${BACKBLAZE_API_URL}/b2api/v2/b2_authorize_account`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${btoa(`${b2KeyId}:${b2AppKey}`)}`
+    if (!content.video_url) {
+      return new Response(
+        JSON.stringify({ error: 'Video file not available' }),
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
+    const videoUrl = content.video_url;
+
+    // Check if it's a Backblaze URL
+    const isBackblazeUrl = videoUrl.includes('backblazeb2.com') || videoUrl.includes('b2cdn.com');
+
+    if (isBackblazeUrl) {
+      const b2KeyId = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY_ID');
+      const b2AppKey = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY');
+      const b2BucketName = Deno.env.get('BACKBLAZE_B2_BUCKET_NAME');
+      const b2BucketId = Deno.env.get('BACKBLAZE_B2_BUCKET_ID');
+
+      if (!b2KeyId || !b2AppKey || !b2BucketName || !b2BucketId) {
+        console.error('Backblaze credentials not configured properly', {
+          hasKeyId: !!b2KeyId,
+          hasAppKey: !!b2AppKey,
+          hasBucketName: !!b2BucketName,
+          hasBucketId: !!b2BucketId
+        });
+        return new Response(
+          JSON.stringify({ error: 'Backblaze credentials not properly configured' }),
+          { status: 500, headers: corsHeaders }
+        );
       }
-    });
 
-    if (!authResponse.ok) {
-      throw new Error('Failed to authorize with Backblaze B2');
-    }
+      // Extract file path (handle various URL formats)
+      let filePath = videoUrl;
+      if (videoUrl.includes('://')) {
+        try {
+          const urlObj = new URL(videoUrl);
+          const segments = urlObj.pathname.split('/').filter(Boolean);
 
-    const authData: B2AuthResponse = await authResponse.json();
-
-    // Generate download authorization (2 hour expiry)
-    const validDurationInSeconds = 7200; // 2 hours
-    const downloadAuthResponse = await fetch(`${authData.apiUrl}/b2api/v2/b2_get_download_authorization`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authData.authorizationToken,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        bucketId: b2BucketName,
-        fileNamePrefix: videoPath,
-        validDurationInSeconds
-      })
-    });
-
-    if (!downloadAuthResponse.ok) {
-      throw new Error('Failed to generate download authorization');
-    }
-
-    const downloadAuthData: B2SignedUrlResponse = await downloadAuthResponse.json();
-
-    // Construct signed URL
-    const signedUrl = `${authData.downloadUrl}/file/${b2BucketName}/${videoPath}?Authorization=${downloadAuthData.authorizationToken}`;
-    const expiresAt = new Date(Date.now() + validDurationInSeconds * 1000).toISOString();
-
-    return new Response(
-      JSON.stringify({
-        signedUrl,
-        expiresAt
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+          if (segments[0] === 'file' && segments.length >= 3) {
+            filePath = segments.slice(2).join('/');
+          } else if (segments[0] === b2BucketName && segments.length >= 2) {
+            filePath = segments.slice(1).join('/');
+          } else {
+            const bucketIndex = segments.indexOf(b2BucketName);
+            if (bucketIndex >= 0 && segments.length > bucketIndex + 1) {
+              filePath = segments.slice(bucketIndex + 1).join('/');
+            } else {
+              filePath = segments.join('/');
+            }
+          }
+        } catch (parseError) {
+          console.error('URL parse error:', parseError);
+          filePath = videoUrl;
+        }
       }
-    );
+
+      if (!filePath || !filePath.includes('.')) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid video file path format' }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      // Authorize with Backblaze B2
+      const authResponse = await fetch(`${BACKBLAZE_API_URL}/b2api/v2/b2_authorize_account`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${btoa(`${b2KeyId}:${b2AppKey}`)}`
+        }
+      });
+
+      if (!authResponse.ok) {
+        // Check if it's a bandwidth limit error
+        if (authResponse.status === 503 || authResponse.status === 429) {
+          console.warn('Backblaze bandwidth limit exceeded on auth');
+          
+          // Fall back to Supabase storage
+          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+            .from('videos')
+            .createSignedUrl(videoUrl, 86400);
+
+          if (signedUrlError) {
+            return new Response(
+              JSON.stringify({ 
+                error: 'Backblaze bandwidth exceeded and Supabase fallback failed'
+              }),
+              { status: 503, headers: { ...corsHeaders, 'X-Bandwidth-Limited': 'true' } }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              signedUrl: signedUrlData.signedUrl,
+              expiresAt: new Date(Date.now() + 86400000).toISOString(),
+              message: 'Using Supabase storage (Backblaze bandwidth limited)',
+              source: 'supabase-fallback'
+            }),
+            { 
+              headers: { 
+                ...corsHeaders,
+                'X-Bandwidth-Limited': 'true',
+                'Cache-Control': 'public, max-age=3600'
+              } 
+            }
+          );
+        }
+
+        console.error('Backblaze auth failed:', authResponse.status);
+        return new Response(
+          JSON.stringify({ error: 'Failed to authorize with Backblaze' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      const authData: B2AuthResponse = await authResponse.json();
+
+      // Generate download authorization
+      const validDurationInSeconds = 7200;
+      const downloadAuthResponse = await fetch(`${authData.apiUrl}/b2api/v2/b2_get_download_authorization`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authData.authorizationToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          bucketId: b2BucketId,
+          fileNamePrefix: filePath,
+          validDurationInSeconds
+        })
+      });
+
+      if (!downloadAuthResponse.ok) {
+        // Check for bandwidth limit errors
+        if (downloadAuthResponse.status === 503 || downloadAuthResponse.status === 429) {
+          console.warn('Backblaze bandwidth limit exceeded on download auth');
+          
+          // Fall back to Supabase
+          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+            .from('videos')
+            .createSignedUrl(videoUrl, 86400);
+
+          if (signedUrlError) {
+            return new Response(
+              JSON.stringify({ 
+                error: 'Backblaze bandwidth exceeded and Supabase fallback failed'
+              }),
+              { status: 503, headers: { ...corsHeaders, 'X-Bandwidth-Limited': 'true' } }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              signedUrl: signedUrlData.signedUrl,
+              expiresAt: new Date(Date.now() + 86400000).toISOString(),
+              message: 'Using Supabase storage (Backblaze bandwidth limited)',
+              source: 'supabase-fallback'
+            }),
+            { 
+              headers: { 
+                ...corsHeaders,
+                'X-Bandwidth-Limited': 'true',
+                'Cache-Control': 'public, max-age=3600'
+              } 
+            }
+          );
+        }
+
+        console.error('Backblaze download auth failed:', downloadAuthResponse.status);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate download authorization' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      const downloadAuthData: B2SignedUrlResponse = await downloadAuthResponse.json();
+      const signedUrl = `${authData.downloadUrl}/file/${b2BucketName}/${filePath}?Authorization=${downloadAuthData.authorizationToken}`;
+      const expiresAt = new Date(Date.now() + validDurationInSeconds * 1000).toISOString();
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          signedUrl,
+          expiresAt,
+          message: 'Video URL generated (Backblaze)',
+          source: 'backblaze'
+        }),
+        { 
+          headers: { 
+            ...corsHeaders,
+            'Cache-Control': `public, max-age=${validDurationInSeconds}`,
+            'X-Signed-Url-Expires': expiresAt
+          } 
+        }
+      );
+
+    } else {
+      // Supabase storage fallback
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('videos')
+        .createSignedUrl(videoUrl, 86400);
+
+      if (signedUrlError) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate video URL' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          signedUrl: signedUrlData.signedUrl,
+          expiresAt: new Date(Date.now() + 86400000).toISOString(),
+          message: 'Video URL generated (Supabase)',
+          source: 'supabase'
+        }),
+        { 
+          headers: { 
+            ...corsHeaders,
+            'Cache-Control': 'public, max-age=86400'
+          } 
+        }
+      );
+    }
 
   } catch (error) {
-    console.error('Error generating signed URL:', error);
+    console.error('Generate B2 signed URL error:', {
+      message: error instanceof Error ? error.message : String(error),
+      type: typeof error
+    });
     return new Response(
-      JSON.stringify({ error: 'An unexpected error occurred' }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      }
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : String(error)
+      }),
+      { status: 500, headers: corsHeaders }
     );
   }
 });

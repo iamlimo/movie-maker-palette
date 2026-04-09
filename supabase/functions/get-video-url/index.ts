@@ -17,6 +17,38 @@ interface B2SignedUrlResponse {
   authorizationToken: string;
 }
 
+// Bandwidth tracking - stored in-memory for this function instance
+const bandwidthTracker = {
+  dailyDownloads: 0,
+  lastReset: new Date().toDateString(),
+  limit: 1024 * 1024 * 1024, // 1 GB in bytes
+  
+  reset() {
+    const today = new Date().toDateString();
+    if (today !== this.lastReset) {
+      this.dailyDownloads = 0;
+      this.lastReset = today;
+      console.log('Daily bandwidth counter reset');
+    }
+  },
+  
+  addDownload(bytes: number) {
+    this.reset();
+    this.dailyDownloads += bytes;
+    return this.dailyDownloads;
+  },
+  
+  getRemainingBandwidth(): number {
+    this.reset();
+    return Math.max(0, this.limit - this.dailyDownloads);
+  },
+  
+  isLimitExceeded(): boolean {
+    this.reset();
+    return this.dailyDownloads >= this.limit;
+  }
+};
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -100,12 +132,12 @@ Deno.serve(async (req) => {
       // Check if user has active rental
       const { data: rental } = await supabase
         .from('rentals')
-        .select('id, expiration_date')
+        .select('id, expires_at')
         .eq('user_id', user.id)
         .eq('content_id', movieId)
         .eq('content_type', 'movie')
         .eq('status', 'active')
-        .gt('expiration_date', new Date().toISOString())
+        .gte('expires_at', new Date().toISOString())
         .single();
 
       if (!purchase && !rental) {
@@ -125,36 +157,71 @@ Deno.serve(async (req) => {
 
     const videoUrl = movie.video_url;
 
-    // Check if it's a Backblaze URL
-    const isBackblazeUrl = videoUrl.includes('backblazeb2.com') || 
-                           videoUrl.includes('b2cdn.com') ||
-                           (!videoUrl.startsWith('http') && videoUrl.includes('/'));
+    // Check if it's a Backblaze URL (must contain backblaze domains)
+    const isBackblazeUrl = videoUrl.includes('backblazeb2.com') || videoUrl.includes('b2cdn.com');
 
     if (isBackblazeUrl) {
       // Generate Backblaze signed URL
       const b2KeyId = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY_ID');
       const b2AppKey = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY');
       const b2BucketName = Deno.env.get('BACKBLAZE_B2_BUCKET_NAME');
+      const b2BucketId = Deno.env.get('BACKBLAZE_B2_BUCKET_ID');
 
-      if (!b2KeyId || !b2AppKey || !b2BucketName) {
+      if (!b2KeyId || !b2AppKey || !b2BucketName || !b2BucketId) {
+        console.error('Backblaze credentials not configured properly', {
+          hasKeyId: !!b2KeyId,
+          hasAppKey: !!b2AppKey,
+          hasBucketName: !!b2BucketName,
+          hasBucketId: !!b2BucketId,
+          videoUrl
+        });
         return new Response(
-          JSON.stringify({ error: 'Backblaze credentials not configured' }),
+          JSON.stringify({ error: 'Backblaze credentials not properly configured' }),
           { status: 500, headers: corsHeaders }
         );
       }
 
-      // Extract file path (remove domain if present)
+      // Extract file path (remove domain and bucket from full URL)
       let filePath = videoUrl;
       if (videoUrl.includes('://')) {
         try {
           const urlObj = new URL(videoUrl);
-          filePath = urlObj.pathname.split('/').filter(p => p).slice(1).join('/');
-        } catch {
+          const segments = urlObj.pathname.split('/').filter(Boolean);
+
+          if (segments[0] === 'file' && segments.length >= 3) {
+            // backblaze direct/download URL format: /file/<bucket>/<path>
+            filePath = segments.slice(2).join('/');
+          } else if (segments[0] === b2BucketName && segments.length >= 2) {
+            // possible /<bucket>/<path> format
+            filePath = segments.slice(1).join('/');
+          } else {
+            const bucketIndex = segments.indexOf(b2BucketName);
+            if (bucketIndex >= 0 && segments.length > bucketIndex + 1) {
+              filePath = segments.slice(bucketIndex + 1).join('/');
+            } else {
+              filePath = segments.join('/');
+            }
+          }
+        } catch (parseError) {
+          console.error('URL parse error:', parseError, 'for URL:', videoUrl);
           filePath = videoUrl;
         }
       }
 
-      // Authorize with Backblaze B2
+      if (!filePath || !filePath.includes('.')) {
+        console.error('Invalid file path extracted:', filePath, 'from URL:', videoUrl);
+        return new Response(
+          JSON.stringify({ error: 'Invalid video file path format' }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      console.log('Successfully extracted Backblaze file path:', {
+        originalUrl: videoUrl,
+        extractedPath: filePath,
+        hasDotExtension: filePath.includes('.')
+      });
+
       const authResponse = await fetch(`${BACKBLAZE_API_URL}/b2api/v2/b2_authorize_account`, {
         method: 'GET',
         headers: {
@@ -163,9 +230,58 @@ Deno.serve(async (req) => {
       });
 
       if (!authResponse.ok) {
-        console.error('Backblaze authorization failed');
+        const authErrorBody = await authResponse.text();
+        
+        // Check if it's a bandwidth limit error (503 Service Unavailable or 429 Too Many Requests)
+        if (authResponse.status === 503 || authResponse.status === 429) {
+          console.warn('Backblaze bandwidth limit likely exceeded', {
+            status: authResponse.status,
+            statusText: authResponse.statusText
+          });
+          
+          // Fall back to Supabase storage
+          console.log('Falling back to Supabase storage due to B2 bandwidth limit');
+          const expiresIn = expiryHours * 3600;
+          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+            .from('videos')
+            .createSignedUrl(videoUrl, expiresIn);
+
+          if (signedUrlError) {
+            return new Response(
+              JSON.stringify({ 
+                error: 'Backblaze bandwidth exceeded and Supabase fallback failed',
+                details: signedUrlError.message
+              }),
+              { status: 503, headers: { ...corsHeaders, 'X-Bandwidth-Limited': 'true' } }
+            );
+          }
+
+          const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
+          return new Response(
+            JSON.stringify({
+              success: true,
+              signedUrl: signedUrlData.signedUrl,
+              expiresAt,
+              message: 'Video URL generated via Supabase (Backblaze bandwidth limited)',
+              source: 'supabase-fallback'
+            }),
+            { 
+              headers: { 
+                ...corsHeaders, 
+                'X-Bandwidth-Limited': 'true',
+                'Cache-Control': 'public, max-age=3600'
+              } 
+            }
+          );
+        }
+        
+        console.error('Backblaze authorization failed', {
+          status: authResponse.status,
+          statusText: authResponse.statusText,
+          body: authErrorBody
+        });
         return new Response(
-          JSON.stringify({ error: 'Failed to authorize with Backblaze' }),
+          JSON.stringify({ error: 'Failed to authorize with Backblaze', details: authErrorBody }),
           { status: 500, headers: corsHeaders }
         );
       }
@@ -181,16 +297,67 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          bucketId: b2BucketName,
+          bucketId: b2BucketId,
           fileNamePrefix: filePath,
           validDurationInSeconds
         })
       });
 
       if (!downloadAuthResponse.ok) {
-        console.error('Backblaze download authorization failed');
+        const downloadErrorBody = await downloadAuthResponse.text();
+        
+        // Check if it's a bandwidth limit error
+        if (downloadAuthResponse.status === 503 || downloadAuthResponse.status === 429) {
+          console.warn('Backblaze download bandwidth limit likely exceeded', {
+            status: downloadAuthResponse.status,
+            statusText: downloadAuthResponse.statusText
+          });
+          
+          // Fall back to Supabase storage
+          console.log('Falling back to Supabase storage due to B2 bandwidth limit');
+          const expiresIn = expiryHours * 3600;
+          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+            .from('videos')
+            .createSignedUrl(videoUrl, expiresIn);
+
+          if (signedUrlError) {
+            return new Response(
+              JSON.stringify({ 
+                error: 'Backblaze bandwidth exceeded and Supabase fallback failed',
+                details: signedUrlError.message
+              }),
+              { status: 503, headers: { ...corsHeaders, 'X-Bandwidth-Limited': 'true' } }
+            );
+          }
+
+          const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
+          return new Response(
+            JSON.stringify({
+              success: true,
+              signedUrl: signedUrlData.signedUrl,
+              expiresAt,
+              message: 'Video URL generated via Supabase (Backblaze bandwidth limited)',
+              source: 'supabase-fallback'
+            }),
+            { 
+              headers: { 
+                ...corsHeaders, 
+                'X-Bandwidth-Limited': 'true',
+                'Cache-Control': 'public, max-age=3600'
+              } 
+            }
+          );
+        }
+        
+        console.error('Backblaze download authorization failed', {
+          status: downloadAuthResponse.status,
+          statusText: downloadAuthResponse.statusText,
+          body: downloadErrorBody,
+          bucketId: b2BucketId,
+          fileNamePrefix: filePath
+        });
         return new Response(
-          JSON.stringify({ error: 'Failed to generate download authorization' }),
+          JSON.stringify({ error: 'Failed to generate download authorization', details: downloadErrorBody }),
           { status: 500, headers: corsHeaders }
         );
       }
@@ -204,9 +371,16 @@ Deno.serve(async (req) => {
           success: true,
           signedUrl,
           expiresAt,
-          message: 'Video URL generated successfully (Backblaze)'
+          message: 'Video URL generated successfully (Backblaze)',
+          source: 'backblaze'
         }),
-        { headers: corsHeaders }
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Cache-Control': `public, max-age=${validDurationInSeconds}`,
+            'X-Signed-Url-Expires': expiresAt
+          } 
+        }
       );
 
     } else {
@@ -231,16 +405,30 @@ Deno.serve(async (req) => {
           success: true,
           signedUrl: signedUrlData.signedUrl,
           expiresAt,
-          message: 'Video URL generated successfully (Supabase)'
+          message: 'Video URL generated successfully (Supabase)',
+          source: 'supabase'
         }),
-        { headers: corsHeaders }
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Cache-Control': `public, max-age=${expiresIn}`,
+            'X-Signed-Url-Expires': expiresAt
+          } 
+        }
       );
     }
 
   } catch (error) {
-    console.error('Get video URL function error:', error);
+    console.error('Get video URL function error:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      type: typeof error
+    });
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : String(error)
+      }),
       { status: 500, headers: corsHeaders }
     );
   }

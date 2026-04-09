@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useWallet } from '@/hooks/useWallet';
-import { Wallet as WalletIcon, Plus, TrendingUp, TrendingDown, History } from 'lucide-react';
+import { Wallet as WalletIcon, Plus, TrendingUp, TrendingDown, History, RefreshCw } from 'lucide-react';
 import Header from '@/components/Header';
 import FundWalletModal from '@/components/wallet/FundWalletModal';
 import TransactionHistory from '@/components/wallet/TransactionHistory';
@@ -13,7 +13,7 @@ import { usePlatform } from '@/hooks/usePlatform';
 export default function Wallet() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { balance, formatBalance, isLoading } = useWallet();
+  const { balance, formatBalance, isLoading, refreshWallet } = useWallet();
   const { isIOS } = usePlatform();
   const [isFundModalOpen, setIsFundModalOpen] = useState(false);
 
@@ -51,8 +51,19 @@ export default function Wallet() {
                     {isLoading ? '...' : formatBalance()}
                   </CardTitle>
                 </div>
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20">
-                  <WalletIcon className="h-12 w-12 text-primary" />
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshWallet}
+                    disabled={isLoading}
+                    className="p-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20">
+                    <WalletIcon className="h-12 w-12 text-primary" />
+                  </div>
                 </div>
               </div>
             </CardHeader>

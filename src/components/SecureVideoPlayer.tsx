@@ -15,6 +15,9 @@ interface SecureVideoPlayerProps {
   onError?: (error: string) => void;
 }
 
+// URL cache with expiry tracking
+const urlCache = new Map<string, { url: string; expiresAt: Date; source: string }>();
+
 const SecureVideoPlayer = ({ 
   contentId, 
   contentType, 
@@ -27,6 +30,7 @@ const SecureVideoPlayer = ({
   const [error, setError] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [isBandwidthLimited, setIsBandwidthLimited] = useState(false);
   const { toast } = useToast();
   const refreshTimerRef = useRef<number | null>(null);
   const lastPositionLoaded = useRef(false);
@@ -37,6 +41,19 @@ const SecureVideoPlayer = ({
     try {
       setLoading(true);
       setError(null);
+      setIsBandwidthLimited(false);
+
+      // Check cache first
+      const cacheKey = `${contentId}-${contentType}`;
+      const cached = urlCache.get(cacheKey);
+      if (cached && new Date() < cached.expiresAt) {
+        console.log('Using cached video URL (source: ' + cached.source + ')');
+        setSignedUrl(cached.url);
+        setExpiresAt(cached.expiresAt.toISOString());
+        setLoading(false);
+        scheduleRefresh(cached.expiresAt);
+        return;
+      }
 
       // Get the current session token (works on both native and web)
       const { data: { session } } = await supabase.auth.getSession();
@@ -61,36 +78,68 @@ const SecureVideoPlayer = ({
         }
       );
 
+      // Check for bandwidth limit response
+      const isBwLimited = response.headers.get('X-Bandwidth-Limited') === 'true';
+      if (isBwLimited) {
+        setIsBandwidthLimited(true);
+        console.warn('Backblaze bandwidth limit exceeded - using fallback source');
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get video URL');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
       const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get video URL');
+      }
+
+      const expiryDate = new Date(data.expiresAt);
+      
+      // Cache the URL
+      urlCache.set(cacheKey, {
+        url: data.signedUrl,
+        expiresAt: expiryDate,
+        source: data.source || 'backblaze'
+      });
+
       setSignedUrl(data.signedUrl);
       setExpiresAt(data.expiresAt);
       setLoading(false);
 
-      // Set up auto-refresh 5 minutes before expiry
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
+      // Schedule auto-refresh
+      scheduleRefresh(expiryDate);
+
+      if (isBwLimited) {
+        toast({
+          title: "Using Backup Server",
+          description: "Backblaze bandwidth limit reached. Using Supabase storage.",
+          variant: "default",
+        });
       }
-
-      const expiryTime = new Date(data.expiresAt).getTime();
-      const now = Date.now();
-      const refreshTime = expiryTime - now - (5 * 60 * 1000); // 5 minutes before expiry
-
-      if (refreshTime > 0) {
-        refreshTimerRef.current = window.setTimeout(() => {
-          handleRefreshUrl();
-        }, refreshTime);
-      }
-
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to load video';
       setError(errorMessage);
       setLoading(false);
       onError?.(errorMessage);
+    }
+  };
+
+  const scheduleRefresh = (expiresAt: Date) => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+
+    const expiryTime = expiresAt.getTime();
+    const now = Date.now();
+    const refreshTime = expiryTime - now - (5 * 60 * 1000); // 5 minutes before expiry
+
+    if (refreshTime > 0) {
+      refreshTimerRef.current = window.setTimeout(() => {
+        handleRefreshUrl();
+      }, refreshTime);
     }
   };
 
@@ -198,6 +247,14 @@ const SecureVideoPlayer = ({
 
   return (
     <div className="relative">
+      {/* Bandwidth Limited Banner */}
+      {isBandwidthLimited && (
+        <div className="bg-amber-900/80 text-amber-100 px-4 py-2 text-sm flex items-center gap-2 mb-2 rounded-t-lg">
+          <span>⚠️</span>
+          <span>Using backup server due to bandwidth limits. Service will resume tomorrow.</span>
+        </div>
+      )}
+
       <div 
         className="aspect-video bg-black rounded-lg overflow-hidden"
         onContextMenu={handleContextMenu}

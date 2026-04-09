@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { usePlatform } from "@/hooks/usePlatform";
+import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const Auth = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // Login form state
   const [loginData, setLoginData] = useState({
@@ -214,6 +216,16 @@ const Auth = () => {
         </div>
       </div>
 
+      <div className="flex items-center justify-between mt-4">
+        <button
+          type="button"
+          onClick={() => setShowForgotPassword(true)}
+          className="text-sm text-primary hover:text-primary/80 transition-smooth font-medium"
+        >
+          Forgot password?
+        </button>
+      </div>
+
       <Button
         type="submit"
         className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
@@ -343,6 +355,16 @@ const Auth = () => {
                           )}
                         </button>
                       </div>
+                    </div>
+
+                    <div className="flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPassword(true)}
+                        className="text-sm text-primary hover:text-primary/80 transition-smooth font-medium"
+                      >
+                        Forgot password?
+                      </button>
                     </div>
 
                     <Button
@@ -488,6 +510,12 @@ const Auth = () => {
           </p>
         )}
       </div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 };

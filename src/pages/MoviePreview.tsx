@@ -13,6 +13,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
 import { usePlatform } from "@/hooks/usePlatform";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { VideoPlayer } from "@/components/VideoPlayer";
 
 interface Movie {
   id: string;
@@ -55,6 +57,7 @@ const MoviePreview = () => {
   const [movie, setMovie] = useState<Movie | null>(preloadedData || null);
   const [loading, setLoading] = useState(!preloadedData);
   const [error, setError] = useState<string | null>(null);
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
 
   const isFavorite = movie
     ? favorites.some(
@@ -136,6 +139,10 @@ const MoviePreview = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleWatch = () => {
+    setShowVideoPlayer(true);
   };
 
   if (loading) {
@@ -319,6 +326,7 @@ const MoviePreview = () => {
               contentType="movie"
               price={movie.price}
               title={movie.title}
+              onWatch={handleWatch}
             />
 
             {/* Watchlist Action */}
@@ -378,6 +386,17 @@ const MoviePreview = () => {
           genreId={movie.genre_id}
         />
       </div>
+
+      {/* Video Player Dialog */}
+      <Dialog open={showVideoPlayer} onOpenChange={setShowVideoPlayer}>
+        <DialogContent className="max-w-6xl w-full h-[80vh] p-0">
+          <VideoPlayer
+            movieId={movie.id}
+            subtitleUrl={movie.subtitle_url}
+            className="w-full h-full"
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

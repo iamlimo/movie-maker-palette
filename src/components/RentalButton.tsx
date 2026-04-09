@@ -26,6 +26,7 @@ interface RentalButtonProps {
   contentType: "movie" | "tv" | "season" | "episode";
   price: number;
   title: string;
+  onWatch?: () => void;
 }
 
 const RentalButton = ({
@@ -33,6 +34,7 @@ const RentalButton = ({
   contentType,
   price,
   title,
+  onWatch,
 }: RentalButtonProps) => {
   const { user } = useAuth();
   const { checkAccess, fetchRentals, activeRentals } = useRentals();
@@ -276,7 +278,12 @@ const RentalButton = ({
   if (hasAccess) {
     return (
       <div className="space-y-2">
-        <Button variant="default" size="lg" className="w-full touch-target">
+        <Button 
+          variant="default" 
+          size="lg" 
+          className="w-full touch-target"
+          onClick={onWatch}
+        >
           <Play className="h-5 w-5 mr-2" />
           Watch Now
         </Button>

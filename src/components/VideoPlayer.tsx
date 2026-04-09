@@ -12,6 +12,9 @@ interface VideoPlayerProps {
   subtitleUrl?: string;
 }
 
+// Client-side URL cache to reduce Backblaze bandwidth calls
+const urlCache = new Map<string, { url: string; expiresAt: Date; source: string }>();
+
 export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlayerProps) => {
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -22,6 +25,7 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [isBandwidthLimited, setIsBandwidthLimited] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,37 +35,82 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
     fetchVideoUrl();
   }, [movieId]);
 
-  const fetchVideoUrl = async () => {
+  const fetchVideoUrl = async (retryCount = 0) => {
     try {
       setLoading(true);
       setError('');
+      setIsBandwidthLimited(false);
+
+      // Check cache first
+      const cached = urlCache.get(movieId);
+      if (cached && new Date() < cached.expiresAt) {
+        console.log('Using cached video URL (source: ' + cached.source + ')');
+        setVideoUrl(cached.url);
+        setLoading(false);
+        return;
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!session?.access_token) {
         setError('Please log in to watch this video');
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('get-video-url', {
+      const { data, error, response } = await supabase.functions.invoke('get-video-url', {
         body: {
           movieId: movieId,
           expiryHours: 24
-        }
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
+      // Check if Backblaze bandwidth is limited
+      const isBwLimited = response?.headers?.get('X-Bandwidth-Limited') === 'true';
+      if (isBwLimited) {
+        setIsBandwidthLimited(true);
+        console.warn('Backblaze bandwidth limit exceeded - using fallback source');
+      }
+
+      const apiError = data?.error || error?.message || 'Failed to load video';
+      const accessDenied = apiError.toLowerCase().includes('access denied') || apiError.toLowerCase().includes('forbidden');
+
       if (error || !data?.success) {
-        console.error('Error fetching video URL:', error);
-        setError(data?.error || 'Failed to load video');
+        console.error('Error fetching video URL:', error || data);
+
+        if (retryCount === 0 && accessDenied) {
+          console.log('Retrying get-video-url after access check update...');
+          setTimeout(() => fetchVideoUrl(1), 1500);
+        }
+
+        setError(apiError);
         toast({
           title: "Error",
-          description: data?.error || 'Failed to load video',
+          description: apiError,
           variant: "destructive",
         });
         return;
       }
 
+      // Cache the URL
+      const expiresAt = new Date(data.expiresAt);
+      urlCache.set(movieId, {
+        url: data.signedUrl,
+        expiresAt,
+        source: data.source || 'backblaze'
+      });
+
       setVideoUrl(data.signedUrl);
-    } catch (error) {
+      
+      if (isBwLimited) {
+        toast({
+          title: "Using Backup Server",
+          description: "Backblaze bandwidth limit reached. Using Supabase storage.",
+          variant: "default",
+        });
+      }
+    } catch (error: any) {
       console.error('Error:', error);
       setError('Failed to load video');
       toast({
@@ -182,6 +231,14 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
       ref={containerRef}
       className={`relative bg-black rounded-lg overflow-hidden group ${className}`}
     >
+      {/* Bandwidth Limited Banner */}
+      {isBandwidthLimited && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-amber-900/80 text-amber-100 px-4 py-2 text-sm flex items-center gap-2">
+          <span>⚠️</span>
+          <span>Using backup server due to bandwidth limits. Service will resume tomorrow.</span>
+        </div>
+      )}
+      
       <video
         ref={videoRef}
         src={videoUrl}

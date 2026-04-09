@@ -16,6 +16,7 @@ import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Lazy load non-critical routes for faster initial load
@@ -90,6 +91,7 @@ function AppContent() {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/movie/:slug" element={<MoviePreview />} />
             <Route path="/tvshow/:slug" element={<TVShowPreview />} />

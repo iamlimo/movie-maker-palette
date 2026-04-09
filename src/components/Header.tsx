@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
   const { isSuperAdmin } = useRole();
-  const { formatBalance } = useWallet();
+  const { formatBalance, isLoading: walletLoading, error: walletError } = useWallet();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -126,7 +126,9 @@ const Header = () => {
                     className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
                   >
                     <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
-                    <span className="text-xs lg:text-sm font-medium">{formatBalance()}</span>
+                    <span className="text-xs lg:text-sm font-medium">
+                      {walletLoading ? '...' : formatBalance()}
+                    </span>
                   </Button>
                 </Link>
               )}

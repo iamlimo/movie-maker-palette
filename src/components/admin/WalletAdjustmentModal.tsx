@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
+import { formatNaira } from '@/lib/priceUtils';
 interface WalletAdjustmentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -77,7 +77,7 @@ export default function WalletAdjustmentModal({
         console.log('Wallet updated successfully. New balance:', data.new_balance);
         toast({
           title: 'Adjustment Successful',
-          description: `Wallet ${type === 'credit' ? 'credited' : 'debited'} with ₦${(amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}. New balance: ₦${(data.new_balance / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
+          description: `Wallet ${type === 'credit' ? 'credited' : 'debited'} with ${formatNaira(amount)}. New balance: ${formatNaira(data.new_balance)}`,
         });
         onSuccess();
       }
@@ -112,7 +112,7 @@ export default function WalletAdjustmentModal({
           <div className="p-4 rounded-lg border border-border bg-muted/20">
             <p className="text-sm text-muted-foreground mb-1">Current Balance</p>
             <p className="text-2xl font-bold">
-              ₦{currentBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              {formatNaira(currentBalance)}
             </p>
           </div>
 
@@ -162,7 +162,7 @@ export default function WalletAdjustmentModal({
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 New balance will be: <strong className={newBalance < 0 ? 'text-destructive' : ''}>
-                  ₦{newBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                  {formatNaira(newBalance)}
                 </strong>
               </AlertDescription>
             </Alert>

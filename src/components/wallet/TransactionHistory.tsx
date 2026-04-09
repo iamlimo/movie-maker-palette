@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowUpCircle, ArrowDownCircle, History, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface Transaction {
   id: string;
@@ -162,11 +163,11 @@ export default function TransactionHistory() {
                         tx.transaction_type === 'credit' && "text-green-500",
                         tx.transaction_type === 'debit' && "text-red-500"
                       )}>
-                        {tx.transaction_type === 'credit' ? '+' : '-'}₦{(tx.amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        {tx.transaction_type === 'credit' ? '+' : '-'}{formatNaira(tx.amount)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      ₦{(tx.balance_after / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                      {formatNaira(tx.balance_after)}
                     </TableCell>
                   </TableRow>
                 ))}

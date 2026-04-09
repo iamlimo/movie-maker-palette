@@ -17,6 +17,9 @@ interface NativeVideoPlayerProps {
   autoPlay?: boolean;
 }
 
+// URL cache with expiry tracking
+const urlCache = new Map<string, { url: string; expiresAt: Date; source: string }>();
+
 // Dynamic import for native video player (installed separately on native builds)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let CapacitorVideoPlayer: any = null;
@@ -46,6 +49,7 @@ const NativeVideoPlayer = ({
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [nativePlayerReady, setNativePlayerReady] = useState(false);
+  const [isBandwidthLimited, setIsBandwidthLimited] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerIdRef = useRef(`video-${contentId}-${Date.now()}`);
   const lastPositionLoaded = useRef(false);
@@ -68,6 +72,17 @@ const NativeVideoPlayer = ({
     try {
       setLoading(true);
       setError(null);
+      setIsBandwidthLimited(false);
+
+      // Check cache first
+      const cacheKey = `${contentId}-${contentType}`;
+      const cached = urlCache.get(cacheKey);
+      if (cached && new Date() < cached.expiresAt) {
+        console.log('Using cached video URL (source: ' + cached.source + ')');
+        setSignedUrl(cached.url);
+        setLoading(false);
+        return;
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -88,17 +103,46 @@ const NativeVideoPlayer = ({
         }
       );
 
+      // Check for bandwidth limit response
+      const isBwLimited = response.headers.get('X-Bandwidth-Limited') === 'true';
+      if (isBwLimited) {
+        setIsBandwidthLimited(true);
+        console.warn('Backblaze bandwidth limit exceeded - using fallback source');
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get video URL');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
       const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get video URL');
+      }
+
+      // Cache the URL
+      const expiresAt = new Date(data.expiresAt);
+      urlCache.set(cacheKey, {
+        url: data.signedUrl,
+        expiresAt,
+        source: data.source || 'backblaze'
+      });
+
       setSignedUrl(data.signedUrl);
       setLoading(false);
 
       if (autoPlay) {
         handlePlay(data.signedUrl);
+      }
+
+      if (isBwLimited) {
+        const { toast } = useToast();
+        toast({
+          title: "Using Backup Server",
+          description: "Backblaze bandwidth limit reached. Using Supabase storage.",
+          variant: "default",
+        });
       }
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to load video';
@@ -240,6 +284,14 @@ const NativeVideoPlayer = ({
 
   return (
     <div className="relative">
+      {/* Bandwidth Limited Banner */}
+      {isBandwidthLimited && (
+        <div className="bg-amber-900/80 text-amber-100 px-3 md:px-4 py-2 text-xs md:text-sm rounded-t-lg flex items-center gap-2 mb-2">
+          <span>⚠️</span>
+          <span>Using backup server due to bandwidth limits. Service will resume tomorrow.</span>
+        </div>
+      )}
+
       {!isPlaying ? (
         // Poster with play button
         <div
