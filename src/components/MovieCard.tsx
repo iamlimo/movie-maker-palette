@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Star, Play, Clock, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -157,4 +157,4 @@ const MovieCard = ({
   );
 };
 
-export default MovieCard;
+export default React.memo(MovieCard);

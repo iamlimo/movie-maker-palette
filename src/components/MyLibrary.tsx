@@ -39,43 +39,60 @@ const MyLibrary = () => {
   const fetchRentedContent = async () => {
     try {
       setIsLoading(true);
-      const contentPromises = activeRentals.map(async (rental) => {
-        if (rental.content_type === 'movie') {
-          const { data, error } = await supabase
-            .from('movies')
-            .select('id, title, thumbnail_url, slug')
-            .eq('id', rental.content_id)
-            .single();
+      
+      // Separate by content type and batch queries
+      const movieIds = activeRentals
+        .filter(r => r.content_type === 'movie')
+        .map(r => r.content_id);
+      
+      const tvIds = activeRentals
+        .filter(r => r.content_type === 'episode')
+        .map(r => r.content_id);
 
-          if (error || !data) return null;
-          return {
-            id: data.id,
-            slug: data.slug,
-            title: data.title,
-            thumbnail_url: data.thumbnail_url,
+      // Single query for all movies
+      let moviesData: any[] = [];
+      if (movieIds.length > 0) {
+        const { data } = await supabase
+          .from('movies')
+          .select('id, title, thumbnail_url, slug')
+          .in('id', movieIds);
+        moviesData = data || [];
+      }
+
+      // Single query for all episodes
+      let episodesData: any[] = [];
+      if (tvIds.length > 0) {
+        const { data } = await supabase
+          .from('episodes')
+          .select('id, title')
+          .in('id', tvIds);
+        episodesData = data || [];
+      }
+
+      // Merge results with rentals
+      const rentedContent = activeRentals.map(rental => {
+        if (rental.content_type === 'movie') {
+          const movieData = moviesData.find(m => m.id === rental.content_id);
+          return movieData ? { 
+            id: movieData.id,
+            slug: movieData.slug,
+            title: movieData.title,
+            thumbnail_url: movieData.thumbnail_url,
             content_type: 'movie' as const,
             rental: { expires_at: rental.expires_at, amount: rental.amount }
-          };
+          } : null;
         } else {
-          const { data, error } = await supabase
-            .from('episodes')
-            .select('id, title')
-            .eq('id', rental.content_id)
-            .single();
-
-          if (error || !data) return null;
-          return {
-            id: data.id,
-            title: data.title,
+          const episodeData = episodesData.find(e => e.id === rental.content_id);
+          return episodeData ? { 
+            id: episodeData.id,
+            title: episodeData.title,
             content_type: 'tv' as const,
             rental: { expires_at: rental.expires_at, amount: rental.amount }
-          };
+          } : null;
         }
-      });
+      }).filter(Boolean) as RentedContent[];
 
-      const results = await Promise.all(contentPromises);
-      const validContent = results.filter((item) => item !== null) as RentedContent[];
-      setRentedContent(validContent);
+      setRentedContent(rentedContent);
       
     } catch (error) {
       console.error('Error fetching rented content:', error);

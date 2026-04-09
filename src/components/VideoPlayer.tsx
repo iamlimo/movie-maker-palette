@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -31,11 +31,7 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchVideoUrl();
-  }, [movieId]);
-
-  const fetchVideoUrl = async (retryCount = 0) => {
+  const fetchVideoUrl = useCallback(async (retryCount = 0) => {
     try {
       setLoading(true);
       setError('');
@@ -110,18 +106,23 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
           variant: "default",
         });
       }
-    } catch (error: any) {
-      console.error('Error:', error);
-      setError('Failed to load video');
+    } catch (err: unknown) {
+      console.error('Error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load video';
+      setError(errorMessage);
       toast({
         title: "Error",
-        description: 'Failed to load video',
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [movieId, toast]);
+
+  useEffect(() => {
+    fetchVideoUrl();
+  }, [fetchVideoUrl]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -218,7 +219,7 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
       <div className={`flex flex-col items-center justify-center bg-black rounded-lg p-8 ${className}`}>
         <div className="text-white text-center">
           <p className="text-lg mb-2">⚠️ {error}</p>
-          <Button variant="outline" onClick={fetchVideoUrl}>
+          <Button variant="outline" onClick={() => fetchVideoUrl()}>
             Retry
           </Button>
         </div>
