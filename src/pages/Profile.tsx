@@ -51,6 +51,7 @@ import { cn } from '@/lib/utils';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ContentCarousel, { ContentCarouselItem } from '@/components/ContentCarousel';
 import WatchProgressCard from '@/components/WatchProgressCard';
+import ActiveRentalCard from '@/components/ActiveRentalCard';
 import { Link } from 'react-router-dom';
 
 const Profile = () => {
@@ -59,7 +60,7 @@ const Profile = () => {
   const { profile, preferences, loading: profileLoading, updateProfile, updatePreferences, uploadProfileImage, refetch: refetchProfile } = useProfile();
   const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
   const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
-  const { activeRentals, formatTimeRemaining } = useRentals();
+  const { activeRentals, formatTimeRemaining, fetchRentals } = useRentals();
   const { isIOS } = usePlatform();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -95,6 +96,7 @@ const Profile = () => {
         refetchProfile?.(),
         refetchHistory?.(),
         refetchFavorites?.(),
+        fetchRentals?.(),
       ]);
     },
     enabled: isMobile,
@@ -510,46 +512,13 @@ const Profile = () => {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {activeRentals.map((rental) => {
-                          const timeLeft = new Date(rental.expires_at).getTime() - new Date().getTime();
-                          const hoursLeft = timeLeft / (1000 * 60 * 60);
-                          const isExpiringSoon = hoursLeft < 24;
-                          const isCritical = hoursLeft < 1;
-
-                          return (
-                            <Card key={rental.id} className={cn(
-                              "card-hover",
-                              isCritical ? "border-red-500/50 bg-red-500/5" : 
-                              isExpiringSoon ? "border-yellow-500/50 bg-yellow-500/5" : ""
-                            )}>
-                              <CardContent className="p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <Badge variant="secondary" className="text-xs">
-                                    {rental.content_type === 'movie' ? 'Movie' : 'TV Show'}
-                                  </Badge>
-                                  <div className={cn(
-                                    "text-xs font-medium",
-                                    isCritical ? "text-red-600" : 
-                                    isExpiringSoon ? "text-yellow-600" : "text-muted-foreground"
-                                  )}>
-                                    Expires {formatTimeRemaining(rental.expires_at)}
-                                  </div>
-                                </div>
-                                <p className="font-medium text-sm mb-3">
-                                  Content ID: {rental.content_id}
-                                </p>
-                                <Button
-                                  size="sm"
-                                  className="w-full"
-                                  onClick={() => navigate(`/watch/${rental.content_type}/${rental.content_id}`)}
-                                >
-                                  <Play size={14} className="mr-2" />
-                                  Watch Now
-                                </Button>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
+                        {activeRentals.map((rental) => (
+                          <ActiveRentalCard
+                            key={rental.id}
+                            rental={rental}
+                            formatTimeRemaining={formatTimeRemaining}
+                          />
+                        ))}
                       </div>
                     )}
                   </CardContent>

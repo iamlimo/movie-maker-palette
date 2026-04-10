@@ -34,7 +34,7 @@ const Watch = () => {
     try {
       // Check rental access
       const { data: accessData, error: accessError } = await supabase.functions.invoke("rental-access", {
-        body: { contentId, contentType }
+        body: { content_id: contentId, content_type: contentType }
       });
 
       if (accessError || !accessData?.has_access) {
@@ -69,18 +69,33 @@ const Watch = () => {
 
       setContent(contentData);
 
-      // Generate secure video URL
-      const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
-        body: { contentId, contentType }
-      });
+      // Get video URL based on content type
+      let videoUrlData: any;
+      
+      if (contentType === "movie") {
+        // Use get-video-url function for movies (generates signed URL)
+        const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
+          body: { movieId: contentId }
+        });
+        
+        if (urlError || !urlData?.url) {
+          // Fallback to direct URL from database
+          videoUrlData = { url: contentData.video_url };
+        } else {
+          videoUrlData = urlData;
+        }
+      } else if (contentType === "episode") {
+        // For episodes, use direct video URL from database
+        videoUrlData = { url: contentData.video_url };
+      }
 
-      if (urlError || !urlData?.url) {
+      if (!videoUrlData?.url) {
         setError("Failed to load video");
         setLoading(false);
         return;
       }
 
-      setVideoUrl(urlData.url);
+      setVideoUrl(videoUrlData.url);
       setLoading(false);
     } catch (err: any) {
       console.error("Error loading content:", err);
