@@ -80,7 +80,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { movieId, expiryHours = 24 } = await req.json();
+    const url = new URL(req.url);
+    const movieIdFromUrl = url.searchParams.get('movieId');
+    const isStreamingRequest = url.searchParams.get('stream') === 'true';
+    
+    // Get movieId from either URL params (for streaming) or request body
+    let movieId = movieIdFromUrl;
+    let expiryHours = 24;
+    
+    if (!movieId) {
+      // Try to get from request body
+      const body = await req.json().catch(() => ({}));
+      movieId = body.movieId;
+      expiryHours = body.expiryHours || 24;
+    }
 
     if (!movieId) {
       return new Response(
@@ -472,6 +485,59 @@ Deno.serve(async (req) => {
       const downloadAuthData: B2SignedUrlResponse = await downloadAuthResponse.json();
       const signedUrl = `${authData.downloadUrl}/file/${b2BucketName}/${filePath}?Authorization=${downloadAuthData.authorizationToken}`;
       const expiresAt = new Date(Date.now() + validDurationInSeconds * 1000).toISOString();
+
+      // For video streaming, we need to proxy the request to avoid CORS issues
+      // Check if this is a direct video request (not just URL generation)
+      if (isStreamingRequest) {
+        console.log('Proxying video request to avoid CORS issues');
+        
+        try {
+          const videoResponse = await fetch(signedUrl, {
+            headers: {
+              'Range': req.headers.get('Range') || '',
+              'User-Agent': req.headers.get('User-Agent') || 'Supabase-Video-Proxy/1.0',
+              'Accept': req.headers.get('Accept') || '*/*',
+            }
+          });
+
+          if (!videoResponse.ok) {
+            console.error('Failed to proxy video request:', {
+              status: videoResponse.status,
+              statusText: videoResponse.statusText
+            });
+            return new Response(
+              JSON.stringify({ error: 'Failed to stream video' }),
+              { status: 500, headers: corsHeaders }
+            );
+          }
+
+          // Return the video content with appropriate headers for streaming
+          const responseHeaders = new Headers({
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers': 'Range, User-Agent, Accept',
+            'Content-Type': videoResponse.headers.get('Content-Type') || 'video/mp4',
+            'Content-Length': videoResponse.headers.get('Content-Length') || '',
+            'Accept-Ranges': videoResponse.headers.get('Accept-Ranges') || 'bytes',
+            'Cache-Control': `public, max-age=${validDurationInSeconds}`,
+            'X-Signed-Url-Expires': expiresAt,
+            'Content-Range': videoResponse.headers.get('Content-Range') || '',
+            'ETag': videoResponse.headers.get('ETag') || '',
+            'Last-Modified': videoResponse.headers.get('Last-Modified') || '',
+          });
+
+          return new Response(videoResponse.body, {
+            status: videoResponse.status,
+            headers: responseHeaders
+          });
+        } catch (proxyError) {
+          console.error('Video proxy error:', proxyError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to proxy video content' }),
+            { status: 500, headers: corsHeaders }
+          );
+        }
+      }
 
       return new Response(
         JSON.stringify({

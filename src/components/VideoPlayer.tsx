@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+
+// Supabase URL for constructing streaming proxy URLs
+const SUPABASE_URL = "https://tsfwlereofjlxhjsarap.supabase.co";
 import { useToast } from '@/hooks/use-toast';
 
 interface VideoPlayerProps {
@@ -93,15 +96,23 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
         return;
       }
 
+      // For Backblaze URLs, use streaming proxy to avoid CORS issues
+      let finalUrl = data.signedUrl;
+      if (data.source === 'backblaze') {
+        // Use our Supabase function as a proxy for Backblaze videos
+        finalUrl = `${SUPABASE_URL}/functions/v1/get-video-url?movieId=${movieId}&stream=true`;
+        console.log('Using streaming proxy for Backblaze video:', finalUrl);
+      }
+
       // Cache the URL
       const expiresAt = new Date(data.expiresAt);
       urlCache.set(movieId, {
-        url: data.signedUrl,
+        url: finalUrl,
         expiresAt,
         source: data.source || 'backblaze'
       });
 
-      setVideoUrl(data.signedUrl);
+      setVideoUrl(finalUrl);
       
       if (isBwLimited) {
         toast({
