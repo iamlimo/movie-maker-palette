@@ -513,7 +513,6 @@ const TVShowPreview = () => {
                         contentType="season"
                         price={currentSeason.price}
                         title={`${tvShow.title} - Season ${selectedSeason}`}
-                        onWatch={() => currentEpisodes.length > 0 && setSelectedEpisode(currentEpisodes[0])}
                       />
                     </div>
                     <div className="p-4 rounded-lg border">
@@ -561,7 +560,6 @@ const TVShowPreview = () => {
                   contentType="season"
                   price={currentSeason.price}
                   title={`${tvShow.title} - Season ${selectedSeason}`}
-                  onWatch={() => currentEpisodes.length > 0 && setSelectedEpisode(currentEpisodes[0])}
                 />
               </div>
               <div className="p-3 rounded-lg border">
@@ -702,7 +700,6 @@ const TVShowPreview = () => {
                                         contentType="episode"
                                         price={episode.price}
                                         title={`Episode ${episode.episode_number}: ${episode.title}`}
-                                        onWatch={() => setSelectedEpisode(episode)}
                                       />
                                     )}
                                   </div>

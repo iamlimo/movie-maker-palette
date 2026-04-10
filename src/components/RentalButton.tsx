@@ -11,7 +11,6 @@ import { formatNaira } from "@/lib/priceUtils";
 import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { RentalBottomSheet } from "./RentalBottomSheet";
-import { PaymentSuccessAnimation } from "./PaymentSuccessAnimation";
 import { usePlatform } from "@/hooks/usePlatform";
 import {
   Dialog,
@@ -27,7 +26,6 @@ interface RentalButtonProps {
   contentType: "movie" | "tv" | "season" | "episode";
   price: number;
   title: string;
-  onWatch?: () => void;
 }
 
 const RentalButton = ({
@@ -35,7 +33,6 @@ const RentalButton = ({
   contentType,
   price,
   title,
-  onWatch,
 }: RentalButtonProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -47,7 +44,6 @@ const RentalButton = ({
     null,
   );
   const [showBottomSheet, setShowBottomSheet] = useState(false);
-  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [showIOSDialog, setShowIOSDialog] = useState(false);
 
@@ -192,13 +188,12 @@ const RentalButton = ({
         refreshWallet();
         await triggerHaptic();
         setShowBottomSheet(false);
-        setShowSuccessAnimation(true);
         toast({
           title: "Payment Successful!",
           description: `You can now watch ${title}`,
         });
-        // Redirect to watch page
-        setTimeout(() => navigate(`/watch/${contentType}/${contentId}`), 2000);
+        // Redirect immediately to watch page for immersive fullscreen playback
+        navigate(`/watch/${contentType}/${contentId}`);
       } else if (data.payment_method === "paystack" || data.authorization_url) {
         // Open Paystack checkout
         const authUrl = data.authorization_url;
@@ -233,13 +228,12 @@ const RentalButton = ({
               clearInterval(pollPayment);
               await fetchRentals();
               await triggerHaptic();
-              setShowSuccessAnimation(true);
               toast({
                 title: "Payment Successful!",
                 description: `You can now watch ${title}`,
               });
-              // Redirect to watch page
-              setTimeout(() => navigate(`/watch/${contentType}/${contentId}`), 2000);
+              // Redirect immediately to watch page for immersive fullscreen playback
+              navigate(`/watch/${contentType}/${contentId}`);
             }
           } catch (pollError) {
             console.error("Payment polling error:", pollError);
@@ -288,7 +282,7 @@ const RentalButton = ({
           variant="default" 
           size="lg" 
           className="w-full touch-target"
-          onClick={onWatch}
+          onClick={() => navigate(`/watch/${contentType}/${contentId}`)}
         >
           <Play className="h-5 w-5 mr-2" />
           Watch Now
@@ -477,14 +471,6 @@ const RentalButton = ({
         onRentWithWallet={(code) => handleRent(true, code)}
         onRentWithCard={(code) => handleRent(false, code)}
       />
-
-      {/* Success Animation */}
-      {showSuccessAnimation && (
-        <PaymentSuccessAnimation
-          onComplete={() => setShowSuccessAnimation(false)}
-          title="Payment Successful!"
-        />
-      )}
     </>
   );
 };
