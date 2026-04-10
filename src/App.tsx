@@ -36,6 +36,7 @@ const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsAndConditions = lazy(() => import('./pages/GeneralTerms'));
 const Careers = lazy(() => import('./pages/Careers'));
 const JobApplication = lazy(() => import('./pages/JobApplication'));
+const Watch = lazy(() => import('./pages/Watch'));
 
 // Lazy load ALL admin routes
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -95,6 +96,7 @@ function AppContent() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/movie/:slug" element={<MoviePreview />} />
             <Route path="/tvshow/:slug" element={<TVShowPreview />} />
+            <Route path="/watch/:contentType/:contentId" element={<Watch />} />
             <Route path="/movies" element={<Movies />} />
             <Route path="/tvshows" element={<TVShows />} />
             <Route path="/genres" element={<Genres />} />

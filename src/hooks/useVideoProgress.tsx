@@ -10,7 +10,7 @@ interface VideoProgressData {
   progress: number;
 }
 
-const SAVE_INTERVAL_MS = 30000; // 30 seconds
+const SAVE_INTERVAL_MS = 10000; // 10 seconds
 const LOCAL_STORAGE_PREFIX = 'watch_progress_';
 
 export const useVideoProgress = (contentId: string, contentType: 'movie' | 'episode') => {

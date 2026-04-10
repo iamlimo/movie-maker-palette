@@ -8,19 +8,38 @@ import { supabase } from '@/integrations/supabase/client';
 // Supabase URL for constructing streaming proxy URLs
 const SUPABASE_URL = "https://tsfwlereofjlxhjsarap.supabase.co";
 import { useToast } from '@/hooks/use-toast';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
 
 interface VideoPlayerProps {
-  movieId: string;
+  src?: string;
+  movieId?: string;
+  contentId?: string;
+  contentType?: string;
+  title?: string;
+  poster?: string;
   className?: string;
   subtitleUrl?: string;
+  autoPlay?: boolean;
+  immersive?: boolean;
 }
 
 // Client-side URL cache to reduce Backblaze bandwidth calls
 const urlCache = new Map<string, { url: string; expiresAt: Date; source: string }>();
 
-export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlayerProps) => {
-  const [videoUrl, setVideoUrl] = useState<string>('');
-  const [isPlaying, setIsPlaying] = useState(false);
+export const VideoPlayer = ({ 
+  src, 
+  movieId, 
+  contentId, 
+  contentType, 
+  title, 
+  poster, 
+  className = '', 
+  subtitleUrl, 
+  autoPlay = false, 
+  immersive = false 
+}: VideoPlayerProps) => {
+  const [videoUrl, setVideoUrl] = useState<string>(src || '');
+  const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState([100]);
   const [currentTime, setCurrentTime] = useState(0);
@@ -34,7 +53,24 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  const { saveProgress, getLastPosition, startAutoSave, stopAutoSave } = useVideoProgress(
+    contentId || movieId || '', 
+    (contentType === 'episode' || contentType === 'movie') ? contentType : 'movie'
+  );
+
   const fetchVideoUrl = useCallback(async (retryCount = 0) => {
+    if (src) {
+      setVideoUrl(src);
+      setLoading(false);
+      return;
+    }
+
+    if (!movieId) {
+      setError('No video source provided');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -139,6 +175,13 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
     fetchVideoUrl();
   }, [fetchVideoUrl]);
 
+  // Cleanup auto-save on unmount
+  useEffect(() => {
+    return () => {
+      stopAutoSave();
+    };
+  }, [stopAutoSave]);
+
   const togglePlay = () => {
     if (!videoRef.current) return;
 
@@ -181,6 +224,16 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
   const handleLoadedMetadata = () => {
     if (!videoRef.current) return;
     setDuration(videoRef.current.duration);
+
+    // Restore last position
+    const lastPos = getLastPosition();
+    if (lastPos > 0 && lastPos < videoRef.current.duration - 10) {
+      videoRef.current.currentTime = lastPos;
+      setCurrentTime(lastPos);
+    }
+
+    // Start auto-save
+    startAutoSave(videoRef.current);
   };
 
   const handleSeek = (value: number[]) => {
@@ -245,7 +298,7 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
   return (
     <div 
       ref={containerRef}
-      className={`relative bg-black rounded-lg overflow-hidden group ${className}`}
+      className={`relative bg-black ${immersive ? 'w-screen h-screen' : 'rounded-lg overflow-hidden group'} ${className}`}
     >
       {/* Bandwidth Limited Banner */}
       {isBandwidthLimited && (
@@ -265,6 +318,7 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
         onPause={() => setIsPlaying(false)}
         preload="metadata"
         crossOrigin="anonymous"
+        autoPlay={autoPlay}
       >
         {subtitleUrl && (
           <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />

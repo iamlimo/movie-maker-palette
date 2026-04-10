@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Play, Loader2, Wallet, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +38,7 @@ const RentalButton = ({
   onWatch,
 }: RentalButtonProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { checkAccess, fetchRentals, activeRentals } = useRentals();
   const { balance, canAfford, formatBalance, refreshWallet } = useWallet();
   const { isIOS } = usePlatform();
@@ -195,6 +197,8 @@ const RentalButton = ({
           title: "Payment Successful!",
           description: `You can now watch ${title}`,
         });
+        // Redirect to watch page
+        setTimeout(() => navigate(`/watch/${contentType}/${contentId}`), 2000);
       } else if (data.payment_method === "paystack" || data.authorization_url) {
         // Open Paystack checkout
         const authUrl = data.authorization_url;
@@ -234,6 +238,8 @@ const RentalButton = ({
                 title: "Payment Successful!",
                 description: `You can now watch ${title}`,
               });
+              // Redirect to watch page
+              setTimeout(() => navigate(`/watch/${contentType}/${contentId}`), 2000);
             }
           } catch (pollError) {
             console.error("Payment polling error:", pollError);

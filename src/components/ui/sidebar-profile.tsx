@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   Menu,
   X,
-  Shield
+  Shield,
+  Play
 } from 'lucide-react';
 
 interface ProfileSidebarProps {
@@ -24,6 +25,7 @@ interface ProfileSidebarProps {
 
 const tabs = [
   { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Dashboard & stats' },
+  { id: 'rentals', label: 'My Rentals', icon: Play, description: 'Active rentals' },
   { id: 'profile', label: 'Personal Info', icon: User, description: 'Edit your profile' },
   { id: 'preferences', label: 'Preferences', icon: Settings, description: 'App settings' },
   { id: 'favorites', label: 'My List', icon: Heart, description: 'Favorites & pinned' },
@@ -62,7 +64,7 @@ export function ProfileSidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-1">
+      <nav className="flex-1 p-2 space-y-1" role="navigation" aria-label="Profile navigation">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -77,6 +79,8 @@ export function ProfileSidebar({
                 isActive && "bg-primary/10 text-primary border-l-4 border-primary"
               )}
               onClick={() => onTabChange(tab.id)}
+              aria-current={isActive ? "page" : undefined}
+              aria-label={`${tab.label}: ${tab.description}`}
             >
               <Icon size={18} className={cn(
                 "flex-shrink-0",

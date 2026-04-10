@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useRentals } from '@/hooks/useRentals';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -57,7 +59,9 @@ const Profile = () => {
   const { profile, preferences, loading: profileLoading, updateProfile, updatePreferences, uploadProfileImage, refetch: refetchProfile } = useProfile();
   const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
   const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
+  const { activeRentals, formatTimeRemaining } = useRentals();
   const { isIOS } = usePlatform();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -292,7 +296,7 @@ const Profile = () => {
           )}
 
           {/* Main Content */}
-          <div className="flex-1 container mx-auto px-4 py-8">
+          <div className="flex-1 container mx-auto px-4 py-8" role="main">
             <div className="space-y-6">
 
             {/* Overview Tab */}
@@ -479,6 +483,77 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               )}
+              </div>
+            )}
+
+            {/* My Rentals Tab */}
+            {activeTab === 'rentals' && (
+              <div className="space-y-6 animate-slide-in-up">
+                <Card className="card-hover">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Play size={20} />
+                      <span>My Rentals</span>
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Manage your active movie and TV show rentals
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {activeRentals.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Play size={48} className="mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">No active rentals</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Rent movies and TV shows to see them here
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {activeRentals.map((rental) => {
+                          const timeLeft = new Date(rental.expires_at).getTime() - new Date().getTime();
+                          const hoursLeft = timeLeft / (1000 * 60 * 60);
+                          const isExpiringSoon = hoursLeft < 24;
+                          const isCritical = hoursLeft < 1;
+
+                          return (
+                            <Card key={rental.id} className={cn(
+                              "card-hover",
+                              isCritical ? "border-red-500/50 bg-red-500/5" : 
+                              isExpiringSoon ? "border-yellow-500/50 bg-yellow-500/5" : ""
+                            )}>
+                              <CardContent className="p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {rental.content_type === 'movie' ? 'Movie' : 'TV Show'}
+                                  </Badge>
+                                  <div className={cn(
+                                    "text-xs font-medium",
+                                    isCritical ? "text-red-600" : 
+                                    isExpiringSoon ? "text-yellow-600" : "text-muted-foreground"
+                                  )}>
+                                    Expires {formatTimeRemaining(rental.expires_at)}
+                                  </div>
+                                </div>
+                                <p className="font-medium text-sm mb-3">
+                                  Content ID: {rental.content_id}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => navigate(`/watch/${rental.content_type}/${rental.content_id}`)}
+                                >
+                                  <Play size={14} className="mr-2" />
+                                  Watch Now
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
 

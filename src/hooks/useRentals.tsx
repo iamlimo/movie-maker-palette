@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
 
 export interface Rental {
   id: string;
@@ -25,6 +26,7 @@ export const useRentals = () => {
   const { user } = useAuth();
   const [activeRentals, setActiveRentals] = useState<Rental[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [alertedRentals, setAlertedRentals] = useState<Set<string>>(new Set());
 
   const fetchActiveRentals = useCallback(async () => {
     if (!user) return;
@@ -108,6 +110,35 @@ export const useRentals = () => {
       supabase.removeChannel(channel);
     };
   }, [user, fetchActiveRentals]);
+
+  // Expiry alerts
+  useEffect(() => {
+    if (!activeRentals.length) return;
+
+    const checkExpiringRentals = () => {
+      const now = new Date().getTime();
+      const tenMinutes = 10 * 60 * 1000;
+
+      activeRentals.forEach(rental => {
+        const expiresAt = new Date(rental.expires_at).getTime();
+        const timeLeft = expiresAt - now;
+
+        if (timeLeft > 0 && timeLeft <= tenMinutes && !alertedRentals.has(rental.id)) {
+          toast({
+            title: "Rental Expires Soon",
+            description: "Your rental expires in less than 10 minutes. Watch now to avoid interruption.",
+            variant: "destructive",
+          });
+          setAlertedRentals(prev => new Set([...prev, rental.id]));
+        }
+      });
+    };
+
+    checkExpiringRentals();
+    const interval = setInterval(checkExpiringRentals, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [activeRentals, alertedRentals, toast]);
 
   return {
     activeRentals,
