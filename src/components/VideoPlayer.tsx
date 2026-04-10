@@ -52,6 +52,8 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
         return;
       }
 
+      console.log('Testing get-video-url function with movieId:', movieId);
+
       const { data, error, response } = await supabase.functions.invoke('get-video-url', {
         body: {
           movieId: movieId,
@@ -61,6 +63,8 @@ export const VideoPlayer = ({ movieId, className = '', subtitleUrl }: VideoPlaye
           Authorization: `Bearer ${session.access_token}`,
         },
       });
+
+      console.log('Function response:', { data, error, response });
 
       // Check if Backblaze bandwidth is limited
       const isBwLimited = response?.headers?.get('X-Bandwidth-Limited') === 'true';

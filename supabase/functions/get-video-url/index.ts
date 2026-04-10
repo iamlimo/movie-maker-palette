@@ -215,16 +215,70 @@ Deno.serve(async (req) => {
       const b2BucketId = Deno.env.get('BACKBLAZE_B2_BUCKET_ID');
 
       if (!b2KeyId || !b2AppKey || !b2BucketName || !b2BucketId) {
-        console.error('Backblaze credentials not configured properly', {
+        console.warn('Backblaze credentials not configured, falling back to Supabase storage', {
           hasKeyId: !!b2KeyId,
           hasAppKey: !!b2AppKey,
           hasBucketName: !!b2BucketName,
           hasBucketId: !!b2BucketId,
           videoUrl
         });
+        
+        // Fall back to Supabase storage
+        console.log('Attempting Supabase storage fallback for Backblaze URL:', videoUrl);
+        
+        // Extract potential file path from Backblaze URL for Supabase storage
+        let supabaseFilePath = videoUrl;
+        try {
+          const urlObj = new URL(videoUrl);
+          // Remove the Backblaze domain and /file/ prefix to get the path
+          const pathParts = urlObj.pathname.split('/').filter(Boolean);
+          if (pathParts[0] === 'file' && pathParts.length > 1) {
+            // Remove 'file' and bucket name, keep the rest as path
+            supabaseFilePath = pathParts.slice(2).join('/');
+          }
+          console.log('Extracted Supabase file path:', supabaseFilePath);
+        } catch (parseError) {
+          console.error('Failed to parse Backblaze URL for Supabase fallback:', parseError);
+          supabaseFilePath = videoUrl; // Use as-is if parsing fails
+        }
+        
+        const expiresIn = expiryHours * 3600;
+        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+          .from('videos')
+          .createSignedUrl(supabaseFilePath, expiresIn);
+
+        if (signedUrlError) {
+          console.error('Supabase fallback failed:', signedUrlError);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Video temporarily unavailable',
+              details: 'Storage configuration issue - video cannot be accessed at this time',
+              debug: {
+                backblazeConfigured: false,
+                supabaseFallbackFailed: true,
+                originalUrl: videoUrl,
+                extractedPath: supabaseFilePath
+              }
+            }),
+            { status: 503, headers: corsHeaders }
+          );
+        }
+
+        const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
         return new Response(
-          JSON.stringify({ error: 'Backblaze credentials not properly configured' }),
-          { status: 500, headers: corsHeaders }
+          JSON.stringify({
+            success: true,
+            signedUrl: signedUrlData.signedUrl,
+            expiresAt,
+            message: 'Video URL generated via Supabase (Backblaze credentials missing)',
+            source: 'supabase-fallback'
+          }),
+          { 
+            headers: { 
+              ...corsHeaders, 
+              'Cache-Control': 'public, max-age=3600'
+            } 
+          }
         );
       }
 
