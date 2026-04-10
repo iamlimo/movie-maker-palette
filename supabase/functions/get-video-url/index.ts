@@ -252,12 +252,13 @@ Deno.serve(async (req) => {
           return new Response(
             JSON.stringify({ 
               error: 'Video temporarily unavailable',
-              details: 'Storage configuration issue - video cannot be accessed at this time',
+              details: 'Storage configuration issue - video cannot be accessed at this time. Please configure Backblaze credentials or ensure videos exist in Supabase storage.',
               debug: {
                 backblazeConfigured: false,
                 supabaseFallbackFailed: true,
                 originalUrl: videoUrl,
-                extractedPath: supabaseFilePath
+                extractedPath: supabaseFilePath,
+                setupGuide: 'See BACKBLAZE_SETUP.md for configuration instructions'
               }
             }),
             { status: 503, headers: corsHeaders }
@@ -281,6 +282,11 @@ Deno.serve(async (req) => {
           }
         );
       }
+
+      console.log('Backblaze credentials configured, generating signed URL for:', {
+        bucketName: b2BucketName,
+        videoUrl: videoUrl.substring(0, 100) + '...' // Truncate for logging
+      });
 
       // Extract file path (remove domain and bucket from full URL)
       let filePath = videoUrl;
