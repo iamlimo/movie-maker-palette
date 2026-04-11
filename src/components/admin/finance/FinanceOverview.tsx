@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface FinanceMetrics {
   totalRevenue: number;
@@ -62,13 +63,18 @@ export const FinanceOverview = () => {
 
       const { data: users } = await supabase
         .from('profiles')
-        .select('id');
+        .select('id, last_sign_in_at');
 
       if (payments) {
         const totalRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
         
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+        // Calculate current month revenue
         const monthlyRevenue = payments
           .filter(p => {
             const paymentDate = new Date(p.created_at);
@@ -76,30 +82,58 @@ export const FinanceOverview = () => {
           })
           .reduce((sum, p) => sum + (p.amount || 0), 0);
 
+        // Calculate previous month revenue for growth calculation
+        const previousMonthRevenue = payments
+          .filter(p => {
+            const paymentDate = new Date(p.created_at);
+            return paymentDate.getMonth() === previousMonth && paymentDate.getFullYear() === previousYear;
+          })
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        // Calculate actual revenue growth percentage
+        let revenueGrowth = 0;
+        if (previousMonthRevenue > 0) {
+          revenueGrowth = ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
+        }
+
+        // Count active users (users who have signed in within last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const activeUsers = (users || []).filter(user => {
+          if (!user.last_sign_in_at) return false;
+          return new Date(user.last_sign_in_at) > thirtyDaysAgo;
+        }).length;
+
         const pendingPayouts = payouts?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
         setMetrics({
           totalRevenue,
           monthlyRevenue,
           totalTransactions: payments.length,
-          activeUsers: users?.length || 0,
+          activeUsers,
           pendingPayouts,
-          revenueGrowth: 12.5 // Calculate actual growth percentage
+          revenueGrowth: Math.round(revenueGrowth * 100) / 100 // Round to 2 decimal places
         });
 
-        // Generate chart data
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          return date.toISOString().split('T')[0];
-        }).reverse();
+        // Generate chart data based on time range
+        let daysToShow = 7;
+        if (timeRange === '30d') daysToShow = 30;
+        else if (timeRange === '90d') daysToShow = 90;
+        else if (timeRange === '1y') daysToShow = 365;
 
-        const chartData = last7Days.map(date => {
+        const dates = Array.from({ length: daysToShow }, (_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - (daysToShow - 1 - i));
+          return date.toISOString().split('T')[0];
+        });
+
+        const chartData = dates.map(date => {
           const dayPayments = payments.filter(p => 
             p.created_at.startsWith(date)
           );
           return {
-            date: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             revenue: dayPayments.reduce((sum, p) => sum + (p.amount || 0), 0),
             transactions: dayPayments.length
           };
@@ -121,7 +155,7 @@ export const FinanceOverview = () => {
   const exportReport = () => {
     // Generate CSV export
     const csvData = chartData.map(item => 
-      `${item.date},${item.revenue},${item.transactions}`
+      `${item.date},${formatNaira(item.revenue)},${item.transactions}`
     ).join('\n');
     
     const blob = new Blob([`Date,Revenue,Transactions\n${csvData}`], { type: 'text/csv' });
@@ -179,7 +213,7 @@ export const FinanceOverview = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{metrics.totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatNaira(metrics.totalRevenue)}</div>
             <div className="flex items-center text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
               +{metrics.revenueGrowth}% from last month
@@ -193,7 +227,7 @@ export const FinanceOverview = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{metrics.monthlyRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatNaira(metrics.monthlyRevenue)}</div>
             <p className="text-xs text-muted-foreground">
               Current month earnings
             </p>
@@ -219,7 +253,7 @@ export const FinanceOverview = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{metrics.pendingPayouts.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatNaira(metrics.pendingPayouts)}</div>
             <p className="text-xs text-muted-foreground">
               Awaiting producer payments
             </p>
@@ -240,7 +274,7 @@ export const FinanceOverview = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`₦${value}`, 'Revenue']} />
+                <Tooltip formatter={(value) => [formatNaira(value as number), 'Revenue']} />
                 <Line type="monotone" dataKey="revenue" stroke="#8884d8" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>

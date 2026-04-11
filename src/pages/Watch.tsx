@@ -3,13 +3,16 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 import { toast } from "@/hooks/use-toast";
+import { usePlatform } from "@/hooks/usePlatform";
 import { Loader2 } from "lucide-react";
 
 const Watch = () => {
   const { contentType, contentId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isNative, isIOS, isAndroid } = usePlatform();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,15 +135,31 @@ const Watch = () => {
   return (
     <div className="min-h-screen bg-black">
       {videoUrl && content && (
-        <VideoPlayer
-          src={videoUrl}
-          contentId={contentId!}
-          contentType={contentType!}
-          title={contentType === "movie" ? content.title : `${content.seasons.shows.title} - Episode ${content.episode_number}`}
-          poster={content.poster_url}
-          autoPlay={true}
-          immersive={true}
-        />
+        <>
+          {/* Use Native Player on iOS/Android if available */}
+          {isNative && (isIOS || isAndroid) ? (
+            <NativeVideoPlayer
+              contentId={contentId!}
+              contentType={contentType as any}
+              videoUrl={videoUrl}
+              title={contentType === "movie" ? content.title : `${content.seasons?.tv_shows?.title || content.show_title || 'Show'} - Episode ${content.episode_number}`}
+              poster={contentType === "movie" ? content.thumbnail_url : content.seasons?.tv_shows?.thumbnail_url}
+              subtitleUrl={content.subtitle_url}
+              autoPlay={true}
+            />
+          ) : (
+            // Fallback to Web Player on desktop or web platforms
+            <VideoPlayer
+              src={videoUrl}
+              contentId={contentId!}
+              contentType={contentType!}
+              title={contentType === "movie" ? content.title : `${content.seasons?.tv_shows?.title || 'Show'} - Episode ${content.episode_number}`}
+              poster={content.thumbnail_url || content.poster_url}
+              autoPlay={true}
+              immersive={true}
+            />
+          )}
+        </>
       )}
     </div>
   );
