@@ -1,297 +1,259 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { supabase } from '@/integrations/supabase/client';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { AlertCircle, RefreshCw, Play } from 'lucide-react';
-import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { useToast } from '@/hooks/use-toast';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
+import { useWatchHistory } from '@/hooks/useWatchHistory';
+import { Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface NativeVideoPlayerProps {
   contentId: string;
   contentType: 'movie' | 'episode';
-  posterUrl?: string;
+  videoUrl: string;
+  title: string;
+  poster?: string;
   subtitleUrl?: string;
-  onError?: (error: string) => void;
   autoPlay?: boolean;
 }
 
-// Dynamic import for native video player (installed separately on native builds)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let CapacitorVideoPlayer: any = null;
-const loadNativePlayer = async () => {
-  if (Capacitor.isNativePlatform() && !CapacitorVideoPlayer) {
-    try {
-      // @ts-ignore - Package installed on native builds only
-      const module = await import(/* @vite-ignore */ '@capacitor-community/video-player');
-      CapacitorVideoPlayer = module.CapacitorVideoPlayer;
-    } catch (e) {
-      console.log('Native video player not available, using web fallback');
-    }
-  }
-  return CapacitorVideoPlayer;
-};
-
-const NativeVideoPlayer = ({
+const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   contentId,
   contentType,
-  posterUrl,
+  videoUrl,
+  title,
+  poster,
   subtitleUrl,
-  onError,
-  autoPlay = false
-}: NativeVideoPlayerProps) => {
+  autoPlay = true,
+}) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [nativePlayerReady, setNativePlayerReady] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const playerIdRef = useRef(`video-${contentId}-${Date.now()}`);
-  const lastPositionLoaded = useRef(false);
-  const { toast } = useToast();
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const playerInitialized = useRef(false);
+  const { saveProgress, getLastPosition } = useVideoProgress(contentId, 'movie');
+  const { markAsCompleted } = useWatchHistory();
 
-  const isNative = Capacitor.isNativePlatform();
-  
-  const { saveProgress, getLastPosition, startAutoSave, stopAutoSave } = useVideoProgress(contentId, contentType);
-
-  // Initialize native player on mount
+  // Resume playback position
   useEffect(() => {
-    if (isNative) {
-      loadNativePlayer().then((player) => {
-        setNativePlayerReady(!!player);
-      });
-    }
-  }, [isNative]);
-
-  const fetchSignedUrl = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await fetch(
-        `https://tsfwlereofjlxhjsarap.supabase.co/functions/v1/generate-b2-signed-url`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ contentId, contentType })
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get video URL');
-      }
-
-      const data = await response.json();
-      setSignedUrl(data.signedUrl);
-      setLoading(false);
-
-      if (autoPlay) {
-        handlePlay(data.signedUrl);
-      }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to load video';
-      setError(errorMessage);
-      setLoading(false);
-      onError?.(errorMessage);
-    }
-  };
-
-  const handlePlay = async (url?: string) => {
-    const videoUrl = url || signedUrl;
-    if (!videoUrl) return;
-
-    if (isNative && nativePlayerReady && CapacitorVideoPlayer) {
+    const resumePlayback = async () => {
       try {
-        // Use native Capacitor video player for hardware acceleration
-        await CapacitorVideoPlayer.initPlayer({
-          mode: 'fullscreen',
-          url: videoUrl,
-          playerId: playerIdRef.current,
-          componentTag: 'native-video-player',
-          title: '',
-          smallTitle: '',
-          accentColor: '#6366f1',
-          chromecast: false,
-          headers: {},
-          showControls: true,
-          displayMode: 'landscape',
-          pipEnabled: true,
-          bkmodeEnabled: true,
-          exitOnEnd: true
-        });
-
-        setIsPlaying(true);
-
-        // Listen for player events
-        CapacitorVideoPlayer.addListener('jeepCapVideoPlayerPlay', () => {
-          setIsPlaying(true);
-        });
-
-        CapacitorVideoPlayer.addListener('jeepCapVideoPlayerPause', () => {
-          setIsPlaying(false);
-        });
-
-        CapacitorVideoPlayer.addListener('jeepCapVideoPlayerEnded', () => {
-          setIsPlaying(false);
-        });
-
-        CapacitorVideoPlayer.addListener('jeepCapVideoPlayerExit', () => {
-          setIsPlaying(false);
-        });
-
-      } catch (err: any) {
-        console.error('Native player error:', err);
-        // Fall back to web player
-        playWebVideo(videoUrl);
-      }
-    } else {
-      playWebVideo(videoUrl);
-    }
-  };
-
-  const playWebVideo = async (url: string) => {
-    if (videoRef.current) {
-      videoRef.current.src = url;
-      
-      // Restore last position
-      if (!lastPositionLoaded.current) {
         const lastPosition = await getLastPosition();
         if (lastPosition > 5) {
-          videoRef.current.currentTime = lastPosition;
           toast({
-            title: "Resuming playback",
-            description: "Continuing from where you left off"
+            title: 'Resuming',
+            description: `Continuing from ${Math.round(lastPosition)}s`,
           });
         }
-        lastPositionLoaded.current = true;
-      }
-      
-      videoRef.current.play();
-      setIsPlaying(true);
-      startAutoSave(videoRef.current);
-    }
-  };
-
-  // Handle pause event
-  const handlePause = useCallback(() => {
-    if (videoRef.current) {
-      saveProgress(videoRef.current.currentTime, videoRef.current.duration);
-    }
-    stopAutoSave();
-  }, [saveProgress, stopAutoSave]);
-
-  // Handle video end
-  const handleEnded = useCallback(() => {
-    if (videoRef.current) {
-      saveProgress(videoRef.current.duration, videoRef.current.duration);
-    }
-    stopAutoSave();
-    setIsPlaying(false);
-  }, [saveProgress, stopAutoSave]);
-
-  useEffect(() => {
-    fetchSignedUrl();
-
-    return () => {
-      // Cleanup native player on unmount
-      stopAutoSave();
-      if (isNative && CapacitorVideoPlayer) {
-        CapacitorVideoPlayer.stopAllPlayers?.().catch(() => {});
-        CapacitorVideoPlayer.removeAllListeners?.();
+      } catch (err) {
+        console.error('Error getting last position:', err);
       }
     };
-  }, [contentId, contentType, stopAutoSave]);
 
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    return false;
+    resumePlayback();
+  }, [contentId, getLastPosition, toast]);
+
+  // Initialize native video player
+  useEffect(() => {
+    if (playerInitialized.current) return;
+    playerInitialized.current = true;
+
+    const initializePlayer = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Only run on native platforms
+        if (!Capacitor.isNativePlatform()) {
+          setError('This is a native-only player');
+          return;
+        }
+
+        // Determine platform-specific implementation
+        const platform = Capacitor.getPlatform();
+
+        if (platform === 'ios') {
+          await initializeIOSPlayer();
+        } else if (platform === 'android') {
+          await initializeAndroidPlayer();
+        }
+
+        setLoading(false);
+      } catch (err: any) {
+        console.error('Player initialization failed:', err);
+        setError(err.message || 'Failed to initialize player');
+        setLoading(false);
+      }
+    };
+
+    initializePlayer();
+  }, [videoUrl, title]);
+
+  const initializeIOSPlayer = async () => {
+    try {
+      // On iOS, we use AVPlayer via Capacitor's native bridge
+      // Try to use @capacitor-community/video-player if available
+      let VideoPlayer;
+
+      try {
+        // @ts-ignore - Plugin may not be installed
+        // Use computed string to prevent Vite from trying to resolve at build time
+        const pluginName = '@capacitor-community' + '/' + 'video-player';
+        const module = await import(pluginName);
+        VideoPlayer = module.VideoPlayer;
+      } catch {
+        console.warn('Video Player plugin not found, falling back to web player');
+        throw new Error('Capacitor Video Player plugin not available on iOS');
+      }
+
+      if (VideoPlayer) {
+        // Play full-screen video with Capacitor Video Player
+        await VideoPlayer.play({
+          url: videoUrl,
+          playerId: 'video-player-ios',
+          width: undefined,
+          height: undefined,
+          showControls: true,
+          showBackButton: true,
+          videoWidth: 1920,
+          videoHeight: 1080,
+          title: title,
+          smallPlaybackRate: true,
+          rate: 1.0,
+          // Custom attributes for security
+          controlsList: 'nodownload',
+          disablePictureInPicture: true,
+        });
+
+        // Track playback events
+        VideoPlayer.addListener('playing', () => {
+          // Save progress on play
+          toast({
+            title: 'Playing',
+            description: title,
+          });
+        });
+
+        VideoPlayer.addListener('ended', async () => {
+          await saveProgress(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+          await markAsCompleted('movie', contentId);
+          toast({
+            title: 'Video Complete',
+            description: 'Thank you for watching!',
+          });
+        });
+
+        VideoPlayer.addListener('stopped', () => {
+          // User exited
+          navigate(-1);
+        });
+      }
+    } catch (err: any) {
+      console.error('iOS player error:', err);
+      throw err;
+    }
   };
 
-  if (loading) {
-    return <Skeleton className="aspect-video w-full rounded-lg" />;
-  }
+  const initializeAndroidPlayer = async () => {
+    try {
+      // On Android, use similar approach with Capacitor Video Player
+      let VideoPlayer;
 
+      try {
+        // @ts-ignore - Plugin may not be installed
+        // Use computed string to prevent Vite from trying to resolve at build time
+        const pluginName = '@capacitor-community' + '/' + 'video-player';
+        const module = await import(pluginName);
+        VideoPlayer = module.VideoPlayer;
+      } catch {
+        console.warn('Video Player plugin not found for Android');
+        throw new Error('Capacitor Video Player plugin not available on Android');
+      }
+
+      if (VideoPlayer) {
+        // Play full-screen video with Capacitor Video Player
+        await VideoPlayer.play({
+          url: videoUrl,
+          playerId: 'video-player-android',
+          width: undefined,
+          height: undefined,
+          showControls: true,
+          showBackButton: true,
+          videoWidth: 1920,
+          videoHeight: 1080,
+          title: title,
+          smallPlaybackRate: false,
+          rate: 1.0,
+          controlsList: 'nodownload',
+          disablePictureInPicture: true,
+        });
+
+        // Track playback events
+        VideoPlayer.addListener('playing', () => {
+          toast({
+            title: 'Playing',
+            description: title,
+          });
+        });
+
+        VideoPlayer.addListener('ended', async () => {
+          await saveProgress(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+          await markAsCompleted('movie', contentId);
+          toast({
+            title: 'Complete',
+            description: 'Video finished!',
+          });
+        });
+
+        VideoPlayer.addListener('closed', () => {
+          navigate(-1);
+        });
+      }
+    } catch (err: any) {
+      console.error('Android player error:', err);
+      throw err;
+    }
+  };
+
+  // Fallback UI for web/error states
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription className="flex items-center justify-between">
-          <span>{error}</span>
-          <Button variant="outline" size="sm" onClick={() => fetchSignedUrl()} className="ml-4">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+        <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
+        <h1 className="text-2xl font-bold text-white mb-2">Player Error</h1>
+        <p className="text-white/70 text-center mb-6 max-w-md">{error}</p>
+        <Button
+          onClick={() => navigate(-1)}
+          variant="outline"
+          className="gap-2"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Go Back
+        </Button>
+      </div>
     );
   }
 
-  return (
-    <div className="relative">
-      {!isPlaying ? (
-        // Poster with play button
-        <div
-          className="aspect-video bg-black rounded-lg overflow-hidden relative cursor-pointer group"
-          onClick={() => handlePlay()}
-        >
-          {posterUrl && (
-            <img
-              src={posterUrl}
-              alt="Video poster"
-              className="w-full h-full object-cover"
-            />
-          )}
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/50 transition-colors">
-            <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Play className="w-8 h-8 md:w-10 md:h-10 text-primary-foreground ml-1" />
-            </div>
-          </div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-white text-lg">Initializing player...</p>
+          <p className="text-white/50 text-sm mt-2">{title}</p>
         </div>
-      ) : (
-        // Web video player (for non-native or fallback)
-        <div
-          className="aspect-video bg-black rounded-lg overflow-hidden"
-          onContextMenu={handleContextMenu}
-        >
-          <video
-            ref={videoRef}
-            poster={posterUrl}
-            controls
-            controlsList="nodownload noplaybackrate"
-            disablePictureInPicture
-            playsInline
-            onContextMenu={handleContextMenu}
-            onPause={handlePause}
-            onEnded={handleEnded}
-            className="w-full h-full"
-            style={{ pointerEvents: 'auto' }}
-          >
-            {subtitleUrl && (
-              <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
-            )}
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Watermark overlay */}
-      <div
-        className="absolute top-4 right-4 text-white/30 text-xs font-mono select-none pointer-events-none"
-        style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
-      >
-        Protected Content
+  // The actual video player is handled by Capacitor native code
+  // This component is essentially a bridge
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+        <p className="text-white">Loading video player...</p>
       </div>
     </div>
   );

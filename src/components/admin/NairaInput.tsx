@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-// Helper functions for Naira <-> Kobo conversion
-export const nairaToKobo = (naira: number): number => Math.round(naira * 100);
-export const koboToNaira = (kobo: number): number => kobo / 100;
+import { nairaToKobo, koboToNaira } from "@/lib/priceUtils";
 
 interface NairaInputProps {
   value: number; // Value in kobo

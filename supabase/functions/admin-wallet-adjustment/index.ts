@@ -1,15 +1,14 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { corsHeaders, jsonResponse, errorResponse, handleOptions } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+const corsHeadersExtended = {
+  ...corsHeaders,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+Deno.serve(async (req) => {
+  const optionsResponse = handleOptions(req);
+  if (optionsResponse) return optionsResponse;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -21,54 +20,35 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return errorResponse('Unauthorized', 401);
     }
 
     // Check if user is super admin
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
+    const { data: isSuperAdmin, error: roleError } = await supabase.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'super_admin'
+    });
 
-    if (userRole?.role !== 'super_admin') {
-      return new Response(JSON.stringify({ error: 'Forbidden: Super admin access required' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (roleError || !isSuperAdmin) {
+      return errorResponse('Forbidden: Super admin access required', 403);
     }
 
     const { targetUserId, amount, type, reason } = await req.json();
 
     if (!targetUserId || !amount || !type || !reason) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return errorResponse('Missing required fields', 400);
     }
 
     if (type !== 'credit' && type !== 'debit') {
-      return new Response(JSON.stringify({ error: 'Invalid transaction type' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return errorResponse('Invalid transaction type', 400);
     }
 
     if (amount <= 0) {
-      return new Response(JSON.stringify({ error: 'Amount must be positive' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return errorResponse('Amount must be positive', 400);
     }
 
     if (reason.length < 10) {
-      return new Response(JSON.stringify({ error: 'Reason must be at least 10 characters' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return errorResponse('Reason must be at least 10 characters', 400);
     }
 
     // Get target user's wallet
@@ -79,10 +59,7 @@ serve(async (req) => {
       .single();
 
     if (!wallet) {
-      return new Response(JSON.stringify({ error: 'Target user wallet not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return errorResponse('Target user wallet not found', 404);
     }
 
     // Process adjustment
@@ -109,6 +86,7 @@ serve(async (req) => {
     await supabase.rpc('log_finance_action', {
       p_action: `wallet_${type}`,
       p_details: {
+        admin_user_id: user.id,
         target_user_id: targetUserId,
         amount: amount,
         reason: reason,
@@ -123,21 +101,16 @@ serve(async (req) => {
       .eq('wallet_id', wallet.wallet_id)
       .single();
 
-    return new Response(JSON.stringify({
+    return jsonResponse({
       success: true,
       transaction_id: transactionId,
       new_balance: updatedWallet?.balance || 0,
       type: type,
       amount: amount
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error: any) {
     console.error('Admin wallet adjustment error:', error);
-    return new Response(JSON.stringify({ error: 'An unexpected error occurred' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return errorResponse('An unexpected error occurred', 500);
   }
 });

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { User, Mail, Phone, MapPin, Calendar, Wallet, Activity, ShieldCheck, Crown, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface UserDetailModalProps {
   open: boolean;
@@ -120,7 +121,7 @@ export const UserDetailModal = ({ open, onOpenChange, user }: UserDetailModalPro
                   <span className="text-sm">Wallet Balance:</span>
                 </div>
                 <span className="text-sm font-semibold text-primary">
-                  ₦{user.wallet_balance.toFixed(2)}
+                  {formatNaira(user.wallet_balance)}
                 </span>
               </div>
             </div>

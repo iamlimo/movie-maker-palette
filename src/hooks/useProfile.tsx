@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -39,7 +39,31 @@ export const useProfile = () => {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async () => {
+  const createDefaultPreferences = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .insert([{
+          user_id: user.id,
+          preferred_language: 'en',
+          preferred_genres: [],
+          email_notifications: true,
+          push_notifications: true,
+          auto_play: true
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setPreferences(data);
+    } catch (error) {
+      console.error('Error creating default preferences:', error);
+    }
+  }, [user]);
+
+  const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
       setPreferences(null);
@@ -77,7 +101,21 @@ export const useProfile = () => {
         }
       }
 
-      setProfile(profileData);
+      // Fetch current wallet balance directly to keep profile data in sync
+      let walletBalance = profileData?.wallet_balance ?? 0;
+      if (profileData) {
+        const { data: walletData, error: walletError } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!walletError && walletData) {
+          walletBalance = walletData.balance;
+        }
+      }
+
+      setProfile(profileData ? { ...profileData, wallet_balance: walletBalance } : null);
       setPreferences(preferencesData);
     } catch (error) {
       console.error('Error fetching profile data:', error);
@@ -89,31 +127,7 @@ export const useProfile = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const createDefaultPreferences = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .insert([{
-          user_id: user.id,
-          preferred_language: 'en',
-          preferred_genres: [],
-          email_notifications: true,
-          push_notifications: true,
-          auto_play: true
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      setPreferences(data);
-    } catch (error) {
-      console.error('Error creating default preferences:', error);
-    }
-  };
+  }, [user, toast, createDefaultPreferences]);
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user || !profile) return false;
@@ -201,11 +215,12 @@ export const useProfile = () => {
 
       await updateProfile({ profile_image_url: publicUrl });
       return publicUrl;
-    } catch (error: any) {
-      console.error('Error uploading profile image:', error);
+    } catch (error) {
+      const err = error as { message?: string };
+      console.error('Error uploading profile image:', err);
       toast({
         title: "Error",
-        description: error?.message || "Failed to upload profile image",
+        description: err.message || "Failed to upload profile image",
         variant: "destructive"
       });
       return null;
@@ -213,8 +228,38 @@ export const useProfile = () => {
   };
 
   useEffect(() => {
+    if (!user) return;
+
     fetchProfile();
-  }, [user]);
+
+    const channel = supabase
+      .channel('profile-wallet-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'wallets',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            setProfile((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                wallet_balance: (payload.new as { balance?: number })?.balance ?? prev.wallet_balance
+              };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchProfile]);
 
   return {
     profile,

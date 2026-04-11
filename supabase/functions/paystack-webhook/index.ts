@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
             user_id: payment.user_id,
             content_id: contentId,
             content_type: contentType,
-            amount: payment.amount, // stored in kobo, matching DB
+            amount: payment.amount / 100, // Convert from kobo to naira
             status: 'active',
             expires_at: expiresAt
           });

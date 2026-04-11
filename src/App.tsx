@@ -16,6 +16,7 @@ import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Lazy load non-critical routes for faster initial load
@@ -35,6 +36,7 @@ const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsAndConditions = lazy(() => import('./pages/GeneralTerms'));
 const Careers = lazy(() => import('./pages/Careers'));
 const JobApplication = lazy(() => import('./pages/JobApplication'));
+const Watch = lazy(() => import('./pages/Watch'));
 
 // Lazy load ALL admin routes
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -86,13 +88,15 @@ function AppContent() {
     <>
       <OfflineBanner />
       <MobileRouteAnimator>
-        <Suspense fallback={null}>
+        <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/movie/:slug" element={<MoviePreview />} />
             <Route path="/tvshow/:slug" element={<TVShowPreview />} />
+            <Route path="/watch/:contentType/:contentId" element={<Watch />} />
             <Route path="/movies" element={<Movies />} />
             <Route path="/tvshows" element={<TVShows />} />
             <Route path="/genres" element={<Genres />} />

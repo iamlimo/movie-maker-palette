@@ -86,10 +86,10 @@ const CinematicHeroSlider = () => {
         title: "Added to Watchlist",
         description: `${item.title} has been added to your watchlist.`,
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Failed to add to watchlist",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
     }

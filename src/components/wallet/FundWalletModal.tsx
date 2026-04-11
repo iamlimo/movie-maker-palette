@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Wallet, CreditCard } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
+import { formatNaira } from '@/lib/priceUtils';
 import { Capacitor } from '@capacitor/core';
 
 interface FundWalletModalProps {
@@ -78,7 +79,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               refreshWallet();
               toast({
                 title: 'Wallet Funded!',
-                description: `₦${(amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })} added to your wallet`,
+                description: `${formatNaira(amount)} added to your wallet`,
               });
               onClose();
               setAmount(0);
@@ -177,7 +178,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
             ) : (
               <>
                 <Wallet className="h-5 w-5 mr-2" />
-                Fund ₦{(amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                Fund {formatNaira(amount)}
               </>
             )}
           </Button>
