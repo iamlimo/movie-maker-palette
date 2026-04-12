@@ -130,6 +130,7 @@ const Watchlist = () => {
                   <div key={favorite.id} className="relative group">
                     <MovieCard
                       id={favorite.content_id}
+                      slug={favorite.slug}
                       title={favorite.title || 'Unknown Title'}
                       year={2024}
                       rating={0}

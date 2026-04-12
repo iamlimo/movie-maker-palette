@@ -118,6 +118,7 @@ const TVShows = () => {
                   <MovieCard
                     key={show.id}
                     id={show.id}
+                    slug={show.slug}
                     title={show.title}
                     year={show.release_date ? new Date(show.release_date).getFullYear() : 2024}
                     rating={parseFloat(show.rating || '0')}

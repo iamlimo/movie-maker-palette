@@ -17,6 +17,11 @@ import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
 import { UserDetailModal } from '@/components/admin/UserDetailModal';
 import { Link } from 'react-router-dom';
 
+// Helper function to convert kobo to naira
+const koboToNaira = (kobo: number): number => {
+  return kobo / 100;
+};
+
 interface UserProfile {
   id: string;
   user_id: string;
@@ -25,8 +30,12 @@ interface UserProfile {
   created_at: string;
   country?: string;
   phone_number?: string;
-  wallet_balance: number;
   status?: string;
+}
+
+interface UserWallet {
+  user_id: string;
+  balance: number;
 }
 
 interface UserRole {
@@ -36,6 +45,7 @@ interface UserRole {
 
 interface UserWithRole extends UserProfile {
   role: 'user' | 'admin' | 'super_admin';
+  wallet_balance: number;
 }
 
 export default function Users() {
@@ -105,10 +115,10 @@ export default function Users() {
     try {
       setLoading(true);
       
-      // Fetch all profiles with their roles
+      // Fetch all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, user_id, name, email, created_at, country, phone_number, status')
         .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
@@ -120,12 +130,32 @@ export default function Users() {
 
       if (rolesError) throw rolesError;
 
-      // Combine profiles with roles
+      // Fetch all wallets data (with balance in kobo)
+      const { data: wallets, error: walletsError } = await supabase
+        .from('wallets')
+        .select('user_id, balance');
+
+      if (walletsError) {
+        console.warn('Warning fetching wallets:', walletsError);
+        // Continue if wallets fetch fails - use 0 as default
+      }
+
+      // Create a map of user_id -> wallet balance for quick lookup
+      const walletMap = new Map<string, number>();
+      wallets?.forEach(wallet => {
+        // Convert kobo to naira
+        walletMap.set(wallet.user_id, wallet.balance / 100);
+      });
+
+      // Combine profiles with roles and wallet data
       const usersWithRoles: UserWithRole[] = profiles?.map(profile => {
         const userRole = roles?.find(role => role.user_id === profile.user_id);
+        const walletBalance = walletMap.get(profile.user_id) || 0;
+        
         return {
           ...profile,
-          role: userRole?.role || 'user'
+          role: userRole?.role || 'user',
+          wallet_balance: walletBalance
         };
       }) || [];
 
