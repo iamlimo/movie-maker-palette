@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { BarChart3, Users, Film, Tv, UserCheck, DollarSign, TrendingUp, Calendar, Clock, Eye } from 'lucide-react';
+import { BarChart3, Users, Film, Tv, UserCheck, DollarSign, TrendingUp, Calendar, Clock, Eye, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +18,42 @@ interface DashboardStats {
   monthlyRevenue: number;
 }
 
+interface Activity {
+  id: string;
+  type: 'user' | 'content' | 'producer' | 'payment' | 'rental' | 'system';
+  message: string;
+  detail: string;
+  timestamp: string;
+  color: string;
+  metadata?: Record<string, any>;
+}
+
+// Helper function to convert kobo to naira
+const koboToNaira = (kobo: number): number => {
+  return kobo / 100;
+};
+
+// Helper function to format currency
+const formatCurrency = (amount: number): string => {
+  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+// Helper function to format time difference
+const timeAgo = (date: string): string => {
+  const now = new Date();
+  const then = new Date(date);
+  const diff = now.getTime() - then.getTime();
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return then.toLocaleDateString();
+};
+
 export default function Dashboard() {
   const { profile } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -30,8 +66,11 @@ export default function Dashboard() {
     totalRevenue: 0,
     monthlyRevenue: 0,
   });
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingActivities, setLoadingActivities] = useState(true);
 
+  // Fetch dashboard statistics
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -50,12 +89,15 @@ export default function Dashboard() {
           supabase.from('tv_shows').select('*', { count: 'exact', head: true })
         ]);
 
-        // Parallel queries for revenue
+        // Fetch revenue data - convert from kobo to naira
         const [
-          { data: revenueData },
-          { data: monthlyRevenueData }
+          { data: revenueData, error: revenueError },
+          { data: monthlyRevenueData, error: monthlyError }
         ] = await Promise.all([
-          supabase.from('payments').select('amount').eq('status', 'completed'),
+          supabase
+            .from('payments')
+            .select('amount')
+            .eq('status', 'completed'),
           (() => {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
@@ -64,16 +106,24 @@ export default function Dashboard() {
               .from('payments')
               .select('amount')
               .eq('status', 'completed')
-              .gte('transaction_date', startOfMonth.toISOString());
+              .gte('created_at', startOfMonth.toISOString());
           })()
         ]);
 
-        const totalRevenue = revenueData?.reduce((sum, payment) => sum + parseFloat(payment.amount.toString()), 0) || 0;
-        const monthlyRevenue = monthlyRevenueData?.reduce((sum, payment) => sum + parseFloat(payment.amount.toString()), 0) || 0;
+        // Convert kobo to naira and sum up
+        const totalRevenue = revenueData?.reduce((sum, payment) => {
+          const amount = typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount;
+          return sum + koboToNaira(amount);
+        }, 0) || 0;
+
+        const monthlyRevenue = monthlyRevenueData?.reduce((sum, payment) => {
+          const amount = typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount;
+          return sum + koboToNaira(amount);
+        }, 0) || 0;
 
         setStats({
           totalUsers: totalUsers || 0,
-          activeUsers: totalUsers || 0, // For now, consider all users as active
+          activeUsers: totalUsers || 0,
           totalProducers: totalProducers || 0,
           pendingProducers: pendingProducers || 0,
           totalMovies: totalMovies || 0,
@@ -89,6 +139,128 @@ export default function Dashboard() {
     };
 
     fetchStats();
+  }, []);
+
+  // Fetch recent activities
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const activitiesList: Activity[] = [];
+
+        // Fetch recent user registrations
+        const { data: newUsers } = await supabase
+          .from('profiles')
+          .select('id, name, email, created_at')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        newUsers?.forEach(user => {
+          activitiesList.push({
+            id: `user-${user.id}`,
+            type: 'user',
+            message: 'New user registration',
+            detail: `${user.name || 'A user'} joined the platform`,
+            timestamp: user.created_at,
+            color: 'bg-emerald-500',
+            metadata: { userId: user.id, userName: user.name }
+          });
+        });
+
+        // Fetch recent movies/content uploads
+        const { data: newMovies } = await supabase
+          .from('movies')
+          .select('id, title, created_at')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        newMovies?.forEach(movie => {
+          activitiesList.push({
+            id: `movie-${movie.id}`,
+            type: 'content',
+            message: 'Movie uploaded',
+            detail: `"${movie.title}" added to catalog`,
+            timestamp: movie.created_at,
+            color: 'bg-blue-500',
+            metadata: { movieId: movie.id, title: movie.title }
+          });
+        });
+
+        // Fetch recent TV shows
+        const { data: newShows } = await supabase
+          .from('tv_shows')
+          .select('id, title, created_at')
+          .order('created_at', { ascending: false })
+          .limit(2);
+
+        newShows?.forEach(show => {
+          activitiesList.push({
+            id: `show-${show.id}`,
+            type: 'content',
+            message: 'TV show published',
+            detail: `"${show.title}" went live`,
+            timestamp: show.created_at,
+            color: 'bg-indigo-500',
+            metadata: { showId: show.id, title: show.title }
+          });
+        });
+
+        // Fetch recent payments
+        const { data: recentPayments } = await supabase
+          .from('payments')
+          .select('id, amount, payment_method, created_at, user_id')
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        recentPayments?.forEach(payment => {
+          const nairaAmount = koboToNaira(typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount);
+          activitiesList.push({
+            id: `payment-${payment.id}`,
+            type: 'payment',
+            message: 'Payment processed',
+            detail: `${formatCurrency(nairaAmount)} payment via ${payment.payment_method || 'unknown method'}`,
+            timestamp: payment.created_at,
+            color: 'bg-purple-500',
+            metadata: { amount: nairaAmount, method: payment.payment_method }
+          });
+        });
+
+        // Fetch pending producer applications
+        const { data: pendingProducers } = await supabase
+          .from('producers')
+          .select('id, full_name, created_at')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(2);
+
+        pendingProducers?.forEach(producer => {
+          activitiesList.push({
+            id: `producer-${producer.id}`,
+            type: 'producer',
+            message: 'Producer application',
+            detail: `${producer.full_name} submitted a producer application`,
+            timestamp: producer.created_at,
+            color: 'bg-amber-500',
+            metadata: { producerId: producer.id, name: producer.full_name }
+          });
+        });
+
+        // Sort by timestamp (most recent first) and limit to 10
+        activitiesList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setActivities(activitiesList.slice(0, 10));
+      } catch (error) {
+        console.error('Error fetching activities:', error);
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+
+    fetchActivities();
+
+    // Auto-refresh activities every 30 seconds
+    const interval = setInterval(fetchActivities, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const statCards = [
@@ -126,16 +298,16 @@ export default function Dashboard() {
     },
     {
       title: 'Total Revenue',
-      value: `₦${stats.totalRevenue.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
-      description: 'All-time revenue',
+      value: formatCurrency(stats.totalRevenue),
+      description: 'All-time revenue (in Naira)',
       icon: DollarSign,
       gradient: 'gradient-accent',
       trend: '+18%'
     },
     {
       title: 'Monthly Revenue',
-      value: `₦${stats.monthlyRevenue.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`,
-      description: 'Current month',
+      value: formatCurrency(stats.monthlyRevenue),
+      description: 'Current month (in Naira)',
       icon: TrendingUp,
       gradient: 'gradient-card',
       trend: '+25%'
@@ -242,26 +414,41 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { type: 'user', message: 'New user registration', detail: 'A new user joined the platform', time: '2m ago', color: 'bg-emerald-500' },
-                { type: 'content', message: 'Movie uploaded', detail: 'New movie added to catalog', time: '5m ago', color: 'bg-blue-500' },
-                { type: 'producer', message: 'Producer application', detail: 'New producer submission pending review', time: '10m ago', color: 'bg-amber-500' },
-                { type: 'payment', message: 'Payment processed', detail: 'Rental payment completed successfully', time: '15m ago', color: 'bg-purple-500' },
-                { type: 'content', message: 'TV show approved', detail: 'Season 2 of "Drama Series" went live', time: '1h ago', color: 'bg-indigo-500' }
-              ].map((activity, index) => (
-                <div key={index} className="flex items-start space-x-4 p-3 rounded-lg hover:bg-muted/10 transition-colors">
-                  <div className={cn("w-3 h-3 rounded-full mt-1.5", activity.color)} />
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">{activity.message}</p>
-                    <p className="text-sm text-muted-foreground">{activity.detail}</p>
+            {loadingActivities ? (
+              <div className="space-y-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-start space-x-4 p-3 rounded-lg animate-pulse">
+                    <div className="w-3 h-3 rounded-full mt-1.5 bg-muted/30"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-muted/30 rounded w-1/3"></div>
+                      <div className="h-3 bg-muted/30 rounded w-full"></div>
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground bg-muted/20 px-2 py-1 rounded-full">
-                    {activity.time}
+                ))}
+              </div>
+            ) : activities.length > 0 ? (
+              <div className="space-y-4">
+                {activities.map((activity) => (
+                  <div key={activity.id} className="flex items-start space-x-4 p-3 rounded-lg hover:bg-muted/10 transition-colors">
+                    <div className={cn("w-3 h-3 rounded-full mt-1.5", activity.color)} />
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium leading-none">{activity.message}</p>
+                      <p className="text-sm text-muted-foreground">{activity.detail}</p>
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-muted/20 px-2 py-1 rounded-full whitespace-nowrap">
+                      {timeAgo(activity.timestamp)}
+                    </div>
                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="p-3 rounded-full bg-muted/20 mb-4">
+                  <AlertCircle className="h-6 w-6 text-muted-foreground" />
                 </div>
-              ))}
-            </div>
+                <p className="text-sm text-muted-foreground">No activity yet</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
