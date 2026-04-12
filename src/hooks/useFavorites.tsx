@@ -11,6 +11,7 @@ export interface FavoriteItem {
   added_at: string;
   // Joined data from content tables
   title?: string;
+  slug?: string;
   thumbnail_url?: string;
   duration?: number;
   price?: number;
@@ -45,18 +46,18 @@ export const useFavorites = () => {
 
       // OPTIMIZED: Parallel batched queries instead of N individual queries
       const [movies, tvShows, seasons, episodes] = await Promise.all([
-        movieIds.length ? supabase.from('movies').select('id, title, thumbnail_url, duration, price, description, genres(name)').in('id', movieIds) : { data: [] },
-        tvShowIds.length ? supabase.from('tv_shows').select('id, title, thumbnail_url, price, description, genres(name)').in('id', tvShowIds) : { data: [] },
-        seasonIds.length ? supabase.from('seasons').select('id, season_number, description, price, tv_shows(title, thumbnail_url, genres(name))').in('id', seasonIds) : { data: [] },
-        episodeIds.length ? supabase.from('episodes').select('id, title, duration, price, thumbnail_url, seasons(season_number, tv_shows(title, thumbnail_url, genres(name)))').in('id', episodeIds) : { data: [] }
+        movieIds.length ? supabase.from('movies').select('id, slug, title, thumbnail_url, duration, price, description, genres(name)').in('id', movieIds) : { data: [] },
+        tvShowIds.length ? supabase.from('tv_shows').select('id, slug, title, thumbnail_url, price, description, genres(name)').in('id', tvShowIds) : { data: [] },
+        seasonIds.length ? supabase.from('seasons').select('id, season_number, description, price, tv_shows(id, slug, title, thumbnail_url, genres(name))').in('id', seasonIds) : { data: [] },
+        episodeIds.length ? supabase.from('episodes').select('id, title, duration, price, thumbnail_url, seasons(season_number, tv_shows(id, slug, title, thumbnail_url, genres(name)))').in('id', episodeIds) : { data: [] }
       ]);
 
       // Create lookup maps for O(1) access
       const contentMaps = {
-        movie: new Map((movies.data || []).map(m => [m.id, { title: m.title, thumbnail_url: m.thumbnail_url, duration: m.duration, price: m.price, description: m.description, genre: m.genres?.name }])),
-        tv_show: new Map((tvShows.data || []).map(t => [t.id, { title: t.title, thumbnail_url: t.thumbnail_url, price: t.price, description: t.description, genre: t.genres?.name }])),
-        season: new Map((seasons.data || []).map(s => [s.id, { title: `${s.tv_shows.title} - Season ${s.season_number}`, thumbnail_url: s.tv_shows.thumbnail_url, price: s.price, description: s.description, genre: s.tv_shows.genres?.name }])),
-        episode: new Map((episodes.data || []).map(e => [e.id, { title: `${e.seasons.tv_shows.title} S${e.seasons.season_number} - ${e.title}`, thumbnail_url: e.thumbnail_url || e.seasons.tv_shows.thumbnail_url, duration: e.duration, price: e.price, genre: e.seasons.tv_shows.genres?.name }]))
+        movie: new Map((movies.data || []).map(m => [m.id, { title: m.title, slug: m.slug, thumbnail_url: m.thumbnail_url, duration: m.duration, price: m.price, description: m.description, genre: m.genres?.name }])),
+        tv_show: new Map((tvShows.data || []).map(t => [t.id, { title: t.title, slug: t.slug, thumbnail_url: t.thumbnail_url, price: t.price, description: t.description, genre: t.genres?.name }])),
+        season: new Map((seasons.data || []).map(s => [s.id, { title: `${s.tv_shows.title} - Season ${s.season_number}`, slug: s.tv_shows.slug, thumbnail_url: s.tv_shows.thumbnail_url, price: s.price, description: s.description, genre: s.tv_shows.genres?.name }])),
+        episode: new Map((episodes.data || []).map(e => [e.id, { title: `${e.seasons.tv_shows.title} S${e.seasons.season_number} - ${e.title}`, slug: e.seasons.tv_shows.slug, thumbnail_url: e.thumbnail_url || e.seasons.tv_shows.thumbnail_url, duration: e.duration, price: e.price, genre: e.seasons.tv_shows.genres?.name }]))
       };
 
       return data.map(item => ({

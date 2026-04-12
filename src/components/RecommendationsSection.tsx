@@ -222,6 +222,7 @@ const RecommendationsSection = ({
           >
             <MovieCard
               id={item.id}
+              slug={(item as any).slug}
               title={item.title}
               year={item.release_date ? new Date(item.release_date).getFullYear() : 2024}
               rating={item.rating ? parseFloat(item.rating) : 0}
