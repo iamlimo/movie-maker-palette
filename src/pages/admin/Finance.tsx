@@ -10,13 +10,15 @@ import {
   BarChart3,
   FileText,
   CreditCard,
-  AlertTriangle 
+  AlertTriangle,
+  Film
 } from 'lucide-react';
 import { FinanceOverview } from '@/components/admin/finance/FinanceOverview';
 import { TransactionsTable } from '@/components/admin/finance/TransactionsTable';
 import { PayoutsManagement } from '@/components/admin/finance/PayoutsManagement';
 import { ReconciliationTools } from '@/components/admin/finance/ReconciliationTools';
 import { AuditTrail } from '@/components/admin/finance/AuditTrail';
+import { RentalReports } from '@/components/admin/finance/RentalReports';
 import { useRole } from '@/hooks/useRole';
 import { Navigate } from 'react-router-dom';
 
@@ -46,10 +48,14 @@ const Finance = () => {
 
       {/* Finance Dashboard */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
+          </TabsTrigger>
+          <TabsTrigger value="rentals" className="flex items-center gap-2">
+            <Film className="h-4 w-4" />
+            Rentals
           </TabsTrigger>
           <TabsTrigger value="transactions" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
@@ -71,6 +77,10 @@ const Finance = () => {
 
         <TabsContent value="overview">
           <FinanceOverview />
+        </TabsContent>
+
+        <TabsContent value="rentals">
+          <RentalReports />
         </TabsContent>
 
         <TabsContent value="transactions">

@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, Loader2, Wallet, Trash2 } from 'lucide-react';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface DeleteUserDialogProps {
   open: boolean;
@@ -115,7 +116,7 @@ export const DeleteUserDialog = ({ open, onOpenChange, user, onUserDeleted }: De
                   Wallet Balance:
                 </span>
                 <span className="text-sm font-semibold text-destructive">
-                  ₦{user.wallet_balance.toFixed(2)}
+                  {formatNaira(user.wallet_balance)}
                 </span>
               </div>
             </div>

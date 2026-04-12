@@ -1,12 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useWallet } from '@/hooks/useWallet';
-import { Wallet, TrendingUp, ArrowUpRight, Clock } from 'lucide-react';
+import { Wallet, TrendingUp, ArrowUpRight, Clock, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export const WalletWidget = () => {
-  const { wallet, formatBalance, isLoading } = useWallet();
+  const { wallet, formatBalance, isLoading, refreshWallet } = useWallet();
 
   if (isLoading) {
     return (
@@ -33,8 +33,19 @@ export const WalletWidget = () => {
             <Wallet className="h-4 w-4" />
             Wallet Balance
           </CardTitle>
-          <div className="p-2 rounded-full bg-gradient-to-r from-primary/20 to-accent/20">
-            <TrendingUp className="h-4 w-4 text-primary" />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshWallet}
+              className="h-8 w-8 p-0"
+              title="Refresh balance"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <div className="p-2 rounded-full bg-gradient-to-r from-primary/20 to-accent/20">
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </div>
           </div>
         </div>
       </CardHeader>

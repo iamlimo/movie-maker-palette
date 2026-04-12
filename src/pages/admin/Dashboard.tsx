@@ -35,49 +35,40 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch users stats
-        const { count: totalUsers } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
+        // Parallel queries for counts
+        const [
+          { count: totalUsers },
+          { count: totalProducers },
+          { count: pendingProducers },
+          { count: totalMovies },
+          { count: totalTvShows }
+        ] = await Promise.all([
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+          supabase.from('producers').select('*', { count: 'exact', head: true }),
+          supabase.from('producers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('movies').select('*', { count: 'exact', head: true }),
+          supabase.from('tv_shows').select('*', { count: 'exact', head: true })
+        ]);
 
-        // Fetch producers stats
-        const { count: totalProducers } = await supabase
-          .from('producers')
-          .select('*', { count: 'exact', head: true });
-
-        const { count: pendingProducers } = await supabase
-          .from('producers')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
-
-        // Fetch content stats
-        const { count: totalMovies } = await supabase
-          .from('movies')
-          .select('*', { count: 'exact', head: true });
-
-        const { count: totalTvShows } = await supabase
-          .from('tv_shows')
-          .select('*', { count: 'exact', head: true });
-
-        // Fetch revenue stats
-        const { data: revenueData } = await supabase
-          .from('payments')
-          .select('amount')
-          .eq('status', 'completed');
+        // Parallel queries for revenue
+        const [
+          { data: revenueData },
+          { data: monthlyRevenueData }
+        ] = await Promise.all([
+          supabase.from('payments').select('amount').eq('status', 'completed'),
+          (() => {
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+            return supabase
+              .from('payments')
+              .select('amount')
+              .eq('status', 'completed')
+              .gte('transaction_date', startOfMonth.toISOString());
+          })()
+        ]);
 
         const totalRevenue = revenueData?.reduce((sum, payment) => sum + parseFloat(payment.amount.toString()), 0) || 0;
-
-        // Monthly revenue (current month)
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-
-        const { data: monthlyRevenueData } = await supabase
-          .from('payments')
-          .select('amount')
-          .eq('status', 'completed')
-          .gte('transaction_date', startOfMonth.toISOString());
-
         const monthlyRevenue = monthlyRevenueData?.reduce((sum, payment) => sum + parseFloat(payment.amount.toString()), 0) || 0;
 
         setStats({

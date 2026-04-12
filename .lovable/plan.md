@@ -1,64 +1,68 @@
 
 
-# Optimize Admin CRUD for Movies & TV Shows
+# Upgrade Push Notifications to FCM v1 API
 
-## Issues Found
+## Problem
 
-After thorough investigation, here are the bugs and gaps in the admin CRUD system:
+The current edge function uses the **legacy FCM HTTP API** (`fcm.googleapis.com/fcm/send` with `key=SERVER_KEY`), which Google has deprecated. The `FIREBASE_SERVICE_ACCOUNT` secret is already stored -- we need to switch to the **FCM v1 HTTP API** which uses OAuth2 access tokens derived from the service account JSON.
 
-### Critical Bugs
+## What Changes
 
-1. **EditMovie -- missing fields in update payload**: `status`, `video_url`, and `trailer_url` are NOT included in the update payload (`handleSubmit`). Changing status or video URLs on edit silently does nothing.
+### 1. `supabase/functions/send-push-notification/index.ts` — Rewrite FCM sending logic
 
-2. **TVShows admin -- episodes never load or render**: The `expandedSeasons` state and UI exist, but `fetchEpisodes` is never called when a season is expanded, and there's no episode row rendering. Expanding a season shows nothing.
+**Remove**: Legacy `FCM_SERVER_KEY` usage, `fcm.googleapis.com/fcm/send` endpoint, `registration_ids` batch format.
 
-3. **ViewMovie -- delete button is non-functional**: The "Delete" button in `ViewMovie.tsx` has no `onClick` handler -- it's a dead button.
+**Add**:
+- Parse `FIREBASE_SERVICE_ACCOUNT` JSON secret to extract `client_email`, `private_key`, `project_id`
+- Generate a short-lived OAuth2 access token by signing a JWT with the service account's RSA private key (using Web Crypto API available in Deno)
+- JWT claims: `iss` = client_email, `sub` = client_email, `aud` = `https://oauth2.googleapis.com/token`, `scope` = `https://www.googleapis.com/auth/firebase.messaging`, `iat`/`exp` (1hr)
+- Exchange the signed JWT for an access token via `POST https://oauth2.googleapis.com/token`
+- Send individual messages to FCM v1 endpoint: `POST https://fcm.googleapis.com/v1/projects/{project_id}/messages:send`
+- FCM v1 payload format uses `message.token` (single device) instead of `registration_ids`
+- Send concurrently in batches of 50 using `Promise.allSettled` for performance
+- Handle v1 error codes: `UNREGISTERED` and `INVALID_ARGUMENT` trigger token deactivation
+- Cache the access token in-memory for the function invocation lifetime
 
-4. **AddSeason -- creates season as `pending`**: The insert omits `status`, so it defaults to `'pending'`. The RLS policy only shows seasons of approved TV shows, but seasons themselves need `status: 'approved'` to be usable in the content flow.
+**FCM v1 payload structure**:
+```text
+{
+  "message": {
+    "token": "<device_token>",
+    "notification": { "title": "...", "body": "..." },
+    "data": { "deepLink": "/movie/slug" },
+    "android": { "priority": "high" },
+    "apns": { "payload": { "aps": { "sound": "default", "badge": 1 } } }
+  }
+}
+```
 
-5. **EditMovie/EditTVShow -- slug not updated on title change**: When the title is edited, the slug column is not recalculated, leading to stale URLs.
+### 2. `src/hooks/usePushNotifications.tsx` — Minor optimization
 
-### UX Issues
+- Add token deduplication check: before upserting, compare with a ref to skip redundant DB calls on re-registration
+- Properly deactivate token on sign-out by storing last registered token in a ref and calling update on unmount
 
-6. **TVShows admin -- uses browser `confirm()` for deletes**: Movies uses proper `AlertDialog` with soft/hard delete options. TV Shows uses raw `confirm()` with only hard delete.
+## Architecture
 
-7. **TVShows admin -- missing React key on fragment**: The `<>` wrapping each show + seasons lacks a key, causing React warnings.
+```text
+Service Account JSON (secret)
+        │
+        ▼
+  Sign JWT with RSA key (Web Crypto)
+        │
+        ▼
+  Exchange for OAuth2 access token
+        │
+        ▼
+  POST fcm.googleapis.com/v1/projects/{id}/messages:send
+        │
+        ▼
+  Per-device delivery with platform-specific config
+```
 
----
+## Files Modified
 
-## Files to Modify
+1. **`supabase/functions/send-push-notification/index.ts`** — Replace legacy FCM with v1 API using service account JWT auth
+2. **`src/hooks/usePushNotifications.tsx`** — Add token caching ref + sign-out deactivation
 
-### 1. `src/pages/admin/EditMovie.tsx`
-- Add `status`, `video_url`, `trailer_url` to the update payload in `handleSubmit`
-- Recalculate and include `slug` when title changes
-
-### 2. `src/pages/admin/TVShows.tsx`
-- Add `fetchEpisodes` call when a season is expanded
-- Render episode rows under expanded seasons (episode number, title, status, price, actions)
-- Replace `confirm()` with `AlertDialog` for TV show and season deletion (soft + hard delete options)
-- Add proper `key` to React fragments
-
-### 3. `src/pages/admin/ViewMovie.tsx`
-- Wire up the Delete button with an `AlertDialog` offering soft/hard delete, matching Movies.tsx pattern
-
-### 4. `src/pages/admin/AddSeason.tsx`
-- Add `status: 'approved'` to the season insert payload so new seasons are immediately available
-
-### 5. `src/pages/admin/EditTVShow.tsx`
-- Recalculate and include `slug` when title changes in the update payload
-
-### 6. `src/pages/admin/EditSeason.tsx`
-- No changes needed (already handles status)
-
----
-
-## Implementation Details
-
-**Slug recalculation** uses existing `generateSlug()` from `src/lib/slugUtils.ts`.
-
-**Episode rows in TVShows.tsx** will show: episode number, title, duration, status badge, price, and action buttons (edit, delete) -- matching the pattern already used in `ViewTVShow.tsx`.
-
-**Delete dialogs** will follow the existing Movies.tsx pattern with soft delete (set status to `rejected`) and hard delete (permanent removal) options.
-
-No new components, edge functions, or database changes required.
+No database changes needed. No new files.
 

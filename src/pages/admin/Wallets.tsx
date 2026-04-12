@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Search, Wallet as WalletIcon, DollarSign, TrendingUp, Users } from 'lucide-react';
 import WalletAdjustmentModal from '@/components/admin/WalletAdjustmentModal';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface UserWallet {
   user_id: string;
@@ -106,7 +107,7 @@ export default function Wallets() {
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Platform Balance</CardTitle>
               <div className="text-3xl font-bold text-foreground">
-                ₦{totalBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                {formatNaira(totalBalance)}
               </div>
             </div>
             <div className="p-3 rounded-xl bg-primary/10">
@@ -120,7 +121,7 @@ export default function Wallets() {
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">Average Balance</CardTitle>
               <div className="text-3xl font-bold text-foreground">
-                ₦{avgBalance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                {formatNaira(avgBalance)}
               </div>
             </div>
             <div className="p-3 rounded-xl bg-accent/10">
@@ -189,7 +190,7 @@ export default function Wallets() {
                     <TableCell className="text-muted-foreground">{wallet.email}</TableCell>
                     <TableCell className="text-right">
                       <span className="font-medium text-lg">
-                        ₦{wallet.balance.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                        {formatNaira(wallet.balance)}
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">

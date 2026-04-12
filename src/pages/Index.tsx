@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import CinematicHeroSlider from "@/components/CinematicHeroSlider";
@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { isIOS } = usePlatform();
+  const { isIOS, isAndroid, isNative } = usePlatform();
   const { sectionsWithContent, loading, refetch } = useSectionsWithContent();
   const currentYear = new Date().getFullYear();
   const isMobile = useIsMobile();
@@ -37,55 +37,142 @@ const Index = () => {
     }
   }, [user, navigate]);
 
+  // iOS Onboarding slides
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  const slides = [
+    { title: "Premium Movies & Shows", subtitle: "Stream exclusive Nollywood and African content in just a few taps" },
+    { title: "Watch From Top Creators", subtitle: "Discover stories from the best filmmakers and storytellers across Africa" },
+    { title: "New Here?", subtitle: "Visit signaturetv.co on your browser to create an account" },
+  ];
+
+  useEffect(() => {
+    if (!(isNative && !user && !authLoading)) return;
+    const timer = setInterval(() => {
+      setSlideIndex((prev) => (prev + 1) % slides.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isNative, user, authLoading]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX);
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const diff = touchStart - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) {
+      setSlideIndex((prev) => diff > 0 ? (prev + 1) % slides.length : (prev - 1 + slides.length) % slides.length);
+    }
+    setTouchStart(null);
+  }, [touchStart, slides.length]);
+
   // iOS Onboarding: Show login-gate for unauthenticated users
-  if (isIOS && !user && !authLoading) {
-    const onboardingBg = "/netflix-onboarding-bg.jpg"; // Add your attached image to public folder at this path
+  if (isNative && !user && !authLoading) {
+    const handleGetStarted = () => {
+      window.open('https://signaturetv.co/auth?mode=signup', '_blank');
+    };
 
     return (
-      <div className="relative min-h-screen overflow-hidden safe-area-inset">
-        {/* Background image skewed/offset for Netflix-like style */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute inset-0 -skew-y-8 rotate-1 scale-[1.12] origin-top-left">
-            <img
-              src={onboardingBg}
-              alt="Onboarding hero background"
-              className="h-full w-full object-cover opacity-80"
-            />
-            <div className="absolute inset-0 bg-black/55" />
-          </div>
+      <div
+        className="fixed inset-0 flex flex-col overflow-hidden"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Background image with tilt effect */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-[-20%] bg-cover bg-center"
+            style={{
+              backgroundImage: 'url(/ios_bg.png)',
+              animation: 'ios-bg-drift 12s ease-in-out infinite alternate',
+            }}
+          />
+          <div className="absolute inset-0"
+            style={{
+              background: 'radial-gradient(ellipse at 30% 20%, hsl(var(--primary) / 0.08) 0%, transparent 60%)',
+              animation: 'ios-parallax-overlay 18s ease-in-out infinite alternate',
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
         </div>
 
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-6">
-          {/* Logo */}
-          <div className="mb-8">
-            <img 
-              src="/signature-tv-logo.png" 
-              alt="Signature TV" 
-              className="h-20 w-auto"
-            />
+        {/* Top bar: Logo + Log In */}
+        <div className="relative z-10 flex items-center justify-between px-6 pt-3">
+          <img src="/signature-tv-logo.png" alt="Signature TV" className="h-10 w-auto" />
+          <Button
+            onClick={() => navigate('/auth')}
+            variant="ghost"
+            className="text-foreground font-semibold text-base"
+          >
+            Log In
+          </Button>
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Slide content */}
+        <div className="relative z-10 px-8 pb-4">
+          <div className="relative h-32 overflow-hidden">
+            {slides.map((slide, i) => (
+              <div
+                key={i}
+                className="absolute inset-0 flex flex-col items-center justify-center text-center transition-all duration-500 ease-in-out"
+                style={{
+                  opacity: i === slideIndex ? 1 : 0,
+                  transform: i === slideIndex ? 'translateY(0)' : 'translateY(16px)',
+                  pointerEvents: i === slideIndex ? 'auto' : 'none',
+                }}
+              >
+                <h1 className="text-3xl font-extrabold text-foreground mb-3 leading-tight">
+                  {slide.title}
+                </h1>
+                <p className="text-muted-foreground text-base leading-relaxed max-w-xs">
+                  {slide.subtitle}
+                </p>
+              </div>
+            ))}
           </div>
-        
-        {/* Title */}
-        <h1 className="text-3xl font-bold text-foreground text-center mb-4">
-          Watch Premium Movies & Shows
-        </h1>
-        
-        {/* Description */}
-        <p className="text-muted-foreground text-center max-w-sm mb-8 leading-relaxed">
-          Stream exclusive content from your favorite creators. 
-          Access your rented videos anytime, anywhere.
-        </p>
-        
-        {/* Login CTA */}
-        <Button 
-          onClick={() => navigate('/auth')}
-          className="gradient-accent text-primary-foreground font-semibold px-8 py-6 text-lg shadow-glow hover:scale-105 transition-bounce"
-          size="lg"
-        >
-          Log In to Continue
-        </Button>
+
+          {/* Dot indicators */}
+          <div className="flex items-center justify-center gap-2 mt-4 mb-6">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSlideIndex(i)}
+                className={`rounded-full transition-all duration-300 ${
+                  i === slideIndex
+                    ? 'w-6 h-2 bg-primary'
+                    : 'w-2 h-2 bg-muted-foreground/40'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* CTA Button */}
+          <Button
+            onClick={handleGetStarted}
+            variant="premium"
+            size="lg"
+            className="w-full py-6 text-lg rounded-md"
+          >
+            Get Started
+          </Button>
+
+          {/* Plain text disclosure */}
+          <p className="text-muted-foreground/60 text-xs text-center mt-4 pb-2">
+            Already have an account? Tap "Log In" above
+          </p>
+        </div>
       </div>
-    </div>
     );
   }
 

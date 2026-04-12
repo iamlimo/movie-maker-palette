@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { formatNaira } from '@/lib/priceUtils';
+import { TransactionDetails } from './TransactionDetails';
 
 interface Payment {
   id: string;
@@ -49,6 +51,8 @@ export const TransactionsTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const fetchPayments = async () => {
     setIsLoading(true);
@@ -320,7 +324,7 @@ export const TransactionsTable = () => {
                       </TableCell>
                       <TableCell>
                         <span className="font-mono">
-                          ₦{Number(payment.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                          {formatNaira(payment.amount)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -346,7 +350,12 @@ export const TransactionsTable = () => {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedPayment(payment);
+                                setDetailsOpen(true);
+                              }}
+                            >
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
@@ -396,6 +405,16 @@ export const TransactionsTable = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Transaction Details Modal */}
+      <TransactionDetails
+        payment={selectedPayment || undefined}
+        isOpen={detailsOpen}
+        onClose={() => {
+          setDetailsOpen(false);
+          setSelectedPayment(null);
+        }}
+      />
     </div>
   );
 };

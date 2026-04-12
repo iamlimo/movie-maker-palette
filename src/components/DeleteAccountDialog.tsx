@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface DeleteAccountDialogProps {
   walletBalance?: number;
@@ -162,7 +163,7 @@ export function DeleteAccountDialog({ walletBalance = 0, children }: DeleteAccou
               {walletBalance > 0 && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
                   <p className="text-sm font-medium text-destructive">
-                    ⚠️ Warning: You have ₦{walletBalance.toLocaleString()} in your wallet
+                    ⚠️ Warning: You have {formatNaira(walletBalance)} in your wallet
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     This balance will be forfeited and cannot be recovered.

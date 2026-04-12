@@ -47,8 +47,8 @@ async function checkAccess(user: any, supabase: any, contentId: string, contentT
     .eq("content_id", contentId)
     .eq("content_type", contentType)
     .eq("status", "active")
-    .gte("expiration_date", new Date().toISOString())
-    .order("expiration_date", { ascending: false })
+    .gte("expires_at", new Date().toISOString())
+    .order("expires_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -68,6 +68,6 @@ async function checkAccess(user: any, supabase: any, contentId: string, contentT
     access_type: rental ? 'rental' : purchase ? 'purchase' : null,
     rental: rental || null,
     purchase: purchase || null,
-    expires_at: rental?.expiration_date || null
+    expires_at: rental?.expires_at || null
   });
 }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,11 +45,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useRentals } from '@/hooks/useRentals';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ContentCarousel, { ContentCarouselItem } from '@/components/ContentCarousel';
 import WatchProgressCard from '@/components/WatchProgressCard';
+import ActiveRentalCard from '@/components/ActiveRentalCard';
 import { Link } from 'react-router-dom';
 
 const Profile = () => {
@@ -57,7 +60,9 @@ const Profile = () => {
   const { profile, preferences, loading: profileLoading, updateProfile, updatePreferences, uploadProfileImage, refetch: refetchProfile } = useProfile();
   const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
   const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
+  const { activeRentals, formatTimeRemaining, fetchRentals } = useRentals();
   const { isIOS } = usePlatform();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -91,6 +96,7 @@ const Profile = () => {
         refetchProfile?.(),
         refetchHistory?.(),
         refetchFavorites?.(),
+        fetchRentals?.(),
       ]);
     },
     enabled: isMobile,
@@ -292,7 +298,7 @@ const Profile = () => {
           )}
 
           {/* Main Content */}
-          <div className="flex-1 container mx-auto px-4 py-8">
+          <div className="flex-1 container mx-auto px-4 py-8" role="main">
             <div className="space-y-6">
 
             {/* Overview Tab */}
@@ -479,6 +485,44 @@ const Profile = () => {
                   </CardContent>
                 </Card>
               )}
+              </div>
+            )}
+
+            {/* My Rentals Tab */}
+            {activeTab === 'rentals' && (
+              <div className="space-y-6 animate-slide-in-up">
+                <Card className="card-hover">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Play size={20} />
+                      <span>My Rentals</span>
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Manage your active movie and TV show rentals
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {activeRentals.length === 0 ? (
+                      <div className="text-center py-12">
+                        <Play size={48} className="mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">No active rentals</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Rent movies and TV shows to see them here
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {activeRentals.map((rental) => (
+                          <ActiveRentalCard
+                            key={rental.id}
+                            rental={rental}
+                            formatTimeRemaining={formatTimeRemaining}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
 

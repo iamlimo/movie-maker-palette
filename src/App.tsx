@@ -9,12 +9,14 @@ import { BottomNav } from "@/components/mobile/BottomNav";
 import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
 import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Lazy load non-critical routes for faster initial load
@@ -34,6 +36,7 @@ const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsAndConditions = lazy(() => import('./pages/GeneralTerms'));
 const Careers = lazy(() => import('./pages/Careers'));
 const JobApplication = lazy(() => import('./pages/JobApplication'));
+const Watch = lazy(() => import('./pages/Watch'));
 
 // Lazy load ALL admin routes
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -60,6 +63,8 @@ const Wallets = lazy(() => import('@/pages/admin/Wallets'));
 const Settings = lazy(() => import('@/pages/admin/Settings'));
 const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
 const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
+const ReferralCodes = lazy(() => import('@/pages/admin/ReferralCodes'));
+const PushNotificationsAdmin = lazy(() => import('@/pages/admin/PushNotifications'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -77,18 +82,21 @@ const queryClient = new QueryClient({
 function AppContent() {
   useDeepLinking();
   useServiceWorker();
+  usePushNotifications();
 
   return (
     <>
       <OfflineBanner />
       <MobileRouteAnimator>
-        <Suspense fallback={null}>
+        <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/movie/:slug" element={<MoviePreview />} />
             <Route path="/tvshow/:slug" element={<TVShowPreview />} />
+            <Route path="/watch/:contentType/:contentId" element={<Watch />} />
             <Route path="/movies" element={<Movies />} />
             <Route path="/tvshows" element={<TVShows />} />
             <Route path="/genres" element={<Genres />} />
@@ -145,6 +153,8 @@ function AppContent() {
             <Route path="settings" element={<Settings />} />
             <Route path="job-listings" element={<JobListingsAdmin />} />
             <Route path="applications" element={<JobApplicationsAdmin />} />
+            <Route path="referral-codes" element={<ReferralCodes />} />
+            <Route path="push-notifications" element={<PushNotificationsAdmin />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

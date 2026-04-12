@@ -361,6 +361,36 @@ async function fulfillRental(supabase: any, payment: any) {
       expires_at: expiresAt,
       status: "active"
     });
+
+  // Record referral code usage if present in metadata
+  if (metadata.referral_code_id) {
+    // Check if already recorded (idempotency)
+    const { count } = await supabase
+      .from('referral_code_uses')
+      .select('id', { count: 'exact', head: true })
+      .eq('code_id', metadata.referral_code_id)
+      .eq('payment_id', payment.id);
+
+    if (count === 0) {
+      await supabase.from('referral_code_uses').insert({
+        code_id: metadata.referral_code_id,
+        user_id: payment.user_id,
+        payment_id: payment.id,
+        discount_applied: metadata.discount_amount || 0,
+      });
+      // Increment times_used
+      const { data: codeData } = await supabase
+        .from('referral_codes')
+        .select('times_used')
+        .eq('id', metadata.referral_code_id)
+        .single();
+      if (codeData) {
+        await supabase.from('referral_codes')
+          .update({ times_used: codeData.times_used + 1 })
+          .eq('id', metadata.referral_code_id);
+      }
+    }
+  }
 }
 
 async function fulfillPurchase(supabase: any, payment: any) {

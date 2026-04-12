@@ -25,14 +25,29 @@ const BackblazeUrlInput = ({
 
   const validateUrl = (url: string) => {
     if (!url) return false;
-    
-    // Check if URL contains Backblaze B2 domain or is a valid file path
-    const isB2Url = url.includes('backblazeb2.com') || url.includes('b2cdn.com');
-    const isFilePath = url.endsWith('.mp4') || url.endsWith('.mov') || 
-                       url.endsWith('.avi') || url.endsWith('.mkv') || 
-                       url.endsWith('.webm');
-    
-    return isB2Url || isFilePath;
+
+    const cleanedUrl = url.trim();
+    const validExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+
+    const getPathname = (value: string) => {
+      try {
+        const parsed = new URL(value);
+        return parsed.pathname || '';
+      } catch {
+        return value;
+      }
+    };
+
+    const hasValidExtension = (value: string) =>
+      validExtensions.some((ext) => value.toLowerCase().endsWith(ext));
+
+    const isBackblazeUrl = /^(https?:\/\/)?([^\/]+\.)?(backblazeb2\.com|b2cdn\.com)(\/.*)?$/i.test(cleanedUrl);
+    const backblazePath = isBackblazeUrl ? getPathname(cleanedUrl) : '';
+    const isBackblazePath = isBackblazeUrl && hasValidExtension(backblazePath);
+
+    const isPlainFilePath = !/^[a-zA-Z]+:\/\//.test(cleanedUrl) && cleanedUrl.includes('/') && hasValidExtension(cleanedUrl);
+
+    return isBackblazePath || isPlainFilePath;
   };
 
   const handleUrlChange = (newUrl: string) => {

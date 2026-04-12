@@ -230,6 +230,20 @@
     animation: scale-in 0.3s ease-out;
   }
 
+  /* iOS onboarding Ken Burns background drift */
+  @keyframes ios-bg-drift {
+    0%   { transform: rotate(-10deg) scale(1.3) translate(0, 0); }
+    33%  { transform: rotate(-6deg) scale(1.4) translate(-4%, 3%); }
+    66%  { transform: rotate(-12deg) scale(1.35) translate(3%, -2%); }
+    100% { transform: rotate(-8deg) scale(1.45) translate(-2%, 4%); }
+  }
+
+  @keyframes ios-parallax-overlay {
+    0%   { transform: translate(0, 0) scale(1); }
+    50%  { transform: translate(2%, -1.5%) scale(1.02); }
+    100% { transform: translate(-1%, 2%) scale(1.01); }
+  }
+
   /* Card Enhancements */
   .card-hover {
     transition: all 0.3s ease;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Play, Loader2, Wallet, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,6 @@ import { formatNaira } from "@/lib/priceUtils";
 import { Capacitor } from "@capacitor/core";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { RentalBottomSheet } from "./RentalBottomSheet";
-import { PaymentSuccessAnimation } from "./PaymentSuccessAnimation";
 import { usePlatform } from "@/hooks/usePlatform";
 import {
   Dialog,
@@ -35,6 +35,7 @@ const RentalButton = ({
   title,
 }: RentalButtonProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { checkAccess, fetchRentals, activeRentals } = useRentals();
   const { balance, canAfford, formatBalance, refreshWallet } = useWallet();
   const { isIOS } = usePlatform();
@@ -43,7 +44,6 @@ const RentalButton = ({
     null,
   );
   const [showBottomSheet, setShowBottomSheet] = useState(false);
-  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [showIOSDialog, setShowIOSDialog] = useState(false);
 
@@ -107,7 +107,7 @@ const RentalButton = ({
     }
   };
 
-  const handleRent = async (useWallet: boolean = false) => {
+  const handleRent = async (useWallet: boolean = false, referralCode?: string) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -150,6 +150,7 @@ const RentalButton = ({
             contentType,
             price, // price already in kobo from database
             useWallet,
+            ...(referralCode ? { referralCode } : {}),
           },
         });
         data = response.data;
@@ -187,11 +188,12 @@ const RentalButton = ({
         refreshWallet();
         await triggerHaptic();
         setShowBottomSheet(false);
-        setShowSuccessAnimation(true);
         toast({
           title: "Payment Successful!",
           description: `You can now watch ${title}`,
         });
+        // Redirect immediately to watch page for immersive fullscreen playback
+        navigate(`/watch/${contentType}/${contentId}`);
       } else if (data.payment_method === "paystack" || data.authorization_url) {
         // Open Paystack checkout
         const authUrl = data.authorization_url;
@@ -226,11 +228,12 @@ const RentalButton = ({
               clearInterval(pollPayment);
               await fetchRentals();
               await triggerHaptic();
-              setShowSuccessAnimation(true);
               toast({
                 title: "Payment Successful!",
                 description: `You can now watch ${title}`,
               });
+              // Redirect immediately to watch page for immersive fullscreen playback
+              navigate(`/watch/${contentType}/${contentId}`);
             }
           } catch (pollError) {
             console.error("Payment polling error:", pollError);
@@ -275,7 +278,12 @@ const RentalButton = ({
   if (hasAccess) {
     return (
       <div className="space-y-2">
-        <Button variant="default" size="lg" className="w-full touch-target">
+        <Button 
+          variant="default" 
+          size="lg" 
+          className="w-full touch-target"
+          onClick={() => navigate(`/watch/${contentType}/${contentId}`)}
+        >
           <Play className="h-5 w-5 mr-2" />
           Watch Now
         </Button>
@@ -358,6 +366,8 @@ const RentalButton = ({
 
   const handleOpenSheet = async () => {
     await triggerHaptic();
+    // Refresh wallet balance to ensure latest balance is used for payment options
+    await refreshWallet();
     setShowBottomSheet(true);
   };
 
@@ -458,17 +468,9 @@ const RentalButton = ({
         canAfford={canAffordRental}
         isLoading={isLoading}
         paymentMethod={paymentMethod}
-        onRentWithWallet={() => handleRent(true)}
-        onRentWithCard={() => handleRent(false)}
+        onRentWithWallet={(code) => handleRent(true, code)}
+        onRentWithCard={(code) => handleRent(false, code)}
       />
-
-      {/* Success Animation */}
-      {showSuccessAnimation && (
-        <PaymentSuccessAnimation
-          onComplete={() => setShowSuccessAnimation(false)}
-          title="Payment Successful!"
-        />
-      )}
     </>
   );
 };
