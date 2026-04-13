@@ -14,7 +14,7 @@ async function validateReferralCode(supabase: any, code: string, userId: string,
     .select('*')
     .eq('code', code.toUpperCase())
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return { valid: false, error: 'Invalid referral code' };
   if (data.valid_until && new Date(data.valid_until) < new Date()) return { valid: false, error: 'Code expired' };
@@ -81,6 +81,17 @@ serve(async (req) => {
 
     if (!contentId || !contentType || !price) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Validate that only rentable content types are allowed (backend validation)
+    const rentableTypes = ['movie', 'season', 'episode'];
+    if (!rentableTypes.includes(contentType)) {
+      return new Response(JSON.stringify({ 
+        error: `Content type "${contentType}" is not available for rental. Only movies, seasons, and episodes can be rented.` 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -212,25 +223,40 @@ serve(async (req) => {
       let expiryHours = 48;
       
       if (contentType === 'movie') {
-        const { data: movieData } = await supabase
+        const { data: movieData, error: movieError } = await supabase
           .from('movies')
           .select('rental_expiry_duration')
           .eq('id', contentId)
-          .single();
+          .maybeSingle();
+        
+        if (movieError) {
+          console.error('Error fetching movie data:', movieError);
+          throw new Error(`Failed to fetch movie details: ${movieError.message}`);
+        }
         expiryHours = movieData?.rental_expiry_duration || 48;
       } else if (contentType === 'season') {
-        const { data: seasonData } = await supabase
+        const { data: seasonData, error: seasonError } = await supabase
           .from('seasons')
           .select('rental_expiry_duration')
           .eq('id', contentId)
-          .single();
+          .maybeSingle();
+        
+        if (seasonError) {
+          console.error('Error fetching season data:', seasonError);
+          throw new Error(`Failed to fetch season details: ${seasonError.message}`);
+        }
         expiryHours = seasonData?.rental_expiry_duration || 336;
       } else if (contentType === 'episode') {
-        const { data: episodeData } = await supabase
+        const { data: episodeData, error: episodeError } = await supabase
           .from('episodes')
           .select('rental_expiry_duration')
           .eq('id', contentId)
-          .single();
+          .maybeSingle();
+        
+        if (episodeError) {
+          console.error('Error fetching episode data:', episodeError);
+          throw new Error(`Failed to fetch episode details: ${episodeError.message}`);
+        }
         expiryHours = episodeData?.rental_expiry_duration || 48;
       }
 
@@ -336,9 +362,17 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Wallet payment error:', error);
-    return new Response(JSON.stringify({ error: 'An error occurred processing your payment' }), {
-      status: 500,
+    console.error('Wallet payment error:', {
+      message: error.message,
+      stack: error.stack,
+      details: error.details || 'No additional details',
+    });
+    
+    const errorMessage = error.message || 'An error occurred processing your payment';
+    const status = error.status || 500;
+    
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

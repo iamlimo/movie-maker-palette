@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Browser } from "@capacitor/browser";
 import Header from "@/components/Header";
 import CinematicHeroSlider from "@/components/CinematicHeroSlider";
 import BrandStrip from "@/components/BrandStrip";
@@ -53,7 +54,7 @@ const Index = () => {
       setSlideIndex((prev) => (prev + 1) % slides.length);
     }, 4000);
     return () => clearInterval(timer);
-  }, [isNative, user, authLoading]);
+  }, [isNative, user, authLoading, slides.length]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
@@ -70,8 +71,12 @@ const Index = () => {
 
   // iOS Onboarding: Show login-gate for unauthenticated users
   if (isNative && !user && !authLoading) {
-    const handleGetStarted = () => {
-      window.open('https://signaturetv.co/auth?mode=signup', '_blank');
+    const handleGetStarted = async () => {
+      try {
+        await Browser.open({ url: 'https://signaturetv.co/auth?mode=signup' });
+      } catch (error) {
+        console.error('Failed to open URL:', error);
+      }
     };
 
     return (

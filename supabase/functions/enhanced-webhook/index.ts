@@ -331,21 +331,28 @@ async function fulfillRental(supabase: any, payment: any) {
       .from('movies')
       .select('rental_expiry_duration')
       .eq('id', contentId)
-      .single();
+      .maybeSingle();
     expiryHours = movieData?.rental_expiry_duration || 48;
+  } else if (contentType === 'tv') {
+    const { data: tvData } = await supabase
+      .from('tv_shows')
+      .select('rental_expiry_duration')
+      .eq('id', contentId)
+      .maybeSingle();
+    expiryHours = tvData?.rental_expiry_duration || 336;
   } else if (contentType === 'season') {
     const { data: seasonData } = await supabase
       .from('seasons')
       .select('rental_expiry_duration')
       .eq('id', contentId)
-      .single();
+      .maybeSingle();
     expiryHours = seasonData?.rental_expiry_duration || 336;
   } else if (contentType === 'episode') {
     const { data: episodeData } = await supabase
       .from('episodes')
       .select('rental_expiry_duration')
       .eq('id', contentId)
-      .single();
+      .maybeSingle();
     expiryHours = episodeData?.rental_expiry_duration || 48;
   }
 
