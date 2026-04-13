@@ -527,8 +527,8 @@ const RentalButton = ({
               </div>
             )}
 
-            {/* Desktop Referral Code Section - Not available on iOS */}
-            {!isNative && !isMobileBrowser && !isIOS && (
+            {/* Desktop Referral Code Section - Available on desktop browsers, hidden on native iOS apps */}
+            {!isNative && !isMobileBrowser && (
               <div className="space-y-2 p-3 bg-secondary rounded-lg">
                 {referralDiscount ? (
                   <div className="flex items-center justify-between p-2 bg-green-500/10 border border-green-500/30 rounded text-sm">
@@ -672,7 +672,7 @@ const RentalButton = ({
             paymentMethod={paymentMethod}
             onRentWithWallet={(code) => handleRent(true, code)}
             onRentWithCard={(code) => handleRent(false, code)}
-            showReferralCode={!isIOS}
+            showReferralCode={!(isNative && isIOS)}
           />
         </>
       )}
