@@ -115,13 +115,16 @@ Deno.serve(async (req) => {
         const contentId = metadata?.content_id;
 
         if (contentType === 'movie') {
-          const { data: movieData } = await supabase.from('movies').select('rental_expiry_duration').eq('id', contentId).single();
+          const { data: movieData } = await supabase.from('movies').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
           expiryHours = movieData?.rental_expiry_duration || 48;
+        } else if (contentType === 'tv') {
+          const { data: tvData } = await supabase.from('tv_shows').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
+          expiryHours = tvData?.rental_expiry_duration || 336;
         } else if (contentType === 'season') {
-          const { data: seasonData } = await supabase.from('seasons').select('rental_expiry_duration').eq('id', contentId).single();
+          const { data: seasonData } = await supabase.from('seasons').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
           expiryHours = seasonData?.rental_expiry_duration || 336;
         } else if (contentType === 'episode') {
-          const { data: episodeData } = await supabase.from('episodes').select('rental_expiry_duration').eq('id', contentId).single();
+          const { data: episodeData } = await supabase.from('episodes').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
           expiryHours = episodeData?.rental_expiry_duration || 48;
         }
 

@@ -133,20 +133,28 @@ const RecommendationsSection = ({
             .limit(3)
         ]);
 
+        // Create a set of existing IDs to avoid duplicates
+        const existingIds = new Set(shuffled.map(item => item.id));
+
         if (additionalMovies.data) {
-          const additionalItems = additionalMovies.data.map(item => ({
-            ...item,
-            content_type: 'movie' as const
-          }));
+          const additionalItems = additionalMovies.data
+            .filter(item => !existingIds.has(item.id))
+            .map(item => ({
+              ...item,
+              content_type: 'movie' as const
+            }));
           shuffled.push(...additionalItems);
         }
         
         if (additionalTVShows.data) {
-          const additionalItems = additionalTVShows.data.map(item => ({
-            ...item,
-            genre: item.genres?.[0] ? { name: item.genres[0] } : undefined,
-            content_type: 'tv_show' as const
-          }));
+          const existingIdsAfter = new Set(shuffled.map(item => item.id));
+          const additionalItems = additionalTVShows.data
+            .filter(item => !existingIdsAfter.has(item.id))
+            .map(item => ({
+              ...item,
+              genre: item.genres?.[0] ? { name: item.genres[0] } : undefined,
+              content_type: 'tv_show' as const
+            }));
           shuffled.push(...additionalItems);
         }
       }

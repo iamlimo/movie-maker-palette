@@ -18,10 +18,10 @@ export function BottomNav() {
   const isMobile = useIsMobile();
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
-  const { isIOS } = usePlatform();
+  const { isNative } = usePlatform();
 
-  // Hide bottom nav on iOS onboarding and login screens for unauthenticated users
-  if (isIOS && !user && !authLoading && (location.pathname === "/" || location.pathname === "/auth")) {
+  // Hide bottom nav during onboarding screen on native platforms (iOS and Android)
+  if (isNative && !user && !authLoading && location.pathname === "/") {
     return null;
   }
 

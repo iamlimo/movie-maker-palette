@@ -6,6 +6,35 @@ const corsHeadersExtended = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, idempotency-key'
 }
 
+async function validateReferralCode(supabase: any, code: string, userId: string, price: number) {
+  const { data, error } = await supabase
+    .from('referral_codes')
+    .select('*')
+    .eq('code', code.toUpperCase())
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error || !data) return { valid: false, error: 'Invalid referral code' };
+  if (data.valid_until && new Date(data.valid_until) < new Date()) return { valid: false, error: 'Code expired' };
+  if (data.max_uses && data.times_used >= data.max_uses) return { valid: false, error: 'Code fully redeemed' };
+  if (data.min_purchase_amount > 0 && price < data.min_purchase_amount) return { valid: false, error: 'Minimum purchase not met' };
+
+  // Check per-user limit
+  const { count } = await supabase
+    .from('referral_code_uses')
+    .select('id', { count: 'exact', head: true })
+    .eq('code_id', data.id)
+    .eq('user_id', userId);
+
+  if (count !== null && count >= data.max_uses_per_user) return { valid: false, error: 'You have already used this code' };
+
+  const discountAmount = data.discount_type === 'percentage'
+    ? Math.floor(price * data.discount_value / 100)
+    : Math.min(data.discount_value, price);
+
+  return { valid: true, codeData: data, discountAmount };
+}
+
 Deno.serve(async (req) => {
   const optionsResponse = handleOptions(req);
   if (optionsResponse) return optionsResponse;
@@ -30,7 +59,7 @@ Deno.serve(async (req) => {
       return errorResponse('Invalid authentication', 401);
     }
 
-    const { userId, contentId, contentType, price } = await req.json();
+    const { userId, contentId, contentType, price, referralCode } = await req.json();
 
     if (!userId || !contentId || !contentType || !price) {
       return errorResponse('Missing required fields: userId, contentId, contentType, price', 400);
@@ -40,8 +69,32 @@ Deno.serve(async (req) => {
       return errorResponse('User ID mismatch', 403);
     }
 
-    // Convert price to kobo for Paystack
-    const amountInKobo = Math.round(price * 100);
+    // Validate that only rentable content types are allowed (backend validation)
+    const rentableTypes = ['movie', 'season', 'episode'];
+    if (!rentableTypes.includes(contentType)) {
+      return errorResponse(
+        `Content type "${contentType}" is not available for rental. Only movies, seasons, and episodes can be rented.`,
+        400
+      );
+    }
+
+    // Validate referral code if provided
+    let discountAmount = 0;
+    let validatedCode: any = null;
+    let finalPrice = price;
+
+    if (referralCode) {
+      const result = await validateReferralCode(supabase, referralCode, user.id, price);
+      if (!result.valid) {
+        return errorResponse(result.error, 400);
+      }
+      discountAmount = result.discountAmount!;
+      validatedCode = result.codeData;
+      finalPrice = Math.max(0, price - discountAmount);
+    }
+
+    // Convert final price to kobo for Paystack
+    const amountInKobo = Math.round(finalPrice * 100);
 
     // Get user email
     const { data: profile } = await supabase
@@ -57,6 +110,21 @@ Deno.serve(async (req) => {
     // Generate unique intent_id for idempotency
     const intentId = crypto.randomUUID();
 
+    // Create payment metadata
+    const paymentMetadata: any = {
+      content_id: contentId,
+      content_type: contentType,
+      original_price: price
+    };
+
+    if (validatedCode) {
+      paymentMetadata.referral_code = validatedCode.code;
+      paymentMetadata.referral_code_id = validatedCode.id;
+      paymentMetadata.discount_amount = discountAmount;
+      paymentMetadata.discount_type = validatedCode.discount_type;
+      paymentMetadata.discount_value = validatedCode.discount_value;
+    }
+
     // Create payment record
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
@@ -66,10 +134,7 @@ Deno.serve(async (req) => {
         currency: 'NGN',
         purpose: 'rental',
         intent_id: intentId,
-        metadata: {
-          content_id: contentId,
-          content_type: contentType
-        },
+        metadata: paymentMetadata,
         status: 'pending'
       })
       .select()
@@ -96,7 +161,11 @@ Deno.serve(async (req) => {
           payment_id: payment.id,
           user_id: user.id,
           content_id: contentId,
-          content_type: contentType
+          content_type: contentType,
+          ...(validatedCode && {
+            referral_code_id: validatedCode.id,
+            discount_applied: discountAmount
+          })
         }
       }),
     });
@@ -111,7 +180,9 @@ Deno.serve(async (req) => {
     return jsonResponse({
       success: true,
       payment_id: payment.id,
-      authorization_url: paystackData.data.authorization_url
+      authorization_url: paystackData.data.authorization_url,
+      discount_applied: discountAmount,
+      final_amount: amountInKobo
     });
 
   } catch (error) {
