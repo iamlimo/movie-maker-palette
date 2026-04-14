@@ -62,6 +62,22 @@ const Watch = () => {
           .eq("id", contentId)
           .single();
         contentData = data;
+      } else if (contentType === "season") {
+        // Seasons cannot be watched directly - redirect to TV show page
+        const { data: seasonData } = await supabase
+          .from("seasons")
+          .select("*, shows(slug)")
+          .eq("id", contentId)
+          .single();
+        
+        if (seasonData?.shows?.slug) {
+          navigate(`/tvshow/${seasonData.shows.slug}`);
+          return;
+        } else {
+          setError("Season not found");
+          setLoading(false);
+          return;
+        }
       }
 
       if (!contentData) {
