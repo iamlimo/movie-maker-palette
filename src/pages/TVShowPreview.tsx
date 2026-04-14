@@ -659,14 +659,21 @@ const TVShowPreview = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex-1">
-                                    <h4 className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                                      {episode.episode_number}. {episode.title}
-                                    </h4>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h4 className="font-semibold group-hover:text-primary transition-colors">
+                                        {episode.episode_number}. {episode.title}
+                                      </h4>
+                                      {hasSeasonAccess && !hasEpisodeAccess && (
+                                        <Badge variant="secondary" className="text-xs py-1 px-2">
+                                          Included in season rental
+                                        </Badge>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                                       <Clock className="h-3 w-3" />
                                       <span>{episode.duration}m</span>
-                                      {/* Hide episode price on iOS */}
-                                      {!isIOS && (
+                                      {/* Hide episode price on iOS or when season rental already covers it */}
+                                      {!isIOS && !hasSeasonAccess && (
                                         <>
                                           <span>•</span>
                                           <span className="font-semibold text-foreground">
