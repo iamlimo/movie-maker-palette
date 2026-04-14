@@ -61,7 +61,10 @@ Deno.serve(async (req) => {
 
     const { userId, contentId, contentType, price, referralCode } = await req.json();
 
-    if (!userId || !contentId || !contentType || !price) {
+    // Normalize contentType to lowercase for consistent checking
+    const normalizedContentType = (contentType || '').toLowerCase().trim();
+
+    if (!userId || !contentId || !normalizedContentType || !price) {
       return errorResponse('Missing required fields: userId, contentId, contentType, price', 400);
     }
 
@@ -71,9 +74,9 @@ Deno.serve(async (req) => {
 
     // Validate that only rentable content types are allowed (backend validation)
     const rentableTypes = ['movie', 'season', 'episode'];
-    if (!rentableTypes.includes(contentType)) {
+    if (!rentableTypes.includes(normalizedContentType)) {
       return errorResponse(
-        `Content type "${contentType}" is not available for rental. Only movies, seasons, and episodes can be rented.`,
+        `Content type "${normalizedContentType}" is not available for rental. Only movies, seasons, and episodes can be rented.`,
         400
       );
     }
@@ -113,7 +116,7 @@ Deno.serve(async (req) => {
     // Create payment metadata
     const paymentMetadata: any = {
       content_id: contentId,
-      content_type: contentType,
+      content_type: normalizedContentType,
       original_price: price
     };
 
@@ -161,7 +164,7 @@ Deno.serve(async (req) => {
           payment_id: payment.id,
           user_id: user.id,
           content_id: contentId,
-          content_type: contentType,
+          content_type: normalizedContentType,
           ...(validatedCode && {
             referral_code_id: validatedCode.id,
             discount_applied: discountAmount
