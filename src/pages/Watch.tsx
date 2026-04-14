@@ -58,26 +58,64 @@ const Watch = () => {
       } else if (contentType === "episode") {
         const { data } = await supabase
           .from("episodes")
-          .select("*, seasons(shows(title, slug))")
+          .select("*, seasons(tv_shows(title, slug))")
           .eq("id", contentId)
           .single();
         contentData = data;
       } else if (contentType === "season") {
-        // Seasons cannot be watched directly - redirect to TV show page
-        const { data: seasonData } = await supabase
+        // Seasons are rented as a package but are not directly playable.
+        const { data: seasonData, error: seasonError } = await supabase
           .from("seasons")
-          .select("*, shows(slug)")
+          .select("id, season_number, tv_shows(slug)")
           .eq("id", contentId)
           .single();
-        
-        if (seasonData?.shows?.slug) {
-          navigate(`/tvshow/${seasonData.shows.slug}`);
-          return;
-        } else {
+
+        if (seasonError || !seasonData) {
+          console.error("Season fetch error:", seasonError);
           setError("Season not found");
           setLoading(false);
           return;
         }
+
+        const { data: episodesData, error: episodesError } = await supabase
+          .from("episodes")
+          .select("id, episode_number")
+          .eq("season_id", contentId)
+          .order("episode_number", { ascending: true });
+
+        if (episodesError || !episodesData || episodesData.length === 0) {
+          console.error("Season episodes fetch error:", episodesError);
+          if (seasonData.tv_shows?.slug) {
+            navigate(`/tvshow/${seasonData.tv_shows.slug}`);
+            return;
+          }
+          setError("Season not found");
+          setLoading(false);
+          return;
+        }
+
+        const episodeIds = episodesData.map((episode: any) => episode.id);
+        const { data: historyData } = await supabase
+          .from("watch_history")
+          .select("content_id, completed, progress")
+          .eq("user_id", user.id)
+          .in("content_id", episodeIds);
+
+        const watchMap = (historyData || []).reduce<Record<string, { completed: boolean; progress: number }>>((map, entry: any) => {
+          map[entry.content_id] = {
+            completed: entry.completed,
+            progress: entry.progress || 0,
+          };
+          return map;
+        }, {});
+
+        const nextEpisode = episodesData.find((episode: any) => {
+          const history = watchMap[episode.id];
+          return !history || (!history.completed && history.progress < 90);
+        }) || episodesData[0];
+
+        navigate(`/watch/episode/${nextEpisode.id}`);
+        return;
       }
 
       if (!contentData) {
