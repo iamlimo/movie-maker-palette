@@ -9,8 +9,6 @@ import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 import RentalButton from './RentalButton';
 
-const SUPABASE_URL = 'https://tsfwlereofjlxhjsarap.supabase.co';
-
 interface EpisodePlayerProps {
   episodeId: string;
   seasonId: string;
@@ -101,19 +99,14 @@ const EpisodePlayer = ({
 
   const loadVideoUrl = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-video-url', {
-        body: {
-          contentId: episodeId,
-          contentType: 'episode',
-          expiryHours: 24,
-        },
-      });
+      const { data, error } = await supabase
+        .from('episodes')
+        .select('video_url')
+        .eq('id', episodeId)
+        .single();
 
-      if (error || !data?.signedUrl) {
-        throw new Error(error?.message || 'Unable to load episode video URL');
-      }
-
-      setVideoUrl(data.signedUrl);
+      if (error) throw error;
+      setVideoUrl(data.video_url);
     } catch (error) {
       console.error('Error loading video URL:', error);
     }
@@ -252,7 +245,7 @@ const EpisodePlayer = ({
           <div className="space-y-2">
             <RentalButton
               contentId={episodeId}
-              contentType="episode"
+              contentType="tv"
               price={price}
               title={`Episode: ${title}`}
             />
@@ -289,9 +282,6 @@ const EpisodePlayer = ({
               });
               setIsPlaying(false);
             }}
-            controlsList="nodownload nofullscreen noremoteplayback"
-            disablePictureInPicture
-            onContextMenu={(e) => e.preventDefault()}
           >
             <source src={videoUrl} type="video/mp4" />
             {subtitleUrl && (
@@ -299,11 +289,6 @@ const EpisodePlayer = ({
             )}
             Your browser does not support the video tag.
           </video>
-          <div className="pointer-events-none absolute inset-0 flex items-end justify-end p-3">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-white/30 drop-shadow-lg">
-              {user?.email || user?.id || 'Signature TV'}
-            </span>
-          </div>
         </div>
         
         {/* Next Episode Overlay */}

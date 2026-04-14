@@ -81,59 +81,40 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const urlMovieId = url.searchParams.get('movieId');
-    const urlContentId = url.searchParams.get('contentId');
-    const urlContentType = url.searchParams.get('contentType')?.toLowerCase();
+    const movieIdFromUrl = url.searchParams.get('movieId');
     const isStreamingRequest = url.searchParams.get('stream') === 'true';
-
-    let movieId = urlMovieId;
-    let contentId = urlContentId;
-    let contentType = urlContentType || 'movie';
+    
+    // Get movieId from either URL params (for streaming) or request body
+    let movieId = movieIdFromUrl;
     let expiryHours = 24;
-
-    if (!movieId && !contentId) {
+    
+    if (!movieId) {
+      // Try to get from request body
       const body = await req.json().catch(() => ({}));
       movieId = body.movieId;
-      contentId = body.contentId;
-      contentType = (body.contentType || contentType).toLowerCase();
-      expiryHours = body.expiryHours || expiryHours;
+      expiryHours = body.expiryHours || 24;
     }
 
-    if (!movieId && !contentId) {
+    if (!movieId) {
       return new Response(
-        JSON.stringify({ error: 'Movie or content ID is required' }),
+        JSON.stringify({ error: 'Movie ID is required' }),
         { status: 400, headers: corsHeaders }
       );
     }
 
-    if (!['movie', 'episode'].includes(contentType)) {
-      contentType = 'movie';
-    }
+    // Get movie details
+    const { data: movie, error: movieError } = await supabase
+      .from('movies')
+      .select('id, video_url, status, price')
+      .eq('id', movieId)
+      .single();
 
-    const contentKey = contentId || movieId;
-    const query = contentType === 'episode'
-      ? 'id, video_url, season_id, seasons(tv_show_id)'
-      : 'id, video_url, status, price';
-
-    const { data: content, error: contentError } = await supabase
-      .from(contentType === 'episode' ? 'episodes' : 'movies')
-      .select(query)
-      .eq('id', contentKey)
-      .maybeSingle();
-
-    if (contentError || !content) {
-      return new Response(
-        JSON.stringify({ error: `${contentType === 'episode' ? 'Episode' : 'Movie'} not found` }),
-        { status: 404, headers: corsHeaders }
-      );
-    }
-
-    console.log('Content lookup:', {
-      contentType,
-      contentKey,
-      found: !!content,
-      hasVideoUrl: !!content?.video_url,
-      contentError: contentError ? { code: contentError.code, message: contentError.message } : null
+    console.log('Movie lookup:', {
+      movieId,
+      found: !!movie,
+      status: movie?.status,
+      hasVideoUrl: !!movie?.video_url,
+      movieError: movieError ? { code: movieError.code, message: movieError.message } : null
     });
 
     if (movieError || !movie) {
@@ -143,9 +124,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (contentType === 'movie' && content.status !== 'approved') {
+    if (movie.status !== 'approved') {
       return new Response(
-        JSON.stringify({ error: 'Movie not available', status: content.status }),
+        JSON.stringify({ error: 'Movie not available', status: movie.status }),
         { status: 403, headers: corsHeaders }
       );
     }
@@ -164,122 +145,64 @@ Deno.serve(async (req) => {
     const isSuperAdmin = roleData?.role === 'super_admin';
 
     if (!isSuperAdmin) {
-      let hasAccess = false;
+      // Check if user has purchased the movie
+      const { data: purchase, error: purchaseError } = await supabase
+        .from('purchases')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('content_id', movieId)
+        .eq('content_type', 'movie')
+        .maybeSingle();
 
-      if (contentType === 'movie') {
-        const { data: purchase, error: purchaseError } = await supabase
-          .from('purchases')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('content_id', contentKey)
-          .eq('content_type', 'movie')
-          .maybeSingle();
-
-        if (purchaseError && purchaseError.code !== 'PGRST116') {
-          console.error('Purchase check error:', purchaseError);
-        }
-
-        const { data: rental, error: rentalError } = await supabase
-          .from('rentals')
-          .select('id, expires_at, status')
-          .eq('user_id', user.id)
-          .eq('content_id', contentKey)
-          .eq('content_type', 'movie')
-          .eq('status', 'active')
-          .gte('expires_at', new Date().toISOString())
-          .maybeSingle();
-
-        if (rentalError && rentalError.code !== 'PGRST116') {
-          console.error('Rental check error:', rentalError);
-        }
-
-        hasAccess = !!purchase || !!rental;
-      } else if (contentType === 'episode') {
-        const seasonId = content.season_id;
-        const tvShowId = content.seasons?.tv_show_id;
-
-        const episodePurchaseQuery = supabase
-          .from('purchases')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('content_id', contentKey)
-          .eq('content_type', 'episode')
-          .maybeSingle();
-
-        const episodeRentalQuery = supabase
-          .from('rentals')
-          .select('id, expires_at, status')
-          .eq('user_id', user.id)
-          .eq('content_id', contentKey)
-          .eq('content_type', 'episode')
-          .eq('status', 'active')
-          .gte('expires_at', new Date().toISOString())
-          .maybeSingle();
-
-        const [episodePurchaseResult, episodeRentalResult] = await Promise.all([
-          episodePurchaseQuery,
-          episodeRentalQuery,
-        ]);
-
-        const episodePurchase = episodePurchaseResult?.data;
-        const episodeRental = episodeRentalResult?.data;
-        hasAccess = !!episodePurchase || !!episodeRental;
-
-        if (!hasAccess && seasonId) {
-          const [seasonPurchaseResult, seasonRentalResult] = await Promise.all([
-            supabase
-              .from('purchases')
-              .select('id')
-              .eq('user_id', user.id)
-              .eq('content_id', seasonId)
-              .eq('content_type', 'season')
-              .maybeSingle(),
-            supabase
-              .from('rentals')
-              .select('id, expires_at, status')
-              .eq('user_id', user.id)
-              .eq('content_id', seasonId)
-              .eq('content_type', 'season')
-              .eq('status', 'active')
-              .gte('expires_at', new Date().toISOString())
-              .maybeSingle(),
-          ]);
-
-          const seasonPurchase = seasonPurchaseResult?.data;
-          const seasonRental = seasonRentalResult?.data;
-          hasAccess = !!seasonPurchase || !!seasonRental;
-        }
-
-        if (!hasAccess && tvShowId) {
-          const { data: showPurchase, error: showPurchaseError } = await supabase
-            .from('purchases')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('content_id', tvShowId)
-            .in('content_type', ['tv', 'tv_show'])
-            .maybeSingle();
-
-          if (showPurchaseError && showPurchaseError.code !== 'PGRST116') {
-            console.error('TV show purchase check error:', showPurchaseError);
-          }
-
-          hasAccess = !!showPurchase;
-        }
+      if (purchaseError && purchaseError.code !== 'PGRST116') {
+        console.error('Purchase check error:', purchaseError);
       }
 
-      if (!hasAccess) {
+      // Check if user has active rental
+      // Use maybeSingle() which returns null if no result instead of throwing an error
+      const { data: rental, error: rentalError } = await supabase
+        .from('rentals')
+        .select('id, expires_at, user_id, content_id, content_type, status')
+        .eq('user_id', user.id)
+        .eq('content_id', movieId)
+        .eq('content_type', 'movie')
+        .eq('status', 'active')
+        .gte('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      console.log('Rental check for user:', {
+        userId: user.id,
+        movieId,
+        hasRental: !!rental,
+        rentalData: rental,
+        rentalError: rentalError ? { code: rentalError.code, message: rentalError.message } : null,
+        hasPurchase: !!purchase,
+        currentTime: new Date().toISOString()
+      });
+
+      if (!purchase && !rental) {
         console.error('Access denied:', {
           userId: user.id,
-          contentType,
-          contentKey,
-          isEpisode: contentType === 'episode',
+          movieId,
+          hasPurchase: !!purchase,
+          hasRental: !!rental,
+          rentalError: rentalError?.message,
+          purchaseError: purchaseError?.message
         });
-
+        
+        // Build a more informative error message
+        let errorDetails = {
+          error: 'Access denied. Purchase or rent this movie to watch.',
+          debug: {
+            movieId,
+            hasPurchase: !!purchase,
+            hasRental: !!rental,
+            movieStatus: movie?.status
+          }
+        };
+        
         return new Response(
-          JSON.stringify({
-            error: 'Access denied. Purchase or rent this content to watch.',
-            details: { contentType, contentKey }
-          }),
+          JSON.stringify(errorDetails),
           { status: 403, headers: corsHeaders }
         );
       }

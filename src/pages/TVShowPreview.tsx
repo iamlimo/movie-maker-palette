@@ -27,10 +27,10 @@ import AutoPlayMediaPlayer from "@/components/AutoPlayMediaPlayer";
 import RecommendationsSection from "@/components/RecommendationsSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
-import { useRentals } from "@/hooks/useRentals";
+import { useOptimizedRentals } from "@/hooks/useOptimizedRentals";
 import { toast } from "@/hooks/use-toast";
 import EpisodePlayer from "@/components/EpisodePlayer";
-import RentalButton from "@/components/RentalButton";
+import { OptimizedRentalButton } from "@/components/OptimizedRentalButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatNaira } from "@/lib/priceUtils";
 import { usePlatform } from "@/hooks/usePlatform";
@@ -96,7 +96,7 @@ const TVShowPreview = () => {
     toggleFavorite,
     loading: favoritesLoading,
   } = useFavorites();
-  const { checkAccess } = useRentals();
+  const { checkAccess: checkAccessOptimized, checkSeasonAccess } = useOptimizedRentals();
   const isMobile = useIsMobile();
   const [tvShow, setTVShow] = useState<TVShow | null>(preloadedData || null);
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -239,19 +239,23 @@ const TVShowPreview = () => {
     if (!user) return;
 
     try {
-      // Check season access
+      // Check season access using optimized rentals
       const newSeasonAccess: { [seasonId: string]: boolean } = {};
       seasonsData.forEach((season) => {
-        newSeasonAccess[season.id] = checkAccess(season.id, "season");
+        const access = checkAccessOptimized(season.id, "season");
+        newSeasonAccess[season.id] = access.hasAccess;
       });
 
-      // Check episode access
+      // Check episode access - also checks if parent season is rented
       const newEpisodeAccess: { [episodeId: string]: boolean } = {};
-      Object.values(episodesMap)
-        .flat()
-        .forEach((episode) => {
-          newEpisodeAccess[episode.id] = checkAccess(episode.id, "episode");
+      Object.entries(episodesMap).forEach(([seasonId, episodeList]) => {
+        const seasonRented = newSeasonAccess[seasonId];
+        episodeList.forEach((episode) => {
+          const episodeAccess = checkAccessOptimized(episode.id, "episode");
+          // User has access if they rented the episode OR the season
+          newEpisodeAccess[episode.id] = episodeAccess.hasAccess || seasonRented;
         });
+      });
 
       setSeasonAccess(newSeasonAccess);
       setEpisodeAccess(newEpisodeAccess);
@@ -508,7 +512,7 @@ const TVShowPreview = () => {
                         {currentEpisodes.length} episodes •{" "}
                         {currentSeason.rental_expiry_duration}h access
                       </p>
-                      <RentalButton
+                      <OptimizedRentalButton
                         contentId={currentSeason.id}
                         contentType="season"
                         price={currentSeason.price}
@@ -555,7 +559,7 @@ const TVShowPreview = () => {
                 <p className="text-xl font-bold text-primary mb-2">
                   {formatNaira(currentSeason.price)}
                 </p>
-                <RentalButton
+                <OptimizedRentalButton
                   contentId={currentSeason.id}
                   contentType="season"
                   price={currentSeason.price}
@@ -702,7 +706,7 @@ const TVShowPreview = () => {
                                         Watch
                                       </Button>
                                     ) : (
-                                      <RentalButton
+                                      <OptimizedRentalButton
                                         contentId={episode.id}
                                         contentType="episode"
                                         price={episode.price}
