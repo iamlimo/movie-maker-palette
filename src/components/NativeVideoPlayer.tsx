@@ -15,6 +15,7 @@ interface NativeVideoPlayerProps {
   poster?: string;
   subtitleUrl?: string;
   autoPlay?: boolean;
+  watermarkText?: string;
 }
 
 const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
@@ -25,6 +26,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   poster,
   subtitleUrl,
   autoPlay = true,
+  watermarkText,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -121,9 +123,14 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
           title: title,
           smallPlaybackRate: true,
           rate: 1.0,
-          // Custom attributes for security
-          controlsList: 'nodownload',
+          // Custom attributes for security and watermark
+          controlsList: 'nodownload nofullscreen noremoteplayback',
           disablePictureInPicture: true,
+          disableAirPlay: true,
+          watermarkText: watermarkText || 'Signature TV',
+          watermarkOpacity: 0.3,
+          watermarkPosition: 'bottom-right',
+          watermarkFontSize: 10,
         });
 
         // Track playback events
@@ -185,8 +192,13 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
           title: title,
           smallPlaybackRate: false,
           rate: 1.0,
-          controlsList: 'nodownload',
+          controlsList: 'nodownload nofullscreen noremoteplayback',
           disablePictureInPicture: true,
+          disableCast: true,
+          watermarkText: watermarkText || 'Signature TV',
+          watermarkOpacity: 0.3,
+          watermarkPosition: 'bottom-right',
+          watermarkFontSize: 10,
         });
 
         // Track playback events

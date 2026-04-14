@@ -24,6 +24,7 @@ interface VideoPlayerProps {
   subtitleUrl?: string;
   autoPlay?: boolean;
   immersive?: boolean;
+  watermarkText?: string;
   // Enhanced props
   cast?: string[];
   director?: string;
@@ -56,6 +57,7 @@ export const VideoPlayer = ({
   episodeNumber,
   hasNextEpisode = false,
   onNextEpisode,
+  watermarkText,
   availableQualities = ['Auto', '1080p', '720p', '480p', '240p'],
   availableSubtitles = [],
 }: VideoPlayerProps) => {
@@ -78,6 +80,7 @@ export const VideoPlayer = ({
   const [showSkipIntro, setShowSkipIntro] = useState(true);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const watermarkLabel = watermarkText || 'Signature TV';
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -116,7 +119,7 @@ export const VideoPlayer = ({
       return;
     }
 
-    if (!movieId) {
+    if (!movieId && !contentId) {
       setError('No video source provided');
       setLoading(false);
       return;
@@ -127,8 +130,8 @@ export const VideoPlayer = ({
       setError('');
       setIsBandwidthLimited(false);
 
-      // Check cache first
-      const cached = urlCache.get(movieId);
+      const cacheKey = contentId ? `${contentType || 'episode'}:${contentId}` : movieId!;
+      const cached = urlCache.get(cacheKey);
       if (cached && new Date() < cached.expiresAt) {
         console.log('Using cached video URL');
         setVideoUrl(cached.url);
@@ -139,14 +142,20 @@ export const VideoPlayer = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         setError('Please log in to watch this video');
+        setLoading(false);
         return;
       }
 
+      const body: any = { expiryHours: 24 };
+      if (contentId) {
+        body.contentId = contentId;
+        body.contentType = contentType || 'episode';
+      } else {
+        body.movieId = movieId;
+      }
+
       const { data, error, response } = await supabase.functions.invoke('get-video-url', {
-        body: {
-          movieId: movieId,
-          expiryHours: 24
-        },
+        body,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -176,12 +185,14 @@ export const VideoPlayer = ({
 
       let finalUrl = data.signedUrl;
       if (data.source === 'backblaze') {
-        finalUrl = `${SUPABASE_URL}/functions/v1/get-video-url?movieId=${movieId}&stream=true`;
+        const queryKey = contentId
+          ? `contentId=${contentId}&contentType=${encodeURIComponent(contentType || 'episode')}`
+          : `movieId=${movieId}`;
+        finalUrl = `${SUPABASE_URL}/functions/v1/get-video-url?${queryKey}&stream=true`;
       }
 
-      // Cache the URL
       const expiresAt = new Date(data.expiresAt);
-      urlCache.set(movieId, {
+      urlCache.set(cacheKey, {
         url: finalUrl,
         expiresAt,
         source: data.source || 'backblaze'
@@ -262,12 +273,12 @@ export const VideoPlayer = ({
     }
   };
 
-  const handleLoadedMetadata = () => {
+  const handleLoadedMetadata = async () => {
     if (!videoRef.current) return;
     setDuration(videoRef.current.duration);
 
     // Restore last position
-    const lastPos = getLastPosition();
+    const lastPos = await getLastPosition();
     if (lastPos > 0 && lastPos < videoRef.current.duration - 10) {
       videoRef.current.currentTime = lastPos;
       setCurrentTime(lastPos);
@@ -436,12 +447,22 @@ export const VideoPlayer = ({
         preload="metadata"
         crossOrigin="anonymous"
         autoPlay={autoPlay}
+        controlsList="nodownload nofullscreen noremoteplayback"
+        disablePictureInPicture
+        onContextMenu={(e) => e.preventDefault()}
       >
         {subtitleUrl && (
           <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
         )}
       </video>
       
+      {/* Watermark Overlay */}
+      <div className="pointer-events-none absolute inset-0 flex items-end justify-end p-4">
+        <span className="text-[10px] uppercase tracking-[0.35em] text-white/30 drop-shadow-lg">
+          {watermarkLabel}
+        </span>
+      </div>
+
       {/* Video Controls */}
       {controlsVisible && (
         <VideoPlayerControls
