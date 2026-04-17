@@ -2,6 +2,10 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { inject } from '@vercel/analytics'
+
+// Initialize Vercel Analytics
+inject();
 
 // Simple render with basic error handling
 const rootElement = document.getElementById('root');
