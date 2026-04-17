@@ -19,7 +19,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { SpeedInsights } from "@vercel/speed-insights/next"
-
+import { Analytics } from "@vercel/analytics/next"
 // Lazy load non-critical routes for faster initial load
 const Profile = lazy(() => import('./pages/Profile'));
 const MoviePreview = lazy(() => import('./pages/MoviePreview'));
@@ -141,6 +141,7 @@ function AppContent() {
               path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
               element={<EditEpisode />}
             />
+            
             <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
             <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
             <Route path="submissions" element={<Submissions />} />
@@ -164,8 +165,10 @@ function AppContent() {
         </Suspense>
       </MobileRouteAnimator>
       <BottomNav />
-      <OfflineSyncStatus />
       <Analytics/>
+      <SpeedInsights/>
+      <OfflineSyncStatus />
+  
     </>
   );
 }
