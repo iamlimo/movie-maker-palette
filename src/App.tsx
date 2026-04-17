@@ -18,7 +18,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
-
+import { Analytics } from "@vercel/analytics/react"
 // Lazy load non-critical routes for faster initial load
 const Profile = lazy(() => import('./pages/Profile'));
 const MoviePreview = lazy(() => import('./pages/MoviePreview'));
@@ -87,6 +87,7 @@ function AppContent() {
   return (
     <>
       <OfflineBanner />
+      <Analytics />
       <MobileRouteAnimator>
         <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
           <Routes>
@@ -140,6 +141,7 @@ function AppContent() {
               path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
               element={<EditEpisode />}
             />
+            
             <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
             <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
             <Route path="submissions" element={<Submissions />} />
@@ -164,6 +166,7 @@ function AppContent() {
       </MobileRouteAnimator>
       <BottomNav />
       <OfflineSyncStatus />
+  
     </>
   );
 }

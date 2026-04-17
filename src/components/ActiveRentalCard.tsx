@@ -81,7 +81,7 @@ const ActiveRentalCard: React.FC<ActiveRentalCardProps> = ({ rental, formatTimeR
         } else if (rental.content_type === 'season') {
           query = supabase
             .from('seasons')
-            .select('id, title, show_id, tv_shows(title, thumbnail_url), episode_count')
+            .select('id, season_number, description, tv_shows(title, thumbnail_url)')
             .eq('id', rental.content_id)
             .single();
         } else if (rental.content_type === 'episode') {
