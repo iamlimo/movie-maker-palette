@@ -18,6 +18,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 // Lazy load non-critical routes for faster initial load
 const Profile = lazy(() => import('./pages/Profile'));
@@ -164,6 +165,7 @@ function AppContent() {
       </MobileRouteAnimator>
       <BottomNav />
       <OfflineSyncStatus />
+      <Analytics/>
     </>
   );
 }
