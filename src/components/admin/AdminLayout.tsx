@@ -20,7 +20,8 @@ import {
   Settings,
   Wallet,
   Briefcase,
-  ClipboardList
+  ClipboardList,
+  CreditCard
 } from 'lucide-react';
 import {
   Sidebar,
@@ -75,6 +76,7 @@ const sidebarItems = [
     ]
   },
   { title: 'Finance', url: '/admin/finance', icon: DollarSign },
+  { title: 'Rental Tracking', url: '/admin/rentals', icon: CreditCard },
   { title: 'Wallets', url: '/admin/wallets', icon: Wallet },
   { title: 'Referral Codes', url: '/admin/referral-codes', icon: Tag },
   { title: 'Push Notifications', url: '/admin/push-notifications', icon: Bell },

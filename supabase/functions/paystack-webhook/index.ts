@@ -62,110 +62,210 @@ Deno.serve(async (req) => {
     }
 
     const event = JSON.parse(body);
-    console.log('Webhook event:', event.event, event.data?.reference);
+    console.log('Webhook event:', event.event, 'Reference:', event.data?.reference);
 
-    // Handle charge.success event
+    // Handle charge.success event (covers card, bank transfer, ussd, etc.)
     if (event.event === 'charge.success') {
       const { data } = event;
       const paymentReference = data.reference;
+      const paymentChannel = data.channel || 'unknown'; // 'card', 'bank_transfer', 'ussd', 'bank', etc.
+      const paymentStatus = data.status; // 'success'
+      const paidAmount = data.amount; // Amount in kobo
 
-      // Find payment by intent_id (reference sent to Paystack is the intent_id)
-      const { data: payment, error: paymentLookupError } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('intent_id', paymentReference)
-        .single();
+      console.log(`Processing payment: channel=${paymentChannel}, reference=${paymentReference}, amount=${paidAmount}`);
 
-      if (paymentLookupError || !payment) {
-        console.error('Payment not found for reference:', paymentReference);
-        return new Response(JSON.stringify({ received: true, message: 'Payment not found' }), {
+      // Find rental_payment by paystack reference
+      const { data: rentalPayment, error: paymentLookupError } = await supabase
+        .from('rental_payments')
+        .select('*, rental:rental_id(*)')
+        .eq('paystack_reference', paymentReference)
+        .maybeSingle();
+
+      if (paymentLookupError || !rentalPayment) {
+        console.error('Rental payment not found for reference:', paymentReference);
+        // Try finding by reference in rentals metadata
+        return new Response(JSON.stringify({ received: true, message: 'Payment processed' }), {
           headers: corsHeaders
         });
       }
 
       // Check if already processed
-      if (payment.enhanced_status === 'completed') {
+      if (rentalPayment.payment_status === 'completed') {
         console.log('Payment already completed, skipping');
         return new Response(JSON.stringify({ received: true, message: 'Already processed' }), {
           headers: corsHeaders
         });
       }
 
+      // Verify amount matches (accounting for fees)
+      const expectedAmount = rentalPayment.amount;
+      if (paidAmount < expectedAmount) {
+        console.warn(`Amount mismatch: received ${paidAmount}, expected ${expectedAmount}`);
+        // Update payment status to investigate
+        await supabase
+          .from('rental_payments')
+          .update({
+            payment_status: 'amount_mismatch',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', rentalPayment.id);
+        return new Response(JSON.stringify({ received: true, message: 'Amount mismatch' }), {
+          headers: corsHeaders
+        });
+      }
+
       // Update payment status
       const { error: paymentUpdateError } = await supabase
-        .from('payments')
+        .from('rental_payments')
         .update({ 
-          status: 'completed',
-          enhanced_status: 'completed',
-          updated_at: new Date().toISOString()
+          payment_status: 'completed',
+          completed_at: new Date().toISOString()
         })
-        .eq('id', payment.id);
+        .eq('id', rentalPayment.id);
 
       if (paymentUpdateError) {
         console.error('Payment update error:', paymentUpdateError);
       }
 
-      // Process based on purpose
-      if (payment.purpose === 'rental') {
-        const metadata = payment.metadata as any;
-        
-        // Fetch content-specific rental duration
-        let expiryHours = 48;
-        const contentType = metadata?.content_type;
-        const contentId = metadata?.content_id;
+      // Update rental status from pending to completed
+      const { error: rentalUpdateError } = await supabase
+        .from('rentals')
+        .update({
+          status: 'completed'
+        })
+        .eq('id', rentalPayment.rental_id);
 
-        if (contentType === 'movie') {
-          const { data: movieData } = await supabase.from('movies').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
-          expiryHours = movieData?.rental_expiry_duration || 48;
-        } else if (contentType === 'tv') {
-          const { data: tvData } = await supabase.from('tv_shows').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
-          expiryHours = tvData?.rental_expiry_duration || 336;
-        } else if (contentType === 'season') {
-          const { data: seasonData } = await supabase.from('seasons').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
-          expiryHours = seasonData?.rental_expiry_duration || 336;
-        } else if (contentType === 'episode') {
-          const { data: episodeData } = await supabase.from('episodes').select('rental_expiry_duration').eq('id', contentId).maybeSingle();
-          expiryHours = episodeData?.rental_expiry_duration || 48;
-        }
-
-        const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString();
-
-        const { error: rentalError } = await supabase
-          .from('rentals')
-          .insert({
-            user_id: payment.user_id,
-            content_id: contentId,
-            content_type: contentType,
-            amount: payment.amount / 100, // Convert from kobo to naira
-            status: 'active',
-            expires_at: expiresAt
-          });
-
-        if (rentalError) {
-          console.error('Rental creation error:', rentalError);
-        } else {
-          console.log('Rental created successfully for payment:', payment.id);
-        }
-      } else if (payment.purpose === 'wallet_topup') {
-        // Credit wallet with the payment amount (in kobo)
-        const { data: wallet } = await supabase
-          .from('wallets')
-          .select('wallet_id')
-          .eq('user_id', payment.user_id)
-          .single();
-
-        if (wallet) {
-          await supabase.rpc('process_wallet_transaction', {
-            p_wallet_id: wallet.wallet_id,
-            p_amount: payment.amount,
-            p_type: 'credit',
-            p_description: 'Wallet top-up via Paystack',
-            p_payment_id: payment.id,
-            p_metadata: { source: 'paystack_webhook' }
-          });
-          console.log('Wallet topped up for payment:', payment.id);
-        }
+      if (rentalUpdateError) {
+        console.error('Rental update error:', rentalUpdateError);
+        return new Response(JSON.stringify({ 
+          received: true, 
+          message: 'Payment confirmed but rental update failed' 
+        }), {
+          headers: corsHeaders
+        });
       }
+
+      console.log(`✅ Rental confirmed: rental_id=${rentalPayment.rental_id}, channel=${paymentChannel}`);
+
+      // Log payment success with channel info
+      await supabase
+        .from('rental_payments')
+        .update({
+          payment_channel: paymentChannel,
+          metadata: {
+            paystack_status: paymentStatus,
+            channel: paymentChannel,
+            amount_paid: paidAmount,
+            fees_charged: paidAmount - expectedAmount > 0 ? paidAmount - expectedAmount : 0
+          }
+        })
+        .eq('id', rentalPayment.id);
+
+      return new Response(JSON.stringify({ 
+        received: true, 
+        message: 'Rental activated',
+        rental_id: rentalPayment.rental_id,
+        channel: paymentChannel
+      }), {
+        headers: corsHeaders
+      });
+    }
+    
+    // Handle transfer.failed event (bank transfer reversals or failures)
+    else if (event.event === 'transfer.failed') {
+      console.log('Transfer failed event:', event.data?.reference);
+      
+      const { data } = event;
+      const transferReference = data.reference;
+      
+      // This is typically for transfers OUT, not relevant for payment received
+      // But log it for investigation
+      return new Response(JSON.stringify({ received: true }), {
+        headers: corsHeaders
+      });
+    }
+    
+    // Handle transfer.reversed event
+    else if (event.event === 'transfer.reversed') {
+      console.log('Transfer reversed event:', event.data?.reference);
+      
+      const { data } = event;
+      const transferReference = data.reference;
+      
+      // This is typically for transfers OUT, not relevant for payment received
+      return new Response(JSON.stringify({ received: true }), {
+        headers: corsHeaders
+      });
+    }
+    
+    // Handle charge.dispute event (chargeback/dispute)
+    else if (event.event === 'charge.dispute.create') {
+      console.warn('Charge dispute created:', event.data?.reference);
+      
+      const { data } = event;
+      const paymentReference = data.reference;
+      
+      const { data: rentalPayment } = await supabase
+        .from('rental_payments')
+        .select('*')
+        .eq('paystack_reference', paymentReference)
+        .maybeSingle();
+        
+      if (rentalPayment) {
+        // Mark as disputed
+        await supabase
+          .from('rental_payments')
+          .update({
+            payment_status: 'disputed',
+            metadata: {
+              dispute_reason: event.data?.reason,
+              dispute_amount: event.data?.amount
+            }
+          })
+          .eq('id', rentalPayment.id);
+      }
+      
+      return new Response(JSON.stringify({ received: true }), {
+        headers: corsHeaders
+      });
+    }
+
+    // Handle charge.failed event
+    else if (event.event === 'charge.failed') {
+      console.warn('Charge failed event:', event.data?.reference);
+      
+      const { data } = event;
+      const paymentReference = data.reference;
+      
+      const { data: rentalPayment } = await supabase
+        .from('rental_payments')
+        .select('*')
+        .eq('paystack_reference', paymentReference)
+        .maybeSingle();
+        
+      if (rentalPayment && rentalPayment.payment_status === 'pending') {
+        // Update to failed
+        await supabase
+          .from('rental_payments')
+          .update({
+            payment_status: 'failed',
+            metadata: {
+              failure_reason: event.data?.failure_reason || 'Unknown',
+              failure_message: event.data?.failure_message || ''
+            }
+          })
+          .eq('id', rentalPayment.id);
+          
+        // Mark rental as cancelled
+        await supabase
+          .from('rentals')
+          .update({ status: 'cancelled' })
+          .eq('id', rentalPayment.rental_id);
+      }
+      
+      return new Response(JSON.stringify({ received: true }), {
+        headers: corsHeaders
+      });
     }
 
     return new Response(JSON.stringify({ received: true }), {

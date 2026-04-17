@@ -56,6 +56,10 @@ CREATE POLICY "Users can view their own rentals"
   ON rentals FOR SELECT
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Admins can view all rentals"
+  ON rentals FOR SELECT
+  USING (public.has_role(auth.uid(), 'admin'::public.app_role) OR public.has_role(auth.uid(), 'super_admin'::public.app_role));
+
 CREATE POLICY "System can insert rentals"
   ON rentals FOR INSERT
   WITH CHECK (true);

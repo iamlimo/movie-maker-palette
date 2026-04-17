@@ -21,10 +21,14 @@ import {
   Zap,
   Gift,
   X,
+  Clock,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/hooks/useWallet';
 import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
+import { usePaystackRentalVerification } from '@/hooks/usePaystackRentalVerification';
 import { toast } from '@/hooks/use-toast';
 import { formatNaira } from '@/lib/priceUtils';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +58,7 @@ export const OptimizedRentalCheckout = ({
   const { user } = useAuth();
   const { balance, canAfford, formatBalance, refreshWallet } = useWallet();
   const { processRental } = useOptimizedRentals();
+  const { pollPaymentStatus } = usePaystackRentalVerification();
 
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'paystack' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -65,6 +70,14 @@ export const OptimizedRentalCheckout = ({
   } | null>(null);
   const [validatingCode, setValidatingCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<{
+    show: boolean;
+    status: 'processing' | 'verifying' | 'success' | 'failed' | 'pending';
+    message: string;
+    rentalId?: string;
+    channel?: string;
+    details?: any;
+  }>({ show: false, status: 'processing', message: '' });
 
   const isNative = Capacitor.isNativePlatform();
   const isMobileBrowser =
@@ -72,7 +85,7 @@ export const OptimizedRentalCheckout = ({
 
   const finalPrice = discount ? Math.max(0, price - discount.amount) : price;
   const canPayWithWallet = canAfford(finalPrice);
-  const canProceed = canPayWithWallet || true; // Can always use Paystack
+  const canProceed = canPayWithWallet || true;
 
   const triggerHaptic = async () => {
     if (isNative) {
@@ -131,6 +144,92 @@ export const OptimizedRentalCheckout = ({
     }
   };
 
+  const handlePaystackPaymentReturn = async (rentalId: string) => {
+    // User has completed payment flow, now verify status
+    setPaymentStatus({
+      show: true,
+      status: 'verifying',
+      message: 'Verifying your payment...',
+      rentalId,
+    });
+
+    try {
+      const result = await pollPaymentStatus(rentalId, undefined, (status) => {
+        if (status.payment?.channel) {
+          setPaymentStatus(prev => ({
+            ...prev,
+            channel: status.payment.channel,
+            details: status.payment,
+          }));
+        }
+
+        if (status.status === 'pending') {
+          setPaymentStatus(prev => ({
+            ...prev,
+            status: 'pending',
+            message: `Payment pending (${status.payment?.channel || 'processing'}). For bank transfers, this may take a few minutes.`,
+          }));
+        }
+      });
+
+      if (result.success) {
+        setPaymentStatus({
+          show: true,
+          status: 'success',
+          message: `✅ Payment successful! Rental activated via ${result.payment?.channel || 'Paystack'}.`,
+          rentalId,
+          channel: result.payment?.channel,
+          details: result.payment,
+        });
+
+        await refreshWallet();
+        await triggerHaptic();
+        toast({
+          title: '🎉 Payment Successful!',
+          description: `You can now watch ${title}`,
+        });
+
+        // Close dialog after 2 seconds
+        setTimeout(() => {
+          onOpenChange(false);
+          setPaymentStatus({ show: false, status: 'processing', message: '' });
+          onSuccess?.();
+        }, 2000);
+      } else if (result.status === 'pending') {
+        setPaymentStatus({
+          show: true,
+          status: 'pending',
+          message: `Payment is being processed. For bank transfers, this may take up to 5 minutes. You can close this dialog and check back later.`,
+          rentalId,
+          channel: result.payment?.channel,
+          details: result.payment,
+        });
+      } else {
+        setPaymentStatus({
+          show: true,
+          status: 'failed',
+          message: result.message || 'Payment verification failed. Please try again.',
+          rentalId,
+          details: result.payment,
+        });
+
+        toast({
+          title: 'Payment Failed',
+          description: result.message || 'Could not verify payment',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      setPaymentStatus({
+        show: true,
+        status: 'failed',
+        message: 'An error occurred while verifying payment',
+        rentalId,
+      });
+    }
+  };
+
   const handlePayment = async () => {
     if (!user || !paymentMethod) return;
 
@@ -163,18 +262,43 @@ export const OptimizedRentalCheckout = ({
         });
         onOpenChange(false);
         onSuccess?.();
-      } else if (paymentMethod === 'paystack' && result.authorizationUrl) {
+      } else if (paymentMethod === 'paystack' && result.authorizationUrl && result.rentalId) {
+        // Show payment processing status
+        setPaymentStatus({
+          show: true,
+          status: 'processing',
+          message: 'Opening payment page...',
+          rentalId: result.rentalId,
+        });
+
         // Open Paystack checkout
+        const paystackWindow = isNative || isMobileBrowser
+          ? null
+          : window.open(result.authorizationUrl, 'paystack_checkout', 'width=500,height=700');
+
         if (isNative || isMobileBrowser) {
           window.location.href = result.authorizationUrl;
-        } else {
-          window.open(result.authorizationUrl, '_blank', 'width=500,height=700');
         }
 
-        toast({
-          title: 'Completing Payment',
-          description: 'Please complete payment in the new window',
-        });
+        // Set a timer to check payment status after user returns
+        // For web, check after 3 seconds (user might close window)
+        // For mobile, user will return to app
+        if (!isNative && !isMobileBrowser && paystackWindow) {
+          const checkWindow = setInterval(() => {
+            if (paystackWindow.closed) {
+              clearInterval(checkWindow);
+              handlePaystackPaymentReturn(result.rentalId!);
+            }
+          }, 1000);
+
+          // Timeout after 10 minutes
+          setTimeout(() => clearInterval(checkWindow), 600000);
+        } else {
+          // For mobile, check after delay
+          setTimeout(() => {
+            handlePaystackPaymentReturn(result.rentalId!);
+          }, 2000);
+        }
       }
     } catch (error: any) {
       console.error('Payment error:', error);
@@ -343,12 +467,41 @@ export const OptimizedRentalCheckout = ({
             )}
 
             <TabsContent value="paystack" className="space-y-4">
-              <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <CreditCard className="h-4 w-4 text-orange-600" />
-                  <div>
-                    <p className="font-medium">Debit or Credit Card</p>
-                    <p className="text-xs text-orange-600">Powered by Paystack</p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CreditCard className="h-4 w-4 text-orange-600" />
+                    <div>
+                      <p className="font-medium">Multiple Payment Options</p>
+                      <p className="text-xs text-orange-600">Powered by Paystack</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <p className="font-medium">Available Payment Methods:</p>
+                  <ul className="space-y-1.5 ml-2">
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CreditCard className="h-3 w-3 text-blue-600" />
+                      <span>Debit/Credit Card (instant)</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <Zap className="h-3 w-3 text-amber-600" />
+                      <span>Bank Transfer (1-5 minutes)</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <Lock className="h-3 w-3 text-green-600" />
+                      <span>USSD (instant)</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-2.5">
+                  <div className="flex gap-2 text-xs text-blue-700 dark:text-blue-300">
+                    <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                    <p>
+                      <strong>Bank Transfer Info:</strong> If you choose bank transfer, your payment may take 1-5 minutes to confirm. Your rental will activate automatically once payment is verified.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -393,6 +546,133 @@ export const OptimizedRentalCheckout = ({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Payment Status Modal */}
+      <Dialog open={paymentStatus.show} onOpenChange={(show) => {
+        if (!show && paymentStatus.status === 'pending') {
+          // Allow user to close pending payment dialog
+          setPaymentStatus({ ...paymentStatus, show: false });
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => {
+          if (paymentStatus.status === 'pending') {
+            e.preventDefault();
+          }
+        }}>
+          <DialogHeader>
+            {paymentStatus.status === 'success' && (
+              <div className="flex justify-center mb-2">
+                <div className="rounded-full bg-green-100 p-3">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            )}
+            {paymentStatus.status === 'failed' && (
+              <div className="flex justify-center mb-2">
+                <div className="rounded-full bg-red-100 p-3">
+                  <XCircle className="h-6 w-6 text-red-600" />
+                </div>
+              </div>
+            )}
+            {(paymentStatus.status === 'verifying' || paymentStatus.status === 'pending') && (
+              <div className="flex justify-center mb-2">
+                <div className="rounded-full bg-blue-100 p-3">
+                  <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                </div>
+              </div>
+            )}
+            <DialogTitle className={
+              paymentStatus.status === 'success'
+                ? 'text-green-600'
+                : paymentStatus.status === 'failed'
+                ? 'text-red-600'
+                : ''
+            }>
+              {paymentStatus.status === 'success' && '✅ Payment Successful'}
+              {paymentStatus.status === 'failed' && '❌ Payment Failed'}
+              {(paymentStatus.status === 'verifying' || paymentStatus.status === 'processing') && 'Processing Payment'}
+              {paymentStatus.status === 'pending' && '⏳ Payment Pending'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-center text-muted-foreground">
+              {paymentStatus.message}
+            </p>
+
+            {paymentStatus.channel && (
+              <div className="rounded-lg border bg-secondary/50 p-2">
+                <p className="text-xs text-muted-foreground">Payment Method</p>
+                <p className="text-sm font-medium capitalize">{paymentStatus.channel}</p>
+              </div>
+            )}
+
+            {paymentStatus.status === 'pending' && (
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                <div className="flex gap-2">
+                  <Clock className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-700 dark:text-blue-300">
+                    <p className="font-medium">Payment Processing</p>
+                    <p className="mt-1">
+                      Bank transfers may take 1-5 minutes to complete. Your rental will activate automatically once the payment is confirmed in our system.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {paymentStatus.status === 'failed' && (
+              <div className="space-y-2">
+                <p className="text-sm text-red-600">
+                  Please try again or use a different payment method.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {paymentStatus.status === 'success' ? (
+              <Button
+                onClick={() => {
+                  setPaymentStatus({ show: false, status: 'processing', message: '' });
+                  onOpenChange(false);
+                  onSuccess?.();
+                }}
+                className="w-full"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Start Watching
+              </Button>
+            ) : paymentStatus.status === 'failed' ? (
+              <Button
+                onClick={() => setPaymentStatus({ show: false, status: 'processing', message: '' })}
+                className="w-full"
+              >
+                Back to Checkout
+              </Button>
+            ) : paymentStatus.status === 'pending' ? (
+              <Button
+                onClick={() => {
+                  setPaymentStatus({ show: false, status: 'processing', message: '' });
+                  onOpenChange(false);
+                  toast({
+                    title: 'Payment Pending',
+                    description: 'Your rental will activate once payment is confirmed',
+                  });
+                }}
+                className="w-full"
+              >
+                Close (Check Back Later)
+              </Button>
+            ) : (
+              <div className="w-full flex items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <span className="text-sm">Verifying payment...</span>
+              </div>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };
