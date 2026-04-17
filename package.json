@@ -54,6 +54,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/supabase-js": "^2.56.0",
     "@tanstack/react-query": "^5.83.0",
+    "@vercel/speed-insights": "^2.0.0",
     "@videojs/http-streaming": "^3.17.2",
     "@videojs/react": "^10.0.0-beta.17",
     "@vitejs/plugin-basic-ssl": "^1.2.0",
