@@ -262,9 +262,27 @@ export const OptimizedRentalCheckout = ({
       );
 
       if (!result.success) {
+        // Better error messages based on error type
+        let errorTitle = 'Payment Failed';
+        let errorDescription = result.error || 'Could not process payment';
+
+        if (result.error?.includes('Insufficient')) {
+          errorTitle = '💰 Insufficient Balance';
+          errorDescription = `You need ${formatNaira(finalPrice - balance)} more. Top up your wallet or use a card.`;
+        } else if (result.error?.includes('CORS') || result.error?.includes('fetch')) {
+          errorTitle = '🌐 Connection Error';
+          errorDescription = 'Please check your internet connection and try again.';
+        } else if (result.error?.includes('Wallet not found')) {
+          errorTitle = '⚠️ Wallet Error';
+          errorDescription = 'Your wallet could not be found. Please refresh and try again.';
+        } else if (result.error?.includes('already has active rental')) {
+          errorTitle = '📺 Already Rented';
+          errorDescription = 'You already have an active rental for this content.';
+        }
+
         toast({
-          title: 'Payment Failed',
-          description: result.error || 'Could not process payment',
+          title: errorTitle,
+          description: errorDescription,
           variant: 'destructive',
         });
         setIsProcessing(false);
@@ -274,10 +292,20 @@ export const OptimizedRentalCheckout = ({
       if (paymentMethod === 'wallet') {
         toast({
           title: '🎉 Payment Successful!',
-          description: `You can now watch ${title}`,
+          description: `You can now watch ${title}. Enjoy!`,
         });
-        onOpenChange(false);
-        onSuccess?.();
+        
+        // Refresh wallet balance
+        try {
+          await refreshWallet();
+        } catch (e) {
+          console.warn('Could not refresh wallet:', e);
+        }
+        
+        setTimeout(() => {
+          onOpenChange(false);
+          onSuccess?.();
+        }, 1500);
       } else if (paymentMethod === 'paystack' && result.authorizationUrl && result.rentalId) {
         // Show payment processing status
         setPaymentStatus({
@@ -318,12 +346,31 @@ export const OptimizedRentalCheckout = ({
       }
     } catch (error: any) {
       console.error('Payment error:', error);
+      
+      let errorTitle = '❌ Payment Error';
+      let errorDescription = 'An unexpected error occurred. Please try again.';
+
+      // Handle specific error types
+      if (error?.message?.includes('CORS') || error?.message?.includes('fetch')) {
+        errorTitle = '🌐 Network Error';
+        errorDescription = 'Unable to reach payment server. Check your internet and try again.';
+      } else if (error?.message?.includes('timeout')) {
+        errorTitle = '⏱️ Request Timeout';
+        errorDescription = 'The request took too long. Please try again.';
+      } else if (error?.response?.status === 402) {
+        errorTitle = '💰 Insufficient Balance';
+        errorDescription = 'Your wallet balance is not enough for this payment.';
+      } else if (error?.response?.status === 404) {
+        errorTitle = '⚠️ Wallet Not Found';
+        errorDescription = 'Your wallet could not be found. Please refresh and try again.';
+      }
+
       toast({
-        title: 'Error',
-        description: 'An unexpected error occurred',
+        title: errorTitle,
+        description: errorDescription,
         variant: 'destructive',
       });
-    } finally {
+      
       setIsProcessing(false);
     }
   };
@@ -497,53 +544,128 @@ export const OptimizedRentalCheckout = ({
 
             {canPayWithWallet && (
               <TabsContent value="wallet" className="space-y-4">
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Wallet className="h-4 w-4 text-blue-600" />
-                      <div className="flex-1">
-                        <p className="font-medium">Current Wallet Balance</p>
-                        <p className="text-xs text-blue-600">{formatBalance()}</p>
-                      </div>
-                    </div>
+                {/* Status Indicators */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900/30 dark:bg-blue-950/20 p-2">
+                    <div className="text-xs font-semibold text-blue-600">Step 1</div>
+                    <div className="text-xs text-muted-foreground">Review</div>
+                    <CheckCircle2 className="h-4 w-4 text-blue-600 mx-auto mt-1" />
                   </div>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900/30 dark:bg-blue-950/20 p-2">
+                    <div className="text-xs font-semibold text-blue-600">Step 2</div>
+                    <div className="text-xs text-muted-foreground">Confirm</div>
+                    <Wallet className="h-4 w-4 text-blue-600 mx-auto mt-1" />
+                  </div>
+                  <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900/30 dark:bg-green-950/20 p-2">
+                    <div className="text-xs font-semibold text-green-600">Step 3</div>
+                    <div className="text-xs text-muted-foreground">Complete</div>
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto mt-1" />
+                  </div>
+                </div>
 
-                  <div className="rounded-lg border border-blue-200/50 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-950/20 p-3">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Amount to Pay:</span>
-                        <span className="font-semibold">{formatNaira(finalPrice)}</span>
+                {/* Balance Section */}
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-blue-500/5 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-full bg-blue-600/10 p-2.5">
+                        <Wallet className="h-5 w-5 text-blue-600" />
                       </div>
-                      <div className="h-px bg-border" />
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Balance After Payment:</span>
-                        <span className="font-semibold text-blue-600">
-                          {formatNaira(Math.max(0, balance - finalPrice))}
-                        </span>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-muted-foreground">Current Wallet Balance</p>
+                        <p className="text-2xl font-bold text-blue-600">{formatBalance()}</p>
                       </div>
-                      {discount && (
-                        <>
-                          <div className="h-px bg-border" />
-                          <div className="flex items-center justify-between text-green-600">
-                            <span className="font-medium flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Discount Saving
-                            </span>
-                            <span className="font-semibold">{formatNaira(discount.amount)}</span>
-                          </div>
-                        </>
+                      {canPayWithWallet && (
+                        <div className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1">
+                          <Check className="h-3 w-3 text-green-600" />
+                          <span className="text-xs font-semibold text-green-600">Ready</span>
+                        </div>
                       )}
                     </div>
                   </div>
 
+                  {/* Transaction Breakdown */}
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Content Price:</span>
+                        <span className="font-medium">{formatNaira(price)}</span>
+                      </div>
+                      {discount && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-1 text-green-600 font-medium">
+                            <Gift className="h-3 w-3" />
+                            Discount Saving:
+                          </span>
+                          <span className="font-semibold text-green-600">-{formatNaira(discount.amount)}</span>
+                        </div>
+                      )}
+                      <div className="h-px bg-border" />
+                      <div className="flex items-center justify-between text-base font-bold">
+                        <span>Amount to Pay:</span>
+                        <span className={discount ? 'text-green-600' : 'text-primary'}>{formatNaira(finalPrice)}</span>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-border" />
+
+                    {/* Balance After Payment */}
+                    <div className="rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3">
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-muted-foreground">After This Payment:</span>
+                        <span className="font-bold text-primary">{formatNaira(Math.max(0, balance - finalPrice))}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Info className="h-3 w-3" />
+                        <span>Your remaining balance for future rentals</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Confirmation Checklist */}
+                  <div className="rounded-lg border border-blue-200 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <p className="font-medium">Instant access to content</p>
+                        <p className="text-muted-foreground">Watch immediately after payment</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <p className="font-medium">Secure wallet payment</p>
+                        <p className="text-muted-foreground">No additional fees or charges</p>
+                      </div>
+                    </div>
+                    {discount && (
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                        <div className="text-xs">
+                          <p className="font-medium">Discount already applied</p>
+                          <p className="text-muted-foreground">Save {formatNaira(discount.amount)} on this payment</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Warnings & Info */}
                   {canPayWithWallet && balance < finalPrice && (
-                    <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
-                      <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div className="text-xs text-amber-600">
-                        You need {formatNaira(finalPrice - balance)} more to complete this payment.
+                    <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-50 dark:border-red-900/30 dark:bg-red-950/20 p-3">
+                      <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-red-600">
+                        <p className="font-semibold mb-0.5">Insufficient Balance</p>
+                        <p className="text-xs">
+                          You need {formatNaira(finalPrice - balance)} more to complete this payment. Switch to card payment or top up your wallet.
+                        </p>
                       </div>
                     </div>
                   )}
+
+                  {/* Security Badge */}
+                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground rounded-lg border border-slate-200 dark:border-slate-800 p-2">
+                    <Lock className="h-3 w-3 text-green-600" />
+                    <span>Secure & Encrypted Transaction</span>
+                  </div>
                 </div>
               </TabsContent>
             )}
