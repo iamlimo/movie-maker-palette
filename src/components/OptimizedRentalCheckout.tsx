@@ -24,6 +24,7 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  Info,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/hooks/useWallet';
