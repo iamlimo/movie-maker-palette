@@ -55,6 +55,7 @@ const EditTVShow = lazy(() => import('@/pages/admin/EditTVShow'));
 const Submissions = lazy(() => import('@/pages/admin/Submissions'));
 const Users = lazy(() => import('@/pages/admin/Users'));
 const Finance = lazy(() => import('@/pages/admin/Finance'));
+const AdminRentals = lazy(() => import('@/pages/admin/Rentals'));
 const Producers = lazy(() => import('@/pages/admin/Producers'));
 const Sections = lazy(() => import('@/pages/admin/Sections'));
 const HeroSlider = lazy(() => import('@/pages/admin/HeroSlider'));
@@ -147,6 +148,7 @@ function AppContent() {
             <Route path="submissions" element={<Submissions />} />
             <Route path="users" element={<Users />} />
             <Route path="finance" element={<Finance />} />
+            <Route path="rentals" element={<AdminRentals />} />
             <Route path="producers" element={<Producers />} />
             <Route path="sections" element={<Sections />} />
             <Route path="hero-slider" element={<HeroSlider />} />
