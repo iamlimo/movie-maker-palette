@@ -1,59 +1,50 @@
 -- Create payment_anomalies table for tracking payment issues
-CREATE TABLE IF NOT EXISTS public.payment_anomalies (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  rental_payment_id uuid NOT NULL REFERENCES public.rental_payments(id) ON DELETE CASCADE,
-  paystack_reference text NOT NULL,
-  anomaly_type text NOT NULL CHECK (anomaly_type IN ('dispute', 'refund', 'partial_payment', 'amount_mismatch', 'status_mismatch')),
-  severity text NOT NULL CHECK (severity IN ('warning', 'critical')) DEFAULT 'warning',
-  message text NOT NULL,
-  paystack_data jsonb,
-  resolved boolean DEFAULT FALSE,
-  resolution_notes text,
-  created_at timestamp with time zone DEFAULT now(),
-  resolved_at timestamp with time zone
+CREATE TABLE IF NOT EXISTS payment_anomalies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  rental_payment_id UUID NOT NULL REFERENCES rental_payments(id) ON DELETE CASCADE,
+  paystack_reference TEXT NOT NULL,
+  anomaly_type TEXT NOT NULL CHECK (anomaly_type IN ('dispute', 'refund', 'partial_payment', 'amount_mismatch', 'status_mismatch')),
+  severity TEXT NOT NULL DEFAULT 'warning' CHECK (severity IN ('warning', 'critical')),
+  message TEXT NOT NULL,
+  paystack_data JSONB,
+  resolved BOOLEAN DEFAULT FALSE,
+  resolution_notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  resolved_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Create indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_payment_anomalies_severity ON public.payment_anomalies(severity);
-CREATE INDEX IF NOT EXISTS idx_payment_anomalies_type ON public.payment_anomalies(anomaly_type);
-CREATE INDEX IF NOT EXISTS idx_payment_anomalies_resolved ON public.payment_anomalies(resolved);
-CREATE INDEX IF NOT EXISTS idx_payment_anomalies_rental_payment_id ON public.payment_anomalies(rental_payment_id);
-CREATE INDEX IF NOT EXISTS idx_payment_anomalies_created_at ON public.payment_anomalies(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_anomalies_severity ON payment_anomalies(severity);
+CREATE INDEX IF NOT EXISTS idx_payment_anomalies_type ON payment_anomalies(anomaly_type);
+CREATE INDEX IF NOT EXISTS idx_payment_anomalies_resolved ON payment_anomalies(resolved);
+CREATE INDEX IF NOT EXISTS idx_payment_anomalies_rental_payment_id ON payment_anomalies(rental_payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_anomalies_created_at ON payment_anomalies(created_at DESC);
 
 -- Enable RLS
-ALTER TABLE public.payment_anomalies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payment_anomalies ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies: Admins can view and update all anomalies
 CREATE POLICY "Admins can view all anomalies"
-  ON public.payment_anomalies
+  ON payment_anomalies
   FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles 
-      WHERE profiles.id = auth.uid() 
-      AND profiles.role IN ('admin', 'super_admin')
-    )
+    public.has_role(auth.uid(), 'admin'::public.app_role) OR 
+    public.has_role(auth.uid(), 'super_admin'::public.app_role)
   );
 
 CREATE POLICY "Admins can update anomalies"
-  ON public.payment_anomalies
+  ON payment_anomalies
   FOR UPDATE
   USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles 
-      WHERE profiles.id = auth.uid() 
-      AND profiles.role IN ('admin', 'super_admin')
-    )
+    public.has_role(auth.uid(), 'admin'::public.app_role) OR 
+    public.has_role(auth.uid(), 'super_admin'::public.app_role)
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles 
-      WHERE profiles.id = auth.uid() 
-      AND profiles.role IN ('admin', 'super_admin')
-    )
+    public.has_role(auth.uid(), 'admin'::public.app_role) OR 
+    public.has_role(auth.uid(), 'super_admin'::public.app_role)
   );
 
 CREATE POLICY "Service role can insert anomalies"
-  ON public.payment_anomalies
+  ON payment_anomalies
   FOR INSERT
   WITH CHECK (auth.role() = 'service_role');

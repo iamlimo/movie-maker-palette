@@ -55,11 +55,8 @@ interface RentalRecord {
   content_id: string;
   content_title: string;
   content_type: 'movie' | 'tv' | 'episode' | 'season';
-  price: number;
-  discount_applied: number;
-  final_price: number;
-  payment_method: 'wallet' | 'paystack';
-  status: 'pending' | 'completed' | 'cancelled' | 'expired';
+  amount: number; // Amount in lowest denomination (kobo)
+  status: 'active' | 'expired';
   created_at: string;
   expires_at: string;
   // Payment tracking fields
@@ -69,9 +66,7 @@ interface RentalRecord {
 }
 
 const statusConfig = {
-  pending: { label: 'Pending', color: 'bg-yellow-100', textColor: 'text-yellow-800', icon: Clock },
-  completed: { label: 'Completed', color: 'bg-green-100', textColor: 'text-green-800', icon: CheckCircle },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100', textColor: 'text-red-800', icon: XCircle },
+  active: { label: 'Active', color: 'bg-green-100', textColor: 'text-green-800', icon: CheckCircle },
   expired: { label: 'Expired', color: 'bg-gray-100', textColor: 'text-gray-800', icon: AlertCircle },
 };
 
@@ -103,7 +98,6 @@ export default function Rentals() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [contentTypeFilter, setContentTypeFilter] = useState('all');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -237,10 +231,7 @@ export default function Rentals() {
               titleMap.get(`${rental.content_type}-${rental.content_id}`) ||
               'Unknown Content',
             content_type: rental.content_type,
-            price: rental.price,
-            discount_applied: rental.discount_applied,
-            final_price: rental.final_price,
-            payment_method: rental.payment_method,
+            amount: rental.amount || 0,
             status: rental.status,
             created_at: rental.created_at,
             expires_at: rental.expires_at,
@@ -346,11 +337,6 @@ export default function Rentals() {
       filtered = filtered.filter(r => r.content_type === contentTypeFilter);
     }
 
-    // Payment method filter
-    if (paymentMethodFilter !== 'all') {
-      filtered = filtered.filter(r => r.payment_method === paymentMethodFilter);
-    }
-
     // Payment status filter
     if (paymentStatusFilter !== 'all') {
       filtered = filtered.filter(r => r.payment_status === paymentStatusFilter);
@@ -370,21 +356,19 @@ export default function Rentals() {
 
     setFilteredRentals(filtered);
     setCurrentPage(1); // Reset to first page when filters change
-  }, [searchQuery, statusFilter, contentTypeFilter, paymentMethodFilter, paymentStatusFilter, startDate, endDate, rentals]);
+  }, [searchQuery, statusFilter, contentTypeFilter, paymentStatusFilter, startDate, endDate, rentals]);
 
   const calculateStats = () => {
     const total = rentals.length;
-    const totalRevenue = rentals.reduce((sum, r) => sum + r.final_price, 0);
-    const active = rentals.filter(
-      r => r.status === 'completed' && new Date(r.expires_at) > new Date()
-    ).length;
-    const completed = rentals.filter(r => r.status === 'completed').length;
+    const totalRevenue = rentals.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const active = rentals.filter(r => r.status === 'active').length;
+    const expired = rentals.filter(r => r.status === 'expired').length;
 
     return {
       total,
       totalRevenue,
       active,
-      completed,
+      expired,
       averagePrice: total > 0 ? totalRevenue / total : 0,
     };
   };
@@ -398,7 +382,7 @@ export default function Rentals() {
       ['Summary'],
       ['Total Rentals', stats.total],
       ['Total Revenue', formatNaira(stats.totalRevenue)],
-      ['Completed Rentals', stats.completed],
+      ['Expired Rentals', stats.expired],
       ['Active Rentals', stats.active],
       ['Average Price', formatNaira(stats.averagePrice)],
       [],
@@ -409,13 +393,10 @@ export default function Rentals() {
         'Content',
         'Type',
         'Status',
-        'Payment Method',
         'Payment Status',
         'Payment Channel',
         'Paystack Reference',
-        'Price',
-        'Discount',
-        'Final Price',
+        'Amount',
         'Created',
         'Expires',
       ],
@@ -425,13 +406,10 @@ export default function Rentals() {
         r.content_title,
         r.content_type,
         r.status,
-        r.payment_method,
         r.payment_status || 'N/A',
         r.payment_channel || 'N/A',
         r.paystack_reference || 'N/A',
-        formatNaira(r.price),
-        formatNaira(r.discount_applied),
-        formatNaira(r.final_price),
+        formatNaira(r.amount || 0),
         new Date(r.created_at).toLocaleDateString(),
         new Date(r.expires_at).toLocaleDateString(),
       ]),
@@ -548,9 +526,7 @@ export default function Rentals() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="expired">Expired</SelectItem>
               </SelectContent>
             </Select>
@@ -565,17 +541,6 @@ export default function Rentals() {
                 <SelectItem value="tv">TV Show</SelectItem>
                 <SelectItem value="episode">Episode</SelectItem>
                 <SelectItem value="season">Season</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Payment method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Methods</SelectItem>
-                <SelectItem value="wallet">Wallet</SelectItem>
-                <SelectItem value="paystack">Paystack</SelectItem>
               </SelectContent>
             </Select>
 
@@ -694,10 +659,7 @@ export default function Rentals() {
                   <TableHead>User</TableHead>
                   <TableHead>Content</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Final Price</TableHead>
-                  <TableHead>Payment Method</TableHead>
+                  <TableHead>Amount</TableHead>
                   <TableHead>Payment Status</TableHead>
                   <TableHead>Payment Channel</TableHead>
                   <TableHead>Rental Status</TableHead>
@@ -707,13 +669,14 @@ export default function Rentals() {
               </TableHeader>
               <TableBody>
                 {filteredRentals.length > 0 ? (
-                  filteredRentals.map(rental => {
-                    const statusInfo = statusConfig[rental.status];
-                    const StatusIcon = statusInfo.icon;
-                    const paymentConfig = paymentMethodConfig[rental.payment_method];
+                  filteredRentals
+                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                    .map(rental => {
+                    const statusInfo = statusConfig[rental.status] || statusConfig['pending'];
+                    const StatusIcon = statusInfo?.icon || Clock;
                     const paymentStatusInfo = paymentStatusConfig[rental.payment_status || 'pending'] || paymentStatusConfig['pending'];
-                    const PaymentStatusIcon = paymentStatusInfo.icon || Clock;
-                    const paymentChannelInfo = paymentChannelConfig[rental.payment_channel || 'unknown'];
+                    const PaymentStatusIcon = paymentStatusInfo?.icon || Clock;
+                    const paymentChannelInfo = paymentChannelConfig[rental.payment_channel || ''] || null;
 
                     return (
                       <TableRow key={rental.id}>
@@ -740,23 +703,8 @@ export default function Rentals() {
                             {rental.content_type}
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatNaira(rental.price)}</TableCell>
-                        <TableCell>
-                          {rental.discount_applied > 0 ? (
-                            <span className="text-green-600 font-medium">
-                              -{formatNaira(rental.discount_applied)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
                         <TableCell className="font-semibold">
-                          {formatNaira(rental.final_price)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={paymentConfig.badge as any}>
-                            {paymentConfig.label}
-                          </Badge>
+                          {formatNaira(rental.amount || 0)}
                         </TableCell>
                         <TableCell>
                           {rental.payment_status ? (
