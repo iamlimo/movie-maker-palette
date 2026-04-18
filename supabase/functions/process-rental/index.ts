@@ -6,19 +6,36 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const RENTAL_DURATION_HOURS = 48;
 const SEASON_RENTAL_DURATION_HOURS = 720; // 30 days
 
-// CORS Headers - explicitly defined to ensure they're always present
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://signaturetv.co',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, idempotency-key',
-  'Content-Type': 'application/json',
-};
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  'https://signaturetv.co',
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:8080',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+];
+
+// Helper function to get CORS headers based on origin
+function getCorsHeaders(origin?: string) {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || '') 
+    ? origin 
+    : 'https://signaturetv.co';
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, idempotency-key',
+    'Content-Type': 'application/json',
+  };
+}
 
 // Helper function to ensure CORS headers on all responses
-function createResponse(data: unknown, status = 200) {
+function createResponse(data: unknown, status = 200, origin?: string) {
   return new Response(
     JSON.stringify(data),
-    { status, headers: corsHeaders }
+    { status, headers: getCorsHeaders(origin) }
   );
 }
 
@@ -32,11 +49,13 @@ interface ProcessRentalRequest {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin') || undefined;
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('OK', {
       status: 200,
-      headers: corsHeaders,
+      headers: getCorsHeaders(origin),
     });
   }
 
@@ -46,12 +65,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const body: ProcessRentalRequest = await req.json();
+    let body: ProcessRentalRequest;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return createResponse({ error: 'Invalid request body' }, 400, origin);
+    }
+
     const { userId, contentId, contentType, price, paymentMethod, referralCode } = body;
 
     // Validate required fields
     if (!userId || !contentId || !contentType || !price || !paymentMethod) {
-      return createResponse({ error: 'Missing required fields' }, 400);
+      return createResponse({ error: 'Missing required fields' }, 400, origin);
     }
 
     // Check for existing active rental
@@ -66,7 +92,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingRental) {
-      return createResponse({ error: 'User already has active rental for this content' }, 409);
+      return createResponse({ error: 'User already has active rental for this content' }, 409, origin);
     }
 
     let finalPrice = price;
@@ -111,15 +137,38 @@ serve(async (req) => {
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (walletError || !wallet) {
-        return createResponse({ error: 'Wallet not found' }, 404);
+      if (walletError) {
+        console.error('Wallet query error:', walletError);
+        return createResponse({ error: 'Failed to retrieve wallet', details: walletError.message }, 500, origin);
       }
 
-      if (wallet.balance < finalPrice) {
-        return createResponse({ error: 'Insufficient wallet balance' }, 402);
+      if (!wallet) {
+        console.error('No wallet found for user:', userId);
+        return createResponse({ error: 'Wallet not found' }, 404, origin);
+      }
+
+      // Ensure balance exists and is a valid number
+      if (wallet.balance === null || wallet.balance === undefined) {
+        console.error('Wallet balance is null/undefined for user:', userId);
+        return createResponse({ error: 'Invalid wallet balance' }, 400, origin);
+      }
+
+      // Ensure balance is a number
+      const walletBalance = typeof wallet.balance === 'string' 
+        ? parseFloat(wallet.balance) 
+        : Number(wallet.balance);
+
+      if (isNaN(walletBalance)) {
+        console.error('Wallet balance is NaN for user:', userId, 'Value:', wallet.balance);
+        return createResponse({ error: 'Invalid wallet balance format' }, 400, origin);
+      }
+
+      if (walletBalance < finalPrice) {
+        return createResponse({ error: 'Insufficient wallet balance' }, 402, origin);
       }
 
       // Create rental record
+      console.log('Creating rental record for user:', userId, 'Content:', contentId);
       const { data: rental, error: rentalError } = await supabase
         .from('rentals')
         .insert({
@@ -137,19 +186,25 @@ serve(async (req) => {
         .single();
 
       if (rentalError) {
-        return createResponse({ error: 'Failed to create rental record' }, 500);
+        console.error('Rental creation error:', rentalError);
+        console.error('Failed to create rental. Error details:', rentalError.message, 'Code:', rentalError.code);
+        return createResponse({ error: 'Failed to create rental record', details: rentalError.message }, 500, origin);
       }
 
       // Deduct from wallet
+      const newBalance = walletBalance - finalPrice;
+      console.log('Updating wallet for user:', userId, 'New balance:', newBalance);
+      
       const { error: updateError } = await supabase
         .from('wallets')
-        .update({ balance: wallet.balance - finalPrice })
+        .update({ balance: newBalance })
         .eq('user_id', userId);
 
       if (updateError) {
         console.error('Wallet update error:', updateError);
+        console.error('Failed to update wallet for user:', userId, 'Error:', updateError.message);
         await supabase.from('rentals').delete().eq('id', rental.id);
-        return createResponse({ error: 'Failed to process payment' }, 500);
+        return createResponse({ error: 'Failed to process payment', details: updateError.message }, 500, origin);
       }
 
       // Update referral code usage with rental ID
@@ -176,7 +231,7 @@ serve(async (req) => {
         rentalId: rental.id,
         paymentMethod: 'wallet',
         discountApplied,
-      });
+      }, 200, origin);
     } else if (paymentMethod === 'paystack') {
       // Paystack payment - create payment record and generate authorization URL
       const { data: user, error: userError } = await supabase
@@ -186,7 +241,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (userError || !user) {
-        return createResponse({ error: 'User profile not found' }, 404);
+        return createResponse({ error: 'User profile not found' }, 404, origin);
       }
 
       // Create pending rental record
@@ -207,7 +262,7 @@ serve(async (req) => {
         .single();
 
       if (rentalError) {
-        return createResponse({ error: 'Failed to create rental record' }, 500);
+        return createResponse({ error: 'Failed to create rental record' }, 500, origin);
       }
 
       // Get user's full name for Paystack
@@ -240,7 +295,7 @@ serve(async (req) => {
         const error = await paystackResponse.json();
         console.error('Paystack error:', error);
         await supabase.from('rentals').delete().eq('id', rental.id);
-        return createResponse({ error: 'Failed to initialize payment' }, 500);
+        return createResponse({ error: 'Failed to initialize payment' }, 500, origin);
       }
 
       const paystackData = await paystackResponse.json();
@@ -268,13 +323,18 @@ serve(async (req) => {
         authorizationUrl: paystackData.data.authorization_url,
         paystackReference: paystackData.data.reference,
         discountApplied,
-      });
+      }, 200, origin);
     }
 
-    return createResponse({ error: 'Invalid payment method' }, 400);
+    return createResponse({ error: 'Invalid payment method' }, 400, origin);
   } catch (error) {
-    console.error('Error in process-rental:', error);
-    return createResponse({ error: 'Internal server error' }, 500);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Error in process-rental:', errorMessage);
+    console.error('Error stack:', errorStack);
+    return createResponse({ 
+      error: 'Internal server error',
+      details: errorMessage 
+    }, 500, origin);
   }
 });
-        await supabase.from('rentals').delete().eq('id', rental.id);

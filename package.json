@@ -10,7 +10,8 @@
     "deploy:mobile": "npm run build && npx cap sync && npx cap open ios && npx cap open android",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+     "deploy:functions": "node deploy-functions.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
