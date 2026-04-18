@@ -96,7 +96,7 @@ const TVShowPreview = () => {
     toggleFavorite,
     loading: favoritesLoading,
   } = useFavorites();
-  const { checkAccess: checkAccessOptimized, checkSeasonAccess } = useOptimizedRentals();
+  const { checkAccess: checkAccessOptimized, checkSeasonAccess, rentals } = useOptimizedRentals();
   const isMobile = useIsMobile();
   const [tvShow, setTVShow] = useState<TVShow | null>(preloadedData || null);
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -129,6 +129,13 @@ const TVShowPreview = () => {
       fetchTVShowData(slug);
     }
   }, [slug]);
+
+  // Re-check access whenever rentals change (when user completes a rental)
+  useEffect(() => {
+    if (user && Object.keys(episodes).length > 0 && seasons.length > 0) {
+      checkSeasonAndEpisodeAccess(seasons, episodes);
+    }
+  }, [rentals, user]);
 
   // Sticky nav on scroll
   useEffect(() => {

@@ -97,6 +97,22 @@ export const OptimizedRentalCheckout = ({
     }
   };
 
+  // Auto-select first available payment method when dialog opens
+  useEffect(() => {
+    if (open) {
+      // Prefer wallet if available, otherwise use paystack
+      if (canPayWithWallet) {
+        setPaymentMethod('wallet');
+      } else {
+        setPaymentMethod('paystack');
+      }
+    } else {
+      // Reset payment method when dialog closes
+      setPaymentMethod(null);
+      setPaymentStatus({ show: false, status: 'processing', message: '' });
+    }
+  }, [open, canPayWithWallet]);
+
   const validateReferralCode = async () => {
     if (!referralCode.trim()) return;
 
@@ -356,6 +372,26 @@ export const OptimizedRentalCheckout = ({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Discount Banner */}
+          {discount && (
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <Gift className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-green-700 dark:text-green-300">Discount Applied!</p>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      Save {discount.percentage > 0 ? `${discount.percentage}%` : formatNaira(discount.amount)} on all payment methods
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                  {discount.percentage > 0 ? `-${discount.percentage}%` : `Save ${formatNaira(discount.amount)}`}
+                </Badge>
+              </div>
+            </div>
+          )}
+
           {/* Pricing Summary */}
           <div className="space-y-3 rounded-lg bg-secondary p-4">
             <div className="flex items-center justify-between text-sm">
@@ -366,8 +402,8 @@ export const OptimizedRentalCheckout = ({
               <>
                 <div className="h-px bg-border" />
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-green-600">Discount</span>
-                  <span className="text-green-600">
+                  <span className="text-green-600 font-medium">Discount</span>
+                  <span className="text-green-600 font-medium">
                     -{formatNaira(discount.amount)}
                   </span>
                 </div>
@@ -375,21 +411,31 @@ export const OptimizedRentalCheckout = ({
             )}
             <div className="h-px bg-border" />
             <div className="flex items-center justify-between text-lg font-semibold">
-              <span>Total</span>
-              <span className="text-primary">{formatNaira(finalPrice)}</span>
+              <span>Total {discount ? '(after discount)' : ''}</span>
+              <span className={discount ? 'text-green-600' : 'text-primary'}>{formatNaira(finalPrice)}</span>
             </div>
           </div>
 
           {/* Referral Code Section */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Referral Code (Optional)</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Referral Code (Optional)</label>
+              {discount && (
+                <span className="text-xs text-green-600 font-medium">✓ Discount Active</span>
+              )}
+            </div>
             {discount ? (
               <div className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/10 p-3">
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-600" />
-                  <code className="font-mono text-sm font-semibold text-green-700 dark:text-green-300">
-                    {discount.code}
-                  </code>
+                  <div className="flex-1">
+                    <code className="font-mono text-sm font-semibold text-green-700 dark:text-green-300">
+                      {discount.code}
+                    </code>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      Applies to wallet & card payments
+                    </p>
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
@@ -398,7 +444,7 @@ export const OptimizedRentalCheckout = ({
                     setDiscount(null);
                     setReferralCode('');
                   }}
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 flex-shrink-0"
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -435,6 +481,11 @@ export const OptimizedRentalCheckout = ({
                 {codeError}
               </div>
             )}
+            {!discount && (
+              <p className="text-xs text-muted-foreground">
+                Have a discount code? Apply it to save on both wallet and card payments.
+              </p>
+            )}
           </div>
 
           {/* Payment Method Selection */}
@@ -446,22 +497,53 @@ export const OptimizedRentalCheckout = ({
 
             {canPayWithWallet && (
               <TabsContent value="wallet" className="space-y-4">
-                <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Wallet className="h-4 w-4 text-blue-600" />
-                    <div>
-                      <p className="font-medium">Wallet Balance</p>
-                      <p className="text-xs text-blue-600">{formatBalance()}</p>
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Wallet className="h-4 w-4 text-blue-600" />
+                      <div className="flex-1">
+                        <p className="font-medium">Current Wallet Balance</p>
+                        <p className="text-xs text-blue-600">{formatBalance()}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">After Payment:</span>
-                    <span className="font-medium">
-                      {formatNaira(Math.max(0, balance - finalPrice))}
-                    </span>
+
+                  <div className="rounded-lg border border-blue-200/50 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-950/20 p-3">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Amount to Pay:</span>
+                        <span className="font-semibold">{formatNaira(finalPrice)}</span>
+                      </div>
+                      <div className="h-px bg-border" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Balance After Payment:</span>
+                        <span className="font-semibold text-blue-600">
+                          {formatNaira(Math.max(0, balance - finalPrice))}
+                        </span>
+                      </div>
+                      {discount && (
+                        <>
+                          <div className="h-px bg-border" />
+                          <div className="flex items-center justify-between text-green-600">
+                            <span className="font-medium flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Discount Saving
+                            </span>
+                            <span className="font-semibold">{formatNaira(discount.amount)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
+
+                  {canPayWithWallet && balance < finalPrice && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+                      <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-600">
+                        You need {formatNaira(finalPrice - balance)} more to complete this payment.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             )}
@@ -477,6 +559,22 @@ export const OptimizedRentalCheckout = ({
                     </div>
                   </div>
                 </div>
+
+                {discount && (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="font-semibold text-green-700 dark:text-green-300">
+                          Discount Applied to Card Payment
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400">
+                          Your discount is applied. Pay only {formatNaira(finalPrice)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="space-y-2 text-sm">
                   <p className="font-medium">Available Payment Methods:</p>
