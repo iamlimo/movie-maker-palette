@@ -137,6 +137,13 @@ const TVShowPreview = () => {
     }
   }, [rentals, user]);
 
+  // Ensure access states are checked when episodes and seasons load
+  useEffect(() => {
+    if (user && Object.keys(episodes).length > 0 && seasons.length > 0) {
+      checkSeasonAndEpisodeAccess(seasons, episodes);
+    }
+  }, [user, Object.keys(episodes).length, seasons.length]);
+
   // Sticky nav on scroll
   useEffect(() => {
     const handleScroll = () => {
@@ -161,11 +168,11 @@ const TVShowPreview = () => {
   };
 
   const handleRentalSuccess = async () => {
-    // Refresh rentals data from server
+    // Refresh rentals data from server and wait for state update
     try {
       await fetchRentals();
-      // Small delay to ensure state is updated
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Small delay to ensure state is updated in React
+      await new Promise(resolve => setTimeout(resolve, 150));
     } catch (error) {
       console.warn('Could not refresh rentals:', error);
     }
@@ -174,6 +181,12 @@ const TVShowPreview = () => {
     if (Object.keys(episodes).length > 0 && seasons.length > 0) {
       await checkSeasonAndEpisodeAccess(seasons, episodes);
     }
+    
+    // Show success notification
+    toast({
+      title: '✅ Rental Successful!',
+      description: 'You can now watch all episodes in this season.',
+    });
   };
 
   const fetchTVShowData = async (slugOrId: string) => {
@@ -667,7 +680,9 @@ const TVShowPreview = () => {
                           <div className="group p-4 rounded-lg border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all">
                             <div className="flex flex-col sm:flex-row gap-4">
                               {episode.thumbnail_url && (
-                                <div className="relative w-full sm:w-40 aspect-video rounded overflow-hidden flex-shrink-0">
+                                <div className={`relative w-full sm:w-40 aspect-video rounded overflow-hidden flex-shrink-0 transition-all duration-300 ${
+                                  hasAnyAccess ? 'ring-2 ring-green-500/50' : ''
+                                }`}>
                                   <img
                                     src={episode.thumbnail_url}
                                     alt={episode.title}
@@ -682,19 +697,31 @@ const TVShowPreview = () => {
                                       <Lock className="h-5 w-5 text-white" />
                                     </div>
                                   )}
+                                  {hasAnyAccess && (
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity duration-300">
+                                      <Play className="h-8 w-8 text-white" />
+                                    </div>
+                                  )}
                                 </div>
                               )}
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <h4 className="font-semibold group-hover:text-primary transition-colors">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                      <h4 className={`font-semibold transition-colors ${
+                                        hasAnyAccess ? 'text-green-600' : 'group-hover:text-primary'
+                                      }`}>
                                         {episode.episode_number}. {episode.title}
                                       </h4>
                                       {hasSeasonAccess && !hasEpisodeAccess && (
-                                        <Badge variant="secondary" className="text-xs py-1 px-2">
-                                          Included in season rental
+                                        <Badge variant="default" className="text-xs py-1 px-2 bg-green-600 hover:bg-green-700">
+                                          ✓ Available
+                                        </Badge>
+                                      )}
+                                      {hasEpisodeAccess && !hasSeasonAccess && (
+                                        <Badge variant="default" className="text-xs py-1 px-2 bg-blue-600 hover:bg-blue-700">
+                                          ✓ Rented
                                         </Badge>
                                       )}
                                     </div>
@@ -726,9 +753,10 @@ const TVShowPreview = () => {
                                         onClick={() =>
                                           setSelectedEpisode(episode)
                                         }
+                                        className="bg-green-600 hover:bg-green-700 text-white animate-in fade-in-50 duration-500"
                                       >
                                         <Play className="h-4 w-4 mr-1" />
-                                        Watch
+                                        Watch Now
                                       </Button>
                                     ) : (
                                       <OptimizedRentalButton
