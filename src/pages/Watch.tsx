@@ -35,10 +35,31 @@ const Watch = () => {
 
   const checkAccessAndLoad = async () => {
     try {
-      // Check rental access
-      const { data: accessData, error: accessError } = await supabase.functions.invoke("rental-access", {
-        body: { content_id: contentId, content_type: contentType }
-      });
+      let accessData = null;
+      let accessError = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      const retryDelay = 500; // ms
+
+      // Retry logic for access check (database sync delay)
+      while (retryCount < maxRetries) {
+        const result = await supabase.functions.invoke("rental-access", {
+          body: { content_id: contentId, content_type: contentType }
+        });
+
+        accessError = result.error;
+        accessData = result.data;
+
+        if (accessData?.has_access) {
+          break; // Access verified, proceed
+        }
+
+        retryCount++;
+        if (retryCount < maxRetries) {
+          // Wait before retrying to allow database to sync
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
 
       if (accessError || !accessData?.has_access) {
         setError("You don't have access to this content");

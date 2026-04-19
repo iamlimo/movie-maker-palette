@@ -176,7 +176,7 @@ serve(async (req) => {
           content_id: contentId,
           content_type: contentType,
           price: finalPrice,
-          payment_method: 'wallet',
+          payment_method: paymentMethod,
           status: 'completed',
           expires_at: expiresAt.toISOString(),
         })
@@ -250,7 +250,7 @@ serve(async (req) => {
           content_id: contentId,
           content_type: contentType,
           price: finalPrice,
-          payment_method: 'paystack',
+          payment_method: paymentMethod,
           status: 'pending',
           expires_at: expiresAt.toISOString(),
         })

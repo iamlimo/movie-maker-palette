@@ -71,7 +71,7 @@ async function checkRentalAccess(supabase: any, userId: string, contentId: strin
       .eq('user_id', userId)
       .eq('content_id', contentId)
       .eq('content_type', contentType)
-      .eq('status', 'active')
+      .eq('status', 'completed')
       .gte('expires_at', new Date().toISOString())
       .single()
 
@@ -108,7 +108,7 @@ async function createRental(supabase: any, userId: string, contentId: string, co
       .eq('user_id', userId)
       .eq('content_id', contentId)
       .eq('content_type', contentType)
-      .eq('status', 'active')
+      .eq('status', 'completed')
       .gte('expires_at', new Date().toISOString())
       .single()
 
@@ -174,7 +174,7 @@ async function validateAndGetVideoUrl(supabase: any, userId: string, contentId: 
       .eq('user_id', userId)
       .eq('content_id', contentId)
       .eq('content_type', contentType)
-      .eq('status', 'active')
+      .eq('status', 'completed')
       .gte('expires_at', new Date().toISOString())
       .single()
 
