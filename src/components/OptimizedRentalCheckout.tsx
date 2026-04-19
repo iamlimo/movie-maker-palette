@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -57,12 +58,14 @@ export const OptimizedRentalCheckout = ({
   onSuccess,
 }: OptimizedRentalCheckoutProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { balance, canAfford, formatBalance, refreshWallet } = useWallet();
-  const { processRental } = useOptimizedRentals();
+  const { processRental, fetchRentals } = useOptimizedRentals();
   const { pollPaymentStatus } = usePaystackRentalVerification();
 
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'paystack' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const [discount, setDiscount] = useState<{
     code: string;
@@ -199,19 +202,43 @@ export const OptimizedRentalCheckout = ({
           details: result.payment,
         });
 
-        await refreshWallet();
+        try {
+          await refreshWallet();
+          await fetchRentals();
+        } catch (e) {
+          console.warn('Could not refresh wallet/rentals:', e);
+        }
+        
         await triggerHaptic();
         toast({
           title: '🎉 Payment Successful!',
           description: `You can now watch ${title}`,
         });
 
-        // Close dialog after 2 seconds
+        // Refresh rentals state before redirecting
+        try {
+          await fetchRentals();
+          // Allow time for state updates to propagate
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (e) {
+          console.warn('Could not refresh rentals:', e);
+        }
+
+        setIsRedirecting(true);
+
+        // Close dialog and redirect to watch page
         setTimeout(() => {
           onOpenChange(false);
           setPaymentStatus({ show: false, status: 'processing', message: '' });
           onSuccess?.();
-        }, 2000);
+          
+          // Redirect to watch page
+          if (contentType === 'season') {
+            navigate(`/watch/season/${contentId}`);
+          } else {
+            navigate(`/watch/episode/${contentId}`);
+          }
+        }, 1000);
       } else if (result.status === 'pending') {
         setPaymentStatus({
           show: true,
@@ -296,17 +323,31 @@ export const OptimizedRentalCheckout = ({
           description: `You can now watch ${title}. Enjoy!`,
         });
         
-        // Refresh wallet balance
+        // Refresh wallet balance and rentals with optimized timing
         try {
           await refreshWallet();
+          await fetchRentals();
+          
+          // Allow time for state updates to propagate
+          await new Promise(resolve => setTimeout(resolve, 300));
         } catch (e) {
-          console.warn('Could not refresh wallet:', e);
+          console.warn('Could not refresh wallet/rentals:', e);
         }
         
+        setIsRedirecting(true);
+        
+        // Brief delay to show success message and allow UI to update
         setTimeout(() => {
           onOpenChange(false);
           onSuccess?.();
-        }, 1500);
+          
+          // Redirect to watch page
+          if (contentType === 'season') {
+            navigate(`/watch/season/${contentId}`);
+          } else {
+            navigate(`/watch/episode/${contentId}`);
+          }
+        }, 800);
       } else if (paymentMethod === 'paystack' && result.authorizationUrl && result.rentalId) {
         // Show payment processing status
         setPaymentStatus({
@@ -818,8 +859,16 @@ export const OptimizedRentalCheckout = ({
 
           <div className="space-y-4">
             <p className="text-sm text-center text-muted-foreground">
-              {paymentStatus.message}
+              {isRedirecting && paymentStatus.status === 'success'
+                ? 'Preparing your content... Redirecting to watch page'
+                : paymentStatus.message}
             </p>
+
+            {isRedirecting && paymentStatus.status === 'success' && (
+              <div className="flex justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              </div>
+            )}
 
             {paymentStatus.channel && (
               <div className="rounded-lg border bg-secondary/50 p-2">

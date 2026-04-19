@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id)
         .eq('content_id', id)
         .eq('content_type', contentType)
-        .eq('status', 'active')
+        .eq('status', 'completed')
         .or(
           `expires_at.gte.${new Date().toISOString()},expiration_date.gte.${new Date().toISOString()}`
         )

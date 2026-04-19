@@ -96,7 +96,7 @@ const TVShowPreview = () => {
     toggleFavorite,
     loading: favoritesLoading,
   } = useFavorites();
-  const { checkAccess: checkAccessOptimized, checkSeasonAccess, rentals } = useOptimizedRentals();
+  const { checkAccess: checkAccessOptimized, checkSeasonAccess, rentals, fetchRentals } = useOptimizedRentals();
   const isMobile = useIsMobile();
   const [tvShow, setTVShow] = useState<TVShow | null>(preloadedData || null);
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -157,6 +157,22 @@ const TVShowPreview = () => {
         element.getBoundingClientRect().top + window.scrollY;
       window.scrollTo({ top: elementPosition - offset, behavior: "smooth" });
       setActiveTab(sectionId);
+    }
+  };
+
+  const handleRentalSuccess = async () => {
+    // Refresh rentals data from server
+    try {
+      await fetchRentals();
+      // Small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.warn('Could not refresh rentals:', error);
+    }
+    
+    // Refresh access states when rental is successful
+    if (Object.keys(episodes).length > 0 && seasons.length > 0) {
+      await checkSeasonAndEpisodeAccess(seasons, episodes);
     }
   };
 
@@ -524,6 +540,7 @@ const TVShowPreview = () => {
                         contentType="season"
                         price={currentSeason.price}
                         title={`${tvShow.title} - Season ${selectedSeason}`}
+                        onRentalSuccess={handleRentalSuccess}
                       />
                     </div>
                     <div className="p-4 rounded-lg border">
@@ -571,6 +588,7 @@ const TVShowPreview = () => {
                   contentType="season"
                   price={currentSeason.price}
                   title={`${tvShow.title} - Season ${selectedSeason}`}
+                  onRentalSuccess={handleRentalSuccess}
                 />
               </div>
               <div className="p-3 rounded-lg border">
@@ -718,6 +736,7 @@ const TVShowPreview = () => {
                                         contentType="episode"
                                         price={episode.price}
                                         title={`Episode ${episode.episode_number}: ${episode.title}`}
+                                        onRentalSuccess={handleRentalSuccess}
                                       />
                                     )}
                                   </div>
