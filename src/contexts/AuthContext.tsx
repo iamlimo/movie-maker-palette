@@ -32,6 +32,7 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: any }>;
   updatePassword: (newPassword: string) => Promise<{ error: any }>;
+  verifyRecoveryToken: () => Promise<{ valid: boolean; error?: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -195,6 +196,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
+  const verifyRecoveryToken = async () => {
+    try {
+      // Check if there's a valid session
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        return { valid: false, error: sessionError };
+      }
+
+      if (!currentSession) {
+        return { valid: false, error: new Error('No valid session found') };
+      }
+
+      // Verify the session can be used by trying to get user data
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !currentUser) {
+        return { valid: false, error: userError || new Error('Failed to verify user') };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      return { valid: false, error };
+    }
+  };
+
   // Execute navigation callback after state updates
   useEffect(() => {
     if (navigationCallback && !loading) {
@@ -214,7 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     refreshProfile,
     resetPassword,
-    updatePassword
+    updatePassword,
+    verifyRecoveryToken
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -17,7 +17,7 @@ import { Eye, EyeOff, Lock, CheckCircle, AlertCircle } from 'lucide-react';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-  const { updatePassword, session } = useAuth();
+  const { updatePassword, session, verifyRecoveryToken } = useAuth();
   const { toast } = useToast();
 
   const [newPassword, setNewPassword] = useState('');
@@ -27,18 +27,26 @@ const ResetPassword = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [isValidToken, setIsValidToken] = useState(false);
 
   // Check if user has valid session (came from reset email)
   useEffect(() => {
-    if (!session) {
-      // User not authenticated from reset link
-      setError('Invalid or expired reset link. Please try again.');
-      const timer = setTimeout(() => {
-        navigate('/auth');
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [session, navigate]);
+    // Give Supabase time to process the recovery token from the email link
+    const checkSession = setTimeout(async () => {
+      if (session) {
+        // Verify the recovery token is valid
+        const { valid } = await verifyRecoveryToken();
+        setIsValidToken(valid);
+        setSessionChecked(true);
+      } else {
+        setError('Invalid or expired reset link. Please try again.');
+        setSessionChecked(true);
+      }
+    }, 500);
+
+    return () => clearTimeout(checkSession);
+  }, [session, verifyRecoveryToken]);
 
   // Calculate password strength
   useEffect(() => {
@@ -56,6 +64,16 @@ const ResetPassword = () => {
 
     setPasswordStrength(Math.min(strength, 100));
   }, [newPassword]);
+
+  // Redirect to login if session check failed
+  useEffect(() => {
+    if (sessionChecked && !isValidToken) {
+      const timer = setTimeout(() => {
+        navigate('/auth');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionChecked, isValidToken, navigate]);
 
   const getStrengthColor = () => {
     if (passwordStrength < 25) return 'bg-red-500';
@@ -97,7 +115,16 @@ const ResetPassword = () => {
       const { error: updateError } = await updatePassword(newPassword);
 
       if (updateError) {
-        setError(updateError.message || 'Failed to update password. Please try again.');
+        // Handle specific error cases
+        const errorMessage = updateError.message || 'Failed to update password';
+        
+        if (errorMessage.includes('Refresh Token Not Found') || 
+            errorMessage.includes('Invalid Refresh Token') ||
+            errorMessage.includes('session')) {
+          setError('Your session has expired. Please request a new password reset link.');
+        } else {
+          setError(errorMessage);
+        }
       } else {
         setSuccess(true);
         toast({
@@ -111,11 +138,71 @@ const ResetPassword = () => {
         }, 2000);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      const errorMessage = err.message || 'An unexpected error occurred.';
+      
+      if (errorMessage.includes('Refresh Token Not Found') || 
+          errorMessage.includes('Invalid Refresh Token')) {
+        setError('Your session has expired. Please request a new password reset link.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (!sessionChecked) {
+    // Show loading state while checking session
+    return (
+      <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
+        <Card className="gradient-card border-border/50 shadow-premium max-w-md w-full">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-foreground">
+              Verifying Reset Link
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-center items-center space-x-2">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100" />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200" />
+            </div>
+            <p className="text-center text-muted-foreground mt-4">
+              Please wait while we verify your reset link...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isValidToken) {
+    return (
+      <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
+        <Card className="gradient-card border-border/50 shadow-premium max-w-md w-full">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-foreground">
+              Invalid Reset Link
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                This reset link has expired or is invalid. Please request a new one.
+              </AlertDescription>
+            </Alert>
+            <Button
+              onClick={() => navigate('/auth')}
+              className="w-full mt-6 gradient-accent text-primary-foreground font-semibold"
+            >
+              Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
