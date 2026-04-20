@@ -87,6 +87,12 @@ export default function CreateTicket() {
     }
   };
 
+  // Helper function to check if string looks like a UUID
+  const isLikelyUUID = (str: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  };
+
   // Debounced user search
   useEffect(() => {
     const debounceTimer = setTimeout(async () => {
@@ -97,11 +103,17 @@ export default function CreateTicket() {
 
       setSearchingUsers(true);
       try {
+        // Build filter string - only include UUID check if search looks like UUID
+        let filterString = `email.ilike.%${userSearch}%,name.ilike.%${userSearch}%`;
+        if (isLikelyUUID(userSearch)) {
+          filterString += `,user_id.eq.${userSearch}`;
+        }
+
         // Search in profiles table for email, username, or ID
         const { data, error } = await supabase
           .from('profiles')
           .select('id, user_id, email, name')
-          .or(`email.ilike.%${userSearch}%,name.ilike.%${userSearch}%,user_id.eq.${userSearch}`)
+          .or(filterString)
           .limit(10);
 
         if (error) throw error;
