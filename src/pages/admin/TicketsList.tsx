@@ -448,7 +448,7 @@ export default function TicketsList() {
         <AlertDialogContent className="bg-slate-900 border-orange-400/30">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-orange-300">Delete Ticket</AlertDialogTitle>
-            <AlertDialogDescription className="text-orange-200">>
+            <AlertDialogDescription className="text-orange-200">
               Are you sure you want to delete ticket {ticketToDelete?.ticket_number}? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
