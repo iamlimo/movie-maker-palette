@@ -14,17 +14,17 @@ import { cn } from '@/lib/utils';
 import type { Ticket, TicketComment, TicketStatus } from '@/types/ticket';
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
-  'Open': 'bg-blue-100 text-blue-800 border-blue-300',
-  'In Progress': 'bg-purple-100 text-purple-800 border-purple-300',
-  'Resolved': 'bg-green-100 text-green-800 border-green-300',
-  'Closed': 'bg-gray-100 text-gray-800 border-gray-300',
-  'On Hold': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  'Open': 'bg-orange-500/20 text-orange-200 border-orange-400/50',
+  'In Progress': 'bg-blue-500/20 text-blue-200 border-blue-400/50',
+  'Resolved': 'bg-green-500/20 text-green-200 border-green-400/50',
+  'Closed': 'bg-gray-500/20 text-gray-200 border-gray-400/50',
+  'On Hold': 'bg-yellow-500/20 text-yellow-200 border-yellow-400/50',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  'Low': 'bg-green-100 text-green-800 border-green-300',
-  'Medium': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  'High': 'bg-red-100 text-red-800 border-red-300',
+  'Low': 'bg-green-500/20 text-green-200 border-green-400/50',
+  'Medium': 'bg-orange-500/20 text-orange-200 border-orange-400/50',
+  'High': 'bg-red-500/20 text-red-200 border-red-400/50',
 };
 
 export default function TicketDetails() {
@@ -209,9 +209,9 @@ export default function TicketDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-black to-slate-900 p-6">
         <div className="max-w-4xl mx-auto flex items-center justify-center h-96">
-          <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
+          <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
         </div>
       </div>
     );
@@ -219,11 +219,11 @@ export default function TicketDetails() {
 
   if (!ticket) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-black to-slate-900 p-6">
         <div className="max-w-4xl mx-auto">
           <div className="text-center py-12">
-            <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-slate-900">Ticket not found</h1>
+            <AlertCircle className="w-12 h-12 text-orange-300 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-white">Ticket not found</h1>
             <Button
               variant="outline"
               onClick={() => navigate('/admin/tickets')}
@@ -239,7 +239,7 @@ export default function TicketDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-black to-slate-900 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -254,8 +254,8 @@ export default function TicketDetails() {
               Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">{ticket.ticket_number}</h1>
-              <p className="text-slate-600">{ticket.title}</p>
+              <h1 className="text-3xl font-bold text-white">{ticket.ticket_number}</h1>
+              <p className="text-orange-300">{ticket.title}</p>
             </div>
           </div>
         </div>
@@ -264,9 +264,9 @@ export default function TicketDetails() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Ticket Details Card */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-slate-900">
+                <CardTitle className="flex items-center gap-2 text-white">
                   <FileText className="w-5 h-5" />
                   Ticket Information
                 </CardTitle>
@@ -275,70 +275,70 @@ export default function TicketDetails() {
                 {ticket.description && (
                   <>
                     <div>
-                      <h3 className="font-medium text-slate-900 mb-2">Description</h3>
-                      <p className="text-slate-600 whitespace-pre-wrap">{ticket.description}</p>
+                      <h3 className="font-medium text-orange-300 mb-2">Description</h3>
+                      <p className="text-orange-200/70 whitespace-pre-wrap">{ticket.description}</p>
                     </div>
-                    <Separator className="bg-slate-200" />
+                    <Separator className="bg-orange-400/20" />
                   </>
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-slate-600">Category</p>
+                    <p className="text-sm text-orange-400">Category</p>
                     <Badge variant="outline">{ticket.category}</Badge>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600">User Type</p>
+                    <p className="text-sm text-orange-400">User Type</p>
                     <Badge variant="outline">{ticket.user_type}</Badge>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600">Created</p>
-                    <p className="text-sm font-medium text-slate-900">{formatDate(ticket.created_at)}</p>
+                    <p className="text-sm text-orange-400">Created</p>
+                    <p className="text-sm font-medium text-orange-100">{formatDate(ticket.created_at)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600">User ID</p>
-                    <p className="text-xs font-mono text-slate-600">{ticket.user_id.slice(0, 8)}...</p>
+                    <p className="text-sm text-orange-400">User ID</p>
+                    <p className="text-xs font-mono text-orange-300/70">{ticket.user_id.slice(0, 8)}...</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* User-facing Message */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-slate-900">
+                <CardTitle className="flex items-center gap-2 text-white">
                   <Mail className="w-5 h-5" />
                   User-Facing Message
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-slate-700 whitespace-pre-wrap">{ticket.user_message}</p>
+                <div className="bg-orange-500/10 border border-orange-400/30 rounded-lg p-4">
+                  <p className="text-orange-200/80 whitespace-pre-wrap">{ticket.user_message}</p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Internal Notes */}
             {ticket.internal_notes && (
-              <Card className="border-slate-200 shadow-sm">
+              <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-slate-900">
+                  <CardTitle className="flex items-center gap-2 text-white">
                     <AlertCircle className="w-5 h-5" />
                     Internal Notes
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-slate-700 whitespace-pre-wrap">{ticket.internal_notes}</p>
+                  <div className="bg-orange-500/10 border border-orange-400/30 rounded-lg p-4">
+                    <p className="text-orange-200/80 whitespace-pre-wrap">{ticket.internal_notes}</p>
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {/* Comments Section */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-slate-900">
+                <CardTitle className="flex items-center gap-2 text-white">
                   <MessageSquare className="w-5 h-5" />
                   Comments ({comments.length})
                 </CardTitle>
@@ -346,7 +346,7 @@ export default function TicketDetails() {
               <CardContent className="space-y-4">
                 {/* Comments List */}
                 {comments.length === 0 ? (
-                  <p className="text-slate-500 text-sm text-center py-8">No comments yet</p>
+                  <p className="text-orange-200/50 text-sm text-center py-8">No comments yet</p>
                 ) : (
                   <div className="space-y-4 max-h-96 overflow-y-auto">
                     {comments.map((comment) => (
@@ -355,22 +355,22 @@ export default function TicketDetails() {
                         className={cn(
                           'p-3 rounded-lg border',
                           comment.is_internal
-                            ? 'bg-yellow-50 border-yellow-200'
-                            : 'bg-slate-50 border-slate-200'
+                            ? 'bg-orange-500/10 border-orange-400/30'
+                            : 'bg-white/5 border-orange-400/20'
                         )}
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
-                            <User className="w-3 h-3 text-slate-400" />
+                            <User className="w-3 h-3 text-orange-400" />
                             {comment.is_internal && (
                               <Badge variant="secondary" className="text-xs">Internal</Badge>
                             )}
                           </div>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-orange-300/70">
                             {formatDate(comment.created_at)}
                           </span>
                         </div>
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                        <p className="text-sm text-orange-200/80 whitespace-pre-wrap">
                           {comment.comment_text}
                         </p>
                       </div>
@@ -378,7 +378,7 @@ export default function TicketDetails() {
                   </div>
                 )}
 
-                <Separator className="bg-slate-200" />
+                <Separator className="bg-orange-400/20" />
 
                 {/* Add Comment */}
                 <div className="space-y-2">
@@ -389,21 +389,21 @@ export default function TicketDetails() {
                         type="checkbox"
                         checked={isInternalComment}
                         onChange={(e) => setIsInternalComment(e.target.checked)}
-                        className="rounded border-slate-300"
+                        className="rounded border-orange-400/30 bg-white/5 text-white"
                       />
-                      <span className="text-sm text-slate-600">Internal comment (admin only)</span>
+                      <span className="text-sm text-orange-300">Internal comment (admin only)</span>
                     </label>
                   </div>
                   <Textarea
                     placeholder="Add a comment..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    className="min-h-24 border-slate-300 focus:ring-blue-500"
+                    className="min-h-24 border-orange-400/30 bg-white/5 text-white placeholder-orange-300/50 focus:ring-orange-500/20 focus:border-orange-400/50"
                   />
                   <Button
                     onClick={handleAddComment}
                     disabled={submittingComment || !newComment.trim()}
-                    className="gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                    className="gap-2 bg-orange-600 text-white hover:bg-orange-700"
                   >
                     {submittingComment ? (
                       <>
@@ -425,9 +425,9 @@ export default function TicketDetails() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Status Card */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
               <CardHeader>
-                <CardTitle className="text-slate-900">Status</CardTitle>
+                <CardTitle className="text-white">Status</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Select
@@ -450,9 +450,9 @@ export default function TicketDetails() {
             </Card>
 
             {/* Priority & Category */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
               <CardHeader>
-                <CardTitle className="text-slate-900">Priority</CardTitle>
+                <CardTitle className="text-white">Priority</CardTitle>
               </CardHeader>
               <CardContent>
                 <Badge
@@ -465,9 +465,9 @@ export default function TicketDetails() {
             </Card>
 
             {/* Assignee Card */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
               <CardHeader>
-                <CardTitle className="text-slate-900">Assigned To</CardTitle>
+                <CardTitle className="text-white">Assigned To</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Select
@@ -475,7 +475,7 @@ export default function TicketDetails() {
                   onValueChange={handleAssigneeChange}
                   disabled={updatingAssignee}
                 >
-                  <SelectTrigger className="border-slate-300">
+                  <SelectTrigger className="border-orange-400/30 bg-white/5 text-white">
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
@@ -491,26 +491,26 @@ export default function TicketDetails() {
             </Card>
 
             {/* Timeline */}
-            <Card className="border-slate-200 shadow-sm">
+            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
               <CardHeader>
-                <CardTitle className="text-slate-900 flex items-center gap-2">
+                <CardTitle className="text-white flex items-center gap-2">
                   <Clock className="w-5 h-5" />
                   Timeline
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div>
-                  <p className="text-slate-600">Created</p>
-                  <p className="font-medium text-slate-900">{formatDate(ticket.created_at)}</p>
+                  <p className="text-orange-400">Created</p>
+                  <p className="font-medium text-orange-100">{formatDate(ticket.created_at)}</p>
                 </div>
                 <div>
-                  <p className="text-slate-600">Updated</p>
-                  <p className="font-medium text-slate-900">{formatDate(ticket.updated_at)}</p>
+                  <p className="text-orange-400">Updated</p>
+                  <p className="font-medium text-orange-100">{formatDate(ticket.updated_at)}</p>
                 </div>
                 {ticket.resolved_at && (
                   <div>
-                    <p className="text-slate-600">Resolved</p>
-                    <p className="font-medium text-slate-900">{formatDate(ticket.resolved_at)}</p>
+                    <p className="text-orange-400">Resolved</p>
+                    <p className="font-medium text-orange-100">{formatDate(ticket.resolved_at)}</p>
                   </div>
                 )}
               </CardContent>
@@ -518,9 +518,9 @@ export default function TicketDetails() {
 
             {/* Status Badge */}
             {ticket.status === 'Resolved' && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                <CheckCircle className="w-6 h-6 text-green-600 mx-auto mb-2" />
-                <p className="text-sm font-medium text-green-800">Ticket Resolved</p>
+              <div className="bg-green-500/10 border border-green-400/50 rounded-lg p-4 text-center">
+                <CheckCircle className="w-6 h-6 text-green-400 mx-auto mb-2" />
+                <p className="text-sm font-medium text-green-200">Ticket Resolved</p>
               </div>
             )}
           </div>
