@@ -31,6 +31,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/hooks/useWallet';
 import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
 import { usePaystackRentalVerification } from '@/hooks/usePaystackRentalVerification';
+import { usePlatform } from '@/hooks/usePlatform';
 import { toast } from '@/hooks/use-toast';
 import { formatNaira } from '@/lib/priceUtils';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +63,7 @@ export const OptimizedRentalCheckout = ({
   const { balance, canAfford, formatBalance, refreshWallet } = useWallet();
   const { processRental, fetchRentals } = useOptimizedRentals();
   const { pollPaymentStatus } = usePaystackRentalVerification();
+  const { isIOS, isAndroid, isWeb } = usePlatform();
 
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'paystack' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -580,8 +582,8 @@ export const OptimizedRentalCheckout = ({
           {/* Payment Method Selection */}
           <Tabs value={paymentMethod || ''} onValueChange={(v) => setPaymentMethod(v as any)}>
             <TabsList className="w-full">
-              {canPayWithWallet && <TabsTrigger value="wallet">Wallet</TabsTrigger>}
-              <TabsTrigger value="paystack">Card</TabsTrigger>
+              {canPayWithWallet && <TabsTrigger value="wallet">💳 Wallet</TabsTrigger>}
+              {!isIOS && <TabsTrigger value="paystack">🏦 Card Payment</TabsTrigger>}
             </TabsList>
 
             {canPayWithWallet && (
@@ -712,7 +714,8 @@ export const OptimizedRentalCheckout = ({
               </TabsContent>
             )}
 
-            <TabsContent value="paystack" className="space-y-4">
+            {!isIOS && (
+              <TabsContent value="paystack" className="space-y-4">
               <div className="space-y-3">
                 <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
                   <div className="flex items-center gap-2 text-sm">
@@ -767,7 +770,25 @@ export const OptimizedRentalCheckout = ({
                   </div>
                 </div>
               </div>
+            )}
             </TabsContent>
+
+            {isIOS && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                <div className="flex gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-700 dark:text-amber-300">
+                    <p className="font-semibold mb-1">⚠️ Card Payment Not Available on iOS</p>
+                    <p className="text-xs mb-2">
+                      Due to App Store policies, direct card payments are not available on iOS. Please use the web version to complete your payment.
+                    </p>
+                    <p className="text-xs">
+                      You can still use your wallet balance if you have funds. Visit our website from Safari to pay with a card.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </Tabs>
 
           {/* Warnings */}

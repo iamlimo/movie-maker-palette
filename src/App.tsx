@@ -66,6 +66,9 @@ const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
 const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
 const ReferralCodes = lazy(() => import('@/pages/admin/ReferralCodes'));
 const PushNotificationsAdmin = lazy(() => import('@/pages/admin/PushNotifications'));
+const CreateTicket = lazy(() => import('@/pages/admin/CreateTicket'));
+const TicketsList = lazy(() => import('@/pages/admin/TicketsList'));
+const TicketDetails = lazy(() => import('@/pages/admin/TicketDetails'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -159,6 +162,9 @@ function AppContent() {
             <Route path="applications" element={<JobApplicationsAdmin />} />
             <Route path="referral-codes" element={<ReferralCodes />} />
             <Route path="push-notifications" element={<PushNotificationsAdmin />} />
+            <Route path="tickets" element={<TicketsList />} />
+            <Route path="tickets/create" element={<CreateTicket />} />
+            <Route path="tickets/:ticketId" element={<TicketDetails />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

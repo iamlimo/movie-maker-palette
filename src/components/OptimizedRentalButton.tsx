@@ -1,12 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Lock, Clock, CheckCircle2 } from 'lucide-react';
+import { Play, Lock, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
 import { formatNaira } from '@/lib/priceUtils';
 import { useState } from 'react';
 import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
 import { useNavigate } from 'react-router-dom';
+import { usePlatform } from '@/hooks/usePlatform';
+import { toast } from '@/hooks/use-toast';
 
 interface OptimizedRentalButtonProps {
   contentId: string;
@@ -26,6 +28,7 @@ export const OptimizedRentalButton = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const { checkAccess } = useOptimizedRentals();
+  const { isIOS, isAndroid, isWeb } = usePlatform();
   const [showCheckout, setShowCheckout] = useState(false);
 
   const access = checkAccess(contentId, contentType);
@@ -43,6 +46,25 @@ export const OptimizedRentalButton = ({
     );
   }
 
+  // iOS users cannot rent from mobile app - show information instead
+  if (isIOS) {
+    return (
+      <div className="space-y-2">
+        <Button
+          disabled
+          variant="secondary"
+          className="w-full opacity-50 cursor-not-allowed"
+        >
+          <AlertCircle className="h-4 w-4 mr-2" />
+          Unavailable on iOS App
+        </Button>
+        <p className="text-xs text-muted-foreground text-center">
+          To rent content on iOS, please visit our website on Safari
+        </p>
+      </div>
+    );
+  }
+
   // User has access
   if (access.hasAccess) {
     return (
@@ -52,7 +74,7 @@ export const OptimizedRentalButton = ({
             navigate(`/watch/${contentType === 'season' ? 'season' : 'episode'}/${contentId}`)
           }
           variant="default"
-          className="w-full"
+          className="w-full bg-green-600 hover:bg-green-700"
         >
           <Play className="h-4 w-4 mr-2" />
           Watch Now
@@ -67,7 +89,7 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  // User needs to rent
+  // Android and Web users can rent
   return (
     <>
       <Button
