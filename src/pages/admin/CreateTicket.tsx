@@ -509,29 +509,6 @@ export default function CreateTicket() {
                     </Button>
                   </div>
                 )}
-
-                {/* User Type Toggle */}
-                <div className="pt-2 space-y-3">
-                  <Label className="text-white font-semibold">User Type</Label>
-                  <div className="flex gap-2">
-                    {['Viewer', 'Creator'].map((type) => (
-                      <Button
-                        key={type}
-                        variant={userType === type ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setUserType(type as UserType)}
-                        className={cn(
-                          'flex-1 font-medium transition-all',
-                          userType === type
-                            ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white border-0 shadow-lg'
-                            : 'bg-white/5 border-orange-400/30 text-orange-200 hover:bg-white/10 hover:border-orange-400/50'
-                        )}
-                      >
-                        {type}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
