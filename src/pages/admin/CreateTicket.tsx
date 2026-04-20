@@ -13,15 +13,15 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Search, X, AlertCircle, Check, Loader2, Mail, User, FileText, Tag, Clock } from 'lucide-react';
+import { Search, X, AlertCircle, Check, Loader2, Mail, User, FileText, Tag, Clock, Send, Link2, DollarSign, Zap, Lock, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TicketCategory, TicketPriority, UserType, UserSearchResult, PaymentResult, ContentResult, TicketTemplate } from '@/types/ticket';
 
 const CATEGORIES: TicketCategory[] = ['Payment Issue', 'Streaming Issue', 'Account Issue', 'Creator Issue', 'Abuse / Fraud'];
 const PRIORITIES: { label: string; value: TicketPriority; color: string }[] = [
-  { label: 'Low', value: 'Low', color: 'bg-green-100 text-green-800 border-green-300' },
-  { label: 'Medium', value: 'Medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  { label: 'High', value: 'High', color: 'bg-red-100 text-red-800 border-red-300' },
+  { label: 'Low', value: 'Low', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/50' },
+  { label: 'Medium', value: 'Medium', color: 'bg-amber-500/20 text-amber-300 border-amber-400/50' },
+  { label: 'High', value: 'High', color: 'bg-red-500/20 text-red-300 border-red-400/50' },
 ];
 
 interface AttachedItem {
@@ -398,51 +398,65 @@ export default function CreateTicket() {
   const priorityConfig = PRIORITIES.find(p => p.value === priority);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-black via-slate-900 to-black">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl animate-pulse" />
+      </div>
+
+      <div className="relative max-w-7xl mx-auto px-4 py-8 space-y-6">
         {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold text-slate-900">Create Ticket</h1>
-          <p className="text-slate-600">Proactively assist users or creators</p>
+        <div className="space-y-3 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl">
+              <FileText className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-white">Create Support Ticket</h1>
+              <p className="text-purple-200 text-sm mt-1">Assist users or creators with their issues</p>
+            </div>
+          </div>
         </div>
 
-        <div className="grid gap-6">
-          {/* Target User Section */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <User className="w-5 h-5" />
-                Target User
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* User Search */}
-              <div className="space-y-2">
-                <Label htmlFor="user-search" className="text-slate-700 font-medium">
-                  Search by email, username, or ID
-                </Label>
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Main Content - Left Side (2/3) */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Target User Section */}
+            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl hover:shadow-orange-500/10 transition-all duration-300">
+              <CardHeader className="pb-4 border-b border-white/10">
+                <CardTitle className="flex items-center gap-3 text-white">
+                  <div className="p-2 bg-orange-500/20 rounded-lg">
+                    <User className="w-5 h-5 text-orange-400" />
+                  </div>
+                  Select User
+                </CardTitle>
+                <CardDescription className="text-orange-200">Choose the user this ticket is for</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-6">
+                {/* User Search */}
+                <div className="space-y-2">
+                  <Label className="text-white font-semibold">Search by email, username, or ID</Label>
+                  <div className="relative group">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-300" />
                     <Input
-                      id="user-search"
                       type="text"
-                      placeholder="Search user..."
+                      placeholder="Type to search..."
                       value={userSearch}
                       onChange={(e) => {
                         setUserSearch(e.target.value);
                         setShowUserDropdown(true);
                       }}
                       onFocus={() => setShowUserDropdown(true)}
-                      className="pl-10 border-slate-300 focus:ring-blue-500"
+                      className="pl-12 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 transition-all"
                     />
                     {searchingUsers && (
-                      <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                      <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-400 animate-spin" />
                     )}
                   </div>
 
                   {showUserDropdown && userSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg z-50">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-orange-400/30 rounded-xl shadow-2xl z-50 overflow-hidden">
                       {userSearchResults.map((result) => (
                         <button
                           key={result.id}
@@ -451,411 +465,439 @@ export default function CreateTicket() {
                             setUserSearch('');
                             setShowUserDropdown(false);
                           }}
-                          className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+                          className="w-full text-left px-4 py-3 hover:bg-orange-500/20 border-b border-orange-400/10 last:border-0 transition-colors group"
                         >
-                          <div className="font-medium text-slate-900">{result.username || 'No name'}</div>
-                          <div className="text-sm text-slate-500">{result.email}</div>
+                          <div className="font-medium text-white group-hover:text-orange-300">{result.username || 'User'}</div>
+                          <div className="text-sm text-orange-300">{result.email}</div>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Selected User Display */}
-              {selectedUser && (
-                <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-blue-600" />
+                {/* Selected User Display */}
+                {selectedUser && (
+                  <div className="flex items-center justify-between bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-400/30 rounded-xl p-4 animate-in fade-in">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                        <User className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-white">{selectedUser.username || 'User'}</div>
+                        <div className="text-sm text-orange-300">{selectedUser.email}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-medium text-slate-900">{selectedUser.username || 'User'}</div>
-                      <div className="text-sm text-slate-600">{selectedUser.email}</div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedUser(null)}
-                    className="text-slate-500 hover:text-slate-700"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-
-              {/* User Type Toggle */}
-              <div className="flex items-center gap-4 pt-2">
-                <Label className="text-slate-700 font-medium">User Type:</Label>
-                <div className="flex gap-2">
-                  {['Viewer', 'Creator'].map((type) => (
                     <Button
-                      key={type}
-                      variant={userType === type ? 'default' : 'outline'}
+                      variant="ghost"
                       size="sm"
-                      onClick={() => setUserType(type as UserType)}
-                      className={cn(
-                        'px-4',
-                        userType === type
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-                      )}
+                      onClick={() => setSelectedUser(null)}
+                      className="text-orange-300 hover:text-white hover:bg-orange-500/20"
                     >
-                      {type}
+                      <X className="w-4 h-4" />
                     </Button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  </div>
+                )}
 
-          {/* Ticket Details Section */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <FileText className="w-5 h-5" />
-                Ticket Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Category */}
-                <div className="space-y-2">
-                  <Label htmlFor="category" className="text-slate-700 font-medium">
-                    Category
-                  </Label>
-                  <Select value={category} onValueChange={(value) => setCategory(value as TicketCategory)}>
-                    <SelectTrigger id="category" className="border-slate-300">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Priority */}
-                <div className="space-y-2">
-                  <Label className="text-slate-700 font-medium">Priority</Label>
+                {/* User Type Toggle */}
+                <div className="pt-2 space-y-3">
+                  <Label className="text-white font-semibold">User Type</Label>
                   <div className="flex gap-2">
-                    {PRIORITIES.map((p) => (
-                      <button
-                        key={p.value}
-                        onClick={() => setPriority(p.value)}
+                    {['Viewer', 'Creator'].map((type) => (
+                      <Button
+                        key={type}
+                        variant={userType === type ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setUserType(type as UserType)}
                         className={cn(
-                          'px-4 py-2 rounded-lg border-2 font-medium transition-all',
-                          priority === p.value
-                            ? p.color + ' border-current'
-                            : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                          'flex-1 font-medium transition-all',
+                          userType === type
+                            ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white border-0 shadow-lg'
+                            : 'bg-white/5 border-orange-400/30 text-orange-200 hover:bg-white/10 hover:border-orange-400/50'
                         )}
                       >
-                        {p.label}
-                      </button>
+                        {type}
+                      </Button>
                     ))}
                   </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title" className="text-slate-700 font-medium">
-                  Ticket Title *
-                </Label>
-                <Input
-                  id="title"
-                  type="text"
-                  placeholder="Brief description of the issue..."
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="border-slate-300 focus:ring-blue-500"
-                />
-              </div>
+            {/* Ticket Details Section */}
+            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl hover:shadow-orange-500/10 transition-all duration-300">
+              <CardHeader className="pb-4 border-b border-white/10">
+                <CardTitle className="flex items-center gap-3 text-white">
+                  <div className="p-2 bg-orange-500/20 rounded-lg">
+                    <FileText className="w-5 h-5 text-orange-400" />
+                  </div>
+                  Ticket Details
+                </CardTitle>
+                <CardDescription className="text-orange-200">Define the issue and set priority</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5 pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Category */}
+                  <div className="space-y-2">
+                    <Label className="text-white font-semibold flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-orange-400" />
+                      Category
+                    </Label>
+                    <Select value={category} onValueChange={(value) => setCategory(value as TicketCategory)}>
+                      <SelectTrigger className="bg-white/5 border-orange-400/30 text-white focus:border-orange-400 focus:ring-orange-500/20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-orange-400/30">
+                        {CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat} className="text-white hover:bg-orange-500/20">
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description" className="text-slate-700 font-medium">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  placeholder="Additional details about the issue..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-24 border-slate-300 focus:ring-blue-500"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Context Attachment Section */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <Tag className="w-5 h-5" />
-                Context Attachments
-              </CardTitle>
-              <CardDescription>Optional: Attach relevant payments or content</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Attach Payment */}
-              <div className="space-y-2">
-                <Label htmlFor="payment-search" className="text-slate-700 font-medium">
-                  Attach Payment (by transaction ID)
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="payment-search"
-                    type="text"
-                    placeholder="Search transaction ID..."
-                    value={paymentSearch}
-                    onChange={(e) => {
-                      setPaymentSearch(e.target.value);
-                      setShowPaymentDropdown(true);
-                    }}
-                    onFocus={() => setShowPaymentDropdown(true)}
-                    className="border-slate-300 focus:ring-blue-500"
-                  />
-
-                  {showPaymentDropdown && paymentResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg z-50">
-                      {paymentResults.map((result) => (
+                  {/* Priority */}
+                  <div className="space-y-2">
+                    <Label className="text-white font-semibold flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-orange-400" />
+                      Priority
+                    </Label>
+                    <div className="flex gap-2">
+                      {PRIORITIES.map((p) => (
                         <button
-                          key={result.id}
-                          onClick={() => handleAddPayment(result)}
-                          className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+                          key={p.value}
+                          onClick={() => setPriority(p.value)}
+                          className={cn(
+                            'flex-1 px-3 py-2 rounded-lg font-medium text-sm transition-all border',
+                            priority === p.value
+                              ? `${p.color} border-current shadow-lg scale-105`
+                              : 'bg-white/5 border-orange-400/30 text-orange-200 hover:bg-white/10'
+                          )}
                         >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium text-slate-900">
-                                ₦{(result.amount / 100).toLocaleString('en-NG')}
-                              </div>
-                              <div className="text-sm text-slate-500">
-                                ID: {result.transaction_id || result.id.slice(0, 8)}
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {result.status}
-                            </Badge>
-                          </div>
+                          {p.label}
                         </button>
                       ))}
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Attach Content */}
-              <div className="space-y-2">
-                <Label htmlFor="content-search" className="text-slate-700 font-medium">
-                  Attach Content (by title)
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="content-search"
-                    type="text"
-                    placeholder="Search movie or show..."
-                    value={contentSearch}
-                    onChange={(e) => {
-                      setContentSearch(e.target.value);
-                      setShowContentDropdown(true);
-                    }}
-                    onFocus={() => setShowContentDropdown(true)}
-                    className="border-slate-300 focus:ring-blue-500"
-                  />
-
-                  {showContentDropdown && contentResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-300 rounded-lg shadow-lg z-50">
-                      {contentResults.map((result) => (
-                        <button
-                          key={result.id}
-                          onClick={() => handleAddContent(result)}
-                          className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
-                        >
-                          <div className="flex gap-2">
-                            <span>{result.type === 'movie' ? '🎬' : '📺'}</span>
-                            <div>
-                              <div className="font-medium text-slate-900">{result.title}</div>
-                              <div className="text-sm text-slate-500">
-                                {result.type === 'movie' ? 'Movie' : 'TV Show'}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Attached Items Display */}
-              {attachedItems.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  <Label className="text-slate-700 font-medium">Attached Items:</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {attachedItems.map((item) => (
-                      <Badge
-                        key={item.id}
-                        variant="secondary"
-                        className="px-3 py-1 flex items-center gap-2 cursor-pointer hover:bg-slate-200 transition-colors"
-                      >
-                        {item.title}
-                        <button
-                          onClick={() => handleRemoveAttachment(item.id)}
-                          className="ml-1 hover:text-red-600"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
                   </div>
                 </div>
-              )}
 
-              {/* System Logs */}
-              <div className="flex items-center gap-2 pt-2">
-                <Switch
-                  checked={includeSystemLogs}
-                  onCheckedChange={setIncludeSystemLogs}
-                  id="system-logs"
-                />
-                <Label htmlFor="system-logs" className="text-slate-700 cursor-pointer">
-                  Include system logs
-                </Label>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Messages Section */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <Mail className="w-5 h-5" />
-                Messages
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Internal Note */}
-              <div className="space-y-2">
-                <Label htmlFor="internal-notes" className="text-slate-700 font-medium">
-                  Internal Note (Admin Only)
-                </Label>
-                <Textarea
-                  id="internal-notes"
-                  placeholder="For admin reference only - not visible to user..."
-                  value={internalNotes}
-                  onChange={(e) => setInternalNotes(e.target.value)}
-                  className="min-h-24 border-slate-300 focus:ring-blue-500 bg-slate-50"
-                />
-              </div>
-
-              <Separator className="bg-slate-200" />
-
-              {/* User-facing Message */}
-              <div className="space-y-2">
-                <Label htmlFor="user-message" className="text-slate-700 font-medium">
-                  User-Facing Message * {userMessage.length > 0 && <span className="text-xs text-slate-500">({userMessage.length} characters)</span>}
-                </Label>
-                <Textarea
-                  id="user-message"
-                  placeholder="Message the user will receive..."
-                  value={userMessage}
-                  onChange={(e) => setUserMessage(e.target.value)}
-                  className="min-h-32 border-slate-300 focus:ring-blue-500"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Template Section */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <Clock className="w-5 h-5" />
-                Quick Templates
-              </CardTitle>
-              <CardDescription>Auto-fill fields with predefined templates</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {templates.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {templates.map((template) => (
-                    <Button
-                      key={template.id}
-                      variant="outline"
-                      onClick={() => handleSelectTemplate(template.id)}
-                      className={cn(
-                        'justify-start text-left h-auto p-3 hover:bg-blue-50 border-slate-300',
-                        templateUsed === template.id && 'bg-blue-100 border-blue-300'
-                      )}
-                    >
-                      <div>
-                        <div className="font-medium text-slate-900">{template.name}</div>
-                        <div className="text-xs text-slate-500">{template.category}</div>
-                      </div>
-                    </Button>
-                  ))}
+                {/* Title */}
+                <div className="space-y-2">
+                  <Label className="text-white font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    Ticket Title
+                    <span className="text-red-400">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="Brief description of the issue..."
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="bg-white/5 border-orange-400/30 text-white placeholder:text-orange-400 focus:border-orange-400 focus:ring-orange-500/20"
+                  />
                 </div>
-              ) : (
-                <p className="text-slate-500 text-sm">No templates available</p>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 justify-end sticky bottom-0 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin/tickets')}
-              className="border-slate-300 text-slate-700 hover:bg-slate-100"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={submitting || !selectedUser || !title}
-              className="bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Create Ticket
-                </>
-              )}
-            </Button>
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label className="text-white font-semibold">Description</Label>
+                  <Textarea
+                    placeholder="Additional details about the issue..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="min-h-24 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-400 focus:border-orange-400 focus:ring-orange-500/20 resize-none"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Messages Section */}
+            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl hover:shadow-orange-500/10 transition-all duration-300">
+              <CardHeader className="pb-4 border-b border-white/10">
+                <CardTitle className="flex items-center gap-3 text-white">
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <Mail className="w-5 h-5 text-green-400" />
+                  </div>
+                  Messages & Communication
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5 pt-6">
+                {/* Internal Note */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-orange-400" />
+                    <Label className="text-white font-semibold">Internal Note</Label>
+                    <Badge variant="secondary" className="bg-orange-500/20 text-orange-300 border-0">Admin Only</Badge>
+                  </div>
+                  <Textarea
+                    placeholder="Private notes - not visible to the user..."
+                    value={internalNotes}
+                    onChange={(e) => setInternalNotes(e.target.value)}
+                    className="min-h-24 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 resize-none"
+                  />
+                </div>
+
+                <Separator className="bg-white/10" />
+
+                {/* User-facing Message */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-white font-semibold flex items-center gap-2">
+                      <Send className="w-4 h-4 text-green-400" />
+                      User-Facing Message
+                      <span className="text-red-400">*</span>
+                    </Label>
+                    {userMessage.length > 0 && (
+                      <span className="text-xs text-orange-300">
+                        {userMessage.length} / 1000 characters
+                      </span>
+                    )}
+                  </div>
+                  <Textarea
+                    placeholder="This message will be sent to the user via email..."
+                    value={userMessage}
+                    onChange={(e) => setUserMessage(e.target.value)}
+                    maxLength={1000}
+                    className="min-h-32 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 resize-none"
+                  />
+                  <p className="text-xs text-orange-300">This message will be included in the notification email.</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+
+          {/* Sidebar - Right Side (1/3) */}
+          <div className="space-y-6">
+            {/* Context Attachments */}
+            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl">
+              <CardHeader className="pb-4 border-b border-white/10">
+                <CardTitle className="flex items-center gap-3 text-white text-base">
+                  <Link2 className="w-4 h-4 text-cyan-400" />
+                  Attachments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-6">
+                {/* Attach Payment */}
+                <div className="space-y-2">
+                  <Label className="text-white font-semibold text-sm">Payment</Label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-400" />
+                    <Input
+                      type="text"
+                      placeholder="Transaction ID..."
+                      value={paymentSearch}
+                      onChange={(e) => {
+                        setPaymentSearch(e.target.value);
+                        setShowPaymentDropdown(true);
+                      }}
+                      onFocus={() => setShowPaymentDropdown(true)}
+                      className="pl-10 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 text-sm"
+                    />
+
+                    {showPaymentDropdown && paymentResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-orange-400/30 rounded-lg shadow-xl z-40 overflow-hidden">
+                        {paymentResults.map((result) => (
+                          <button
+                            key={result.id}
+                            onClick={() => handleAddPayment(result)}
+                            className="w-full text-left px-3 py-2 hover:bg-orange-500/20 border-b border-orange-400/10 last:border-0 transition-colors text-sm"
+                          >
+                            <div className="font-medium text-white">{result.transaction_id}</div>
+                            <div className="text-xs text-orange-300">₦{(result.amount / 100).toLocaleString()}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Attach Content */}
+                <div className="space-y-2">
+                  <Label className="text-white font-semibold text-sm">Content</Label>
+                  <div className="relative">
+                    <Play className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-400" />
+                    <Input
+                      type="text"
+                      placeholder="Movie or show..."
+                      value={contentSearch}
+                      onChange={(e) => {
+                        setContentSearch(e.target.value);
+                        setShowContentDropdown(true);
+                      }}
+                      onFocus={() => setShowContentDropdown(true)}
+                      className="pl-10 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 text-sm"
+                    />
+
+                    {showContentDropdown && contentResults.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-orange-400/30 rounded-lg shadow-xl z-40 overflow-hidden">
+                        {contentResults.map((result) => (
+                          <button
+                            key={result.id}
+                            onClick={() => handleAddContent(result)}
+                            className="w-full text-left px-3 py-2 hover:bg-orange-500/20 border-b border-orange-400/10 last:border-0 transition-colors text-sm"
+                          >
+                            <div className="font-medium text-white flex items-center gap-2">
+                              {result.type === 'movie' ? '🎬' : '📺'} {result.title}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Attached Items */}
+                {attachedItems.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-white/10">
+                    <p className="text-white font-semibold text-sm">Attached</p>
+                    <div className="space-y-1.5">
+                      {attachedItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between bg-orange-500/10 border border-orange-400/30 rounded-lg px-3 py-2 group hover:bg-orange-500/20 transition-all"
+                        >
+                          <span className="text-xs text-orange-200">{item.title}</span>
+                          <button
+                            onClick={() => handleRemoveAttachment(item.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3 text-orange-400 hover:text-orange-300" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* System Logs */}
+                <div className="pt-2 border-t border-white/10">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                    <Switch
+                      checked={includeSystemLogs}
+                      onCheckedChange={setIncludeSystemLogs}
+                      id="system-logs"
+                      className="data-[state=checked]:bg-purple-600"
+                    />
+                    <Label htmlFor="system-logs" className="text-white text-sm font-medium cursor-pointer flex-1">
+                      Include System Logs
+                    </Label>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Templates */}
+            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl">
+              <CardHeader className="pb-4 border-b border-white/10">
+                <CardTitle className="flex items-center gap-3 text-white text-base">
+                  <Clock className="w-4 h-4 text-pink-400" />
+                  Templates
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-6">
+                {templates.length > 0 ? (
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <Button
+                        key={template.id}
+                        variant="outline"
+                        onClick={() => handleSelectTemplate(template.id)}
+                        className={cn(
+                          'justify-start text-left w-full h-auto p-3 transition-all text-sm',
+                          templateUsed === template.id
+                            ? 'bg-gradient-to-r from-orange-500/30 to-orange-600/30 border-orange-400/50 text-white'
+                            : 'bg-white/5 border-orange-400/30 text-orange-200 hover:bg-white/10 hover:border-orange-400/50'
+                        )}
+                      >
+                        <div className="text-left">
+                          <div className="font-medium">{template.title}</div>
+                          <div className="text-xs opacity-75">{template.category}</div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-purple-300 text-sm text-center py-4">No templates available</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Status Card */}
+            <Card className="border-0 bg-gradient-to-br from-orange-500/20 to-orange-600/20 backdrop-blur-xl shadow-2xl border border-orange-400/30">
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-5 h-5 text-orange-400" />
+                    <span className="text-white font-semibold">Ready to Create?</span>
+                  </div>
+                  <div className="space-y-1.5 text-sm text-orange-200">
+                    <div className={selectedUser ? 'flex items-center gap-2 text-orange-300' : 'opacity-50'}>
+                      <Check className="w-3.5 h-3.5" />
+                      User selected
+                    </div>
+                    <div className={title ? 'flex items-center gap-2 text-orange-300' : 'opacity-50'}>
+                      <Check className="w-3.5 h-3.5" />
+                      Title filled
+                    </div>
+                    <div className={userMessage ? 'flex items-center gap-2 text-orange-300' : 'opacity-50'}>
+                      <Check className="w-3.5 h-3.5" />
+                      Message ready
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Action Buttons - Sticky Footer */}
+        <div className="sticky bottom-0 flex gap-3 justify-end bg-gradient-to-t from-black to-transparent p-6 -mx-4 px-4">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/admin/tickets')}
+            className="border-orange-400/30 text-orange-200 hover:bg-white/10 hover:border-orange-400/50"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || !selectedUser || !title || !userMessage}
+            className="bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-2" />
+                Create Ticket
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
       {/* Duplicate Alert */}
       <AlertDialog open={duplicateCheckAlert} onOpenChange={setDuplicateCheckAlert}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-slate-900 border-orange-400/30">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-slate-900">
-              <AlertCircle className="w-5 h-5 text-yellow-600" />
-              Potential Duplicate Ticket
+            <AlertDialogTitle className="flex items-center gap-2 text-white">
+              <AlertCircle className="w-5 h-5 text-yellow-400" />
+              Duplicate Warning
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600">
+            <AlertDialogDescription className="text-orange-200">
               A ticket with the title "{title}" is already open for this user ({existingTicket}). Do you want to create anyway?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-slate-300">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-orange-400/30 text-orange-200 hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setDuplicateCheckAlert(false);
                 createTicket();
               }}
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              className="bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800"
             >
               Create Anyway
             </AlertDialogAction>
