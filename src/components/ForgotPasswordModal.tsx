@@ -33,12 +33,25 @@ export const ForgotPasswordModal = ({ isOpen, onClose }: ForgotPasswordModalProp
       const { error } = await resetPassword(email);
 
       if (error) {
-        // Don't expose whether email exists (security best practice)
-        // but handle specific errors
+        console.error('Reset password error:', error);
+        
+        // Handle different error types
         if (error.message?.includes('rate')) {
           toast({
             title: 'Too Many Attempts',
             description: 'Please wait a few minutes before trying again.',
+            variant: 'destructive',
+          });
+        } else if (error.code === 'unexpected_failure' || error.message?.includes('sending') || error.message?.includes('email')) {
+          toast({
+            title: 'Email Service Error',
+            description: 'We\'re having trouble sending emails right now. Please try again in a few moments.',
+            variant: 'destructive',
+          });
+        } else if (error.message?.includes('invalid') || error.message?.includes('format')) {
+          toast({
+            title: 'Invalid Email',
+            description: 'Please check that your email address is correct.',
             variant: 'destructive',
           });
         } else {
@@ -60,6 +73,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose }: ForgotPasswordModalProp
         return () => clearTimeout(timer);
       }
     } catch (error: any) {
+      console.error('Unexpected error:', error);
       toast({
         title: 'Error',
         description: error.message || 'An unexpected error occurred.',
