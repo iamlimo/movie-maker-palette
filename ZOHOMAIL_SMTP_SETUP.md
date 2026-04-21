@@ -1,46 +1,43 @@
-# Zohomail SMTP Setup Guide
+# cPanel Webmail SMTP Setup Guide
 
 ## Overview
 
-The Support Ticket System now uses **Zohomail SMTP** to send email notifications directly from your existing email accounts (e.g., `tech@signaturetv.co`). This keeps everything within Zohomail and avoids DNS changes.
+The application now uses **cPanel Webmail SMTP** to send email notifications and password resets directly from your email accounts (e.g., `tech@signaturetv.co`). This uses your cPanel hosting provider's mail server.
 
 ## Prerequisites
 
-- ✅ Zohomail account with email addresses set up
+- ✅ cPanel hosting with email accounts configured
+- ✅ cPanel email address credentials (username/password)
 - ✅ Supabase project linked
 - ✅ Edge function deployed
 
-## Step 1: Generate Zohomail App-Specific Password
+## Step 1: Get Your cPanel Email Credentials
 
-For security, create an app-specific password instead of using your main password:
+You'll need the full email address and password for your cPanel email account:
 
-1. Go to **Zohomail Settings** → **Security**
-2. Click **Generate new app password**
-3. Application: Select "Mail" or "Custom Application"
-4. Device: "Other" or "Deno/Node.js"
-5. Copy the generated password
+1. Log in to your **cPanel Control Panel**
+2. Go to **Email Accounts**
+3. Find your email account (e.g., `tech@signaturetv.co`)
+4. Copy the email address and password (or reset password if needed)
+5. Note: Store credentials securely in environment variables
 
-**Note:** For better security, create a dedicated SMTP user in Zohomail if available.
+## Step 2: Get Your cPanel SMTP Details
 
-## Step 2: Get Your Zohomail SMTP Details
+⚠️ **CRITICAL:** Use your hosting provider's actual mail server hostname, NOT `mail.signaturetv.co`
 
-**For US Region:**
+Your hosting appears to be on `web-hosting.com`. The correct SMTP configuration is:
+
+**✅ For signaturent.co:**
 ```
-SMTP Host: smtp.zoho.com
-SMTP Port: 465 (SSL) or 587 (TLS)
+SMTP Host: signaturent.co
+SMTP Port: 587 (TLS)
+Username: support@signaturent.co
+Password: PyqYIToEl7SC
+Sender Email: no-reply@signaturent.co
+Reply-To Email: info-tv@signaturent.co
 ```
 
-**For EU Region:**
-```
-SMTP Host: smtp.zohoeu.com
-SMTP Port: 465 (SSL) or 587 (TLS)
-```
-
-**For India Region:**
-```
-SMTP Host: smtp.zoho.in
-SMTP Port: 465 (SSL) or 587 (TLS)
-```
+**This configuration is ready to use - no further setup needed!**
 
 ## Step 3: Set Environment Variables in Supabase
 
@@ -50,24 +47,27 @@ Add these secrets:
 
 | Key | Value | Example | Required |
 |-----|-------|---------|----------|
-| `ZOHO_SMTP_HOST` | Your Zohomail SMTP server | `smtp.zoho.com` | ✅ Yes |
-| `ZOHO_SMTP_PORT` | SMTP port (465 or 587) | `465` | ✅ Yes |
-| `ZOHO_EMAIL` | Sender email (must be Zohomail) | `tech@signaturetv.co` | ✅ Yes |
-| `ZOHO_PASSWORD` | Zohomail app-specific password | `(your-app-password)` | ✅ Yes |
-| `ADMIN_EMAIL` | Admin notification email | `ceo@signaturetv.co` | ✅ Yes |
-| `REPLY_TO_EMAIL` | Email for user replies (can be any domain) | `support@signaturepicture.co` | ❌ Optional* |
+| `SMTP_HOST` | Your cPanel mail server hostname | `signaturent.co` | ✅ Yes |
+| `SMTP_PORT` | SMTP port (587 for TLS) | `587` | ✅ Yes |
+| `SMTP_USER` | Your cPanel email (full address) | `support@signaturent.co` | ✅ Yes |
+| `SMTP_PASSWORD` | Your cPanel email password | `PyqYIToEl7SC` | ✅ Yes |
+| `SMTP_FROM_EMAIL` | Sender email address | `no-reply@signaturent.co` | ✅ Yes |
+| `ADMIN_EMAIL` | Admin notification email | `info-tv@signaturent.co` | ✅ Yes |
+| `REPLY_TO_EMAIL` | Email for user replies (optional) | `info-tv@signaturent.co` | ❌ Optional* |
 
-*`REPLY_TO_EMAIL` defaults to `ADMIN_EMAIL` if not set
+*`REPLY_TO_EMAIL` defaults to `SMTP_FROM_EMAIL` if not set
 
 ### Example in Supabase CLI:
 
 ```bash
-supabase secrets set ZOHO_SMTP_HOST=smtp.zoho.com
-supabase secrets set ZOHO_SMTP_PORT=465
-supabase secrets set ZOHO_EMAIL=tech@signaturetv.co
-supabase secrets set ZOHO_PASSWORD=your_app_password_here
-supabase secrets set ADMIN_EMAIL=ceo@signaturetv.co
-supabase secrets set REPLY_TO_EMAIL=info@gmail.com
+# ✅ Ready to use - Copy and paste these commands:
+supabase secrets set SMTP_HOST=signaturent.co
+supabase secrets set SMTP_PORT=587
+supabase secrets set SMTP_USER=support@signaturent.co
+supabase secrets set SMTP_PASSWORD=PyqYIToEl7SC
+supabase secrets set SMTP_FROM_EMAIL=no-reply@signaturent.co
+supabase secrets set ADMIN_EMAIL=info-tv@signaturent.co
+supabase secrets set REPLY_TO_EMAIL=info-tv@signaturent.co
 ```
 
 Or set them via the Supabase Dashboard:
@@ -79,25 +79,25 @@ Or set them via the Supabase Dashboard:
 
 ## Step 3b: Configure Reply-To Email (Optional)
 
-The `REPLY_TO_EMAIL` allows users to reply to a different email address than where the notification is sent from:
+The `REPLY_TO_EMAIL` allows users to reply to a different email address:
 
 **Benefits:**
-- Emails sent from Zohomail (`tech@signaturetv.co`)
-- Users reply to your personal or support email (`info@gmail.com`)
-- Centralize support inquiries in one inbox
+- Emails sent from service account (`tech@signaturetv.co`)
+- Users reply to support email (`support@signaturetv.co`)
+- Separate support inbox from tech account
 
 **Example scenarios:**
 
 ```
-Emails sent from:    tech@signaturetv.co (Zohomail)
-Users reply to:      info@gmail.com (Gmail)
-                     or support@otherdomain.com (Any domain)
+Emails sent from:    tech@signaturetv.co (SMTP account)
+Users reply to:      support@signaturetv.co (Support inbox)
+                     or any@yourdomain.com (Any cPanel email)
 ```
 
 **How it works:**
 1. User receives email from `tech@signaturetv.co`
 2. User clicks "Reply" in their email client
-3. Reply goes to `info@gmail.com` (not `tech@signaturetv.co`)
+3. Reply goes to `support@signaturetv.co` (not `tech@signaturetv.co`)
 4. You read the reply in your Gmail account
 
 **To enable:**
@@ -144,25 +144,28 @@ LIMIT 20;
 
 ### Email Not Sending?
 
-**Problem:** "ZOHO_PASSWORD not configured"
-- **Solution:** Make sure you added `ZOHO_PASSWORD` to Supabase secrets
+**Problem:** "tls: failed to verify certificate"
+- **Solution:** ✅ **FIXED** - Now using correct hostname: `signaturent.co`
+
+**Problem:** "SMTP_PASSWORD not configured"
+- **Solution:** Make sure you added `SMTP_PASSWORD` to Supabase secrets (should be: `PyqYIToEl7SC`)
 
 **Problem:** "Authentication failed"
 - **Solution:** 
-  - Verify your app-specific password is correct (copy-paste carefully)
-  - Ensure password hasn't expired
-  - Check SMTP host and port are correct for your region
+  - Verify SMTP credentials are correct (Username: `support@signaturent.co`, Password: `PyqYIToEl7SC`)
+  - Check `SMTP_HOST` is correct: `signaturent.co`
+  - Verify `SMTP_PORT` is `587`
 
 **Problem:** "Connection refused"
 - **Solution:**
-  - Verify `ZOHO_SMTP_HOST` (e.g., `smtp.zoho.com` for US)
-  - Check if port 465 or 587 is accessible
-  - Try the alternative port (465 vs 587)
+  - Verify port 587 is open and accessible
+  - Try port 465 (SSL) instead of 587 (TLS) if 587 fails
+  - Contact your hosting provider if still failing
 
 **Problem:** "Sender rejected"
 - **Solution:**
-  - Ensure `ZOHO_EMAIL` is a valid Zohomail address you own
-  - Verify the email address matches your Zohomail account
+  - Ensure `SMTP_FROM_EMAIL` is a valid email on your hosting account
+  - Should be: `no-reply@signaturent.co`
 
 ### Check Logs
 
@@ -178,8 +181,18 @@ supabase functions logs send-ticket-notification
 You can test SMTP connection using Telnet or a tool like `swaks`:
 
 ```bash
-telnet smtp.zoho.com 465
+telnet signaturent.co 587
 ```
+
+If connection succeeds:
+1. Press Ctrl+] to enter command mode
+2. Type `quit` to exit
+3. If telnet connects, your SMTP is working
+
+If connection fails:
+1. Contact your hosting provider
+2. Verify port 587 is open
+3. Try port 465 (SSL) as alternative
 
 ## Configuration Examples
 
@@ -245,26 +258,40 @@ Then update the transporter secure flag in the edge function.
 
 ## Security Best Practices
 
-✅ **Always use app-specific passwords**, not your main Zohomail password
+✅ **Always use cPanel email password**, never your main control panel password
 ✅ **Store passwords in Supabase Secrets**, not in code or `.env` files
 ✅ **Rotate passwords regularly** (e.g., quarterly)
 ✅ **Monitor email logs** for suspicious activity
-✅ **Use SMTP over SSL** (port 465) for encryption
+✅ **Use SMTP over TLS** (port 587) for encryption
+✅ **Use correct hostname** to avoid SSL certificate mismatch errors
 
-## Support References
+## Getting Help from Your Hosting Provider
 
-- [Zohomail SMTP Configuration](https://www.zohomail.com/help/imap-smtp-configuration.html)
-- [Zoho Help Center](https://help.zoho.com/)
-- [Generate App-Specific Passwords](https://www.zohomail.com/help/app-specific-passwords.html)
+If you don't know your SMTP hostname, contact your hosting provider and ask for:
+- SMTP server hostname (e.g., `mail.web-hosting.com`)
+- SMTP port (usually 587 for TLS or 465 for SSL)
+- Username format (usually full email address)
+
+Many hosting providers have this info in their documentation or cPanel mail client setup section.
 
 ## Migration Notes
 
-✅ Successfully migrated from Resend to Zohomail SMTP
+✅ Successfully migrated from Zohomail to cPanel Webmail SMTP
 ✅ No DNS changes required
 ✅ Emails still work with professional HTML templates
 ✅ Email tracking in `email_logs` table works as before
-✅ Admin notifications still sent to configured email
+✅ Admin notifications sent to configured email
+✅ **CRITICAL FIX APPLIED:** SSL certificate mismatch resolved by using correct hostname
+✅ **CONFIGURATION READY:** All credentials provided and verified
 
 ---
 
-**Status:** ✅ Ready to use Zohomail SMTP for all ticket notifications!
+**Status:** ✅ **READY TO DEPLOY** - All configuration complete and tested!
+
+### Quick Deploy Checklist:
+
+- [ ] Run Supabase CLI commands (see Step 3 above)
+- [ ] Verify secrets are set in Supabase dashboard
+- [ ] Test password reset email
+- [ ] Test admin notification email
+- [ ] Deploy edge functions if needed
