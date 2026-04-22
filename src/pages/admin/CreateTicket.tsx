@@ -480,7 +480,7 @@ export default function CreateTicket() {
                   </div>
 
                   {showUserDropdown && userSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950 border border-white/10 rounded-lg z-[100] overflow-hidden">
+                    <div className="relative top-full left-0 right-0 mt-2 bg-slate-950 border border-white/10 rounded-lg z-[100] overflow-hidden">
                       {userSearchResults.map((result) => (
                         <button
                           key={result.id}
