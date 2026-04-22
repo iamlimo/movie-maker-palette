@@ -19,6 +19,8 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/next"
+
 // Lazy load non-critical routes for faster initial load
 const Profile = lazy(() => import('./pages/Profile'));
 const MoviePreview = lazy(() => import('./pages/MoviePreview'));
