@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useExtensionDetection } from '@/hooks/useExtensionDetection';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,12 +14,22 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, CheckCircle, AlertCircle, Shield } from 'lucide-react';
+import {
+  sanitizeInput,
+  validatePasswordStrength,
+  validateEmail,
+  generateCSRFToken,
+  RateLimiter,
+} from '@/lib/security';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
   const { updatePassword, session, verifyRecoveryToken } = useAuth();
   const { toast } = useToast();
+  
+  // Security detection
+  const { isSuspicious, extensions, warnings } = useExtensionDetection();
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -29,6 +40,11 @@ const ResetPassword = () => {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [isValidToken, setIsValidToken] = useState(false);
+  const [csrfToken] = useState(() => generateCSRFToken());
+  const [showSecurityWarning, setShowSecurityWarning] = useState(false);
+
+  // Rate limiter for password reset attempts
+  const [rateLimiter] = useState(() => new RateLimiter(5, 15 * 60 * 1000));
 
   // Check if user has valid session (came from reset email)
   useEffect(() => {
@@ -48,21 +64,33 @@ const ResetPassword = () => {
     return () => clearTimeout(checkSession);
   }, [session, verifyRecoveryToken]);
 
-  // Calculate password strength
+  // Monitor for extension interference
+  useEffect(() => {
+    if (isSuspicious && extensions.length > 0) {
+      setShowSecurityWarning(true);
+      toast({
+        title: '⚠️ Security Warning',
+        description: `Detected ${extensions.length} suspicious browser extension(s). This may interfere with your account security.`,
+        variant: 'destructive',
+      });
+      
+      console.error('🚨 Suspicious Extensions Detected:', extensions);
+    }
+
+    if (warnings.length > 0) {
+      console.warn('Security Warnings:', warnings);
+    }
+  }, [isSuspicious, extensions, warnings, toast]);
+
+  // Calculate password strength with security validation
   useEffect(() => {
     if (newPassword.length === 0) {
       setPasswordStrength(0);
       return;
     }
 
-    let strength = 0;
-    if (newPassword.length >= 8) strength += 25;
-    if (newPassword.length >= 12) strength += 25;
-    if (/[A-Z]/.test(newPassword)) strength += 25;
-    if (/[0-9]/.test(newPassword)) strength += 25;
-    if (/[^A-Za-z0-9]/.test(newPassword)) strength += 25;
-
-    setPasswordStrength(Math.min(strength, 100));
+    const { score } = validatePasswordStrength(newPassword);
+    setPasswordStrength(score);
   }, [newPassword]);
 
   // Redirect to login if session check failed
@@ -93,26 +121,47 @@ const ResetPassword = () => {
     e.preventDefault();
     setError(null);
 
-    // Validation
-    if (newPassword.length < 8) {
+    // Rate limiting check
+    const rateLimitKey = `password-reset-${session?.user?.id || 'unknown'}`;
+    if (!rateLimiter.isAllowed(rateLimitKey)) {
+      const remainingMs = rateLimiter.getRemainingTime(rateLimitKey);
+      const remainingMins = Math.ceil(remainingMs / 60000);
+      setError(`Too many attempts. Please try again in ${remainingMins} minutes.`);
+      return;
+    }
+
+    // Security: Sanitize input
+    const sanitizedPassword = sanitizeInput(newPassword);
+    const sanitizedConfirmPassword = sanitizeInput(confirmPassword);
+
+    // Validation with enhanced security
+    if (sanitizedPassword.length < 8) {
       setError('Password must be at least 8 characters long.');
       return;
     }
 
-    if (newPassword !== confirmPassword) {
+    if (sanitizedPassword !== sanitizedConfirmPassword) {
       setError('Passwords do not match. Please check and try again.');
       return;
     }
 
-    if (passwordStrength < 50) {
-      setError('Please create a stronger password.');
+    const { isValid: isStrongPassword, feedback } = validatePasswordStrength(sanitizedPassword);
+    if (!isStrongPassword) {
+      setError(`Password is not strong enough. ${feedback.join(' ')}`);
+      return;
+    }
+
+    // Verify CSRF token is present (simple check)
+    if (!csrfToken) {
+      setError('Security validation failed. Please refresh the page and try again.');
       return;
     }
 
     setLoading(true);
 
     try {
-      const { error: updateError } = await updatePassword(newPassword);
+      // Sanitize password before sending to server
+      const { error: updateError } = await updatePassword(sanitizedPassword);
 
       if (updateError) {
         // Handle specific error cases
@@ -126,6 +175,10 @@ const ResetPassword = () => {
           setError(errorMessage);
         }
       } else {
+        // Clear sensitive data from memory
+        setNewPassword('');
+        setConfirmPassword('');
+
         setSuccess(true);
         toast({
           title: 'Success!',
@@ -263,15 +316,31 @@ const ResetPassword = () => {
           ) : (
             <>
               <CardHeader>
-                <CardTitle className="text-2xl font-bold text-foreground">
-                  Create New Password
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Choose a strong password to secure your Signature TV account.
-                </CardDescription>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-foreground">
+                      Create New Password
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">
+                      Choose a strong password to secure your Signature TV account.
+                    </CardDescription>
+                  </div>
+                  {isSuspicious && (
+                    <Shield className="h-5 w-5 text-red-500 ml-2" />
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {isSuspicious && extensions.length > 0 && (
+                    <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        🚨 <strong>{extensions.length} suspicious browser extension(s) detected.</strong> This may interfere with your account security. Consider disabling them before proceeding.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {error && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />

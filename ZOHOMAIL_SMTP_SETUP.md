@@ -4,12 +4,15 @@
 
 The application now uses **cPanel Webmail SMTP** to send email notifications and password resets directly from your email accounts (e.g., `tech@signaturetv.co`). This uses your cPanel hosting provider's mail server.
 
+⚠️ **IMPORTANT:** To prevent emails from being marked as dangerous/spam, you MUST configure email authentication (SPF, DKIM, DMARC) - see **Step 4** below.
+
 ## Prerequisites
 
 - ✅ cPanel hosting with email accounts configured
 - ✅ cPanel email address credentials (username/password)
 - ✅ Supabase project linked
 - ✅ Edge function deployed
+- ✅ SPF/DKIM/DMARC records configured (see Step 4)
 
 ## Step 1: Get Your cPanel Email Credentials
 
@@ -107,13 +110,133 @@ supabase secrets set REPLY_TO_EMAIL=info@gmail.com
 
 If you don't set `REPLY_TO_EMAIL`, it defaults to your `ADMIN_EMAIL`.
 
-## Step 4: Deploy the Updated Edge Function
+## Step 4: Configure Email Authentication (SPF, DKIM, DMARC)
+
+⚠️ **IMPORTANT:** Without proper authentication, emails may be marked as spam or dangerous
+
+### What You Need to Do:
+
+Your hosting provider (cPanel) should have configured these automatically, but verify:
+
+#### In cPanel - Email Authentication:
+1. Log in to **cPanel**
+2. Go to **Email Authentication** or **Email Deliverability**
+3. Look for **SPF, DKIM, DMARC** records
+4. They should show as **✓ ENABLED**
+
+#### If Not Enabled, Add These DNS Records:
+
+**1. SPF Record** (Add to DNS):
+```
+v=spf1 include:signaturent.co ~all
+```
+
+**2. DKIM Record** (Usually auto-configured in cPanel):
+- Go to cPanel → Email Authentication
+- Enable DKIM
+- Copy the DNS record provided
+
+**3. DMARC Record** (Add to DNS):
+```
+v=DMARC1; p=quarantine; rua=mailto:info-tv@signaturent.co
+```
+
+### Testing Email Authentication:
+
+1. **Send test email** to yourself
+2. **Check email headers** (look for):
+   - `SPF: PASS`
+   - `DKIM: PASS`
+   - `DMARC: PASS`
+
+3. **Use online tool:** https://mxtoolbox.com/spf.aspx
+   - Enter: `signaturent.co`
+   - Verify all records pass
+
+### If Email Still Marked as Dangerous:
+
+**Problem:** "This message might be dangerous"
+- **Causes:**
+  - SPF/DKIM/DMARC not properly configured
+  - Email content flagged as phishing
+  - Sender domain reputation is low
+  - Missing authentication headers
+
+- **Solutions:**
+  1. Verify all authentication records in cPanel are enabled
+  2. Check email content doesn't look like phishing
+  3. Make sure FROM address matches authenticated sender
+  4. Wait 24-48 hours for DNS records to propagate
+  5. Use professional email template (avoid suspicious links)
+  6. Test with different email providers (Gmail, Outlook, etc.)
+
+### Email Content Best Practices:
+
+✅ **DO:**
+- Use clear sender name: `Signature TV <no-reply@signaturent.co>`
+- Include company branding/logo
+- Add unsubscribe link (for marketing emails)
+- Use professional HTML template
+- Include company contact info
+
+❌ **DON'T:**
+- Use generic "no-reply" without branding
+- Include suspicious shortened URLs
+- Ask for passwords in emails
+- Use ALL CAPS for warnings
+- Include too many external links
+
+### Recommended Email Template Structure:
+
+```html
+<html>
+<body style="font-family: Arial, sans-serif;">
+  <table width="600" cellpadding="0" cellspacing="0">
+    <!-- Logo/Header -->
+    <tr>
+      <td style="background-color: #1a1a1a; padding: 20px;">
+        <img src="https://signaturetv.co/logo.png" alt="Signature TV" height="40">
+      </td>
+    </tr>
+    
+    <!-- Content -->
+    <tr>
+      <td style="padding: 30px; background-color: #f5f5f5;">
+        <h2>Reset Your Password</h2>
+        <p>Click the button below to reset your password:</p>
+        
+        <a href="[RESET_LINK]" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+          Reset Password
+        </a>
+        
+        <p style="font-size: 12px; color: #666; margin-top: 20px;">
+          This link expires in 24 hours.
+        </p>
+      </td>
+    </tr>
+    
+    <!-- Footer -->
+    <tr>
+      <td style="padding: 20px; background-color: #f5f5f5; border-top: 1px solid #ddd; font-size: 12px; color: #666;">
+        <p>Signature TV Support<br>
+        info-tv@signaturent.co<br>
+        https://signaturetv.co</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+```
+
+## Step 5: Deploy Edge Functions and Test
+
+### Deploy the Updated Edge Function
 
 ```bash
 supabase functions deploy send-ticket-notification
 ```
 
-## Step 5: Test Email Sending
+### Step 6: Test Email Sending
 
 Create a test ticket through the admin dashboard at `/admin/tickets/create`:
 
@@ -143,6 +266,15 @@ LIMIT 20;
 ## Troubleshooting
 
 ### Email Not Sending?
+
+**Problem:** "This message might be dangerous" - Email flagged as suspicious
+- **Solution:** ⚠️ **Email Authentication Required**
+  - Ensure SPF, DKIM, DMARC records are properly configured (see Step 4)
+  - Check all authentication records pass validation at https://mxtoolbox.com/spf.aspx
+  - Verify email content doesn't look like phishing (no shortened URLs, clear sender)
+  - Use professional email template with company branding
+  - Wait 24-48 hours for DNS changes to propagate
+  - Test with multiple email providers (Gmail, Outlook, Yahoo)
 
 **Problem:** "tls: failed to verify certificate"
 - **Solution:** ✅ **FIXED** - Now using correct hostname: `signaturent.co`

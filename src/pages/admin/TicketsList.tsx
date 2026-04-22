@@ -15,17 +15,17 @@ import { cn } from '@/lib/utils';
 import type { Ticket, TicketStatus, TicketPriority, TicketCategory } from '@/types/ticket';
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
-  'Open': 'bg-blue-100 text-blue-800 border-blue-300',
-  'In Progress': 'bg-purple-100 text-purple-800 border-purple-300',
-  'Resolved': 'bg-green-100 text-green-800 border-green-300',
-  'Closed': 'bg-gray-100 text-gray-800 border-gray-300',
-  'On Hold': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  'Open': 'bg-white/10 text-white border-white/20',
+  'In Progress': 'bg-white/10 text-white border-white/20',
+  'Resolved': 'bg-white/10 text-white border-white/20',
+  'Closed': 'bg-white/10 text-white border-white/20',
+  'On Hold': 'bg-white/10 text-white border-white/20',
 };
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
-  'Low': 'bg-green-100 text-green-800 border-green-300',
-  'Medium': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  'High': 'bg-red-100 text-red-800 border-red-300',
+  'Low': 'bg-white/10 text-white border-white/20',
+  'Medium': 'bg-white/10 text-white border-white/20',
+  'High': 'bg-white/10 text-white border-white/20',
 };
 
 export default function TicketsList() {
@@ -72,7 +72,7 @@ export default function TicketsList() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTickets(data || []);
+      setTickets((data || []) as Ticket[]);
     } catch (err) {
       console.error('Error fetching tickets:', err);
       toast({
@@ -187,11 +187,11 @@ export default function TicketsList() {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h1 className="text-3xl font-bold text-white">Support Tickets</h1>
-            <p className="text-orange-200">Manage user and creator support tickets</p>
+            <p className="text-white/70">Manage user and creator support tickets</p>
           </div>
           <Button
             onClick={() => navigate('/admin/tickets/create')}
-            className="bg-orange-600 text-white hover:bg-orange-700 gap-2"
+            className="bg-white text-black hover:bg-white/90 gap-2"
           >
             <Plus className="w-4 h-4" />
             Create Ticket
@@ -199,24 +199,24 @@ export default function TicketsList() {
         </div>
 
         {/* Filters Card */}
-        <Card className="border-orange-400/30 shadow-sm bg-white/5 backdrop-blur-xl">
+        <Card className="border border-white/10 bg-black">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
               {/* Search */}
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/70" />
                 <Input
                   type="text"
                   placeholder="Search ticket number, title, or user ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-orange-400/30 bg-white/5 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20"
+                  className="pl-10 border-white/10 bg-white/5 text-white placeholder:text-white/50 focus:border-white/20 focus:ring-white/10"
                 />
               </div>
 
               {/* Status Filter */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px] border-orange-400/30 bg-white/5 text-white">
+                <SelectTrigger className="w-[180px] border-white/10 bg-white/5 text-white">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,7 +231,7 @@ export default function TicketsList() {
 
               {/* Priority Filter */}
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-[180px] border-orange-400/30 bg-white/5 text-white">
+                <SelectTrigger className="w-[180px] border-white/10 bg-white/5 text-white">
                   <SelectValue placeholder="All Priorities" />
                 </SelectTrigger>
                 <SelectContent>
@@ -244,7 +244,7 @@ export default function TicketsList() {
 
               {/* Category Filter */}
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[200px] border-orange-400/30 bg-white/5 text-white">
+                <SelectTrigger className="w-[200px] border-white/10 bg-white/5 text-white">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,23 +261,23 @@ export default function TicketsList() {
         </Card>
 
         {/* Tickets Table */}
-        <Card className="border-orange-400/30 shadow-sm overflow-hidden bg-white/5 backdrop-blur-xl border">
+        <Card className="border border-white/10 overflow-hidden bg-black">
           {loading ? (
             <div className="flex items-center justify-center p-12">
-              <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+              <Loader2 className="w-8 h-8 text-white/70 animate-spin" />
             </div>
           ) : filteredTickets.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 text-center">
-              <AlertCircle className="w-12 h-12 text-orange-300 mb-4" />
-              <h3 className="text-lg font-medium text-orange-100 mb-1">No tickets found</h3>
-              <p className="text-orange-200 mb-6">
+              <AlertCircle className="w-12 h-12 text-white/50 mb-4" />
+              <h3 className="text-lg font-medium text-white/70 mb-1">No tickets found</h3>
+              <p className="text-white/50 mb-6">
                 {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all'
                   ? 'Try adjusting your filters'
                   : 'Create your first ticket to get started'}
               </p>
               <Button
                 onClick={() => navigate('/admin/tickets/create')}
-                className="bg-orange-600 text-white hover:bg-orange-700 gap-2"
+                className="bg-white text-black hover:bg-white/90 gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Create Ticket
@@ -287,30 +287,33 @@ export default function TicketsList() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-b border-orange-400/30 bg-orange-500/10">
-                    <TableHead className="text-orange-300 font-semibold">Ticket</TableHead>
-                    <TableHead className="text-orange-300 font-semibold">Title</TableHead>
-                    <TableHead className="text-orange-300 font-semibold">Category</TableHead>
-                    <TableHead className="text-orange-300 font-semibold">Priority</TableHead>
-                    <TableHead className="text-orange-300 font-semibold">Status</TableHead>
-                    <TableHead className="text-orange-300 font-semibold">Created</TableHead>
-                    <TableHead className="text-orange-300 font-semibold text-right">Actions</TableHead>
+                  <TableRow className="border-b border-white/10 bg-white/5">
+                    <TableHead className="text-white/70 font-semibold">Ticket</TableHead>
+                    <TableHead className="text-white/70 font-semibold">Title</TableHead>
+                    <TableHead className="text-white/70 font-semibold">Category</TableHead>
+                    <TableHead className="text-white/70 font-semibold">Priority</TableHead>
+                    <TableHead className="text-white/70 font-semibold">Status</TableHead>
+                    <TableHead className="text-white/70 font-semibold">Created</TableHead>
+                    <TableHead className="text-white/70 font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTickets.map((ticket) => (
-                    <TableRow key={ticket.id} className="border-b border-orange-400/20 hover:bg-orange-500/10 transition-colors">
-                      <TableCell className="font-mono text-sm text-orange-400 font-medium">
+                    <TableRow key={ticket.id} className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                      <TableCell className="font-mono text-sm text-white/70 font-medium">
                         {ticket.ticket_number}
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-xs">
-                          <div className="font-medium text-white truncate">{ticket.title}</div>
-                          <div className="text-xs text-orange-300">{ticket.user_type}</div>
-                        </div>
+                        <button
+                          onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                          className="max-w-xs hover:opacity-80 transition-opacity cursor-pointer text-left"
+                        >
+                          <div className="font-medium text-white truncate hover:text-white/80">{ticket.title}</div>
+                          <div className="text-xs text-white/50">{ticket.user_type}</div>
+                        </button>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs text-white border-orange-400/30 bg-orange-500/10">
+                        <Badge variant="outline" className="text-xs text-white/70 border-white/10 bg-white/5">
                           {ticket.category}
                         </Badge>
                       </TableCell>
@@ -351,8 +354,9 @@ export default function TicketsList() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-orange-400" />
-                          {getTimeAgo(ticket.created_at)}</div>
+                          <Clock className="w-3 h-3 text-white/50" />
+                          <span className="text-white/70">{getTimeAgo(ticket.created_at)}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -407,36 +411,36 @@ export default function TicketsList() {
         {/* Stats */}
         {filteredTickets.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="border-orange-400/30 shadow-sm bg-white/5 backdrop-blur-xl border">
+            <Card className="border border-white/10 bg-white/5">
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-orange-400">
+                <div className="text-3xl font-bold text-white/70">
                   {filteredTickets.filter(t => t.status === 'Open').length}
                 </div>
-                <p className="text-sm text-orange-200 mt-1">Open Tickets</p>
+                <p className="text-sm text-white/50 mt-1">Open Tickets</p>
               </CardContent>
             </Card>
-            <Card className="border-orange-400/30 shadow-sm bg-white/5 backdrop-blur-xl border">
+            <Card className="border border-white/10 bg-white/5">
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-orange-400">
+                <div className="text-3xl font-bold text-white/70">
                   {filteredTickets.filter(t => t.priority === 'High').length}
                 </div>
-                <p className="text-sm text-orange-200 mt-1">High Priority</p>
+                <p className="text-sm text-white/50 mt-1">High Priority</p>
               </CardContent>
             </Card>
-            <Card className="border-orange-400/30 shadow-sm bg-white/5 backdrop-blur-xl border">
+            <Card className="border border-white/10 bg-white/5">
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-orange-400">
+                <div className="text-3xl font-bold text-white/70">
                   {filteredTickets.filter(t => t.status === 'Resolved').length}
                 </div>
-                <p className="text-sm text-orange-200 mt-1">Resolved</p>
+                <p className="text-sm text-white/50 mt-1">Resolved</p>
               </CardContent>
             </Card>
-            <Card className="border-orange-400/30 shadow-sm bg-white/5 backdrop-blur-xl border">
+            <Card className="border border-white/10 bg-white/5">
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-orange-400">
+                <div className="text-3xl font-bold text-white/70">
                   {filteredTickets.length}
                 </div>
-                <p className="text-sm text-orange-200 mt-1">Total Tickets</p>
+                <p className="text-sm text-white/50 mt-1">Total Tickets</p>
               </CardContent>
             </Card>
           </div>
@@ -445,19 +449,19 @@ export default function TicketsList() {
 
       {/* Delete Alert Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="bg-slate-900 border-orange-400/30">
+        <AlertDialogContent className="bg-black border border-white/10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-orange-300">Delete Ticket</AlertDialogTitle>
-            <AlertDialogDescription className="text-orange-200">
+            <AlertDialogTitle className="text-white/70">Delete Ticket</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/50">
               Are you sure you want to delete ticket {ticketToDelete?.ticket_number}? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-orange-400/30 text-orange-200 hover:bg-orange-500/10">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-white/10 text-white/70 hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteTicket}
               disabled={deleting}
-              className="bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
+              className="bg-white text-black hover:bg-white/90 disabled:opacity-50"
             >
               {deleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
