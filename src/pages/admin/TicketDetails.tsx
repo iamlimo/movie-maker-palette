@@ -14,17 +14,17 @@ import { cn } from '@/lib/utils';
 import type { Ticket, TicketComment, TicketStatus } from '@/types/ticket';
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
-  'Open': 'bg-orange-500/20 text-orange-200 border-orange-400/50',
-  'In Progress': 'bg-blue-500/20 text-blue-200 border-blue-400/50',
-  'Resolved': 'bg-green-500/20 text-green-200 border-green-400/50',
-  'Closed': 'bg-gray-500/20 text-gray-200 border-gray-400/50',
-  'On Hold': 'bg-yellow-500/20 text-yellow-200 border-yellow-400/50',
+  'Open': 'bg-white/10 text-white border-white/20',
+  'In Progress': 'bg-white/10 text-white border-white/20',
+  'Resolved': 'bg-white/10 text-white border-white/20',
+  'Closed': 'bg-white/10 text-white border-white/20',
+  'On Hold': 'bg-white/10 text-white border-white/20',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-  'Low': 'bg-green-500/20 text-green-200 border-green-400/50',
-  'Medium': 'bg-orange-500/20 text-orange-200 border-orange-400/50',
-  'High': 'bg-red-500/20 text-red-200 border-red-400/50',
+  'Low': 'bg-white/10 text-white border-white/20',
+  'Medium': 'bg-white/10 text-white border-white/20',
+  'High': 'bg-white/10 text-white border-white/20',
 };
 
 export default function TicketDetails() {
@@ -42,6 +42,7 @@ export default function TicketDetails() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingAssignee, setUpdatingAssignee] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     if (ticketId) {
@@ -51,28 +52,34 @@ export default function TicketDetails() {
     }
   }, [ticketId]);
 
-  const fetchTicket = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tickets')
-        .select('*')
-        .eq('id', ticketId)
+const fetchTicket = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    if (error) throw error;
+
+    setTicket(data);
+
+    // 👇 fetch user after
+    if (data?.user_id) {
+      const { data: user } = await supabase
+        .from('profiles')
+        .select('name, email')
+        .eq('user_id', data.user_id)
         .single();
 
-      if (error) throw error;
-      setTicket(data);
-    } catch (err) {
-      console.error('Error fetching ticket:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to fetch ticket details.',
-      });
-    } finally {
-      setLoading(false);
+      setUserProfile(user);
     }
-  };
-
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
   const fetchComments = async () => {
     try {
       const { data, error } = await supabase
@@ -167,35 +174,35 @@ export default function TicketDetails() {
     }
   };
 
-  const handleAssigneeChange = async (userId: string) => {
-    if (!ticket) return;
+ const handleAssigneeChange = async (userId: string | null) => {
+  if (!ticket) return;
 
-    setUpdatingAssignee(true);
-    try {
-      const { error } = await supabase
-        .from('tickets')
-        .update({ assigned_to: userId || null })
-        .eq('id', ticket.id);
+  setUpdatingAssignee(true);
+  try {
+    const { error } = await supabase
+      .from('tickets')
+      .update({ assigned_to: userId })
+      .eq('id', ticket.id);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      setTicket({ ...ticket, assigned_to: userId || undefined });
+    setTicket({ ...ticket, assigned_to: userId || undefined });
 
-      toast({
-        title: 'Success',
-        description: 'Assignee updated successfully.',
-      });
-    } catch (err: any) {
-      console.error('Error updating assignee:', err);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: err.message || 'Failed to update assignee.',
-      });
-    } finally {
-      setUpdatingAssignee(false);
-    }
-  };
+    toast({
+      title: 'Success',
+      description: 'Assignee updated successfully.',
+    });
+  } catch (err: any) {
+    console.error('Error updating assignee:', err);
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: err.message || 'Failed to update assignee.',
+    });
+  } finally {
+    setUpdatingAssignee(false);
+  }
+};
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-NG', {
@@ -264,10 +271,10 @@ export default function TicketDetails() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Ticket Details Card */}
-            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
+            <Card className="border border-white/10 bg-black">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <FileText className="w-5 h-5" />
+                  <FileText className="w-5 h-5 text-white/70" />
                   Ticket Information
                 </CardTitle>
               </CardHeader>
@@ -275,78 +282,78 @@ export default function TicketDetails() {
                 {ticket.description && (
                   <>
                     <div>
-                      <h3 className="font-medium text-orange-300 mb-2">Description</h3>
-                      <p className="text-orange-200/70 whitespace-pre-wrap">{ticket.description}</p>
+                      <h3 className="font-medium text-white/70 mb-2">Description</h3>
+                      <p className="text-white/60 whitespace-pre-wrap">{ticket.description}</p>
                     </div>
-                    <Separator className="bg-orange-400/20" />
+                    <Separator className="bg-white/10" />
                   </>
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-orange-400">Category</p>
-                    <Badge variant="outline">{ticket.category}</Badge>
+                    <p className="text-sm text-white/50">Category</p>
+                    <Badge variant="outline" className="text-white/70 border-white/20 bg-white/5">{ticket.category}</Badge>
                   </div>
                   <div>
-                    <p className="text-sm text-orange-400">User Type</p>
-                    <Badge variant="outline">{ticket.user_type}</Badge>
+                    <p className="text-sm text-white/50">User Type</p>
+                    <Badge variant="outline" className="text-white/70 border-white/20 bg-white/5">{ticket.user_type}</Badge>
                   </div>
                   <div>
-                    <p className="text-sm text-orange-400">Created</p>
-                    <p className="text-sm font-medium text-orange-100">{formatDate(ticket.created_at)}</p>
+                    <p className="text-sm text-white/50">Created</p>
+                    <p className="text-sm font-medium text-white/70">{formatDate(ticket.created_at)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-orange-400">User ID</p>
-                    <p className="text-xs font-mono text-orange-300/70">{ticket.user_id.slice(0, 8)}...</p>
+                    <p className="text-sm text-white/50">User ID</p>
+                    <p className="text-xs font-mono text-white/50">{userProfile?.name || userProfile?.email || 'Unknown User'}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* User-facing Message */}
-            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
+            <Card className="border border-white/10 bg-black">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <Mail className="w-5 h-5" />
+                  <Mail className="w-5 h-5 text-white/70" />
                   User-Facing Message
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-orange-500/10 border border-orange-400/30 rounded-lg p-4">
-                  <p className="text-orange-200/80 whitespace-pre-wrap">{ticket.user_message}</p>
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <p className="text-white/70 whitespace-pre-wrap">{ticket.user_message}</p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Internal Notes */}
             {ticket.internal_notes && (
-              <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
+              <Card className="border border-white/10 bg-black">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-white">
-                    <AlertCircle className="w-5 h-5" />
+                    <AlertCircle className="w-5 h-5 text-white/70" />
                     Internal Notes
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="bg-orange-500/10 border border-orange-400/30 rounded-lg p-4">
-                    <p className="text-orange-200/80 whitespace-pre-wrap">{ticket.internal_notes}</p>
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <p className="text-white/70 whitespace-pre-wrap">{ticket.internal_notes}</p>
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {/* Comments Section */}
-            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
+            <Card className="border border-white/10 bg-black">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
-                  <MessageSquare className="w-5 h-5" />
+                  <MessageSquare className="w-5 h-5 text-white/70" />
                   Comments ({comments.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Comments List */}
                 {comments.length === 0 ? (
-                  <p className="text-orange-200/50 text-sm text-center py-8">No comments yet</p>
+                  <p className="text-white/50 text-sm text-center py-8">No comments yet</p>
                 ) : (
                   <div className="space-y-4 max-h-96 overflow-y-auto">
                     {comments.map((comment) => (
@@ -355,22 +362,22 @@ export default function TicketDetails() {
                         className={cn(
                           'p-3 rounded-lg border',
                           comment.is_internal
-                            ? 'bg-orange-500/10 border-orange-400/30'
-                            : 'bg-white/5 border-orange-400/20'
+                            ? 'bg-white/10 border-white/20'
+                            : 'bg-white/5 border-white/10'
                         )}
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
-                            <User className="w-3 h-3 text-orange-400" />
+                            <User className="w-3 h-3 text-white/50" />
                             {comment.is_internal && (
-                              <Badge variant="secondary" className="text-xs">Internal</Badge>
+                              <Badge variant="secondary" className="text-xs bg-white/10 text-white/70 border-white/20">Internal</Badge>
                             )}
                           </div>
-                          <span className="text-xs text-orange-300/70">
+                          <span className="text-xs text-white/50">
                             {formatDate(comment.created_at)}
                           </span>
                         </div>
-                        <p className="text-sm text-orange-200/80 whitespace-pre-wrap">
+                        <p className="text-sm text-white/70 whitespace-pre-wrap">
                           {comment.comment_text}
                         </p>
                       </div>
@@ -378,7 +385,7 @@ export default function TicketDetails() {
                   </div>
                 )}
 
-                <Separator className="bg-orange-400/20" />
+                <Separator className="bg-white/10" />
 
                 {/* Add Comment */}
                 <div className="space-y-2">
@@ -389,21 +396,21 @@ export default function TicketDetails() {
                         type="checkbox"
                         checked={isInternalComment}
                         onChange={(e) => setIsInternalComment(e.target.checked)}
-                        className="rounded border-orange-400/30 bg-white/5 text-white"
+                        className="rounded border-white/20 bg-white/5 text-white"
                       />
-                      <span className="text-sm text-orange-300">Internal comment (admin only)</span>
+                      <span className="text-sm text-white/70">Internal comment (admin only)</span>
                     </label>
                   </div>
                   <Textarea
                     placeholder="Add a comment..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    className="min-h-24 border-orange-400/30 bg-white/5 text-white placeholder-orange-300/50 focus:ring-orange-500/20 focus:border-orange-400/50"
+                    className="min-h-24 border-white/10 bg-white/5 text-white placeholder-white/40 focus:ring-white/10 focus:border-white/20"
                   />
                   <Button
                     onClick={handleAddComment}
                     disabled={submittingComment || !newComment.trim()}
-                    className="gap-2 bg-orange-600 text-white hover:bg-orange-700"
+                    className="gap-2 bg-white text-black hover:bg-white/90"
                   >
                     {submittingComment ? (
                       <>
@@ -425,7 +432,7 @@ export default function TicketDetails() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Status Card */}
-            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
+            <Card className="border border-white/10 bg-black">
               <CardHeader>
                 <CardTitle className="text-white">Status</CardTitle>
               </CardHeader>
@@ -438,7 +445,7 @@ export default function TicketDetails() {
                   <SelectTrigger className={cn('border-2', STATUS_COLORS[ticket.status])}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-black border-white/10">
                     <SelectItem value="Open">Open</SelectItem>
                     <SelectItem value="In Progress">In Progress</SelectItem>
                     <SelectItem value="On Hold">On Hold</SelectItem>
@@ -450,7 +457,7 @@ export default function TicketDetails() {
             </Card>
 
             {/* Priority & Category */}
-            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
+            <Card className="border border-white/10 bg-black">
               <CardHeader>
                 <CardTitle className="text-white">Priority</CardTitle>
               </CardHeader>
@@ -465,52 +472,55 @@ export default function TicketDetails() {
             </Card>
 
             {/* Assignee Card */}
-            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
-              <CardHeader>
-                <CardTitle className="text-white">Assigned To</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Select
-                  value={ticket.assigned_to || ''}
-                  onValueChange={handleAssigneeChange}
-                  disabled={updatingAssignee}
-                >
-                  <SelectTrigger className="border-orange-400/30 bg-white/5 text-white">
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.user_id} value={user.user_id}>
-                        {user.name || user.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
+          <Card className="border border-white/10 bg-black">
+  <CardHeader>
+    <CardTitle className="text-white">Assigned To</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-3">
+    <Select
+      value={ticket.assigned_to ?? 'unassigned'} // ✅ never empty string
+      onValueChange={(value) =>
+        handleAssigneeChange(value === 'unassigned' ? null : value)
+      }
+      disabled={updatingAssignee}
+    >
+      <SelectTrigger className="border-white/10 bg-white/5 text-white">
+        <SelectValue placeholder="Unassigned" />
+      </SelectTrigger>
 
+      <SelectContent className="bg-black border-white/10">
+        <SelectItem value="unassigned">Unassigned</SelectItem> {/* ✅ FIX */}
+
+        {users.map((user) => (
+          <SelectItem key={user.user_id} value={user.user_id}>
+            {user.name || user.email}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </CardContent>
+</Card>
             {/* Timeline */}
-            <Card className="border-orange-400/30 bg-white/5 backdrop-blur-md shadow-lg shadow-orange-500/10">
+            <Card className="border border-white/10 bg-black">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
+                  <Clock className="w-5 h-5 text-white/70" />
                   Timeline
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div>
-                  <p className="text-orange-400">Created</p>
-                  <p className="font-medium text-orange-100">{formatDate(ticket.created_at)}</p>
+                  <p className="text-white/50">Created</p>
+                  <p className="font-medium text-white/70">{formatDate(ticket.created_at)}</p>
                 </div>
                 <div>
-                  <p className="text-orange-400">Updated</p>
-                  <p className="font-medium text-orange-100">{formatDate(ticket.updated_at)}</p>
+                  <p className="text-white/50">Updated</p>
+                  <p className="font-medium text-white/70">{formatDate(ticket.updated_at)}</p>
                 </div>
                 {ticket.resolved_at && (
                   <div>
-                    <p className="text-orange-400">Resolved</p>
-                    <p className="font-medium text-orange-100">{formatDate(ticket.resolved_at)}</p>
+                    <p className="text-white/50">Resolved</p>
+                    <p className="font-medium text-white/70">{formatDate(ticket.resolved_at)}</p>
                   </div>
                 )}
               </CardContent>
@@ -518,9 +528,9 @@ export default function TicketDetails() {
 
             {/* Status Badge */}
             {ticket.status === 'Resolved' && (
-              <div className="bg-green-500/10 border border-green-400/50 rounded-lg p-4 text-center">
-                <CheckCircle className="w-6 h-6 text-green-400 mx-auto mb-2" />
-                <p className="text-sm font-medium text-green-200">Ticket Resolved</p>
+              <div className="bg-white/10 border border-white/20 rounded-lg p-4 text-center">
+                <CheckCircle className="w-6 h-6 text-white/70 mx-auto mb-2" />
+                <p className="text-sm font-medium text-white/70">Ticket Resolved</p>
               </div>
             )}
           </div>

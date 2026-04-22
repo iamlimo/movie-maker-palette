@@ -23,6 +23,7 @@ const PRIORITIES: { label: string; value: TicketPriority; color: string }[] = [
   { label: 'Medium', value: 'Medium', color: 'bg-amber-500/20 text-amber-300 border-amber-400/50' },
   { label: 'High', value: 'High', color: 'bg-red-500/20 text-red-300 border-red-400/50' },
 ];
+const SUPABASE_URL = "https://tsfwlereofjlxhjsarap.supabase.co";
 
 interface AttachedItem {
   id: string;
@@ -81,7 +82,7 @@ export default function CreateTicket() {
         .order('name');
 
       if (error) throw error;
-      setTemplates(data || []);
+      setTemplates((data || []) as TicketTemplate[]);
     } catch (err) {
       console.error('Error fetching templates:', err);
     }
@@ -91,6 +92,13 @@ export default function CreateTicket() {
   const isLikelyUUID = (str: string): boolean => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
+  };
+
+  // Helper function to generate ticket number
+  const generateTicketNumber = (): string => {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+    return `TKT-${timestamp}-${random}`;
   };
 
   // Debounced user search
@@ -146,15 +154,14 @@ export default function CreateTicket() {
       try {
         const { data, error } = await supabase
           .from('payments')
-          .select('id, amount, status, created_at, transaction_id')
-          .or(`id.eq.${paymentSearch},transaction_id.ilike.%${paymentSearch}%`)
+          .select('id, amount, status, created_at')
+          .or(`id.ilike.%${paymentSearch}%,status.ilike.%${paymentSearch}%`)
           .limit(10);
 
         if (error) throw error;
 
         const results: PaymentResult[] = data?.map(payment => ({
           id: payment.id,
-          transaction_id: payment.transaction_id,
           amount: payment.amount,
           status: payment.status,
           created_at: payment.created_at,
@@ -163,6 +170,7 @@ export default function CreateTicket() {
         setPaymentResults(results);
       } catch (err) {
         console.error('Error searching payments:', err);
+        setPaymentResults([]);
       }
     }, 300);
 
@@ -321,10 +329,14 @@ export default function CreateTicket() {
       const attachedPaymentId = attachedItems.find(item => item.type === 'payment')?.id;
       const attachedContentId = attachedItems.find(item => item.type === 'content')?.id;
 
+      // Generate ticket number
+      const ticketNumber = generateTicketNumber();
+
       // Create ticket
       const { data: ticket, error: ticketError } = await supabase
         .from('tickets')
         .insert({
+          ticket_number: ticketNumber,
           user_id: selectedUser.id,
           created_by: profile.user_id,
           title,
@@ -348,7 +360,7 @@ export default function CreateTicket() {
       // Call edge function to send email notification
       try {
         const response = await fetch(
-          `${supabase.supabaseUrl}/functions/v1/send-ticket-notification`,
+          `${SUPABASE_URL}/functions/v1/send-ticket-notification`,
           {
             method: 'POST',
             headers: {
@@ -411,10 +423,10 @@ export default function CreateTicket() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-slate-900 to-black">
-      {/* Animated background elements */}
+      {/* Minimal background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-600/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-white/3 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-white/3 rounded-full blur-3xl" />
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -435,22 +447,22 @@ export default function CreateTicket() {
           {/* Main Content - Left Side (2/3) */}
           <div className="lg:col-span-2 space-y-6">
             {/* Target User Section */}
-            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl hover:shadow-orange-500/10 transition-all duration-300">
-              <CardHeader className="pb-4 border-b border-white/10">
+            <Card className="bg-white/10 backdrop-blur-xl border border-white/10 relative">
+              <CardHeader className="pb-4 border-b border-white/10 relative z-0">
                 <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-orange-500/20 rounded-lg">
-                    <User className="w-5 h-5 text-orange-400" />
+                  <div className="p-2 bg-white/10 rounded-lg">
+                    <User className="w-5 h-5 text-white/70" />
                   </div>
                   Select User
                 </CardTitle>
-                <CardDescription className="text-orange-200">Choose the user this ticket is for</CardDescription>
+                <CardDescription className="text-white/50">Choose the user this ticket is for</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 pt-6">
+              <CardContent className="space-y-4 pt-6 overflow-visible">
                 {/* User Search */}
-                <div className="space-y-2">
+                <div className="space-y-2 relative z-10">
                   <Label className="text-white font-semibold">Search by email, username, or ID</Label>
                   <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-300" />
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
                     <Input
                       type="text"
                       placeholder="Type to search..."
@@ -460,15 +472,15 @@ export default function CreateTicket() {
                         setShowUserDropdown(true);
                       }}
                       onFocus={() => setShowUserDropdown(true)}
-                      className="pl-12 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 transition-all"
+                      className="pl-12 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/20 focus:ring-white/10 transition-all"
                     />
                     {searchingUsers && (
-                      <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-400 animate-spin" />
+                      <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50 animate-spin" />
                     )}
                   </div>
 
                   {showUserDropdown && userSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-orange-400/30 rounded-xl shadow-2xl z-50 overflow-hidden">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950 border border-white/10 rounded-lg z-[100] overflow-hidden">
                       {userSearchResults.map((result) => (
                         <button
                           key={result.id}
@@ -477,10 +489,10 @@ export default function CreateTicket() {
                             setUserSearch('');
                             setShowUserDropdown(false);
                           }}
-                          className="w-full text-left px-4 py-3 hover:bg-orange-500/20 border-b border-orange-400/10 last:border-0 transition-colors group"
+                          className="w-full text-left px-4 py-3 hover:bg-white/10 border-b border-white/5 last:border-0 transition-colors group"
                         >
-                          <div className="font-medium text-white group-hover:text-orange-300">{result.username || 'User'}</div>
-                          <div className="text-sm text-orange-300">{result.email}</div>
+                          <div className="font-medium text-white group-hover:text-white/80">{result.username || 'User'}</div>
+                          <div className="text-sm text-white/50">{result.email}</div>
                         </button>
                       ))}
                     </div>
@@ -489,21 +501,21 @@ export default function CreateTicket() {
 
                 {/* Selected User Display */}
                 {selectedUser && (
-                  <div className="flex items-center justify-between bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-400/30 rounded-xl p-4 animate-in fade-in">
+                  <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                        <User className="w-5 h-5 text-white/70" />
                       </div>
                       <div>
                         <div className="font-semibold text-white">{selectedUser.username || 'User'}</div>
-                        <div className="text-sm text-orange-300">{selectedUser.email}</div>
+                        <div className="text-sm text-white/50">{selectedUser.email}</div>
                       </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedUser(null)}
-                      className="text-orange-300 hover:text-white hover:bg-orange-500/20"
+                      className="text-white/70 hover:text-white hover:bg-white/10"
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -513,31 +525,31 @@ export default function CreateTicket() {
             </Card>
 
             {/* Ticket Details Section */}
-            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl hover:shadow-orange-500/10 transition-all duration-300">
+            <Card className="bg-white/10 backdrop-blur-xl border border-white/10">
               <CardHeader className="pb-4 border-b border-white/10">
                 <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-orange-500/20 rounded-lg">
-                    <FileText className="w-5 h-5 text-orange-400" />
+                  <div className="p-2 bg-white/10 rounded-lg">
+                    <FileText className="w-5 h-5 text-white/70" />
                   </div>
                   Ticket Details
                 </CardTitle>
-                <CardDescription className="text-orange-200">Define the issue and set priority</CardDescription>
+                <CardDescription className="text-white/50">Define the issue and set priority</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5 pt-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Category */}
                   <div className="space-y-2">
                     <Label className="text-white font-semibold flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-orange-400" />
+                      <Tag className="w-4 h-4 text-white/50" />
                       Category
                     </Label>
                     <Select value={category} onValueChange={(value) => setCategory(value as TicketCategory)}>
-                      <SelectTrigger className="bg-white/5 border-orange-400/30 text-white focus:border-orange-400 focus:ring-orange-500/20">
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-white/20 focus:ring-white/10">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-orange-400/30">
+                      <SelectContent className="bg-black border-white/10">
                         {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat} value={cat} className="text-white hover:bg-orange-500/20">
+                          <SelectItem key={cat} value={cat} className="text-white hover:bg-white/10">
                             {cat}
                           </SelectItem>
                         ))}
@@ -582,7 +594,7 @@ export default function CreateTicket() {
                     placeholder="Brief description of the issue..."
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="bg-white/5 border-orange-400/30 text-white placeholder:text-orange-400 focus:border-orange-400 focus:ring-orange-500/20"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/20 focus:ring-white/10"
                   />
                 </div>
 
@@ -593,18 +605,18 @@ export default function CreateTicket() {
                     placeholder="Additional details about the issue..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-24 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-400 focus:border-orange-400 focus:ring-orange-500/20 resize-none"
+                    className="min-h-24 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/20 focus:ring-white/10 resize-none"
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Messages Section */}
-            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl hover:shadow-orange-500/10 transition-all duration-300">
+            <Card className="bg-white/10 backdrop-blur-xl border border-white/10">
               <CardHeader className="pb-4 border-b border-white/10">
                 <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-green-500/20 rounded-lg">
-                    <Mail className="w-5 h-5 text-green-400" />
+                  <div className="p-2 bg-white/10 rounded-lg">
+                    <Mail className="w-5 h-5 text-white/70" />
                   </div>
                   Messages & Communication
                 </CardTitle>
@@ -613,15 +625,15 @@ export default function CreateTicket() {
                 {/* Internal Note */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-orange-400" />
+                    <Lock className="w-4 h-4 text-white/50" />
                     <Label className="text-white font-semibold">Internal Note</Label>
-                    <Badge variant="secondary" className="bg-orange-500/20 text-orange-300 border-0">Admin Only</Badge>
+                    <Badge variant="secondary" className="bg-white/10 text-white/70 border-0">Admin Only</Badge>
                   </div>
                   <Textarea
                     placeholder="Private notes - not visible to the user..."
                     value={internalNotes}
                     onChange={(e) => setInternalNotes(e.target.value)}
-                    className="min-h-24 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 resize-none"
+                    className="min-h-24 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/20 focus:ring-white/10 resize-none"
                   />
                 </div>
 
@@ -631,12 +643,12 @@ export default function CreateTicket() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-white font-semibold flex items-center gap-2">
-                      <Send className="w-4 h-4 text-green-400" />
+                      <Send className="w-4 h-4 text-white/50" />
                       User-Facing Message
                       <span className="text-red-400">*</span>
                     </Label>
                     {userMessage.length > 0 && (
-                      <span className="text-xs text-orange-300">
+                      <span className="text-xs text-white/50">
                         {userMessage.length} / 1000 characters
                       </span>
                     )}
@@ -646,9 +658,9 @@ export default function CreateTicket() {
                     value={userMessage}
                     onChange={(e) => setUserMessage(e.target.value)}
                     maxLength={1000}
-                    className="min-h-32 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 resize-none"
+                    className="min-h-32 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/20 focus:ring-white/10 resize-none"
                   />
-                  <p className="text-xs text-orange-300">This message will be included in the notification email.</p>
+                  <p className="text-xs text-white/50">This message will be included in the notification email.</p>
                 </div>
               </CardContent>
             </Card>
@@ -657,10 +669,10 @@ export default function CreateTicket() {
           {/* Sidebar - Right Side (1/3) */}
           <div className="space-y-6">
             {/* Context Attachments */}
-            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl">
+            <Card className="bg-white/10 backdrop-blur-xl border border-white/10">
               <CardHeader className="pb-4 border-b border-white/10">
                 <CardTitle className="flex items-center gap-3 text-white text-base">
-                  <Link2 className="w-4 h-4 text-cyan-400" />
+                  <Link2 className="w-4 h-4 text-white/50" />
                   Attachments
                 </CardTitle>
               </CardHeader>
@@ -669,7 +681,7 @@ export default function CreateTicket() {
                 <div className="space-y-2">
                   <Label className="text-white font-semibold text-sm">Payment</Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-400" />
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
                     <Input
                       type="text"
                       placeholder="Transaction ID..."
@@ -679,19 +691,19 @@ export default function CreateTicket() {
                         setShowPaymentDropdown(true);
                       }}
                       onFocus={() => setShowPaymentDropdown(true)}
-                      className="pl-10 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 text-sm"
+                      className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/20 focus:ring-white/10 text-sm"
                     />
 
                     {showPaymentDropdown && paymentResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-orange-400/30 rounded-lg shadow-xl z-40 overflow-hidden">
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950 border border-white/10 rounded-lg z-[100] overflow-hidden">
                         {paymentResults.map((result) => (
                           <button
                             key={result.id}
                             onClick={() => handleAddPayment(result)}
-                            className="w-full text-left px-3 py-2 hover:bg-orange-500/20 border-b border-orange-400/10 last:border-0 transition-colors text-sm"
+                            className="w-full text-left px-3 py-2 hover:bg-white/10 border-b border-white/5 last:border-0 transition-colors text-sm"
                           >
                             <div className="font-medium text-white">{result.transaction_id}</div>
-                            <div className="text-xs text-orange-300">₦{(result.amount / 100).toLocaleString()}</div>
+                            <div className="text-xs text-orange-200/70">₦{(result.amount / 100).toLocaleString('en-NG')}</div>
                           </button>
                         ))}
                       </div>
@@ -703,7 +715,7 @@ export default function CreateTicket() {
                 <div className="space-y-2">
                   <Label className="text-white font-semibold text-sm">Content</Label>
                   <div className="relative">
-                    <Play className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-400" />
+                    <Play className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
                     <Input
                       type="text"
                       placeholder="Movie or show..."
@@ -713,16 +725,16 @@ export default function CreateTicket() {
                         setShowContentDropdown(true);
                       }}
                       onFocus={() => setShowContentDropdown(true)}
-                      className="pl-10 bg-white/5 border-orange-400/30 text-white placeholder:text-orange-300 focus:border-orange-400 focus:ring-orange-500/20 text-sm"
+                      className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-white/20 focus:ring-white/10 text-sm"
                     />
 
                     {showContentDropdown && contentResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-orange-400/30 rounded-lg shadow-xl z-40 overflow-hidden">
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950 border border-white/10 rounded-lg z-[100] overflow-hidden">
                         {contentResults.map((result) => (
                           <button
                             key={result.id}
                             onClick={() => handleAddContent(result)}
-                            className="w-full text-left px-3 py-2 hover:bg-orange-500/20 border-b border-orange-400/10 last:border-0 transition-colors text-sm"
+                            className="w-full text-left px-3 py-2 hover:bg-white/10 border-b border-white/5 last:border-0 transition-colors text-sm"
                           >
                             <div className="font-medium text-white flex items-center gap-2">
                               {result.type === 'movie' ? '🎬' : '📺'} {result.title}
@@ -742,14 +754,14 @@ export default function CreateTicket() {
                       {attachedItems.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between bg-orange-500/10 border border-orange-400/30 rounded-lg px-3 py-2 group hover:bg-orange-500/20 transition-all"
+                          className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-3 py-2 group hover:bg-white/10 transition-colors"
                         >
-                          <span className="text-xs text-orange-200">{item.title}</span>
+                          <span className="text-xs text-white/70">{item.title}</span>
                           <button
                             onClick={() => handleRemoveAttachment(item.id)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <X className="w-3 h-3 text-orange-400 hover:text-orange-300" />
+                            <X className="w-3 h-3 text-white/50 hover:text-white/70" />
                           </button>
                         </div>
                       ))}
@@ -775,10 +787,10 @@ export default function CreateTicket() {
             </Card>
 
             {/* Quick Templates */}
-            <Card className="border-0 bg-white/10 backdrop-blur-xl shadow-2xl">
+            <Card className="bg-white/10 backdrop-blur-xl border border-white/10">
               <CardHeader className="pb-4 border-b border-white/10">
                 <CardTitle className="flex items-center gap-3 text-white text-base">
-                  <Clock className="w-4 h-4 text-pink-400" />
+                  <Clock className="w-4 h-4 text-white/50" />
                   Templates
                 </CardTitle>
               </CardHeader>
@@ -793,8 +805,8 @@ export default function CreateTicket() {
                         className={cn(
                           'justify-start text-left w-full h-auto p-3 transition-all text-sm',
                           templateUsed === template.id
-                            ? 'bg-gradient-to-r from-orange-500/30 to-orange-600/30 border-orange-400/50 text-white'
-                            : 'bg-white/5 border-orange-400/30 text-orange-200 hover:bg-white/10 hover:border-orange-400/50'
+                            ? 'bg-white/10 border-white/20 text-white'
+                            : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20'
                         )}
                       >
                         <div className="text-left">
@@ -811,23 +823,23 @@ export default function CreateTicket() {
             </Card>
 
             {/* Status Card */}
-            <Card className="border-0 bg-gradient-to-br from-orange-500/20 to-orange-600/20 backdrop-blur-xl shadow-2xl border border-orange-400/30">
+            <Card className="bg-white/5 backdrop-blur-xl border border-white/10">
               <CardContent className="pt-6">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Check className="w-5 h-5 text-orange-400" />
+                    <Check className="w-5 h-5 text-white/50" />
                     <span className="text-white font-semibold">Ready to Create?</span>
                   </div>
-                  <div className="space-y-1.5 text-sm text-orange-200">
-                    <div className={selectedUser ? 'flex items-center gap-2 text-orange-300' : 'opacity-50'}>
+                  <div className="space-y-1.5 text-sm text-white/70">
+                    <div className={selectedUser ? 'flex items-center gap-2 text-white/70' : 'opacity-30'}>
                       <Check className="w-3.5 h-3.5" />
                       User selected
                     </div>
-                    <div className={title ? 'flex items-center gap-2 text-orange-300' : 'opacity-50'}>
+                    <div className={title ? 'flex items-center gap-2 text-white/70' : 'opacity-30'}>
                       <Check className="w-3.5 h-3.5" />
                       Title filled
                     </div>
-                    <div className={userMessage ? 'flex items-center gap-2 text-orange-300' : 'opacity-50'}>
+                    <div className={userMessage ? 'flex items-center gap-2 text-white/70' : 'opacity-30'}>
                       <Check className="w-3.5 h-3.5" />
                       Message ready
                     </div>
@@ -843,14 +855,14 @@ export default function CreateTicket() {
           <Button
             variant="outline"
             onClick={() => navigate('/admin/tickets')}
-            className="border-orange-400/30 text-orange-200 hover:bg-white/10 hover:border-orange-400/50"
+            className="border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={submitting || !selectedUser || !title || !userMessage}
-            className="bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+            className="bg-white text-black hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
           >
             {submitting ? (
               <>
@@ -869,24 +881,24 @@ export default function CreateTicket() {
 
       {/* Duplicate Alert */}
       <AlertDialog open={duplicateCheckAlert} onOpenChange={setDuplicateCheckAlert}>
-        <AlertDialogContent className="bg-slate-900 border-orange-400/30">
+        <AlertDialogContent className="bg-black border border-white/10">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-white">
-              <AlertCircle className="w-5 h-5 text-yellow-400" />
+              <AlertCircle className="w-5 h-5 text-white/70" />
               Duplicate Warning
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-orange-200">
+            <AlertDialogDescription className="text-white/50">
               A ticket with the title "{title}" is already open for this user ({existingTicket}). Do you want to create anyway?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-orange-400/30 text-orange-200 hover:bg-white/10">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="border-white/10 text-white/70 hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setDuplicateCheckAlert(false);
                 createTicket();
               }}
-              className="bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800"
+              className="bg-white text-black hover:bg-white/90"
             >
               Create Anyway
             </AlertDialogAction>

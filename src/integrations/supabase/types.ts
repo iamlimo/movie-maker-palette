@@ -1548,6 +1548,181 @@ export type Database = {
         }
         Relationships: []
       }
+      tickets: {
+        Row: {
+          assigned_to: string | null
+          attached_content_id: string | null
+          attached_payment_id: string | null
+          category: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          include_system_logs: boolean
+          internal_notes: string | null
+          is_admin_created: boolean
+          priority: string
+          resolved_at: string | null
+          status: string
+          template_used: string | null
+          ticket_number: string
+          title: string
+          updated_at: string
+          user_id: string
+          user_message: string
+          user_type: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          attached_content_id?: string | null
+          attached_payment_id?: string | null
+          category?: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          include_system_logs?: boolean
+          internal_notes?: string | null
+          is_admin_created?: boolean
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          template_used?: string | null
+          ticket_number: string
+          title: string
+          updated_at?: string
+          user_id: string
+          user_message: string
+          user_type?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          attached_content_id?: string | null
+          attached_payment_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          include_system_logs?: boolean
+          internal_notes?: string | null
+          is_admin_created?: boolean
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          template_used?: string | null
+          ticket_number?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          user_message?: string
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      ticket_comments: {
+        Row: {
+          author_id: string
+          comment_text: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          comment_text: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          comment_text?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      ticket_templates: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          internal_note_template: string | null
+          name: string
+          suggested_priority: string
+          title: string
+          updated_at: string
+          user_message_template: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          internal_note_template?: string | null
+          name: string
+          suggested_priority?: string
+          title: string
+          updated_at?: string
+          user_message_template?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          internal_note_template?: string | null
+          name?: string
+          suggested_priority?: string
+          title?: string
+          updated_at?: string
+          user_message_template?: string | null
+        }
+        Relationships: []
+      }
       webhook_events: {
         Row: {
           event_id: string
