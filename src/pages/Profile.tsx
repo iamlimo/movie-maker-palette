@@ -358,7 +358,9 @@ const Profile = () => {
               </div>
 
               {/* Continue Watching */}
-              {continueWatching.length > 0 && (
+            <div>
+
+                {continueWatching.length > 0 && (
                 <ContentCarousel 
                   title="Continue Watching" 
                   subtitle="Pick up where you left off"
@@ -377,6 +379,7 @@ const Profile = () => {
                   ))}
                 </ContentCarousel>
               )}
+            </div>
 
               {/* Recent Activity & Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
