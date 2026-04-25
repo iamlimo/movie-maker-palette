@@ -77,9 +77,80 @@ export function buildRentalContentFields(contentId: string, contentType: RentalC
   };
 }
 
+async function findDirectRentalAccess(
+  supabase: {
+    from: (table: string) => {
+      select: (columns: string) => any;
+      eq: (column: string, value: unknown) => any;
+      gt: (column: string, value: unknown) => any;
+      order: (column: string, options: { ascending: boolean }) => any;
+      maybeSingle: () => Promise<{ data: any; error: any }>;
+    };
+  },
+  userId: string,
+  contentId: string,
+  contentType: RentalContentType,
+) {
+  const now = new Date().toISOString();
+
+  const queryByColumn = async (column: 'movie_id' | 'season_id' | 'episode_id', value: string) => {
+    const { data, error } = await supabase
+      .from('rental_access')
+      .select('*')
+      .eq('user_id', userId)
+      .eq(column, value)
+      .eq('status', 'paid')
+      .eq('revoked_at', null)
+      .gt('expires_at', now)
+      .order('expires_at', { ascending: false })
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
+  };
+
+  if (contentType === 'movie') {
+    return await queryByColumn('movie_id', contentId);
+  }
+
+  if (contentType === 'season') {
+    return await queryByColumn('season_id', contentId);
+  }
+
+  const episodeAccess = await queryByColumn('episode_id', contentId);
+  if (episodeAccess) {
+    return episodeAccess;
+  }
+
+  const { data: episodeData } = await supabase
+    .from('episodes')
+    .select('season_id')
+    .eq('id', contentId)
+    .maybeSingle();
+
+  if (episodeData?.season_id) {
+    const seasonAccess = await queryByColumn('season_id', episodeData.season_id);
+    if (seasonAccess) {
+      return seasonAccess;
+    }
+  }
+
+  return null;
+}
+
 export async function hasActiveRentalAccess(
   supabase: {
     rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+    from: (table: string) => {
+      select: (columns: string) => any;
+      eq: (column: string, value: unknown) => any;
+      gt: (column: string, value: unknown) => any;
+      order: (column: string, options: { ascending: boolean }) => any;
+      maybeSingle: () => Promise<{ data: any; error: any }>;
+    };
   },
   userId: string,
   contentId: string,
@@ -87,24 +158,43 @@ export async function hasActiveRentalAccess(
 ): Promise<RentalAccessResult> {
   const normalizedType = normalizeContentType(contentType);
 
-  const { data, error } = await supabase.rpc('has_active_rental_access', {
-    p_user_id: userId,
-    p_content_id: contentId,
-    p_content_type: normalizedType,
-  });
+  try {
+    const { data, error } = await supabase.rpc('has_active_rental_access', {
+      p_user_id: userId,
+      p_content_id: contentId,
+      p_content_type: normalizedType,
+    });
 
-  if (error) {
-    throw error;
+    if (!error) {
+      const rows = Array.isArray(data) ? data : [];
+      const row = rows[0] as Partial<RentalAccessResult> | undefined;
+
+      return {
+        has_access: !!row?.has_access,
+        access_type: (row?.access_type as RentalAccessResult['access_type']) ?? null,
+        expires_at: (row?.expires_at as string | null) ?? null,
+        rental_access_id: (row?.rental_access_id as string | null) ?? null,
+      };
+    }
+  } catch {
+    // Fall through to direct lookup when the RPC is missing from schema cache.
   }
 
-  const rows = Array.isArray(data) ? data : [];
-  const row = rows[0] as Partial<RentalAccessResult> | undefined;
+  const directAccess = await findDirectRentalAccess(supabase, userId, contentId, normalizedType);
+  if (directAccess) {
+    return {
+      has_access: true,
+      access_type: directAccess.source === 'purchase' ? 'purchase' : 'rental',
+      expires_at: directAccess.expires_at ?? null,
+      rental_access_id: directAccess.id ?? null,
+    };
+  }
 
   return {
-    has_access: !!row?.has_access,
-    access_type: (row?.access_type as RentalAccessResult['access_type']) ?? null,
-    expires_at: (row?.expires_at as string | null) ?? null,
-    rental_access_id: (row?.rental_access_id as string | null) ?? null,
+    has_access: false,
+    access_type: null,
+    expires_at: null,
+    rental_access_id: null,
   };
 }
 
