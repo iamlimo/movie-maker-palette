@@ -76,12 +76,16 @@ export const nairaToKobo = (naira: number): number => Math.round(naira * 100);
 /**
  * Format kobo as Naira currency string with proper localization
  * @param kobo - Amount in kobo
- * @returns Formatted Naira string (e.g., "₦1,000.00")
+ * @returns Formatted Naira string (e.g., "₦1,000")
  */
 export const formatNaira = (kobo: number): string => {
   const naira = koboToNaira(kobo);
-  return `₦${naira.toLocaleString('en-NG', { 
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 2 
-  })}`;
+  const formatted = naira
+    .toLocaleString('en-NG', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    .replace(/\.?0+$/, '');
+
+  return `₦${formatted}`;
 };

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { WatchHistoryItem } from '@/hooks/useWatchHistory';
 import { formatDistanceToNow } from 'date-fns';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface WatchProgressCardProps {
   item: WatchHistoryItem;
@@ -162,9 +163,9 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
             </span>
           </div>
 
-          {item.price && (
+          {item.price !== undefined && item.price !== null && (
             <div className="text-xs font-medium text-primary">
-              ₦{item.price.toLocaleString()}
+              {formatNaira(item.price)}
             </div>
           )}
         </div>

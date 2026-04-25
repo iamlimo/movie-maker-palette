@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useWatchHistory, WatchHistoryItem } from '@/hooks/useWatchHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface ContinueWatchingCardProps {
   item: WatchHistoryItem;
@@ -17,11 +18,9 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
   onPlay,
   onRemove,
 }) => {
-  // Use playback_position and video_duration if available, otherwise fall back to progress-based calculation
   const formatTimeRemaining = (item: WatchHistoryItem) => {
-    // Use seconds-based calculation if available
     if (item.playback_position !== undefined && item.video_duration && item.video_duration > 0) {
-      const remainingSeconds = item.video_duration - item.playback_position;
+      const remainingSeconds = Math.max(item.video_duration - item.playback_position, 0);
       const remainingMinutes = Math.round(remainingSeconds / 60);
       if (remainingMinutes >= 60) {
         const hours = Math.floor(remainingMinutes / 60);
@@ -30,11 +29,10 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
       }
       return `${remainingMinutes}m remaining`;
     }
-    
-    // Fall back to progress-based calculation
+
     if (!item.duration) return '';
     const watchedMinutes = (item.duration * item.progress) / 100;
-    const remainingMinutes = Math.round(item.duration - watchedMinutes);
+    const remainingMinutes = Math.max(Math.round(item.duration - watchedMinutes), 0);
     if (remainingMinutes >= 60) {
       const hours = Math.floor(remainingMinutes / 60);
       const mins = remainingMinutes % 60;
@@ -43,10 +41,25 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
     return `${remainingMinutes}m remaining`;
   };
 
+  const progressValue = Math.min(100, Math.max(0, item.progress));
+  const priceLabel = item.price !== undefined && item.price !== null ? formatNaira(item.price) : null;
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onPlay();
+    }
+  };
+
   return (
-    <div className="group relative flex-shrink-0 w-[280px] sm:w-[320px] md:w-[340px] snap-start">
+    <div
+      className="group relative flex-shrink-0 w-[280px] sm:w-[320px] md:w-[340px] snap-start cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      role="button"
+      tabIndex={0}
+      onClick={onPlay}
+      onKeyDown={handleKeyDown}
+    >
       <div className="relative overflow-hidden rounded-lg bg-card transition-all duration-300 group-hover:ring-2 group-hover:ring-primary/50 group-hover:shadow-xl">
-        {/* Thumbnail with gradient overlay */}
         <div className="relative aspect-video">
           {item.thumbnail_url ? (
             <img
@@ -61,24 +74,24 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
             </div>
           )}
 
-          {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
-          {/* Play button overlay on hover */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <Button
               size="lg"
-              onClick={onPlay}
+              onClick={(event) => {
+                event.stopPropagation();
+                onPlay();
+              }}
               className="rounded-full bg-white text-black hover:bg-white/90 hover:scale-105 transition-transform shadow-2xl"
             >
               <Play size={24} className="fill-current" />
             </Button>
           </div>
 
-          {/* Remove button */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={(event) => {
+              event.stopPropagation();
               onRemove();
             }}
             className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
@@ -87,24 +100,43 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
             <X size={14} />
           </button>
 
-          {/* Content info at bottom */}
           <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
             <h3 className="font-semibold text-white text-sm line-clamp-1">
               {item.title || 'Unknown Title'}
             </h3>
-            
-            {/* Progress bar */}
+
             <div className="space-y-1">
-              <Progress 
-                value={item.progress} 
+              <Progress
+                value={progressValue}
                 className="h-1 bg-white/20"
               />
               <div className="flex items-center justify-between text-xs text-white/70">
-                <span>{Math.round(item.progress)}% watched</span>
+                <span>{Math.round(progressValue)}% watched</span>
                 <span>{formatTimeRemaining(item)}</span>
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="space-y-3 border-t border-border/60 bg-card p-3">
+          {priceLabel && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Rental price</span>
+              <span className="font-semibold text-foreground">{priceLabel}</span>
+            </div>
+          )}
+
+          <Button
+            size="sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onPlay();
+            }}
+            className="w-full rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Play size={16} className="mr-2 fill-current" />
+            Continue Watching
+          </Button>
         </div>
       </div>
     </div>
