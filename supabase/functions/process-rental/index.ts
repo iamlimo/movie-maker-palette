@@ -1,336 +1,252 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { normalizeContentType, getDefaultRentalDurationHours, hasActiveRentalAccess, buildRentalIntentPayload } from "../_shared/rental.ts";
 
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const RENTAL_DURATION_HOURS = 48;
-const SEASON_RENTAL_DURATION_HOURS = 720; // 30 days
+const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 
-// Allowed origins for CORS
 const ALLOWED_ORIGINS = [
-  'https://signaturetv.co',
-  'http://localhost:8080',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:8080',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000',
+  "https://signaturetv.co",
+  "http://localhost:8080",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:8080",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:3000",
 ];
 
-// Helper function to get CORS headers based on origin
-function getCorsHeaders(origin?: string) {
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || '') 
-    ? origin 
-    : 'https://signaturetv.co';
-  
+function getCorsHeaders(origin?: string): Record<string, string> {
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || "")
+    ? (origin || "https://signaturetv.co")
+    : "https://signaturetv.co";
+
   return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, idempotency-key',
-    'Content-Type': 'application/json',
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key",
+    "Content-Type": "application/json",
   };
 }
 
-// Helper function to ensure CORS headers on all responses
 function createResponse(data: unknown, status = 200, origin?: string) {
-  return new Response(
-    JSON.stringify(data),
-    { status, headers: getCorsHeaders(origin) }
-  );
+  return new Response(JSON.stringify(data), { status, headers: getCorsHeaders(origin) });
 }
 
 interface ProcessRentalRequest {
   userId: string;
   contentId: string;
-  contentType: 'episode' | 'season';
+  contentType: "movie" | "episode" | "season";
   price: number;
-  paymentMethod: 'wallet' | 'paystack';
+  paymentMethod: "wallet" | "paystack";
   referralCode?: string;
 }
 
-serve(async (req) => {
-  const origin = req.headers.get('origin') || undefined;
-  
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('OK', {
-      status: 200,
-      headers: getCorsHeaders(origin),
-    });
+function buildExpiryAt(contentType: "movie" | "episode" | "season") {
+  const expiryHours = getDefaultRentalDurationHours(contentType);
+  return new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString();
+}
+
+serve(async (req: Request) => {
+  const origin = req.headers.get("origin") || undefined;
+
+  if (req.method === "OPTIONS") {
+    return new Response("OK", { status: 200, headers: getCorsHeaders(origin) });
   }
 
   try {
     const supabase = createClient(
       SUPABASE_URL,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     let body: ProcessRentalRequest;
     try {
       body = await req.json();
     } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      return createResponse({ error: 'Invalid request body' }, 400, origin);
+      console.error("JSON parse error:", parseError);
+      return createResponse({ error: "Invalid request body" }, 400, origin);
     }
 
     const { userId, contentId, contentType, price, paymentMethod, referralCode } = body;
+    const normalizedType = normalizeContentType(contentType);
 
-    // Validate required fields
-    if (!userId || !contentId || !contentType || !price || !paymentMethod) {
-      return createResponse({ error: 'Missing required fields' }, 400, origin);
+    if (!userId || !contentId || !normalizedType || typeof price !== "number" || !paymentMethod) {
+      return createResponse({ error: "Missing required fields" }, 400, origin);
     }
 
-    // Check for existing active rental
-    const { data: existingRental } = await supabase
-      .from('rentals')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('content_id', contentId)
-      .eq('content_type', contentType)
-      .eq('status', 'completed')
-      .gte('expires_at', new Date().toISOString())
-      .maybeSingle();
-
-    if (existingRental) {
-      return createResponse({ error: 'User already has active rental for this content' }, 409, origin);
+    const accessResult = await hasActiveRentalAccess(supabase, userId, contentId, normalizedType);
+    if (accessResult.has_access) {
+      return createResponse({ error: "User already has active rental for this content" }, 409, origin);
     }
 
     let finalPrice = price;
     let discountApplied = 0;
 
-    // Apply referral code discount if provided
     if (referralCode) {
       const { data: codeData } = await supabase
-        .from('referral_codes')
-        .select('id, discount_type, discount_value')
-        .eq('code', referralCode.toUpperCase())
-        .eq('is_active', true)
+        .from("referral_codes")
+        .select("id, discount_type, discount_value")
+        .eq("code", referralCode.toUpperCase())
+        .eq("is_active", true)
         .maybeSingle();
 
       if (codeData) {
-        if (codeData.discount_type === 'percentage') {
-          discountApplied = Math.floor(price * codeData.discount_value / 100);
+        if (codeData.discount_type === "percentage") {
+          discountApplied = Math.floor((price * codeData.discount_value) / 100);
         } else {
           discountApplied = Math.min(codeData.discount_value, price);
         }
         finalPrice = Math.max(0, price - discountApplied);
-
-        // Record referral code usage
-        await supabase.from('referral_code_uses').insert({
-          code_id: codeData.id,
-          user_id: userId,
-          rental_id: undefined,
-        });
       }
     }
 
-    // Calculate expiration time based on content type
-    const expiresAt = new Date();
-    const durationHours = contentType === 'season' ? SEASON_RENTAL_DURATION_HOURS : RENTAL_DURATION_HOURS;
-    expiresAt.setHours(expiresAt.getHours() + durationHours);
+    const expiresAt = buildExpiryAt(normalizedType);
 
-    if (paymentMethod === 'wallet') {
-      // Wallet payment - deduct from user's wallet
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (walletError) {
-        console.error('Wallet query error:', walletError);
-        return createResponse({ error: 'Failed to retrieve wallet', details: walletError.message }, 500, origin);
-      }
-
-      if (!wallet) {
-        console.error('No wallet found for user:', userId);
-        return createResponse({ error: 'Wallet not found' }, 404, origin);
-      }
-
-      // Ensure balance exists and is a valid number
-      if (wallet.balance === null || wallet.balance === undefined) {
-        console.error('Wallet balance is null/undefined for user:', userId);
-        return createResponse({ error: 'Invalid wallet balance' }, 400, origin);
-      }
-
-      // Ensure balance is a number
-      const walletBalance = typeof wallet.balance === 'string' 
-        ? parseFloat(wallet.balance) 
-        : Number(wallet.balance);
-
-      if (isNaN(walletBalance)) {
-        console.error('Wallet balance is NaN for user:', userId, 'Value:', wallet.balance);
-        return createResponse({ error: 'Invalid wallet balance format' }, 400, origin);
-      }
-
-      if (walletBalance < finalPrice) {
-        return createResponse({ error: 'Insufficient wallet balance' }, 402, origin);
-      }
-
-      // Create rental record
-      console.log('Creating rental record for user:', userId, 'Content:', contentId);
-      const { data: rental, error: rentalError } = await supabase
-        .from('rentals')
-        .insert({
-          user_id: userId,
+    if (paymentMethod === "wallet") {
+      const { data, error } = await supabase.rpc("process_wallet_rental_payment", {
+        p_user_id: userId,
+        p_content_id: contentId,
+        p_content_type: normalizedType,
+        p_final_price: finalPrice,
+        p_expires_at: expiresAt,
+        p_metadata: {
           content_id: contentId,
-          content_type: contentType,
-          price: finalPrice,
-          payment_method: paymentMethod,
-          status: 'completed',
-          expires_at: expiresAt.toISOString(),
-        })
-        .select()
-        .single();
-
-      if (rentalError) {
-        console.error('Rental creation error:', rentalError);
-        console.error('Failed to create rental. Error details:', rentalError.message, 'Code:', rentalError.code);
-        return createResponse({ error: 'Failed to create rental record', details: rentalError.message }, 500, origin);
-      }
-
-      // Deduct from wallet
-      const newBalance = walletBalance - finalPrice;
-      console.log('Updating wallet for user:', userId, 'New balance:', newBalance);
-      
-      const { error: updateError } = await supabase
-        .from('wallets')
-        .update({ balance: newBalance })
-        .eq('user_id', userId);
-
-      if (updateError) {
-        console.error('Wallet update error:', updateError);
-        console.error('Failed to update wallet for user:', userId, 'Error:', updateError.message);
-        await supabase.from('rentals').delete().eq('id', rental.id);
-        return createResponse({ error: 'Failed to process payment', details: updateError.message }, 500, origin);
-      }
-
-      // Update referral code usage with rental ID
-      if (referralCode && discountApplied > 0) {
-        const { data: codeData } = await supabase
-          .from('referral_codes')
-          .select('id')
-          .eq('code', referralCode.toUpperCase())
-          .maybeSingle();
-
-        if (codeData) {
-          await supabase
-            .from('referral_code_uses')
-            .update({ rental_id: rental.id })
-            .eq('user_id', userId)
-            .eq('code_id', codeData.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-        }
-      }
-
-      return createResponse({
-        success: true,
-        rentalId: rental.id,
-        paymentMethod: 'wallet',
-        discountApplied,
-      }, 200, origin);
-    } else if (paymentMethod === 'paystack') {
-      // Paystack payment - create payment record and generate authorization URL
-      const { data: user, error: userError } = await supabase
-        .from('profiles')
-        .select('email, raw_user_meta_data')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (userError || !user) {
-        return createResponse({ error: 'User profile not found' }, 404, origin);
-      }
-
-      // Create pending rental record
-      const { data: rental, error: rentalError } = await supabase
-        .from('rentals')
-        .insert({
-          user_id: userId,
-          content_id: contentId,
-          content_type: contentType,
-          price: finalPrice,
-          payment_method: paymentMethod,
-          status: 'pending',
-          expires_at: expiresAt.toISOString(),
-        })
-        .select()
-        .single();
-
-      if (rentalError) {
-        return createResponse({ error: 'Failed to create rental record' }, 500, origin);
-      }
-
-      // Get user's full name for Paystack
-      const userData = user.raw_user_meta_data as any;
-      const fullName = userData?.full_name || user.email?.split('@')[0] || 'Customer';
-
-      // Initialize Paystack payment
-      const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          'Content-Type': 'application/json',
+          content_type: normalizedType,
+          original_price: price,
+          payment_method: "wallet",
         },
-        body: JSON.stringify({
-          email: user.email,
-          amount: finalPrice, // Already in kobo
-          metadata: {
-            rental_id: rental.id,
-            content_id: contentId,
-            content_type: contentType,
-            discount_code: referralCode || null,
-            discount_amount: discountApplied,
-            user_name: fullName,
-          },
-          callback_url: `${SUPABASE_URL}/verify-rental-payment?rental_id=${rental.id}`,
-        }),
+        p_referral_code: referralCode || null,
+        p_discount_amount: discountApplied,
+        p_provider_reference: null,
       });
 
-      if (!paystackResponse.ok) {
-        const error = await paystackResponse.json();
-        console.error('Paystack error:', error);
-        await supabase.from('rentals').delete().eq('id', rental.id);
-        return createResponse({ error: 'Failed to initialize payment' }, 500, origin);
+      if (error) {
+        console.error("Wallet rental RPC error:", error);
+        return createResponse({ error: error.message || "Failed to process wallet rental" }, 500, origin);
       }
 
-      const paystackData = await paystackResponse.json();
-
-      // Create rental_payments tracking record
-      const { error: paymentTrackError } = await supabase
-        .from('rental_payments')
-        .insert({
-          rental_id: rental.id,
-          user_id: userId,
-          paystack_reference: paystackData.data.reference,
-          paystack_access_code: paystackData.data.access_code,
-          amount: finalPrice,
-          payment_status: 'pending',
-        });
-
-      if (paymentTrackError) {
-        console.error('Payment tracking error:', paymentTrackError);
-      }
+      const rows = Array.isArray(data) ? data : [];
+      const row = rows[0] as { rental_intent_id?: string; rental_access_id?: string; wallet_balance?: number; expires_at?: string } | undefined;
 
       return createResponse({
         success: true,
-        rentalId: rental.id,
-        paymentMethod: 'paystack',
-        authorizationUrl: paystackData.data.authorization_url,
-        paystackReference: paystackData.data.reference,
+        rentalIntentId: row?.rental_intent_id ?? null,
+        rentalAccessId: row?.rental_access_id ?? null,
+        paymentMethod: "wallet",
+        walletBalance: row?.wallet_balance ?? null,
+        expiresAt: row?.expires_at ?? expiresAt,
         discountApplied,
       }, 200, origin);
     }
 
-    return createResponse({ error: 'Invalid payment method' }, 400, origin);
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("email, raw_user_meta_data")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError || !profile) {
+      return createResponse({ error: "User profile not found" }, 404, origin);
+    }
+
+    const userMeta = profile.raw_user_meta_data as { full_name?: string } | null;
+    const fullName = userMeta?.full_name || profile.email?.split("@")[0] || "Customer";
+    const intentId = crypto.randomUUID();
+
+    const rentalIntentPayload = buildRentalIntentPayload({
+      userId,
+      contentId,
+      contentType: normalizedType,
+      price: finalPrice,
+      paymentMethod: "paystack",
+      status: "pending",
+      providerReference: intentId,
+      paystackReference: null,
+      referralCode: referralCode || null,
+      discountAmount: discountApplied,
+      expiresAt,
+      metadata: {
+        content_id: contentId,
+        content_type: normalizedType,
+        original_price: price,
+        payment_method: "paystack",
+        user_name: fullName,
+      },
+    });
+
+    const { data: rentalIntent, error: rentalIntentError } = await supabase
+      .from("rental_intents")
+      .insert(rentalIntentPayload)
+      .select("id")
+      .single();
+
+    if (rentalIntentError) {
+      console.error("Rental intent creation error:", rentalIntentError);
+      return createResponse({ error: "Failed to create rental intent" }, 500, origin);
+    }
+
+    const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: profile.email,
+        amount: Math.round(finalPrice * 100),
+        reference: intentId,
+        callback_url: `${SUPABASE_URL}/functions/v1/verify-payment`,
+        metadata: {
+          rental_intent_id: rentalIntent.id,
+          user_id: userId,
+          content_id: contentId,
+          content_type: normalizedType,
+          purpose: "rental",
+          referral_code: referralCode || null,
+          discount_amount: discountApplied,
+        },
+      }),
+    });
+
+    if (!paystackResponse.ok) {
+      const error = await paystackResponse.json().catch(() => ({}));
+      console.error("Paystack error:", error);
+      await supabase.from("rental_intents").update({ status: "failed", failed_at: new Date().toISOString() }).eq("id", rentalIntent.id);
+      return createResponse({ error: "Failed to initialize payment" }, 500, origin);
+    }
+
+    const paystackData = await paystackResponse.json();
+
+    await supabase
+      .from("rental_intents")
+      .update({
+        paystack_reference: paystackData.data.reference,
+        provider_reference: paystackData.data.reference,
+        metadata: {
+          content_id: contentId,
+          content_type: normalizedType,
+          original_price: price,
+          payment_method: "paystack",
+          user_name: fullName,
+          paystack_access_code: paystackData.data.access_code,
+        },
+      })
+      .eq("id", rentalIntent.id);
+
+    return createResponse({
+      success: true,
+      paymentMethod: "paystack",
+      rentalIntentId: rentalIntent.id,
+      authorizationUrl: paystackData.data.authorization_url,
+      paystackReference: paystackData.data.reference,
+      discountApplied,
+    }, 200, origin);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : '';
-    console.error('Error in process-rental:', errorMessage);
-    console.error('Error stack:', errorStack);
-    return createResponse({ 
-      error: 'Internal server error',
-      details: errorMessage 
+    console.error("Error in process-rental:", errorMessage);
+    return createResponse({
+      error: "Internal server error",
+      details: errorMessage,
     }, 500, origin);
   }
 });

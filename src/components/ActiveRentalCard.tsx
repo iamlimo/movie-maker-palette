@@ -7,13 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Play, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface Rental {
   id: string;
   content_id: string;
   content_type: string;
   expires_at: string;
-  amount: number;
+  price: number;
   created_at: string;
 }
 
@@ -253,9 +254,9 @@ const ActiveRentalCard: React.FC<ActiveRentalCardProps> = ({ rental, formatTimeR
         )}
 
         {/* Price Paid */}
-        {rental.amount && (
+        {rental.price !== undefined && rental.price !== null && (
           <div className="text-xs text-muted-foreground mb-3">
-            Paid: <span className="font-medium">₦{(rental.amount / 100).toLocaleString('en-NG')}</span>
+            Paid: <span className="font-medium">{formatNaira(rental.price)}</span>
           </div>
         )}
 

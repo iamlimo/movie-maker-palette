@@ -42,72 +42,93 @@ function normalizeContentType(contentType: string) {
 
 async function checkAccess(user: any, supabase: any, contentId: string, contentType: string) {
   const normalizedType = normalizeContentType(contentType);
-  const now = new Date().toISOString();
 
   const isSuperAdmin = await hasRole(supabase, user.id, 'super_admin');
   if (isSuperAdmin) {
     return jsonResponse({
       has_access: true,
-      access_type: 'purchase',
-      rental: null,
-      purchase: null,
+      access_type: 'admin',
       expires_at: null,
     });
   }
 
-  const rentalQuery = supabase
-    .from('rentals')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('content_id', contentId)
-    .eq('content_type', normalizedType)
-    .eq('status', 'completed')
-    .gte('expires_at', now)
-    .order('expires_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const purchaseQuery = supabase
-    .from('purchases')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('content_id', contentId)
-    .eq('content_type', normalizedType)
-    .maybeSingle();
-
-  const [{ data: rental }, { data: purchase }] = await Promise.all([rentalQuery, purchaseQuery]);
-
-  if (rental || purchase) {
-    return jsonResponse({
-      has_access: true,
-      access_type: rental ? 'rental' : 'purchase',
-      rental: rental || null,
-      purchase: purchase || null,
-      expires_at: rental?.expires_at || null,
+  try {
+    // Use optimized RPC function for access check
+    // This handles episode->season access delegation automatically
+    const { data, error } = await supabase.rpc('has_active_rental_access', {
+      p_user_id: user.id,
+      p_content_id: contentId,
+      p_content_type: normalizedType,
     });
-  }
 
-  if (normalizedType === 'episode') {
-    const { data: episodeData, error: episodeError } = await supabase
-      .from('episodes')
-      .select('id, season_id, seasons(tv_show_id)')
-      .eq('id', contentId)
+    if (error) {
+      console.error('RPC access check error:', error);
+      return errorResponse('Unable to verify access', 500);
+    }
+
+    const accessResult = Array.isArray(data) ? data[0] : data;
+
+    if (accessResult?.has_access) {
+      return jsonResponse({
+        has_access: true,
+        access_type: accessResult.access_type || 'rental',
+        expires_at: accessResult.expires_at,
+        rental_access_id: accessResult.rental_access_id,
+      });
+    }
+
+    // Fallback: check legacy rentals table for backward compatibility
+    const now = new Date().toISOString();
+    const { data: legacyRental } = await supabase
+      .from('rentals')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('content_id', contentId)
+      .eq('content_type', normalizedType)
+      .eq('status', 'completed')
+      .gte('expires_at', now)
+      .order('expires_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (episodeError) {
-      console.error('Episode lookup failed:', episodeError);
-      return errorResponse('Unable to verify episode access', 500);
+    if (legacyRental) {
+      return jsonResponse({
+        has_access: true,
+        access_type: 'rental',
+        expires_at: legacyRental.expires_at,
+      });
     }
 
-    if (!episodeData) {
-      return errorResponse('Episode not found', 404);
+    // Check purchases for permanent access
+    const { data: purchase } = await supabase
+      .from('purchases')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('content_id', contentId)
+      .eq('content_type', normalizedType)
+      .maybeSingle();
+
+    if (purchase) {
+      return jsonResponse({
+        has_access: true,
+        access_type: 'purchase',
+        expires_at: null,
+      });
     }
 
-    const seasonId = episodeData.season_id;
-    const tvShowId = episodeData.seasons?.tv_show_id;
+    // For episodes, check if season rental/purchase exists
+    if (normalizedType === 'episode') {
+      const { data: episodeData } = await supabase
+        .from('episodes')
+        .select('season_id, seasons(tv_show_id)')
+        .eq('id', contentId)
+        .maybeSingle();
 
-    const seasonRentalQuery = seasonId
-      ? supabase
+      if (episodeData?.season_id) {
+        const seasonId = episodeData.season_id;
+
+        // Check season rental
+        const { data: seasonRental } = await supabase
           .from('rentals')
           .select('*')
           .eq('user_id', user.id)
@@ -115,102 +136,90 @@ async function checkAccess(user: any, supabase: any, contentId: string, contentT
           .eq('content_type', 'season')
           .eq('status', 'completed')
           .gte('expires_at', now)
-          .order('expires_at', { ascending: false })
           .limit(1)
-          .maybeSingle()
-      : Promise.resolve({ data: null });
+          .maybeSingle();
 
-    const seasonPurchaseQuery = seasonId
-      ? supabase
+        if (seasonRental) {
+          return jsonResponse({
+            has_access: true,
+            access_type: 'rental',
+            expires_at: seasonRental.expires_at,
+          });
+        }
+
+        // Check season purchase and show purchase
+        const { data: seasonPurchase } = await supabase
           .from('purchases')
           .select('*')
           .eq('user_id', user.id)
           .eq('content_id', seasonId)
           .eq('content_type', 'season')
-          .maybeSingle()
-      : Promise.resolve({ data: null });
+          .maybeSingle();
 
-    const showPurchaseQuery = tvShowId
-      ? supabase
+        if (seasonPurchase) {
+          return jsonResponse({
+            has_access: true,
+            access_type: 'purchase',
+            expires_at: null,
+          });
+        }
+
+        if (episodeData.seasons?.tv_show_id) {
+          const { data: showPurchase } = await supabase
+            .from('purchases')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('content_id', episodeData.seasons.tv_show_id)
+            .in('content_type', ['tv', 'tv_show'])
+            .maybeSingle();
+
+          if (showPurchase) {
+            return jsonResponse({
+              has_access: true,
+              access_type: 'purchase',
+              expires_at: null,
+            });
+          }
+        }
+      }
+    }
+
+    // For seasons, check if show purchase exists
+    if (normalizedType === 'season') {
+      const { data: seasonData } = await supabase
+        .from('seasons')
+        .select('tv_show_id')
+        .eq('id', contentId)
+        .maybeSingle();
+
+      if (seasonData?.tv_show_id) {
+        const { data: showPurchase } = await supabase
           .from('purchases')
           .select('*')
           .eq('user_id', user.id)
-          .eq('content_id', tvShowId)
+          .eq('content_id', seasonData.tv_show_id)
           .in('content_type', ['tv', 'tv_show'])
-          .maybeSingle()
-      : Promise.resolve({ data: null });
+          .maybeSingle();
 
-    const [seasonRentalResult, seasonPurchaseResult, showPurchaseResult] = await Promise.all([
-      seasonRentalQuery,
-      seasonPurchaseQuery,
-      showPurchaseQuery,
-    ]);
-
-    const seasonRental = seasonRentalResult?.data;
-    const seasonPurchase = seasonPurchaseResult?.data;
-    const showPurchase = showPurchaseResult?.data;
-
-    if (seasonRental || seasonPurchase) {
-      return jsonResponse({
-        has_access: true,
-        access_type: seasonRental ? 'rental' : 'purchase',
-        rental: seasonRental || null,
-        purchase: seasonPurchase || null,
-        expires_at: seasonRental?.expires_at || null,
-      });
-    }
-
-    if (showPurchase) {
-      return jsonResponse({
-        has_access: true,
-        access_type: 'purchase',
-        rental: null,
-        purchase: showPurchase,
-        expires_at: null,
-      });
-    }
-  }
-
-  if (normalizedType === 'season') {
-    const { data: seasonData, error: seasonError } = await supabase
-      .from('seasons')
-      .select('tv_show_id')
-      .eq('id', contentId)
-      .maybeSingle();
-
-    if (seasonError) {
-      console.error('Season lookup failed:', seasonError);
-      return errorResponse('Unable to verify season access', 500);
-    }
-
-    if (seasonData?.tv_show_id) {
-      const { data: showPurchase } = await supabase
-        .from('purchases')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('content_id', seasonData.tv_show_id)
-        .in('content_type', ['tv', 'tv_show'])
-        .maybeSingle();
-
-      if (showPurchase) {
-        return jsonResponse({
-          has_access: true,
-          access_type: 'purchase',
-          rental: null,
-          purchase: showPurchase,
-          expires_at: null,
-        });
+        if (showPurchase) {
+          return jsonResponse({
+            has_access: true,
+            access_type: 'purchase',
+            expires_at: null,
+          });
+        }
       }
     }
-  }
 
-  return jsonResponse({
-    has_access: false,
-    access_type: null,
-    rental: null,
-    purchase: null,
-    expires_at: null,
-  });
+    return jsonResponse({
+      has_access: false,
+      access_type: null,
+      expires_at: null,
+    });
+  } catch (error) {
+    console.error('Error checking access:', error);
+    return errorResponse('Unable to verify access', 500);
+  }
 }
 
 async function hasRole(supabase: any, userId: string, role: string) {

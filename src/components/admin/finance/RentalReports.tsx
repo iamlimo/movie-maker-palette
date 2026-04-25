@@ -66,6 +66,13 @@ interface PaymentMethodData {
   count: number;
 }
 
+interface RentalPaymentRecord {
+  amount: number;
+  method: string | null;
+  provider: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#a4de6c'];
 
 export const RentalReports = () => {
@@ -125,7 +132,7 @@ export const RentalReports = () => {
         const tvRentals = rentals.filter(r => r.content_type === 'tv').length;
         const activeRentals = rentals.filter(r => r.status === 'active').length;
         const expiredRentals = rentals.filter(r => r.status === 'expired').length;
-        const totalRevenue = rentals.reduce((sum, r) => sum + (r.amount || 0), 0);
+        const totalRevenue = rentals.reduce((sum, r) => sum + (r.price || 0), 0);
         const successRate = payments ? (rentals.length / (payments.length || 1)) * 100 : 0;
 
         setMetrics({
@@ -161,16 +168,21 @@ export const RentalReports = () => {
         const contentMap = new Map<string, { title: string; type: 'movie' | 'tv'; count: number; revenue: number }>();
         
         for (const rental of rentals) {
-          const key = `${rental.content_id}-${rental.content_type}`;
-          const title = contentTitleMap.get(`${rental.content_type}-${rental.content_id}`) || 'Unknown Content';
+          if (rental.content_type !== 'movie' && rental.content_type !== 'tv') {
+            continue;
+          }
+
+          const contentType = rental.content_type;
+          const key = `${rental.content_id}-${contentType}`;
+          const title = contentTitleMap.get(`${contentType}-${rental.content_id}`) || 'Unknown Content';
           const existing = contentMap.get(key) || {
-            title: title,
-            type: rental.content_type,
+            title,
+            type: contentType,
             count: 0,
             revenue: 0,
           };
           existing.count += 1;
-          existing.revenue += rental.amount || 0;
+          existing.revenue += rental.price || 0;
           contentMap.set(key, existing);
         }
 
@@ -203,7 +215,7 @@ export const RentalReports = () => {
           const dateStr = rental.created_at.split('T')[0];
           const existing = trendMap.get(dateStr) || { rentals: 0, revenue: 0 };
           existing.rentals += 1;
-          existing.revenue += rental.amount || 0;
+          existing.revenue += rental.price || 0;
           trendMap.set(dateStr, existing);
         }
 
@@ -218,12 +230,17 @@ export const RentalReports = () => {
         setRentalTrends(trends);
 
         // Get payment method breakdown
+        const paymentList = (payments || []) as RentalPaymentRecord[];
         const paymentMethodMap = new Map<string, { count: number; revenue: number }>();
-        for (const rental of rentals) {
-          const method = rental.payment_method || 'unknown';
+        for (const payment of paymentList) {
+          const metadataPaymentMethod =
+            payment.metadata && typeof payment.metadata['payment_method'] === 'string'
+              ? (payment.metadata['payment_method'] as string)
+              : null;
+          const method = payment.method || metadataPaymentMethod || payment.provider || 'unknown';
           const existing = paymentMethodMap.get(method) || { count: 0, revenue: 0 };
           existing.count += 1;
-          existing.revenue += rental.amount || 0;
+          existing.revenue += payment.amount || 0;
           paymentMethodMap.set(method, existing);
         }
 
