@@ -174,8 +174,9 @@ function AppContent() {
           </Routes>
         </Suspense>
       </MobileRouteAnimator>
-      <BottomNav />
+      <BottomNav /> 
       <OfflineSyncStatus />
+       {/* this controls the syncing status badge that appears when the user is offline or has pending sync actions. It listens for online/offline events and updates the UI accordingly, showing a badge with the number of pending sync actions when offline, and a syncing animation when processing the queue. */}
   
     </>
   );
