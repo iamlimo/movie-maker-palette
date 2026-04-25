@@ -40,11 +40,22 @@ const Watch = () => {
       let retryCount = 0;
       const maxRetries = 3;
       const retryDelay = 500; // ms
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        setError("Please sign in again to continue");
+        setLoading(false);
+        return;
+      }
 
       // Retry logic for access check (database sync delay)
       while (retryCount < maxRetries) {
         const result = await supabase.functions.invoke("rental-access", {
-          body: { content_id: contentId, content_type: contentType }
+          body: { content_id: contentId, content_type: contentType },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          }
         });
 
         accessError = result.error;
@@ -153,14 +164,17 @@ const Watch = () => {
       if (contentType === "movie") {
         // Use get-video-url function for movies (generates signed URL)
         const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
-          body: { movieId: contentId }
+          body: { movieId: contentId },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          }
         });
         
-        if (urlError || !urlData?.url) {
+        if (urlError || !urlData?.signedUrl) {
           // Fallback to direct URL from database
           videoUrlData = { url: contentData.video_url };
         } else {
-          videoUrlData = urlData;
+          videoUrlData = { url: urlData.signedUrl };
         }
       } else if (contentType === "episode") {
         // For episodes, use direct video URL from database

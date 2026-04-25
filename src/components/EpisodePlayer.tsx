@@ -89,8 +89,18 @@ const EpisodePlayer = ({
   };
 
   const checkRentalAccess = async (contentId: string, contentType: 'episode' | 'season'): Promise<RentalAccess> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      throw new Error('Missing session token');
+    }
+
     const { data, error } = await supabase.functions.invoke('rental-access', {
-      body: { content_id: contentId, content_type: contentType }
+      body: { content_id: contentId, content_type: contentType },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      }
     });
     
     if (error) throw error;

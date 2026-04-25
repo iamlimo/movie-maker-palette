@@ -1,8 +1,9 @@
-﻿import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+﻿/// <reference path="../deno.d.ts" />
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { jsonResponse, handleOptions, errorResponse } from "../_shared/cors.ts";
 import { authenticateUser } from "../_shared/auth.ts";
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const optionsResponse = handleOptions(req);
   if (optionsResponse) return optionsResponse;
 
@@ -33,11 +34,54 @@ serve(async (req) => {
 
 function normalizeContentType(contentType: string) {
   const lowerType = String(contentType).toLowerCase().trim();
-  if (lowerType === 'tv_show') return 'tv';
-  if (['movie', 'tv', 'season', 'episode'].includes(lowerType)) {
+  if (lowerType === 'tv_show' || lowerType === 'tv') return 'season';
+  if (['movie', 'season', 'episode'].includes(lowerType)) {
     return lowerType;
   }
-  return 'tv';
+  return 'season';
+}
+
+async function findDirectRentalAccess(supabase: any, userId: string, contentId: string, contentType: string) {
+  const now = new Date().toISOString();
+
+  const buildQuery = (column: 'movie_id' | 'season_id' | 'episode_id', value: string) =>
+    supabase
+      .from('rental_access')
+      .select('*')
+      .eq('user_id', userId)
+      .eq(column, value)
+      .eq('revoked_at', null)
+      .eq('status', 'paid')
+      .gt('expires_at', now)
+      .order('expires_at', { ascending: false });
+
+  if (contentType === 'movie') {
+    const { data, error } = await buildQuery('movie_id', contentId).maybeSingle();
+    if (!error && data) return data;
+  }
+
+  if (contentType === 'season') {
+    const { data, error } = await buildQuery('season_id', contentId).maybeSingle();
+    if (!error && data) return data;
+  }
+
+  if (contentType === 'episode') {
+    const { data: episodeAccess, error: episodeAccessError } = await buildQuery('episode_id', contentId).maybeSingle();
+    if (!episodeAccessError && episodeAccess) return episodeAccess;
+
+    const { data: episodeData } = await supabase
+      .from('episodes')
+      .select('season_id')
+      .eq('id', contentId)
+      .maybeSingle();
+
+    if (episodeData?.season_id) {
+      const { data: seasonAccess, error: seasonAccessError } = await buildQuery('season_id', episodeData.season_id).maybeSingle();
+      if (!seasonAccessError && seasonAccess) return seasonAccess;
+    }
+  }
+
+  return null;
 }
 
 async function checkAccess(user: any, supabase: any, contentId: string, contentType: string) {
@@ -52,21 +96,25 @@ async function checkAccess(user: any, supabase: any, contentId: string, contentT
     });
   }
 
-  try {
+    try {
     // Use optimized RPC function for access check
     // This handles episode->season access delegation automatically
-    const { data, error } = await supabase.rpc('has_active_rental_access', {
-      p_user_id: user.id,
-      p_content_id: contentId,
-      p_content_type: normalizedType,
-    });
+    let accessResult: any = null;
+    try {
+      const { data, error } = await supabase.rpc('has_active_rental_access', {
+        p_user_id: user.id,
+        p_content_id: contentId,
+        p_content_type: normalizedType,
+      });
 
-    if (error) {
-      console.error('RPC access check error:', error);
-      return errorResponse('Unable to verify access', 500);
+      if (error) {
+        console.warn('RPC access check error, falling back to direct lookup:', error);
+      } else {
+        accessResult = Array.isArray(data) ? data[0] : data;
+      }
+    } catch (rpcError) {
+      console.warn('RPC access check failed, falling back to direct lookup:', rpcError);
     }
-
-    const accessResult = Array.isArray(data) ? data[0] : data;
 
     if (accessResult?.has_access) {
       return jsonResponse({
@@ -74,6 +122,16 @@ async function checkAccess(user: any, supabase: any, contentId: string, contentT
         access_type: accessResult.access_type || 'rental',
         expires_at: accessResult.expires_at,
         rental_access_id: accessResult.rental_access_id,
+      });
+    }
+
+    const directAccess = await findDirectRentalAccess(supabase, user.id, contentId, normalizedType);
+    if (directAccess) {
+      return jsonResponse({
+        has_access: true,
+        access_type: directAccess.source === 'purchase' ? 'purchase' : 'rental',
+        expires_at: directAccess.expires_at,
+        rental_access_id: directAccess.id,
       });
     }
 
