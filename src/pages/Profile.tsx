@@ -179,6 +179,10 @@ const Profile = () => {
 
   const stats = getDashboardStats();
 
+  const handleContinueWatching = (contentType: 'movie' | 'episode', contentId: string) => {
+    navigate(`/watch/${contentType}/${contentId}`);
+  };
+
   const availableGenres = [
     'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Mystery', 
     'Romance', 'Sci-Fi', 'Thriller', 'Documentary', 'Animation', 'Crime', 'War'
@@ -340,9 +344,7 @@ const Profile = () => {
                         <ContentCarouselItem key={item.id} minWidth="220px" className="max-w-xs w-full">
                           <WatchProgressCard
                             item={item}
-                            onPlay={() => {
-                              console.log('Playing:', item.title);
-                            }}
+                            onPlay={() => handleContinueWatching(item.content_type, item.content_id)}
                             onRemove={() => removeFromHistory(item.id)}
                             onMarkCompleted={() => markAsCompleted(item.content_type, item.content_id)}
                           />
@@ -626,6 +628,8 @@ const Profile = () => {
                         value={preferencesData.preferred_language}
                         onChange={(e) => setPreferencesData({ ...preferencesData, preferred_language: e.target.value })}
                         className="w-full p-2 border rounded-md bg-background"
+                        aria-label="Preferred language"
+                        title="Preferred language"
                       >
                         {languages.map((lang) => (
                           <option key={lang.code} value={lang.code}>
@@ -761,7 +765,7 @@ const Profile = () => {
                               >
                                 Remove
                               </Button>
-                              <Button size="sm">
+                              <Button size="sm" onClick={() => handleContinueWatching(item.content_type, item.content_id)}>
                                 <Play size={12} className="mr-1" />
                                 Continue
                               </Button>

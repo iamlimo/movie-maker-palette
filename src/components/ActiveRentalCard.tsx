@@ -8,14 +8,29 @@ import { Progress } from '@/components/ui/progress';
 import { Play, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatNaira } from '@/lib/priceUtils';
+import type { Rental } from '@/hooks/useRentals';
 
-interface Rental {
-  id: string;
-  content_id: string;
-  content_type: string;
-  expires_at: string;
-  price: number;
-  created_at: string;
+interface ActiveRentalContent {
+  id?: string;
+  title?: string;
+  thumbnail_url?: string | null;
+  duration?: number | null;
+  release_date?: string | null;
+  price?: number | null;
+  total_seasons?: number | null;
+  season_number?: number | null;
+  episode_number?: number | null;
+  episode_count?: number | null;
+  tv_shows?: {
+    title?: string;
+    thumbnail_url?: string | null;
+  };
+  seasons?: {
+    tv_shows?: {
+      title?: string;
+      thumbnail_url?: string | null;
+    };
+  };
 }
 
 interface ActiveRentalCardProps {
@@ -25,7 +40,7 @@ interface ActiveRentalCardProps {
 
 const ActiveRentalCard: React.FC<ActiveRentalCardProps> = ({ rental, formatTimeRemaining }) => {
   const navigate = useNavigate();
-  const [content, setContent] = useState<any>(null);
+  const [content, setContent] = useState<ActiveRentalContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number } | null>(null);
   const [expiryPercentage, setExpiryPercentage] = useState(100);
@@ -254,9 +269,9 @@ const ActiveRentalCard: React.FC<ActiveRentalCardProps> = ({ rental, formatTimeR
         )}
 
         {/* Price Paid */}
-        {rental.price !== undefined && rental.price !== null && (
+        {rental.amount !== undefined && rental.amount !== null && (
           <div className="text-xs text-muted-foreground mb-3">
-            Paid: <span className="font-medium">{formatNaira(rental.price)}</span>
+            Paid: <span className="font-medium">{formatNaira(rental.amount)}</span>
           </div>
         )}
 
