@@ -284,7 +284,7 @@ serve(async (req) => {
           user_id: user.id,
           content_id: contentId,
           content_type: normalizedContentType,
-          amount: finalPrice / 100, // Convert from kobo to naira
+          price: finalPrice, // Store in kobo to match the DB schema
           expires_at: expiresAt,
           status: 'active'
         });

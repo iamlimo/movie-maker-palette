@@ -33,12 +33,12 @@ export const useContentUpload = () => {
         return await uploadLargeFile(file, fileType);
       }
 
-      const { data, error } = await supabase.functions.invoke(`file-upload?type=${fileType}&filename=${encodeURIComponent(file.name)}`, {
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-        method: 'POST'
+      const { data, error } = await supabase.functions.invoke('unified-media-upload', {
+        body: {
+          fileName: file.name,
+          fileType: fileType,
+          contentType: file.type
+        }
       });
 
       if (error) {
@@ -92,8 +92,12 @@ export const useContentUpload = () => {
   ): Promise<UploadResult | null> => {
     try {
       // Get signed upload URL first
-      const { data: signedData, error: signedError } = await supabase.functions.invoke(`file-upload?action=signed-url&type=${fileType}&filename=${encodeURIComponent(file.name)}`, {
-        method: 'GET'
+      const { data: signedData, error: signedError } = await supabase.functions.invoke('unified-media-upload', {
+        body: {
+          fileName: file.name,
+          fileType: fileType,
+          contentType: 'video/mp4'
+        }
       });
 
       if (signedError || !signedData.success) {
@@ -140,12 +144,12 @@ export const useContentUpload = () => {
       try {
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
         
-        const { data, error } = await supabase.functions.invoke(`file-upload?type=${fileType}&filename=${encodeURIComponent(file.name)}`, {
-          body: file,
-          headers: {
-            'Content-Type': file.type,
-          },
-          method: 'POST'
+        const { data, error } = await supabase.functions.invoke('unified-media-upload', {
+          body: {
+            fileName: file.name,
+            fileType: fileType,
+            contentType: file.type
+          }
         });
 
         if (error) throw error;

@@ -122,11 +122,8 @@ const ContinueWatchingSection: React.FC = () => {
   }
 
   const handlePlay = (item: WatchHistoryItem) => {
-    if (item.content_type === 'movie') {
-      navigate(`/movie/${item.content_id}`);
-    } else {
-      navigate(`/episode/${item.content_id}`);
-    }
+    // Navigate to the actual watch page instead of preview
+    navigate(`/watch/${item.content_type}/${item.content_id}`);
   };
 
   const handleRemove = async (item: WatchHistoryItem) => {

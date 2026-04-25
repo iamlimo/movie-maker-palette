@@ -943,32 +943,32 @@ export type Database = {
       }
       rentals: {
         Row: {
-          amount: number
           content_id: string
           content_type: string
           created_at: string
           expires_at: string
           id: string
+          price: number
           status: string
           user_id: string
         }
         Insert: {
-          amount: number
           content_id: string
           content_type: string
           created_at?: string
           expires_at: string
           id?: string
+          price: number
           status?: string
           user_id: string
         }
         Update: {
-          amount?: number
           content_id?: string
           content_type?: string
           created_at?: string
           expires_at?: string
           id?: string
+          price?: number
           status?: string
           user_id?: string
         }
