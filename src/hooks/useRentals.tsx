@@ -37,12 +37,34 @@ export const useRentals = () => {
         .from('rentals')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'active')
+        .in('status', ['active', 'completed'])
         .gte('expires_at', new Date().toISOString())
         .order('expires_at', { ascending: true });
 
       if (error) throw error;
-      setActiveRentals(data || []);
+      const normalizedRentals: Rental[] = (data || []).map(
+        (rental: {
+          id: string;
+          user_id: string;
+          content_id: string;
+          content_type: string;
+          price?: number;
+          amount?: number;
+          status: string;
+          expires_at: string;
+          created_at: string;
+        }) => ({
+          id: rental.id,
+          user_id: rental.user_id,
+          content_id: rental.content_id,
+          content_type: rental.content_type,
+          amount: rental.amount ?? rental.price ?? 0,
+          status: rental.status,
+          expires_at: rental.expires_at,
+          created_at: rental.created_at,
+        })
+      );
+      setActiveRentals(normalizedRentals);
     } catch (error) {
       console.error('Error fetching rentals:', error);
     } finally {
@@ -54,7 +76,7 @@ export const useRentals = () => {
     return activeRentals.some(rental => 
       rental.content_id === contentId && 
       rental.content_type === contentType &&
-      rental.status === 'active' &&
+      (rental.status === 'active' || rental.status === 'completed') &&
       new Date(rental.expires_at) > new Date()
     );
   }, [activeRentals]);

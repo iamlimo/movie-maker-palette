@@ -144,6 +144,18 @@ const TVShowPreview = () => {
     }
   }, [user, Object.keys(episodes).length, seasons.length]);
 
+  useEffect(() => {
+    if (seasons.length > 0) {
+      const hasSelectedSeason = seasons.some(
+        (season) => season.season_number === selectedSeason
+      );
+
+      if (!hasSelectedSeason) {
+        setSelectedSeason(seasons[0].season_number);
+      }
+    }
+  }, [seasons, selectedSeason]);
+
   // Sticky nav on scroll
   useEffect(() => {
     const handleScroll = () => {
@@ -359,7 +371,8 @@ const TVShowPreview = () => {
     );
   }
 
-  const currentSeason = seasons.find((s) => s.season_number === selectedSeason);
+  const currentSeason =
+    seasons.find((s) => s.season_number === selectedSeason) ?? seasons[0] ?? null;
   const currentEpisodes = currentSeason ? episodes[currentSeason.id] || [] : [];
 
   return (

@@ -11,12 +11,14 @@ interface ContinueWatchingCardProps {
   item: WatchHistoryItem;
   onPlay: () => void;
   onRemove: () => void;
+  canRemove: boolean;
 }
 
 const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
   item,
   onPlay,
   onRemove,
+  canRemove,
 }) => {
   const formatTimeRemaining = (item: WatchHistoryItem) => {
     if (item.playback_position !== undefined && item.video_duration && item.video_duration > 0) {
@@ -92,10 +94,14 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
           <button
             onClick={(event) => {
               event.stopPropagation();
-              onRemove();
+              if (canRemove) {
+                onRemove();
+              }
             }}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
-            aria-label="Remove from Continue Watching"
+            className={`absolute top-2 right-2 p-1.5 rounded-full text-white transition-opacity ${canRemove ? 'bg-black/60 opacity-0 group-hover:opacity-100 hover:bg-black/80' : 'bg-black/35 opacity-100 cursor-not-allowed'}`}
+            aria-label={canRemove ? "Remove from Continue Watching" : "Active rental cannot be removed"}
+            disabled={!canRemove}
+            title={canRemove ? "Remove from Continue Watching" : "Active rental cannot be removed"}
           >
             <X size={14} />
           </button>
@@ -146,7 +152,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
 const ContinueWatchingSection: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { continueWatching, loading, removeFromHistory } = useWatchHistory();
+  const { continueWatching, loading, removeFromHistory, canRemoveFromHistory } = useWatchHistory();
 
   // Don't render if user is not logged in or no content to show
   if (!user || loading || continueWatching.length === 0) {
@@ -191,6 +197,7 @@ const ContinueWatchingSection: React.FC = () => {
               item={item}
               onPlay={() => handlePlay(item)}
               onRemove={() => handleRemove(item)}
+              canRemove={canRemoveFromHistory(item)}
             />
           ))}
         </div>
