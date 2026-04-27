@@ -83,7 +83,7 @@ export const useProfile = () => {
 
       if (profileError && profileError.code !== 'PGRST116') {
         console.error('Error fetching profile:', profileError);
-        throw profileError;
+        setProfile(null);
       }
 
       // Fetch preferences
@@ -228,7 +228,12 @@ export const useProfile = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setProfile(null);
+      setPreferences(null);
+      setLoading(false);
+      return;
+    }
 
     fetchProfile();
 

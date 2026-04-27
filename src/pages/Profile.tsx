@@ -48,7 +48,6 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useRentals } from '@/hooks/useRentals';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import ContentCarousel, { ContentCarouselItem } from '@/components/ContentCarousel';
 import WatchProgressCard from '@/components/WatchProgressCard';
 import ActiveRentalCard from '@/components/ActiveRentalCard';
@@ -67,7 +66,10 @@ const Profile = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 1024;
+  });
   const isMobile = useIsMobile();
 
   const handleSignOut = async () => {
@@ -90,6 +92,10 @@ const Profile = () => {
       setIsSigningOut(false);
     }
   };
+  React.useEffect(() => {
+    setSidebarCollapsed(isMobile);
+  }, [isMobile]);
+
   const { isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
       await Promise.all([
@@ -201,21 +207,18 @@ const Profile = () => {
     { code: 'zh', name: 'Chinese' }
   ];
 
-  if (profileLoading || historyLoading || favoritesLoading) {
+  if (profileLoading) {
     return (
-      <ProtectedRoute>
-        <div className="min-h-screen gradient-hero flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 gradient-accent rounded-full animate-pulse mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading your profile...</p>
-          </div>
+      <div className="min-h-screen gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 gradient-accent rounded-full animate-pulse mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your profile...</p>
         </div>
-      </ProtectedRoute>
+      </div>
     );
   }
 
   return (
-    <ProtectedRoute>
       <div className="min-h-screen bg-background">
         {/* Pull-to-refresh indicator */}
         {isRefreshing && isMobile && (
@@ -281,13 +284,13 @@ const Profile = () => {
         <div className="flex">
           {/* Sidebar */}
           <div className={cn(
-            "fixed inset-y-0 left-0 z-50 bg-background border-r border-border transition-transform duration-300 lg:relative lg:translate-x-0",
+            "fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] bg-background border-r border-border transition-transform duration-300 lg:relative lg:translate-x-0 lg:w-80 lg:max-w-none",
             sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
           )}>
             <ProfileSidebar
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              isCollapsed={false}
+              isCollapsed={sidebarCollapsed}
               onToggleCollapse={() => setSidebarCollapsed(true)}
               className="h-full"
             />
@@ -328,7 +331,7 @@ const Profile = () => {
                   <div className="flex flex-col items-center p-2 md:p-4">
                     <Star className="w-5 h-5 text-muted-foreground mb-1" />
                     <span className="text-xs md:text-sm text-muted-foreground">Watch Time</span>
-                    <span className="font-semibold text-lg md:text-2xl">{Math.round(watchHistory.reduce((acc, item) => acc + (item.duration || 0) * (item.progress / 100), 0) / 60)}h</span>
+                    <span className="font-semibold text-lg md:text-2xl">{Math.round((Array.isArray(watchHistory) ? watchHistory : []).reduce((acc, item) => acc + (item.duration || 0) * (item.progress / 100), 0) / 60)}h</span>
                   </div>
                 </div>
 
@@ -930,7 +933,6 @@ const Profile = () => {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
   );
 };
 
