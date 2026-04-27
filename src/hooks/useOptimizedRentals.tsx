@@ -1,23 +1,13 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/hooks/useWallet';
-import { toast } from '@/hooks/use-toast';
 
 export type RentalType = 'episode' | 'season';
 export type PaymentMethod = 'wallet' | 'paystack';
 
-export interface RentalRecord {
-  id: string;
-  user_id: string;
-  content_id: string;
-  content_type: RentalType;
-  price: number;
-  payment_method: PaymentMethod;
-  status: 'pending' | 'completed' | 'cancelled' | 'expired';
-  expires_at: string;
-  created_at: string;
-}
+export type RentalRecord = Tables<'rentals'>;
 
 export interface RentalAccess {
   hasAccess: boolean;
@@ -31,9 +21,12 @@ export interface RentalAccess {
 
 export const useOptimizedRentals = () => {
   const { user } = useAuth();
-  const { canAfford, balance, refreshWallet } = useWallet();
+  const { canAfford, refreshWallet } = useWallet();
   const [rentals, setRentals] = useState<RentalRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const rentalsChannelNameRef = useRef(
+    `rentals-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  );
 
   // Fetch active rentals for user
   const fetchRentals = useCallback(async () => {
@@ -45,7 +38,7 @@ export const useOptimizedRentals = () => {
         .from('rentals')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'completed')
+        .in('status', ['completed', 'active'])
         .gte('expires_at', new Date().toISOString())
         .order('expires_at', { ascending: true });
 
@@ -64,7 +57,7 @@ export const useOptimizedRentals = () => {
       (r) =>
         r.content_id === contentId &&
         r.content_type === contentType &&
-        r.status === 'completed' &&
+        (r.status === 'completed' || r.status === 'active') &&
         new Date(r.expires_at) > new Date()
     );
 
@@ -106,7 +99,7 @@ export const useOptimizedRentals = () => {
       (r) =>
         r.content_id === seasonId &&
         r.content_type === 'season' &&
-        r.status === 'completed' &&
+        (r.status === 'completed' || r.status === 'active') &&
         new Date(r.expires_at) > new Date()
     );
   }, [rentals]);
@@ -183,11 +176,12 @@ export const useOptimizedRentals = () => {
           success: false,
           error: 'Unknown payment method',
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Rental processing error:', error);
+        const rentalError = error as { message?: string };
         return {
           success: false,
-          error: error.message || 'Failed to process rental',
+          error: rentalError.message || 'Failed to process rental',
         };
       }
     },
@@ -199,7 +193,7 @@ export const useOptimizedRentals = () => {
     if (!user) return;
 
     const channel = supabase
-      .channel(`rentals:${user.id}`)
+      .channel(rentalsChannelNameRef.current)
       .on(
         'postgres_changes',
         {

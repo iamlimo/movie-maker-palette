@@ -18,13 +18,15 @@ interface WatchProgressCardProps {
   onPlay?: () => void;
   onRemove?: () => void;
   onMarkCompleted?: () => void;
+  canRemoveFromHistory?: boolean;
 }
 
 const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
   item,
   onPlay,
   onRemove,
-  onMarkCompleted
+  onMarkCompleted,
+  canRemoveFromHistory = true
 }) => {
   const formatDuration = (minutes: number) => {
     if (!minutes) return '';
@@ -122,12 +124,18 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
               </DropdownMenuItem>
             )}
             {onRemove && (
-              <DropdownMenuItem 
-                onClick={onRemove}
-                className="text-destructive focus:text-destructive"
-              >
-                Remove from History
-              </DropdownMenuItem>
+              canRemoveFromHistory ? (
+                <DropdownMenuItem 
+                  onClick={onRemove}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Remove from History
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled>
+                  Rental Active - Cannot Remove
+                </DropdownMenuItem>
+              )
             )}
           </DropdownMenuContent>
         </DropdownMenu>
