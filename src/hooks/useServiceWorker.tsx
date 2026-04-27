@@ -1,50 +1,44 @@
-import { useEffect, useState } from 'react';
-// import { useRegisterSW } from 'virtual:pwa-register/react';
+import { useEffect, useRef, useState } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
 export const useServiceWorker = () => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [needRefresh, setNeedRefresh] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const hasShownUpdateToast = useRef(false);
 
-  // Temporarily disable PWA service worker registration
-  // const {
-  //   needRefresh: [needRefresh, setNeedRefresh],
-  //   updateServiceWorker,
-  // } = useRegisterSW({
-  //   onRegistered(registration) {
-  //     console.log('Service Worker registered:', registration);
-      
-  //     // Check for updates every hour
-  //     if (registration) {
-  //       setInterval(() => {
-  //         registration.update();
-  //       }, 60 * 60 * 1000);
-  //     }
-  //   },
-  //   onRegisterError(error) {
-  //     console.error('Service Worker registration error:', error);
-  //   },
-  // });
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    offlineReady: [offlineReady, setOfflineReady],
+    updateServiceWorker,
+  } = useRegisterSW({
+    immediate: true,
+    onRegisteredSW(_swUrl, swRegistration) {
+      setRegistration(swRegistration ?? null);
+    },
+    onRegisterError(error) {
+      console.error('Service worker registration error:', error);
+    },
+  });
 
-  // Monitor online/offline status
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      // toast({
-      //   title: "Back Online",
-      //   description: "Your connection has been restored",
-      // });
-    };
+    if (!registration) return;
 
-    const handleOffline = () => {
-      setIsOnline(false);
-      // toast({
-      //   title: "You're Offline",
-      //   description: "Some features may be limited",
-      //   variant: "destructive",
-      // });
-    };
+    const intervalId = window.setInterval(() => {
+      registration.update().catch((error) => {
+        console.error('Service worker update check failed:', error);
+      });
+    }, UPDATE_CHECK_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [registration]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -55,30 +49,47 @@ export const useServiceWorker = () => {
     };
   }, []);
 
-  // Show update notification
   useEffect(() => {
-    if (needRefresh) {
+    if (offlineReady) {
       toast({
-        title: "Update Available",
-        description: "A new version is available. Click to update.",
-        action: (
-          <Button onClick={() => {
-            // PWA registration is currently disabled
-            console.log('Update requested (PWA disabled)');
-          }} size="sm">
-            Update Now
-          </Button>
-        ),
+        title: 'App ready for offline use',
+        description: 'Key assets are now cached for offline access.',
       });
+      setOfflineReady(false);
     }
-  }, [needRefresh]);
+  }, [offlineReady, setOfflineReady]);
+
+  useEffect(() => {
+    if (!needRefresh) {
+      hasShownUpdateToast.current = false;
+      return;
+    }
+
+    if (hasShownUpdateToast.current) return;
+    hasShownUpdateToast.current = true;
+
+    toast({
+      title: 'Update available',
+      description: 'A newer version is ready. Refresh now to load the latest UI and assets.',
+      action: (
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            hasShownUpdateToast.current = false;
+            setNeedRefresh(false);
+            updateServiceWorker(true);
+          }}
+        >
+          Refresh
+        </Button>
+      ),
+    });
+  }, [needRefresh, setNeedRefresh, updateServiceWorker]);
 
   return {
     isOnline,
     needRefresh,
-    updateServiceWorker: () => {
-      // PWA registration is currently disabled
-      console.log('Update service worker called (PWA disabled)');
-    },
+    updateServiceWorker: () => updateServiceWorker(true),
   };
 };

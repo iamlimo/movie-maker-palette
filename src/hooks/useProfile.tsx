@@ -79,11 +79,11 @@ export const useProfile = () => {
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (profileError && profileError.code !== 'PGRST116') {
+      if (profileError) {
         console.error('Error fetching profile:', profileError);
-        throw profileError;
+        setProfile(null);
       }
 
       // Fetch preferences
@@ -91,14 +91,16 @@ export const useProfile = () => {
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (preferencesError && preferencesError.code !== 'PGRST116') {
+      if (preferencesError) {
         console.error('Error fetching preferences:', preferencesError);
-        // Don't throw error for preferences, create default if missing
-        if (preferencesError.code === 'PGRST116') {
-          await createDefaultPreferences();
-        }
+      }
+
+      if (!preferencesData) {
+        await createDefaultPreferences();
+      } else {
+        setPreferences(preferencesData);
       }
 
       // Fetch current wallet balance directly to keep profile data in sync
@@ -108,15 +110,18 @@ export const useProfile = () => {
           .from('wallets')
           .select('balance')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (!walletError && walletData) {
+        if (walletError) {
+          console.error('Error fetching wallet balance:', walletError);
+        }
+
+        if (walletData) {
           walletBalance = walletData.balance;
         }
       }
 
       setProfile(profileData ? { ...profileData, wallet_balance: walletBalance } : null);
-      setPreferences(preferencesData);
     } catch (error) {
       console.error('Error fetching profile data:', error);
       toast({
@@ -228,7 +233,12 @@ export const useProfile = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setProfile(null);
+      setPreferences(null);
+      setLoading(false);
+      return;
+    }
 
     fetchProfile();
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -27,6 +27,9 @@ export const useRentals = () => {
   const [activeRentals, setActiveRentals] = useState<Rental[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [alertedRentals, setAlertedRentals] = useState<Set<string>>(new Set());
+  const rentalsChannelNameRef = useRef(
+    `rental-updates-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  );
 
   const fetchActiveRentals = useCallback(async () => {
     if (!user) return;
@@ -113,7 +116,7 @@ export const useRentals = () => {
     if (!user) return;
 
     const channel = supabase
-      .channel('rental-updates')
+      .channel(rentalsChannelNameRef.current)
       .on(
         'postgres_changes',
         {
