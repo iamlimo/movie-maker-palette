@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "clean:vite": "cmd /c if exist node_modules\\.vite rmdir /s /q node_modules\\.vite",
+    "dev": "npm run clean:vite && vite",
+    "build": "npm run clean:vite && vite build",
     "assets:generate": "npx @capacitor/assets generate resources/icon.png resources/splash.png",
     "deploy:mobile": "npm run build && npx cap sync && npx cap open ios && npx cap open android",
     "build:dev": "vite build --mode development",

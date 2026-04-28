@@ -314,7 +314,7 @@ serve(async (req) => {
       .from('payments')
       .insert({
         user_id: user.id,
-        amount: finalPrice * 100, // in kobo
+        amount: finalPrice, // in kobo
         purpose: 'rental',
         currency: 'NGN',
         provider: 'paystack',
@@ -335,7 +335,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email: profile?.email || user.email,
-        amount: finalPrice * 100, // in kobo
+        amount: finalPrice, // in kobo
         reference: payment.intent_id,
         callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${normalizedContentType}/${contentId}?payment=success`,
 
