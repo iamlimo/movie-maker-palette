@@ -370,10 +370,10 @@ async function createPaystackRental(
   };
 
   const { data: payment, error: paymentError } = await supabase
-    .from("payments")
+      .from("payments")
     .insert({
       user_id: input.userId,
-      amount: Math.round(input.finalPrice * 100),
+      amount: Math.round(input.finalPrice),
       currency: "NGN",
       purpose: "rental",
       provider: "paystack",
@@ -400,7 +400,7 @@ async function createPaystackRental(
     },
     body: JSON.stringify({
       email: profile.email,
-      amount: Math.round(input.finalPrice * 100),
+      amount: Math.round(input.finalPrice),
       reference: intentId,
       callback_url: `${SUPABASE_URL}/functions/v1/verify-payment`,
       metadata: {
