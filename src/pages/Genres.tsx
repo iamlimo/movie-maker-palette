@@ -158,7 +158,7 @@ const Genres = () => {
                     year={item.release_date ? new Date(item.release_date).getFullYear() : 2024}
                     rating={parseFloat(item.rating || '0')}
                     duration={(item as any).duration ? `${(item as any).duration}m` : 'N/A'}
-                    price={`₦${item.price}`}
+                    price={item.price}
                     genre={item.genre?.name || 'Unknown'}
                     imageUrl={item.thumbnail_url || '/placeholder.svg'}
                     contentType={item.content_type}

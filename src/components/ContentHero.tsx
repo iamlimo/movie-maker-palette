@@ -10,6 +10,7 @@ import {
   Share2,
 } from "lucide-react";
 import { usePlatform } from "@/hooks/usePlatform";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface ContentHeroProps {
   title: string;
@@ -154,7 +155,7 @@ const ContentHero = ({
               >
                 <Play className="h-5 w-5 mr-2" />
                 {contentType === "movie"
-                  ? `Rent for ₦${price}`
+                  ? `Rent for ${formatNaira(price)}`
                   : "Rent Episodes"}
               </Button>
             )}

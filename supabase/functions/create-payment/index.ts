@@ -1,3 +1,5 @@
+/// <reference path="../deno.d.ts" />
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0'
 import { corsHeaders, jsonResponse, errorResponse, handleOptions } from '../_shared/cors.ts'
 
@@ -35,7 +37,7 @@ async function validateReferralCode(supabase: any, code: string, userId: string,
   return { valid: true, codeData: data, discountAmount };
 }
 
-Deno.serve(async (req) => {
+serve(async (req: Request) => {
   const optionsResponse = handleOptions(req);
   if (optionsResponse) return optionsResponse;
 
@@ -89,15 +91,16 @@ Deno.serve(async (req) => {
     if (referralCode) {
       const result = await validateReferralCode(supabase, referralCode, user.id, price);
       if (!result.valid) {
-        return errorResponse(result.error, 400);
+      return errorResponse(result.error ?? 'Invalid referral code', 400);
       }
       discountAmount = result.discountAmount!;
       validatedCode = result.codeData;
       finalPrice = Math.max(0, price - discountAmount);
     }
 
-    // Convert final price to kobo for Paystack
-    const amountInKobo = Math.round(finalPrice * 100);
+    // `price`/`finalPrice` coming into this function is already stored in KOBO (smallest unit).
+    // Paystack initialization for this project expects NGN major units (same convention used in wallet-payment).
+    const amountInKobo = Math.round(finalPrice);
 
     // Get user email
     const { data: profile } = await supabase
@@ -131,7 +134,7 @@ Deno.serve(async (req) => {
     // Create payment record
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
-      .insert({
+        .insert({
         user_id: user.id,
         amount: amountInKobo,
         currency: 'NGN',
@@ -152,14 +155,14 @@ Deno.serve(async (req) => {
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('PAYSTACK_SECRET_KEY')}`,
+        'Authorization': `Bearer ${Deno.env.get('PAYSTACK_SECRET_KEY') ?? ''}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         email: profile.email,
         amount: amountInKobo,
         reference: intentId,
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/paystack-webhook`,
+        callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/paystack-webhook`,
         metadata: {
           payment_id: payment.id,
           user_id: user.id,

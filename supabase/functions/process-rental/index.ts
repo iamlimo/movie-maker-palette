@@ -371,7 +371,7 @@ async function createPaystackRental(
 
   const { data: payment, error: paymentError } = await supabase
       .from("payments")
-    .insert({
+      .insert({
       user_id: input.userId,
       amount: Math.round(input.finalPrice),
       currency: "NGN",
