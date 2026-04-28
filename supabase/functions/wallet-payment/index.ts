@@ -335,7 +335,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email: profile?.email || user.email,
-        amount: finalPrice, // in kobo
+        amount: Math.round(finalPrice), // DB price is in kobo; Paystack expects amount in kobo
         reference: payment.intent_id,
         callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${normalizedContentType}/${contentId}?payment=success`,
 
