@@ -241,13 +241,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       setLoading(true);
       await supabase.auth.signOut();
-      // State will be cleared by the auth state change listener
-      // Set navigation callback to navigate after state is cleared
-      setNavigationCallback(() => () => {
-        if (window.location.pathname !== '/') {
-          window.location.href = '/';
-        }
-      });
+
+      // iOS/Android reliability: redirect immediately after signOut resolves.
+      // This avoids any timing issues with auth-state listener updates.
+      window.location.replace('/auth');
     } catch (error) {
       console.error('Sign out error:', error);
       setLoading(false);
