@@ -1,8 +1,40 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "fs";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+
+const spaHistoryFallbackPlugin = () => {
+  return {
+    name: "spa-history-fallback",
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
+        if (req.method !== "GET") return next();
+
+        const url = (req.originalUrl ?? req.url ?? "") as string;
+        const pathname = url.split("?")[0] || "";
+
+        // Skip Vite internals, assets, and API routes
+        if (
+          pathname.startsWith("/@") ||
+          pathname.startsWith("/api/") ||
+          pathname.startsWith("/supabase/") ||
+          pathname.includes(".")
+        ) {
+          return next();
+        }
+
+        const indexPath = path.resolve(__dirname, "index.html");
+        const html = fs.readFileSync(indexPath, "utf-8");
+
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.end(html);
+      });
+    },
+  };
+};
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -10,10 +42,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    hmr: false,
   },
   plugins: [
     react(),
-    mode === 'development' && componentTagger(),
+    mode === 'development' && spaHistoryFallbackPlugin(),
+    mode === 'development' && process.env.VITE_ENABLE_COMPONENT_TAGGER === 'true' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
