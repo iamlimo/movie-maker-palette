@@ -48,7 +48,6 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useRentals } from '@/hooks/useRentals';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import ContentCarousel, { ContentCarouselItem } from '@/components/ContentCarousel';
 import WatchProgressCard from '@/components/WatchProgressCard';
 import ActiveRentalCard from '@/components/ActiveRentalCard';
@@ -67,7 +66,10 @@ const Profile = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 1024;
+  });
   const isMobile = useIsMobile();
 
   const handleSignOut = async () => {
@@ -90,6 +92,10 @@ const Profile = () => {
       setIsSigningOut(false);
     }
   };
+  React.useEffect(() => {
+    setSidebarCollapsed(isMobile);
+  }, [isMobile]);
+
   const { isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
       await Promise.all([
@@ -179,6 +185,10 @@ const Profile = () => {
 
   const stats = getDashboardStats();
 
+  const handleContinueWatching = (contentType: 'movie' | 'episode', contentId: string) => {
+    navigate(`/watch/${contentType}/${contentId}`);
+  };
+
   const availableGenres = [
     'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Mystery', 
     'Romance', 'Sci-Fi', 'Thriller', 'Documentary', 'Animation', 'Crime', 'War'
@@ -197,21 +207,18 @@ const Profile = () => {
     { code: 'zh', name: 'Chinese' }
   ];
 
-  if (profileLoading || historyLoading || favoritesLoading) {
+  if (profileLoading) {
     return (
-      <ProtectedRoute>
-        <div className="min-h-screen gradient-hero flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 gradient-accent rounded-full animate-pulse mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading your profile...</p>
-          </div>
+      <div className="min-h-screen gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 gradient-accent rounded-full animate-pulse mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your profile...</p>
         </div>
-      </ProtectedRoute>
+      </div>
     );
   }
 
   return (
-    <ProtectedRoute>
       <div className="min-h-screen bg-background">
         {/* Pull-to-refresh indicator */}
         {isRefreshing && isMobile && (
@@ -277,13 +284,13 @@ const Profile = () => {
         <div className="flex">
           {/* Sidebar */}
           <div className={cn(
-            "fixed inset-y-0 left-0 z-50 bg-background border-r border-border transition-transform duration-300 lg:relative lg:translate-x-0",
+            "fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] bg-background border-r border-border transition-transform duration-300 lg:relative lg:translate-x-0 lg:w-80 lg:max-w-none",
             sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
           )}>
             <ProfileSidebar
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              isCollapsed={false}
+              isCollapsed={sidebarCollapsed}
               onToggleCollapse={() => setSidebarCollapsed(true)}
               className="h-full"
             />
@@ -303,188 +310,122 @@ const Profile = () => {
 
             {/* Overview Tab */}
             {activeTab === 'overview' && (
-              <div className="space-y-6 animate-slide-in-up">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="card-hover">
-                  <CardContent className="p-6 flex items-center space-x-4">
-                    <div className="bg-blue-500/10 p-3 rounded-full">
-                      <Eye className="w-6 h-6 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Content Watched</p>
-                      <p className="text-2xl font-bold">{stats.totalWatched}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="space-y-8 animate-slide-in-up">
+                {/* Minimal Stats Row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-6">
+                  <div className="flex flex-col items-center p-2 md:p-4">
+                    <Eye className="w-5 h-5 text-muted-foreground mb-1" />
+                    <span className="text-xs md:text-sm text-muted-foreground">Watched</span>
+                    <span className="font-semibold text-lg md:text-2xl">{stats.totalWatched}</span>
+                  </div>
+                  <div className="flex flex-col items-center p-2 md:p-4">
+                    <Heart className="w-5 h-5 text-muted-foreground mb-1" />
+                    <span className="text-xs md:text-sm text-muted-foreground">Favorites</span>
+                    <span className="font-semibold text-lg md:text-2xl">{stats.totalFavorites}</span>
+                  </div>
+                  <div className="flex flex-col items-center p-2 md:p-4">
+                    <Play className="w-5 h-5 text-muted-foreground mb-1" />
+                    <span className="text-xs md:text-sm text-muted-foreground">Continue</span>
+                    <span className="font-semibold text-lg md:text-2xl">{stats.continueWatchingCount}</span>
+                  </div>
+                  <div className="flex flex-col items-center p-2 md:p-4">
+                    <Star className="w-5 h-5 text-muted-foreground mb-1" />
+                    <span className="text-xs md:text-sm text-muted-foreground">Watch Time</span>
+                    <span className="font-semibold text-lg md:text-2xl">{Math.round((Array.isArray(watchHistory) ? watchHistory : []).reduce((acc, item) => acc + (item.duration || 0) * (item.progress / 100), 0) / 60)}h</span>
+                  </div>
+                </div>
 
-                <Card className="card-hover">
-                  <CardContent className="p-6 flex items-center space-x-4">
-                    <div className="bg-red-500/10 p-3 rounded-full">
-                      <Heart className="w-6 h-6 text-red-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Favorites</p>
-                      <p className="text-2xl font-bold">{stats.totalFavorites}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="card-hover">
-                  <CardContent className="p-6 flex items-center space-x-4">
-                    <div className="bg-green-500/10 p-3 rounded-full">
-                      <Play className="w-6 h-6 text-green-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Continue Watching</p>
-                      <p className="text-2xl font-bold">{stats.continueWatchingCount}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="card-hover">
-                  <CardContent className="p-6 flex items-center space-x-4">
-                    <div className="bg-purple-500/10 p-3 rounded-full">
-                      <Star className="w-6 h-6 text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Watch Time</p>
-                      <p className="text-lg font-bold">
-                        {Math.round(watchHistory.reduce((acc, item) => acc + (item.duration || 0) * (item.progress / 100), 0) / 60)}h
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Continue Watching */}
-              {continueWatching.length > 0 && (
-                <ContentCarousel 
-                  title="Continue Watching" 
-                  subtitle="Pick up where you left off"
-                >
-                  {continueWatching.slice(0, 6).map((item) => (
-                    <ContentCarouselItem key={item.id} minWidth="320px">
-                      <WatchProgressCard
-                        item={item}
-                        onPlay={() => {
-                          console.log('Playing:', item.title);
-                        }}
-                        onRemove={() => removeFromHistory(item.id)}
-                        onMarkCompleted={() => markAsCompleted(item.content_type, item.content_id)}
-                      />
-                    </ContentCarouselItem>
-                  ))}
-                </ContentCarousel>
-              )}
-
-              {/* Recent Activity & Quick Actions */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Recent Activity */}
-                <Card className="lg:col-span-2 card-hover">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <TrendingUp size={20} />
-                      <span>Recent Activity</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {continueWatching.length === 0 && completedItems.length === 0 ? (
-                      <div className="text-center py-8">
-                        <Play size={48} className="mx-auto text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">No recent activity</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Start watching content to see your activity here
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {[...continueWatching.slice(0, 3), ...completedItems.slice(0, 2)].map((item) => (
-                          <div key={item.id} className="flex items-center space-x-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary/70 transition-colors">
-                            <div className="w-12 h-8 bg-gradient-to-br from-primary/20 to-accent/20 rounded flex items-center justify-center">
-                              <Play size={12} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{item.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {item.completed ? 'Completed' : `${Math.round(item.progress)}% watched`}
-                              </p>
-                            </div>
-                            <Badge variant={item.completed ? 'default' : 'outline'}>
-                              {item.completed ? 'Done' : 'In Progress'}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <Card className="card-hover">
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start hover:bg-secondary transition-colors"
-                      onClick={() => setActiveTab('profile')}
+                {/* Continue Watching - Responsive Carousel */}
+                {continueWatching.length > 0 && (
+                  <div>
+                    <ContentCarousel 
+                      title="Continue Watching" 
+                      subtitle="Pick up where you left off"
+                      className="mb-2"
                     >
-                      <User size={16} className="mr-2" />
-                      Edit Profile
-                    </Button>
-                    
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start hover:bg-secondary transition-colors"
-                      onClick={() => setActiveTab('favorites')}
-                    >
-                      <Heart size={16} className="mr-2" />
-                      My List ({stats.totalFavorites})
-                    </Button>
-                    
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start hover:bg-secondary transition-colors"
-                      onClick={() => setActiveTab('history')}
-                    >
-                      <Clock size={16} className="mr-2" />
-                      Watch History
-                    </Button>
-                    
-                    <Link to="/">
-                      <Button className="w-full">
-                        <Play size={16} className="mr-2" />
-                        Browse Content
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </div>
+                      {continueWatching.slice(0, 6).map((item) => (
+                        <ContentCarouselItem key={item.id} minWidth="220px" className="max-w-xs w-full">
+                          <WatchProgressCard
+                            item={item}
+                            onPlay={() => handleContinueWatching(item.content_type, item.content_id)}
+                            onRemove={() => removeFromHistory(item.id)}
+                            onMarkCompleted={() => markAsCompleted(item.content_type, item.content_id)}
+                          />
+                        </ContentCarouselItem>
+                      ))}
+                    </ContentCarousel>
+                  </div>
+                )}
 
-              {/* Recommendations Based on Preferences */}
-              {preferences?.preferred_genres && preferences.preferred_genres.length > 0 && (
-                <Card className="card-hover">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Star size={20} />
-                      <span>Recommended for You</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
+                {/* Recent Activity - Minimal */}
+                <div className="space-y-2">
+                  <h3 className="text-base font-semibold text-foreground mb-2 flex items-center gap-2"><TrendingUp size={18}/>Recent Activity</h3>
+                  {continueWatching.length === 0 && completedItems.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Play size={32} className="mx-auto text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground text-sm">No recent activity</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {[...continueWatching.slice(0, 2), ...completedItems.slice(0, 2)].map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 p-2 rounded bg-secondary/50">
+                          <Play size={14} className="text-muted-foreground" />
+                          <span className="truncate flex-1 text-sm">{item.title}</span>
+                          <Badge variant={item.completed ? 'default' : 'outline'} className="text-xs">
+                            {item.completed ? 'Done' : `${Math.round(item.progress)}%`}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Actions - Minimal */}
+                <div className="flex flex-col sm:flex-row gap-2 mt-4">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 justify-center"
+                    onClick={() => setActiveTab('profile')}
+                  >
+                    <User size={16} className="mr-2" />
+                    Edit Profile
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 justify-center"
+                    onClick={() => setActiveTab('favorites')}
+                  >
+                    <Heart size={16} className="mr-2" />
+                    My List
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 justify-center"
+                    onClick={() => setActiveTab('history')}
+                  >
+                    <Clock size={16} className="mr-2" />
+                    Watch History
+                  </Button>
+                  <Link to="/" className="flex-1">
+                    <Button className="w-full justify-center">
+                      <Play size={16} className="mr-2" />
+                      Browse
+                    </Button>
+                  </Link>
+                </div>
+
+                {/* Recommendations - Minimal Placeholder */}
+                {preferences?.preferred_genres && preferences.preferred_genres.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-base font-semibold text-foreground mb-2 flex items-center gap-2"><Star size={18}/>Recommended for You</h3>
+                    <p className="text-muted-foreground text-sm mb-2">
                       Based on your preferences: {preferences.preferred_genres.join(', ')}
                     </p>
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {/* This would be replaced with actual recommendations */}
-                      <div className="aspect-video bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg flex items-center justify-center">
-                        <p className="text-muted-foreground">Recommendations coming soon</p>
-                      </div>
+                    <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg flex items-center justify-center">
+                      <p className="text-muted-foreground text-xs">Recommendations coming soon</p>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -690,6 +631,8 @@ const Profile = () => {
                         value={preferencesData.preferred_language}
                         onChange={(e) => setPreferencesData({ ...preferencesData, preferred_language: e.target.value })}
                         className="w-full p-2 border rounded-md bg-background"
+                        aria-label="Preferred language"
+                        title="Preferred language"
                       >
                         {languages.map((lang) => (
                           <option key={lang.code} value={lang.code}>
@@ -825,7 +768,7 @@ const Profile = () => {
                               >
                                 Remove
                               </Button>
-                              <Button size="sm">
+                              <Button size="sm" onClick={() => handleContinueWatching(item.content_type, item.content_id)}>
                                 <Play size={12} className="mr-1" />
                                 Continue
                               </Button>
@@ -990,7 +933,6 @@ const Profile = () => {
           </div>
         </div>
       </div>
-    </ProtectedRoute>
   );
 };
 

@@ -136,11 +136,12 @@ const Movies = () => {
                   <MovieCard
                     key={movie.id}
                     id={movie.id}
+                    slug={movie.slug}
                     title={movie.title}
                     year={movie.release_date ? new Date(movie.release_date).getFullYear() : 2024}
                     rating={parseFloat(movie.rating || '0')}
                     duration={movie.duration ? `${movie.duration}m` : 'N/A'}
-                    price={`₦${movie.price}`}
+                    price={movie.price}
                     genre={movie.genre?.name || 'Unknown'}
                     imageUrl={movie.thumbnail_url || '/placeholder.svg'}
                     contentType="movie"

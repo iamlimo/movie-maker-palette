@@ -11,7 +11,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { useExtensionDetection } from '@/hooks/useExtensionDetection';
+import { Mail, ArrowLeft, CheckCircle, Shield } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  sanitizeInput, 
+  validateEmail, 
+  detectXSSPayload, 
+  RateLimiter,
+  generateCSRFToken 
+} from '@/lib/security';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -22,26 +31,79 @@ export const ForgotPasswordModal = ({ isOpen, onClose }: ForgotPasswordModalProp
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { resetPassword } = useAuth();
   const { toast } = useToast();
+  
+  // Security detection
+  const { isSuspicious, extensions } = useExtensionDetection();
+  
+  // Security utilities
+  const [rateLimiter] = useState(() => new RateLimiter(3, 15 * 60 * 1000)); // 3 attempts per 15 min
+  const [csrfToken] = useState(() => generateCSRFToken());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
 
+    // Rate limiting check
+    const rateLimitKey = `forgot-password-${email}`;
+    if (!rateLimiter.isAllowed(rateLimitKey)) {
+      const remainingMs = rateLimiter.getRemainingTime(rateLimitKey);
+      const remainingMins = Math.ceil(remainingMs / 60000);
+      setError(`Too many attempts. Please try again in ${remainingMins} minutes.`);
+      setLoading(false);
+      return;
+    }
+
+    // Sanitize email input
+    const sanitizedEmail = sanitizeInput(email.trim().toLowerCase());
+
+    // Check for XSS payloads in email field
+    if (detectXSSPayload(sanitizedEmail)) {
+      setError('Invalid email format detected. Please enter a valid email address.');
+      setLoading(false);
+      return;
+    }
+
+    // Validate email format
+    if (!validateEmail(sanitizedEmail)) {
+      setError('Please enter a valid email address.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await resetPassword(email);
+      const { error } = await resetPassword(sanitizedEmail);
 
       if (error) {
-        // Don't expose whether email exists (security best practice)
-        // but handle specific errors
+        console.error('Reset password error:', error);
+        
+        // Handle different error types
         if (error.message?.includes('rate')) {
+          setError('Too many requests. Please wait before trying again.');
           toast({
             title: 'Too Many Attempts',
             description: 'Please wait a few minutes before trying again.',
             variant: 'destructive',
           });
+        } else if (error.code === 'unexpected_failure' || error.message?.includes('sending') || error.message?.includes('email')) {
+          setError('Email service temporarily unavailable. Please try again later.');
+          toast({
+            title: 'Email Service Error',
+            description: 'We\'re having trouble sending emails right now. Please try again in a few moments.',
+            variant: 'destructive',
+          });
+        } else if (error.message?.includes('invalid') || error.message?.includes('format')) {
+          setError('Please check that your email address is correct.');
+          toast({
+            title: 'Invalid Email',
+            description: 'Please check that your email address is correct.',
+            variant: 'destructive',
+          });
         } else {
+          setError('Failed to send reset email. Please try again.');
           toast({
             title: 'Error',
             description: 'Failed to send reset email. Please try again.',
@@ -52,6 +114,9 @@ export const ForgotPasswordModal = ({ isOpen, onClose }: ForgotPasswordModalProp
         // Show success state
         setSubmitted(true);
         
+        // Clear sensitive data
+        setEmail('');
+        
         // Auto-close after 4 seconds
         const timer = setTimeout(() => {
           handleClose();
@@ -60,6 +125,8 @@ export const ForgotPasswordModal = ({ isOpen, onClose }: ForgotPasswordModalProp
         return () => clearTimeout(timer);
       }
     } catch (error: any) {
+      console.error('Unexpected error:', error);
+      setError('An unexpected error occurred. Please try again.');
       toast({
         title: 'Error',
         description: error.message || 'An unexpected error occurred.',
@@ -82,15 +149,36 @@ export const ForgotPasswordModal = ({ isOpen, onClose }: ForgotPasswordModalProp
         {!submitted ? (
           <>
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold text-foreground">
-                Reset Password
-              </DialogTitle>
-              <DialogDescription className="text-muted-foreground">
-                We'll send you an email with a link to reset your password.
-              </DialogDescription>
+              <div className="flex items-start justify-between">
+                <div>
+                  <DialogTitle className="text-2xl font-bold text-foreground">
+                    Reset Password
+                  </DialogTitle>
+                  <DialogDescription className="text-muted-foreground">
+                    We'll send you an email with a link to reset your password.
+                  </DialogDescription>
+                </div>
+                {isSuspicious && (
+                  <Shield className="h-5 w-5 text-red-500 ml-2" />
+                )}
+              </div>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+              {isSuspicious && extensions.length > 0 && (
+                <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
+                  <AlertDescription className="text-sm">
+                    🚨 <strong>{extensions.length} suspicious browser extension(s) detected.</strong> This may interfere with your security.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="reset-email" className="text-foreground">
                   Email Address

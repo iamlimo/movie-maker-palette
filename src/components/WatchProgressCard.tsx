@@ -11,19 +11,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { WatchHistoryItem } from '@/hooks/useWatchHistory';
 import { formatDistanceToNow } from 'date-fns';
+import { formatNaira } from '@/lib/priceUtils';
 
 interface WatchProgressCardProps {
   item: WatchHistoryItem;
   onPlay?: () => void;
   onRemove?: () => void;
   onMarkCompleted?: () => void;
+  canRemoveFromHistory?: boolean;
 }
 
 const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
   item,
   onPlay,
   onRemove,
-  onMarkCompleted
+  onMarkCompleted,
+  canRemoveFromHistory = true
 }) => {
   const formatDuration = (minutes: number) => {
     if (!minutes) return '';
@@ -121,12 +124,18 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
               </DropdownMenuItem>
             )}
             {onRemove && (
-              <DropdownMenuItem 
-                onClick={onRemove}
-                className="text-destructive focus:text-destructive"
-              >
-                Remove from History
-              </DropdownMenuItem>
+              canRemoveFromHistory ? (
+                <DropdownMenuItem 
+                  onClick={onRemove}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Remove from History
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled>
+                  Rental Active - Cannot Remove
+                </DropdownMenuItem>
+              )
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -162,9 +171,9 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
             </span>
           </div>
 
-          {item.price && (
+          {item.price !== undefined && item.price !== null && (
             <div className="text-xs font-medium text-primary">
-              ₦{item.price.toLocaleString()}
+              {formatNaira(item.price)}
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatNaira, koboToNaira } from '@/lib/priceUtils';
@@ -14,6 +14,9 @@ export const useWallet = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const walletChannelNameRef = useRef(
+    `wallet-changes-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  );
 
   const fetchWallet = useCallback(async () => {
     if (!user) {
@@ -84,7 +87,7 @@ export const useWallet = () => {
 
     // Subscribe to real-time updates
     const channel = supabase
-      .channel('wallet-changes')
+      .channel(walletChannelNameRef.current)
       .on(
         'postgres_changes',
         {
@@ -93,7 +96,7 @@ export const useWallet = () => {
           table: 'wallets',
           filter: `user_id=eq.${user.id}`
         },
-        (payload: any) => {
+        (payload: { eventType: string; new: unknown }) => {
           console.log('Wallet updated:', payload);
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             setWallet(payload.new as WalletData);

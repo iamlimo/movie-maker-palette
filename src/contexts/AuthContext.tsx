@@ -26,12 +26,19 @@ interface AuthContextType {
   profile: UserProfile | null;
   userRole: UserRole | null;
   loading: boolean;
-  signUp: (email: string, password: string, name?: string) => Promise<{ error: any }>;
+  signUp: (
+    email: string,
+    password: string,
+    name?: string,
+  ) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: any }>;
+  resetPassword: (
+    email: string,
+  ) => Promise<{ error: any; nonce?: string }>;
   updatePassword: (newPassword: string) => Promise<{ error: any }>;
+  verifyRecoveryToken: () => Promise<{ valid: boolean; error?: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,24 +51,84 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const RESET_NONCE_KEY_PREFIX = 'rp_nonce_email:';
+const RESET_NONCE_LATEST_KEY = 'rp_nonce_latest:';
+
+const generateResetNonce = (): string => {
+  // crypto.randomUUID is widely supported; fallback to random bytes.
+  // We avoid depending on node APIs.
+  const globalCrypto =
+    typeof crypto !== 'undefined' ? crypto : (undefined as unknown);
+
+  if (
+    globalCrypto &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    typeof (globalCrypto as any).randomUUID === 'function'
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (globalCrypto as any).randomUUID();
+  }
+
+  if (!globalCrypto) {
+    // Extremely defensive fallback; should practically never happen in browsers.
+    return `nonce_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  const array = new Uint8Array(16);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalCrypto as any).getRandomValues(array);
+  return Array.from(array, (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+};
+
+const setLocalResetNonceEmail = (nonce: string, email: string) => {
+  try {
+    localStorage.setItem(
+      `${RESET_NONCE_KEY_PREFIX}${nonce}`,
+      JSON.stringify({ email, createdAt: Date.now() }),
+    );
+    localStorage.setItem(RESET_NONCE_LATEST_KEY, nonce);
+  } catch (error) {
+    // Non-fatal: auto-resend will fall back to manual email entry.
+    console.error('Failed to store reset nonce email:', error);
+  }
+};
+
+const getLocalResetNonceEmail = (nonce: string): string | null => {
+  try {
+    const raw = localStorage.getItem(`${RESET_NONCE_KEY_PREFIX}${nonce}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { email?: string; createdAt?: number };
+    if (!parsed.email) return null;
+    return parsed.email;
+  } catch {
+    return null;
+  }
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
-  const [navigationCallback, setNavigationCallback] = useState<(() => void) | null>(null);
+  const [navigationCallback, setNavigationCallback] = useState<
+    (() => void) | null
+  >(null);
 
   const fetchUserProfile = async (userId: string) => {
     try {
       console.log('Fetching user profile for:', userId);
-      
+
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .single();
-      
+
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
@@ -72,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Profile fetch error:', profileError);
         // Don't throw error, just log it - profile might not exist yet
       }
-      
+
       if (roleError && roleError.code !== 'PGRST116') {
         console.error('Role fetch error:', roleError);
         // Don't throw error, just log it - role might not exist yet
@@ -82,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Profile fetched successfully:', profileData.name);
         setProfile(profileData);
       }
-      
+
       if (roleData) {
         console.log('Role fetched successfully:', roleData.role);
         setUserRole(roleData);
@@ -102,25 +169,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Set up auth state listener FIRST - NEVER use async functions directly in callbacks
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Defer Supabase calls outside the callback to prevent deadlocks
-          setTimeout(() => {
-            fetchUserProfile(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setUserRole(null);
-        }
-        
-        setLoading(false);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(
+        'Auth state changed:',
+        event,
+        session?.user?.email,
+      );
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        // Defer Supabase calls outside the callback to prevent deadlocks
+        setTimeout(() => {
+          fetchUserProfile(session.user!.id);
+        }, 0);
+      } else {
+        setProfile(null);
+        setUserRole(null);
       }
-    );
+
+      setLoading(false);
+    });
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -138,18 +209,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, name?: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name?: string,
+  ) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
         data: {
-          name: name || ''
-        }
-      }
+          name: name || '',
+        },
+      },
     });
     return { error };
   };
@@ -157,7 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
-      password
+      password,
     });
     return { error };
   };
@@ -166,13 +241,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       await supabase.auth.signOut();
-      // State will be cleared by the auth state change listener
-      // Set navigation callback to navigate after state is cleared
-      setNavigationCallback(() => () => {
-        if (window.location.pathname !== '/') {
-          window.location.href = '/';
-        }
-      });
+
+      // iOS/Android reliability: redirect immediately after signOut resolves.
+      // This avoids any timing issues with auth-state listener updates.
+      window.location.replace('/auth');
     } catch (error) {
       console.error('Sign out error:', error);
       setLoading(false);
@@ -180,19 +252,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
-    const redirectUrl = `${window.location.origin}/reset-password`;
-    
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl
-    });
-    return { error };
+    try {
+      const nonce = generateResetNonce();
+      const redirectUrl = `${window.location.origin}/reset-password?rp=${encodeURIComponent(
+        nonce,
+      )}`;
+
+      setLocalResetNonceEmail(nonce, email);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        console.error('Password reset error:', {
+          code: error.code,
+          message: error.message,
+          status: error.status,
+        });
+      }
+
+      // Return nonce so callers can correlate UI if needed.
+      return { error, nonce };
+    } catch (err: any) {
+      console.error('Password reset exception:', err);
+      return { error: err };
+    }
   };
 
   const updatePassword = async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({
-      password: newPassword
+      password: newPassword,
     });
     return { error };
+  };
+
+  const verifyRecoveryToken = async () => {
+    try {
+      // Check if there's a valid session
+      const {
+        data: { session: currentSession },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        return { valid: false, error: sessionError };
+      }
+
+      if (!currentSession) {
+        return { valid: false, error: new Error('No valid session found') };
+      }
+
+      // Verify the session can be used by trying to get user data
+      const {
+        data: { user: currentUser },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !currentUser) {
+        return {
+          valid: false,
+          error: userError || new Error('Failed to verify user'),
+        };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      return { valid: false, error };
+    }
   };
 
   // Execute navigation callback after state updates
@@ -203,7 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [navigationCallback, loading]);
 
-  const value = {
+  const value: AuthContextType = {
     user,
     session,
     profile,
@@ -214,8 +341,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     refreshProfile,
     resetPassword,
-    updatePassword
+    updatePassword,
+    verifyRecoveryToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// Small named exports for potential reuse elsewhere.
+export const __resetPasswordUtils = {
+  getLocalResetNonceEmail,
 };

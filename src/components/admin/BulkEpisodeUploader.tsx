@@ -136,7 +136,7 @@ export const BulkEpisodeUploader = ({
 
     try {
       // Get upload info
-      const { data: uploadInfo, error: uploadInfoError } = await supabase.functions.invoke('tv-show-upload', {
+      const { data: uploadInfo, error: uploadInfoError } = await supabase.functions.invoke('upload-episode', {
         body: {
           action: 'get_upload_info',
           fileName: episode.file.name,
@@ -183,7 +183,7 @@ export const BulkEpisodeUploader = ({
       updateEpisode(index, 'progress', 90);
 
       // Confirm upload
-      const { data: confirmData, error: confirmError } = await supabase.functions.invoke('tv-show-upload', {
+      const { data: confirmData, error: confirmError } = await supabase.functions.invoke('upload-episode', {
         body: {
           action: 'confirm_upload',
           filePath: uploadInfo.filePath,

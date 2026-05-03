@@ -72,8 +72,10 @@ export const VideoPlayer = ({
   const [showMovieInfo, setShowMovieInfo] = useState(false);
   const [currentQuality, setCurrentQuality] = useState('Auto');
   const [currentSubtitle, setCurrentSubtitle] = useState<string | null>(null);
-  const [hideControlsTimeout, setHideControlsTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [hideControlsTimeout, setHideControlsTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [skipIntroClicked, setSkipIntroClicked] = useState(false);
+  const [showSkipIntro, setShowSkipIntro] = useState(true);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -253,6 +255,11 @@ export const VideoPlayer = ({
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
     setCurrentTime(videoRef.current.currentTime);
+    
+    // Hide skip intro after 1:30 (90 seconds) of playback
+    if (videoRef.current.currentTime >= 90 && showSkipIntro) {
+      setShowSkipIntro(false);
+    }
   };
 
   const handleLoadedMetadata = () => {
@@ -300,6 +307,8 @@ export const VideoPlayer = ({
     if (!videoRef.current) return;
     // Typically skip intro is 90 seconds, but this can be customized
     videoRef.current.currentTime += 90;
+    setSkipIntroClicked(true);
+    setShowSkipIntro(false);
     toast({
       title: "Skipped",
       description: "Intro skipped",
@@ -354,6 +363,24 @@ export const VideoPlayer = ({
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
+  }, []);
+
+  // Prevent right-click on video to protect against piracy
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target === videoRef.current || containerRef.current?.contains(target)) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    if (videoRef.current) {
+      videoRef.current.addEventListener('contextmenu', handleContextMenu as EventListener);
+      return () => {
+        videoRef.current?.removeEventListener('contextmenu', handleContextMenu as EventListener);
+      };
+    }
   }, []);
 
   if (loading) {
@@ -425,6 +452,7 @@ export const VideoPlayer = ({
           duration={duration}
           isFullscreen={isFullscreen}
           hasNextEpisode={hasNextEpisode}
+          showSkipIntro={showSkipIntro}
           onPlay={togglePlay}
           onPause={togglePlay}
           onMute={toggleMute}

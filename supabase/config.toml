@@ -10,7 +10,7 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
+major_version = 17
 
 [db.pooler]
 enabled = false
@@ -39,13 +39,13 @@ verify_jwt = true
 [functions.unified-content-manager]
 verify_jwt = true
 
-[functions.unified-rental-manager]
-verify_jwt = true
-
 [functions.create-payment]
 verify_jwt = true
 
 [functions.verify-payment]
+verify_jwt = true
+
+[functions.sync-paystack-payments]
 verify_jwt = true
 
 [functions.paystack-webhook]
@@ -59,9 +59,6 @@ verify_jwt = false
 
 [functions.slider-items]
 verify_jwt = false
-
-[functions.generate-b2-signed-url]
-verify_jwt = true
 
 [functions.generate-trailer-url]
 verify_jwt = false

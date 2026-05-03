@@ -35,10 +35,42 @@ const Watch = () => {
 
   const checkAccessAndLoad = async () => {
     try {
-      // Check rental access
-      const { data: accessData, error: accessError } = await supabase.functions.invoke("rental-access", {
-        body: { content_id: contentId, content_type: contentType }
-      });
+      let accessData = null;
+      let accessError = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      const retryDelay = 500; // ms
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        setError("Please sign in again to continue");
+        setLoading(false);
+        return;
+      }
+
+      // Retry logic for access check (database sync delay)
+      while (retryCount < maxRetries) {
+        const result = await supabase.functions.invoke("rental-access", {
+          body: { content_id: contentId, content_type: contentType },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          }
+        });
+
+        accessError = result.error;
+        accessData = result.data;
+
+        if (accessData?.has_access) {
+          break; // Access verified, proceed
+        }
+
+        retryCount++;
+        if (retryCount < maxRetries) {
+          // Wait before retrying to allow database to sync
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
 
       if (accessError || !accessData?.has_access) {
         setError("You don't have access to this content");
@@ -58,10 +90,64 @@ const Watch = () => {
       } else if (contentType === "episode") {
         const { data } = await supabase
           .from("episodes")
-          .select("*, seasons(shows(title, slug))")
+          .select("*, seasons(tv_shows(title, slug))")
           .eq("id", contentId)
           .single();
         contentData = data;
+      } else if (contentType === "season") {
+        // Seasons are rented as a package but are not directly playable.
+        const { data: seasonData, error: seasonError } = await supabase
+          .from("seasons")
+          .select("id, season_number, tv_shows(slug)")
+          .eq("id", contentId)
+          .single();
+
+        if (seasonError || !seasonData) {
+          console.error("Season fetch error:", seasonError);
+          setError("Season not found");
+          setLoading(false);
+          return;
+        }
+
+        const { data: episodesData, error: episodesError } = await supabase
+          .from("episodes")
+          .select("id, episode_number")
+          .eq("season_id", contentId)
+          .order("episode_number", { ascending: true });
+
+        if (episodesError || !episodesData || episodesData.length === 0) {
+          console.error("Season episodes fetch error:", episodesError);
+          if (seasonData.tv_shows?.slug) {
+            navigate(`/tvshow/${seasonData.tv_shows.slug}`);
+            return;
+          }
+          setError("Season not found");
+          setLoading(false);
+          return;
+        }
+
+        const episodeIds = episodesData.map((episode: any) => episode.id);
+        const { data: historyData } = await supabase
+          .from("watch_history")
+          .select("content_id, completed, progress")
+          .eq("user_id", user.id)
+          .in("content_id", episodeIds);
+
+        const watchMap = (historyData || []).reduce<Record<string, { completed: boolean; progress: number }>>((map, entry: any) => {
+          map[entry.content_id] = {
+            completed: entry.completed,
+            progress: entry.progress || 0,
+          };
+          return map;
+        }, {});
+
+        const nextEpisode = episodesData.find((episode: any) => {
+          const history = watchMap[episode.id];
+          return !history || (!history.completed && history.progress < 90);
+        }) || episodesData[0];
+
+        navigate(`/watch/episode/${nextEpisode.id}`);
+        return;
       }
 
       if (!contentData) {
@@ -78,14 +164,17 @@ const Watch = () => {
       if (contentType === "movie") {
         // Use get-video-url function for movies (generates signed URL)
         const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
-          body: { movieId: contentId }
+          body: { movieId: contentId },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          }
         });
         
-        if (urlError || !urlData?.url) {
+        if (urlError || !urlData?.signedUrl) {
           // Fallback to direct URL from database
           videoUrlData = { url: contentData.video_url };
         } else {
-          videoUrlData = urlData;
+          videoUrlData = { url: urlData.signedUrl };
         }
       } else if (contentType === "episode") {
         // For episodes, use direct video URL from database

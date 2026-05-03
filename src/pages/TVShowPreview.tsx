@@ -27,10 +27,10 @@ import AutoPlayMediaPlayer from "@/components/AutoPlayMediaPlayer";
 import RecommendationsSection from "@/components/RecommendationsSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
-import { useRentals } from "@/hooks/useRentals";
+import { useOptimizedRentals } from "@/hooks/useOptimizedRentals";
 import { toast } from "@/hooks/use-toast";
 import EpisodePlayer from "@/components/EpisodePlayer";
-import RentalButton from "@/components/RentalButton";
+import { OptimizedRentalButton } from "@/components/OptimizedRentalButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatNaira } from "@/lib/priceUtils";
 import { usePlatform } from "@/hooks/usePlatform";
@@ -96,7 +96,7 @@ const TVShowPreview = () => {
     toggleFavorite,
     loading: favoritesLoading,
   } = useFavorites();
-  const { checkAccess } = useRentals();
+  const { checkAccess: checkAccessOptimized, checkSeasonAccess, rentals, fetchRentals } = useOptimizedRentals();
   const isMobile = useIsMobile();
   const [tvShow, setTVShow] = useState<TVShow | null>(preloadedData || null);
   const [seasons, setSeasons] = useState<Season[]>([]);
@@ -130,6 +130,32 @@ const TVShowPreview = () => {
     }
   }, [slug]);
 
+  // Re-check access whenever rentals change (when user completes a rental)
+  useEffect(() => {
+    if (user && Object.keys(episodes).length > 0 && seasons.length > 0) {
+      checkSeasonAndEpisodeAccess(seasons, episodes);
+    }
+  }, [rentals, user]);
+
+  // Ensure access states are checked when episodes and seasons load
+  useEffect(() => {
+    if (user && Object.keys(episodes).length > 0 && seasons.length > 0) {
+      checkSeasonAndEpisodeAccess(seasons, episodes);
+    }
+  }, [user, Object.keys(episodes).length, seasons.length]);
+
+  useEffect(() => {
+    if (seasons.length > 0) {
+      const hasSelectedSeason = seasons.some(
+        (season) => season.season_number === selectedSeason
+      );
+
+      if (!hasSelectedSeason) {
+        setSelectedSeason(seasons[0].season_number);
+      }
+    }
+  }, [seasons, selectedSeason]);
+
   // Sticky nav on scroll
   useEffect(() => {
     const handleScroll = () => {
@@ -151,6 +177,28 @@ const TVShowPreview = () => {
       window.scrollTo({ top: elementPosition - offset, behavior: "smooth" });
       setActiveTab(sectionId);
     }
+  };
+
+  const handleRentalSuccess = async () => {
+    // Refresh rentals data from server and wait for state update
+    try {
+      await fetchRentals();
+      // Small delay to ensure state is updated in React
+      await new Promise(resolve => setTimeout(resolve, 150));
+    } catch (error) {
+      console.warn('Could not refresh rentals:', error);
+    }
+    
+    // Refresh access states when rental is successful
+    if (Object.keys(episodes).length > 0 && seasons.length > 0) {
+      await checkSeasonAndEpisodeAccess(seasons, episodes);
+    }
+    
+    // Show success notification
+    toast({
+      title: '✅ Rental Successful!',
+      description: 'You can now watch all episodes in this season.',
+    });
   };
 
   const fetchTVShowData = async (slugOrId: string) => {
@@ -239,19 +287,23 @@ const TVShowPreview = () => {
     if (!user) return;
 
     try {
-      // Check season access
+      // Check season access using optimized rentals
       const newSeasonAccess: { [seasonId: string]: boolean } = {};
       seasonsData.forEach((season) => {
-        newSeasonAccess[season.id] = checkAccess(season.id, "season");
+        const access = checkAccessOptimized(season.id, "season");
+        newSeasonAccess[season.id] = access.hasAccess;
       });
 
-      // Check episode access
+      // Check episode access - also checks if parent season is rented
       const newEpisodeAccess: { [episodeId: string]: boolean } = {};
-      Object.values(episodesMap)
-        .flat()
-        .forEach((episode) => {
-          newEpisodeAccess[episode.id] = checkAccess(episode.id, "episode");
+      Object.entries(episodesMap).forEach(([seasonId, episodeList]) => {
+        const seasonRented = newSeasonAccess[seasonId];
+        episodeList.forEach((episode) => {
+          const episodeAccess = checkAccessOptimized(episode.id, "episode");
+          // User has access if they rented the episode OR the season
+          newEpisodeAccess[episode.id] = episodeAccess.hasAccess || seasonRented;
         });
+      });
 
       setSeasonAccess(newSeasonAccess);
       setEpisodeAccess(newEpisodeAccess);
@@ -319,7 +371,8 @@ const TVShowPreview = () => {
     );
   }
 
-  const currentSeason = seasons.find((s) => s.season_number === selectedSeason);
+  const currentSeason =
+    seasons.find((s) => s.season_number === selectedSeason) ?? seasons[0] ?? null;
   const currentEpisodes = currentSeason ? episodes[currentSeason.id] || [] : [];
 
   return (
@@ -508,11 +561,12 @@ const TVShowPreview = () => {
                         {currentEpisodes.length} episodes •{" "}
                         {currentSeason.rental_expiry_duration}h access
                       </p>
-                      <RentalButton
+                      <OptimizedRentalButton
                         contentId={currentSeason.id}
                         contentType="season"
                         price={currentSeason.price}
                         title={`${tvShow.title} - Season ${selectedSeason}`}
+                        onRentalSuccess={handleRentalSuccess}
                       />
                     </div>
                     <div className="p-4 rounded-lg border">
@@ -555,11 +609,12 @@ const TVShowPreview = () => {
                 <p className="text-xl font-bold text-primary mb-2">
                   {formatNaira(currentSeason.price)}
                 </p>
-                <RentalButton
+                <OptimizedRentalButton
                   contentId={currentSeason.id}
                   contentType="season"
                   price={currentSeason.price}
                   title={`${tvShow.title} - Season ${selectedSeason}`}
+                  onRentalSuccess={handleRentalSuccess}
                 />
               </div>
               <div className="p-3 rounded-lg border">
@@ -638,7 +693,9 @@ const TVShowPreview = () => {
                           <div className="group p-4 rounded-lg border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all">
                             <div className="flex flex-col sm:flex-row gap-4">
                               {episode.thumbnail_url && (
-                                <div className="relative w-full sm:w-40 aspect-video rounded overflow-hidden flex-shrink-0">
+                                <div className={`relative w-full sm:w-40 aspect-video rounded overflow-hidden flex-shrink-0 transition-all duration-300 ${
+                                  hasAnyAccess ? 'ring-2 ring-green-500/50' : ''
+                                }`}>
                                   <img
                                     src={episode.thumbnail_url}
                                     alt={episode.title}
@@ -653,20 +710,39 @@ const TVShowPreview = () => {
                                       <Lock className="h-5 w-5 text-white" />
                                     </div>
                                   )}
+                                  {hasAnyAccess && (
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity duration-300">
+                                      <Play className="h-8 w-8 text-white" />
+                                    </div>
+                                  )}
                                 </div>
                               )}
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex-1">
-                                    <h4 className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                                      {episode.episode_number}. {episode.title}
-                                    </h4>
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                      <h4 className={`font-semibold transition-colors ${
+                                        hasAnyAccess ? 'text-green-600' : 'group-hover:text-primary'
+                                      }`}>
+                                        {episode.episode_number}. {episode.title}
+                                      </h4>
+                                      {hasSeasonAccess && !hasEpisodeAccess && (
+                                        <Badge variant="default" className="text-xs py-1 px-2 bg-green-600 hover:bg-green-700">
+                                          ✓ Available
+                                        </Badge>
+                                      )}
+                                      {hasEpisodeAccess && !hasSeasonAccess && (
+                                        <Badge variant="default" className="text-xs py-1 px-2 bg-blue-600 hover:bg-blue-700">
+                                          ✓ Rented
+                                        </Badge>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                                       <Clock className="h-3 w-3" />
                                       <span>{episode.duration}m</span>
-                                      {/* Hide episode price on iOS */}
-                                      {!isIOS && (
+                                      {/* Hide episode price on iOS or when season rental already covers it */}
+                                      {!isIOS && !hasSeasonAccess && (
                                         <>
                                           <span>•</span>
                                           <span className="font-semibold text-foreground">
@@ -690,16 +766,18 @@ const TVShowPreview = () => {
                                         onClick={() =>
                                           setSelectedEpisode(episode)
                                         }
+                                        className="bg-green-600 hover:bg-green-700 text-white animate-in fade-in-50 duration-500"
                                       >
                                         <Play className="h-4 w-4 mr-1" />
-                                        Watch
+                                        Watch Now
                                       </Button>
                                     ) : (
-                                      <RentalButton
+                                      <OptimizedRentalButton
                                         contentId={episode.id}
                                         contentType="episode"
                                         price={episode.price}
                                         title={`Episode ${episode.episode_number}: ${episode.title}`}
+                                        onRentalSuccess={handleRentalSuccess}
                                       />
                                     )}
                                   </div>

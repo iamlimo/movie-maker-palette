@@ -31,6 +31,7 @@ interface VideoPlayerControlsProps {
   duration: number;
   isFullscreen: boolean;
   hasNextEpisode?: boolean;
+  showSkipIntro?: boolean;
   onPlay: () => void;
   onPause: () => void;
   onMute: () => void;
@@ -69,6 +70,7 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
   duration,
   isFullscreen,
   hasNextEpisode,
+  showSkipIntro = true,
   onPlay,
   onPause,
   onMute,
@@ -165,7 +167,7 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
           </div>
 
           {/* Skip Intro (if available) */}
-          {onSkipIntro && (
+          {onSkipIntro && showSkipIntro && (
             <Button
               variant="ghost"
               size="sm"

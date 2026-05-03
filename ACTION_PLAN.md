@@ -4,7 +4,7 @@
 ✅ **Root cause identified**: The `get-video-url` function references a non-existent database column
 ✅ **Code fix completed**: Updated function code and committed to git
 ⏳ **Deployment blocked**: Supabase project is currently PAUSED
-
+npx supabase functions deploy sync-paystack-payments
 ## Immediate Action Required
 
 ### Step 1: Unpause the Supabase Project

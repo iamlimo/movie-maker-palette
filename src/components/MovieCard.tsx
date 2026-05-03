@@ -1,7 +1,7 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Star, Play, Clock, Eye } from "lucide-react";
+import { Star, Play, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import moviePlaceholder from "@/assets/movie-placeholder.jpg";
 import { formatNaira } from "@/lib/priceUtils";
@@ -19,6 +19,7 @@ interface MovieCardProps {
   imageUrl: string;
   contentType?: "movie" | "tv_show";
   featured?: boolean;
+  isRented?: boolean;
 }
 
 const MovieCard = ({
@@ -33,6 +34,7 @@ const MovieCard = ({
   imageUrl,
   contentType = "movie",
   featured = false,
+  isRented = false,
 }: MovieCardProps) => {
   const navigate = useNavigate();
   const { isIOS } = usePlatform();
@@ -48,7 +50,7 @@ const MovieCard = ({
           thumbnail_url: imageUrl,
           genre: { name: genre },
           rating: rating?.toString(),
-          price: typeof price === 'string' ? parseFloat(price.replace(/[^0-9.]/g, "")) : price,
+          price: typeof price === "string" ? parseFloat(price.replace(/[^0-9.]/g, "")) : price,
           duration,
           release_date: year ? `${year}-01-01` : undefined,
         }
@@ -56,10 +58,21 @@ const MovieCard = ({
     });
   };
 
+  const handlePrimaryAction = () => {
+    if (isRented && contentType === "movie") {
+      navigate(`/watch/movie/${id}`);
+      return;
+    }
+
+    handlePreview();
+  };
+
   const getFormattedPrice = () => {
+    if (isRented) return "Rented";
+
     // iOS: Hide pricing to comply with App Store guidelines
     if (isIOS) return "Available";
-    
+
     const numPrice =
       typeof price === "string"
         ? parseFloat(price.replace(/[^0-9.]/g, ""))
@@ -70,12 +83,19 @@ const MovieCard = ({
     return `${formatNaira(numPrice)} • ${contentType === "movie" ? "Rent" : "Season"}`;
   };
 
+  const isFree = (() => {
+    if (typeof price === "string") {
+      return parseFloat(price.replace(/[^0-9.]/g, "")) === 0;
+    }
+    return price === 0;
+  })();
+
   return (
     <div
-      onClick={handlePreview}
+      onClick={handlePrimaryAction}
       className={`group relative flex flex-col overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
         featured ? "ring-1 ring-primary/20" : ""
-      }`}
+      } ${isRented ? "ring-1 ring-emerald-500/30" : ""}`}
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] overflow-hidden bg-muted/30">
@@ -89,23 +109,29 @@ const MovieCard = ({
           loading="lazy"
         />
 
-        {/* Hover Overlay - Hide Rent/Info buttons on iOS */}
-        {!isIOS && (
+        {/* Hover Overlay */}
+        {!isIOS && !isRented && (
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <div className="absolute inset-x-4 bottom-4 flex gap-2">
               <Button
                 size="sm"
                 className="flex-1 h-8 text-xs font-medium shadow-lg"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePreview();
+                }}
               >
                 <Play className="h-3 w-3 mr-1.5" />
-                {getFormattedPrice() === "Free" ? "Watch" : "Rent"}
+                {isFree ? "Watch" : "Rent"}
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
                 className="flex-1 h-8 text-xs font-medium shadow-lg"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePreview();
+                }}
               >
                 <Eye className="h-3 w-3 mr-1.5" />
                 Info
@@ -114,10 +140,28 @@ const MovieCard = ({
           </div>
         )}
 
+        {!isIOS && isRented && (
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="absolute inset-x-4 bottom-4">
+              <Button
+                size="sm"
+                className="w-full h-8 text-xs font-medium shadow-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrimaryAction();
+                }}
+              >
+                <Play className="h-3 w-3 mr-1.5" />
+                Watch Now
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Price Badge */}
         <div className="absolute top-2 right-2">
           <Badge
-            variant={getFormattedPrice() === "Free" ? "secondary" : "default"}
+            variant={isFree || isRented ? "secondary" : "default"}
             className="text-xs font-semibold backdrop-blur-md bg-background/95 border-0 shadow-md"
           >
             <span className="text-gray-400">{getFormattedPrice()}</span>

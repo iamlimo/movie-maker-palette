@@ -8,6 +8,7 @@ export interface SliderItem {
   poster_url: string | null;
   content_type: 'movie' | 'tv_show';
   content_id: string;
+  slug?: string;
   genre: string | null;
   rating: string | null;
   price: number;

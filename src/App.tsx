@@ -14,10 +14,13 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // Lazy load non-critical routes for faster initial load
 const Profile = lazy(() => import('./pages/Profile'));
@@ -55,6 +58,7 @@ const EditTVShow = lazy(() => import('@/pages/admin/EditTVShow'));
 const Submissions = lazy(() => import('@/pages/admin/Submissions'));
 const Users = lazy(() => import('@/pages/admin/Users'));
 const Finance = lazy(() => import('@/pages/admin/Finance'));
+const AdminRentals = lazy(() => import('@/pages/admin/Rentals'));
 const Producers = lazy(() => import('@/pages/admin/Producers'));
 const Sections = lazy(() => import('@/pages/admin/Sections'));
 const HeroSlider = lazy(() => import('@/pages/admin/HeroSlider'));
@@ -65,6 +69,9 @@ const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
 const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
 const ReferralCodes = lazy(() => import('@/pages/admin/ReferralCodes'));
 const PushNotificationsAdmin = lazy(() => import('@/pages/admin/PushNotifications'));
+const CreateTicket = lazy(() => import('@/pages/admin/CreateTicket'));
+const TicketsList = lazy(() => import('@/pages/admin/TicketsList'));
+const TicketDetails = lazy(() => import('@/pages/admin/TicketDetails'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,13 +94,22 @@ function AppContent() {
   return (
     <>
       <OfflineBanner />
+      <Analytics />
+      <SpeedInsights />
       <MobileRouteAnimator>
         <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/profile" element={<Profile />} />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/movie/:slug" element={<MoviePreview />} />
             <Route path="/tvshow/:slug" element={<TVShowPreview />} />
             <Route path="/watch/:contentType/:contentId" element={<Watch />} />
@@ -140,11 +156,13 @@ function AppContent() {
               path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
               element={<EditEpisode />}
             />
+            
             <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
             <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
             <Route path="submissions" element={<Submissions />} />
             <Route path="users" element={<Users />} />
             <Route path="finance" element={<Finance />} />
+            <Route path="rentals" element={<AdminRentals />} />
             <Route path="producers" element={<Producers />} />
             <Route path="sections" element={<Sections />} />
             <Route path="hero-slider" element={<HeroSlider />} />
@@ -155,6 +173,9 @@ function AppContent() {
             <Route path="applications" element={<JobApplicationsAdmin />} />
             <Route path="referral-codes" element={<ReferralCodes />} />
             <Route path="push-notifications" element={<PushNotificationsAdmin />} />
+            <Route path="tickets" element={<TicketsList />} />
+            <Route path="tickets/create" element={<CreateTicket />} />
+            <Route path="tickets/:ticketId" element={<TicketDetails />} />
           </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
@@ -162,9 +183,13 @@ function AppContent() {
           </Routes>
         </Suspense>
       </MobileRouteAnimator>
-      <BottomNav />
+      <BottomNav /> 
       <OfflineSyncStatus />
+       {/* this controls the syncing status badge that appears when the user is offline or has pending sync actions. It listens for online/offline events and updates the UI accordingly, showing a badge with the number of pending sync actions when offline, and a syncing animation when processing the queue. */}
+  
     </>
+
+    
   );
 }
 

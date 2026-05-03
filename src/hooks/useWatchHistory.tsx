@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { dbCache } from '@/utils/indexedDBCache';
+import { useRentals } from '@/hooks/useRentals';
+import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
 
 export interface WatchHistoryItem {
   id: string;
@@ -17,6 +19,7 @@ export interface WatchHistoryItem {
   // Playback position tracking (in seconds)
   playback_position?: number;
   video_duration?: number;
+  season_id?: string;
   // Joined data from content tables
   title?: string;
   thumbnail_url?: string;
@@ -28,6 +31,8 @@ export interface WatchHistoryItem {
 export const useWatchHistory = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { checkAccess: checkMovieAccess } = useRentals();
+  const { checkAccess: checkEpisodeAccess, checkSeasonAccess } = useOptimizedRentals();
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [continueWatching, setContinueWatching] = useState<WatchHistoryItem[]>([]);
   const [completedItems, setCompletedItems] = useState<WatchHistoryItem[]>([]);
@@ -78,10 +83,12 @@ export const useWatchHistory = () => {
             const { data: episodeData } = await supabase
               .from('episodes')
               .select(`
-                title, 
-                duration, 
+                title,
+                duration,
                 price,
+                season_id,
                 seasons!inner(
+                  id,
                   tv_shows!inner(
                     title,
                     thumbnail_url,
@@ -99,7 +106,8 @@ export const useWatchHistory = () => {
                 thumbnail_url: episodeData.seasons.tv_shows.thumbnail_url,
                 duration: episodeData.duration,
                 price: episodeData.price,
-                genre: episodeData.seasons.tv_shows.genres?.name
+                genre: episodeData.seasons.tv_shows.genres?.name,
+                season_id: episodeData.season_id || episodeData.seasons.id
               };
             }
           }
@@ -189,8 +197,32 @@ export const useWatchHistory = () => {
     return await updateWatchProgress(contentType, contentId, 100, true);
   };
 
+  const canRemoveFromHistory = useCallback((historyItem: WatchHistoryItem) => {
+    if (historyItem.content_type === 'movie') {
+      return !checkMovieAccess(historyItem.content_id, 'movie');
+    }
+
+    if (historyItem.content_type === 'episode') {
+      const hasEpisodeAccess = checkEpisodeAccess(historyItem.content_id, 'episode');
+      const hasSeasonAccess = historyItem.season_id ? checkSeasonAccess(historyItem.season_id) : false;
+      return !(hasEpisodeAccess || hasSeasonAccess);
+    }
+
+    return true;
+  }, [checkMovieAccess, checkEpisodeAccess, checkSeasonAccess]);
+
   const removeFromHistory = async (historyId: string) => {
     if (!user) return false;
+
+    const historyItem = watchHistory.find((item) => item.id === historyId);
+    if (historyItem && !canRemoveFromHistory(historyItem)) {
+      toast({
+        title: "Rental Active",
+        description: "You can only remove expired rentals from watch history.",
+        variant: "destructive"
+      });
+      return false;
+    }
 
     try {
       const { error } = await supabase
@@ -221,18 +253,35 @@ export const useWatchHistory = () => {
   const clearHistory = async () => {
     if (!user) return false;
 
+    const removableItems = watchHistory.filter((item) => canRemoveFromHistory(item));
+    const blockedCount = watchHistory.length - removableItems.length;
+
+    if (removableItems.length === 0) {
+      toast({
+        title: "Rental Active",
+        description: "Only expired rentals can be removed from watch history.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     try {
+      const removableIds = removableItems.map((item) => item.id);
+
       const { error } = await supabase
         .from('watch_history')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .in('id', removableIds);
 
       if (error) throw error;
 
       await fetchWatchHistory();
       toast({
-        title: "Success",
-        description: "Watch history cleared"
+        title: blockedCount > 0 ? "Partial Success" : "Success",
+        description: blockedCount > 0
+          ? `Removed ${removableItems.length} expired item${removableItems.length === 1 ? '' : 's'} from watch history. Active rentals were kept.`
+          : "Watch history cleared"
       });
       return true;
     } catch (error) {
@@ -283,6 +332,7 @@ export const useWatchHistory = () => {
     updateWatchProgress,
     markAsCompleted,
     removeFromHistory,
+    canRemoveFromHistory,
     clearHistory,
     refetch: fetchWatchHistory
   };

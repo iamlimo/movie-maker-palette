@@ -26,6 +26,7 @@ interface EnhancedContentCardProps {
   description?: string;
   featured?: boolean;
   className?: string;
+  isRented?: boolean;
 }
 
 const EnhancedContentCard = ({
@@ -42,6 +43,7 @@ const EnhancedContentCard = ({
   description,
   featured = false,
   className = "",
+  isRented = false,
 }: EnhancedContentCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -70,11 +72,20 @@ const EnhancedContentCard = ({
           genre: { name: genre },
           rating: rating?.toString(),
           price,
-          duration: typeof duration === 'number' ? duration : undefined,
+          duration: typeof duration === "number" ? duration : undefined,
           release_date: year ? `${year}-01-01` : undefined,
         }
       }
     });
+  };
+
+  const handlePrimaryAction = () => {
+    if (isRented && contentType === "movie") {
+      navigate(`/watch/movie/${id}`);
+      return;
+    }
+
+    handlePreview();
   };
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
@@ -106,27 +117,20 @@ const EnhancedContentCard = ({
     }
   };
 
-  const formatDuration = (dur?: string | number) => {
-    if (!dur) return "";
-    if (typeof dur === "string") return dur;
-    return `${dur}min`;
-  };
-
-  const displayRating = rating
-    ? typeof rating === "string"
-      ? rating
-      : rating.toFixed(1)
-    : "0.0";
   const displayImage = imageError || !imageUrl ? moviePlaceholder : imageUrl;
 
   const getFormattedPrice = () => {
+    if (isRented) return "Rented";
+
     // iOS: Hide pricing to comply with App Store guidelines
     if (isIOS) return "Available";
-    
+
     if (price === 0) return "Free";
 
     return `${formatNaira(price)} • ${contentType === "movie" ? "Rent" : "Season"}`;
   };
+
+  const isFree = price === 0;
 
   // Long-press gesture handling
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -168,8 +172,8 @@ const EnhancedContentCard = ({
     <div
       className={`group relative flex flex-col overflow-hidden rounded-lg bg-card border border-border/40 hover:border-primary/40 transition-all duration-300 hover:shadow-xl cursor-pointer ${
         featured ? "ring-1 ring-primary/20" : ""
-      } ${className}`}
-      onClick={handlePreview}
+      } ${isRented ? "ring-1 ring-emerald-500/30" : ""} ${className}`}
+      onClick={handlePrimaryAction}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
@@ -185,8 +189,8 @@ const EnhancedContentCard = ({
           loading="lazy"
         />
 
-        {/* Hover Overlay - Hide Rent/Info buttons on iOS */}
-        {!isIOS && (
+        {/* Hover Overlay */}
+        {!isIOS && !isRented && (
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <div className="absolute inset-x-4 bottom-4 space-y-2">
               <div className="flex gap-2">
@@ -195,11 +199,11 @@ const EnhancedContentCard = ({
                   className="flex-1 h-8 text-xs font-medium shadow-lg"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handlePreview();
+                    handlePrimaryAction();
                   }}
                 >
                   <Play className="h-3 w-3 mr-1.5" />
-                  {price > 0 ? "Rent" : "Watch"}
+                  {isFree ? "Watch" : "Rent"}
                 </Button>
                 <Button
                   variant="secondary"
@@ -215,6 +219,23 @@ const EnhancedContentCard = ({
                 </Button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Rented State Overlay */}
+        {isRented && (
+          <div className="absolute inset-x-4 bottom-4">
+            <Button
+              size="sm"
+              className="w-full h-8 text-xs font-medium shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrimaryAction();
+              }}
+            >
+              <Play className="h-3 w-3 mr-1.5" />
+              {contentType === "movie" ? "Watch Now" : "Open Show"}
+            </Button>
           </div>
         )}
 
@@ -238,7 +259,7 @@ const EnhancedContentCard = ({
         {/* Price Badge */}
         <div className="absolute top-2 right-2">
           <Badge
-            variant={price > 0 ? "default" : "secondary"}
+            variant={isRented || isFree ? "secondary" : "default"}
             className="text-xs font-semibold backdrop-blur-md bg-background/95 border-0 shadow-md"
           >
             <span className="text-gray-400">{getFormattedPrice()}</span>
@@ -257,13 +278,13 @@ const EnhancedContentCard = ({
           {rating && (
             <div className="flex items-center gap-1">
               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              {/* <span className="font-medium">{displayRating}</span> */}
+              {/* <span className="font-medium">{typeof rating === "string" ? rating : rating.toFixed(1)}</span> */}
             </div>
           )}
           {duration && (
             <div className="flex items-center gap-1">
               {/* <Clock className="h-3 w-3" /> */}
-              {/* <span>{formatDuration(duration)}</span> */}
+              {/* <span>{typeof duration === "number" ? `${duration}min` : duration}</span> */}
             </div>
           )}
         </div>
@@ -286,7 +307,7 @@ const EnhancedContentCard = ({
 
       {/* Quick Actions Modal */}
       {showQuickActions && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center"
           onClick={(e) => {
             e.stopPropagation();
@@ -295,31 +316,41 @@ const EnhancedContentCard = ({
         >
           <div className="bg-card border border-border rounded-xl p-4 space-y-3 min-w-[200px] animate-scale-in">
             <h4 className="font-semibold text-sm text-center">{title}</h4>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowQuickActions(false);
-                handlePreview();
+                handlePrimaryAction();
               }}
             >
               <Play className="h-4 w-4 mr-2" />
-              {isIOS ? "View Details" : (price > 0 ? "Rent Now" : "Watch Now")}
+              {isRented
+                ? contentType === "movie"
+                  ? "Watch Now"
+                  : "Open Show"
+                : isIOS
+                  ? "View Details"
+                  : price > 0
+                    ? "Rent Now"
+                    : "Watch Now"}
             </Button>
-            <Button 
-              variant="secondary" 
-              className="w-full" 
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowQuickActions(false);
-                handleToggleFavorite(e);
-              }}
-            >
-              <Heart className={`h-4 w-4 mr-2 ${isFavorite ? "fill-rose-500 text-rose-500" : ""}`} />
-              {isFavorite ? "Remove from Watchlist" : "Add to Watchlist"}
-            </Button>
+            {!isRented && (
+              <Button
+                variant="secondary"
+                className="w-full"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowQuickActions(false);
+                  handleToggleFavorite(e);
+                }}
+              >
+                <Heart className={`h-4 w-4 mr-2 ${isFavorite ? "fill-rose-500 text-rose-500" : ""}`} />
+                {isFavorite ? "Remove from Watchlist" : "Add to Watchlist"}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -328,4 +359,3 @@ const EnhancedContentCard = ({
 };
 
 export default memo(EnhancedContentCard);
-

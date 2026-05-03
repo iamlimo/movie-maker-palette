@@ -1,21 +1,63 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "fs";
 import { componentTagger } from "lovable-tagger";
-import { VitePWA } from 'vite-plugin-pwa';
+import { VitePWA } from "vite-plugin-pwa";
+
+const spaHistoryFallbackPlugin = () => {
+  return {
+    name: "spa-history-fallback",
+    configureServer(server: any) {
+      server.middlewares.use((req: any, res: any, next: any) => {
+        if (req.method !== "GET") return next();
+
+        const url = (req.originalUrl ?? req.url ?? "") as string;
+        const pathname = url.split("?")[0] || "";
+
+        // Skip Vite internals, assets, and API routes
+        if (
+          pathname.startsWith("/@") ||
+          pathname.startsWith("/api/") ||
+          pathname.startsWith("/supabase/") ||
+          pathname.includes(".")
+        ) {
+          return next();
+        }
+
+        const indexPath = path.resolve(__dirname, "index.html");
+        const html = fs.readFileSync(indexPath, "utf-8");
+
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.end(html);
+      });
+    },
+  };
+};
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  appType: 'spa',
   server: {
     host: "::",
     port: 8080,
+    hmr: false,
   },
   plugins: [
     react(),
-    mode === 'development' && componentTagger(),
+    mode === 'development' && spaHistoryFallbackPlugin(),
+    mode === 'development' && process.env.VITE_ENABLE_COMPONENT_TAGGER === 'true' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['signature-tv-logo.png', 'icons/*.webp'],
+      includeAssets: [
+        'favicon.ico',
+        'manifest.webmanifest',
+        'offline.html',
+        'pwa-icon.svg',
+        'robots.txt',
+        'signature-tv-logo.png',
+      ],
       manifest: {
         name: 'Signature TV',
         short_name: 'Signature TV',
@@ -28,21 +70,15 @@ export default defineConfig(({ mode }) => ({
         start_url: '/',
         icons: [
           {
-            src: '/icons/icon-192.webp',
-            sizes: '192x192',
-            type: 'image/webp',
-            purpose: 'any maskable'
-          },
-          {
-            src: '/icons/icon-512.webp',
-            sizes: '512x512',
-            type: 'image/webp',
+            src: '/pwa-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
             purpose: 'any maskable'
           }
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2,txt,webmanifest}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/tsfwlereofjlxhjsarap\.supabase\.co\/rest\/.*/i,
@@ -51,7 +87,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'supabase-api-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 5 // 5 minutes
+                maxAgeSeconds: 60 * 5
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -66,7 +102,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'supabase-storage-cache',
               expiration: {
                 maxEntries: 500,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+                maxAgeSeconds: 60 * 60 * 24 * 7
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -80,7 +116,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'images-cache',
               expiration: {
                 maxEntries: 1000,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 30
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -94,7 +130,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'fonts-cache',
               expiration: {
                 maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                maxAgeSeconds: 60 * 60 * 24 * 365
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -103,7 +139,7 @@ export default defineConfig(({ mode }) => ({
           }
         ],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /^\/admin/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/supabase\//],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true

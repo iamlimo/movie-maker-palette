@@ -14,7 +14,7 @@ async function validateReferralCode(supabase: any, code: string, userId: string,
     .select('*')
     .eq('code', code.toUpperCase())
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   if (error || !data) return { valid: false, error: 'Invalid referral code' };
   if (data.valid_until && new Date(data.valid_until) < new Date()) return { valid: false, error: 'Code expired' };
@@ -71,6 +71,20 @@ serve(async (req) => {
     const sanitized = sanitizeInput(requestBody);
     const { contentId, contentType, price, useWallet, referralCode } = sanitized;
 
+    console.log('Wallet payment request:', {
+      contentId,
+      contentType,
+      price,
+      useWallet,
+      hasReferralCode: !!referralCode,
+      userId: user.id,
+    });
+
+    // Normalize contentType to lowercase for consistent checking
+    const normalizedContentType = (contentType || '').toLowerCase().trim();
+
+    console.log('Normalized content type:', normalizedContentType);
+
     const amountValidation = validatePaymentAmount(price);
     if (!amountValidation.isValid) {
       return new Response(JSON.stringify({ error: amountValidation.errors[0] }), {
@@ -79,8 +93,19 @@ serve(async (req) => {
       });
     }
 
-    if (!contentId || !contentType || !price) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    if (!contentId || !normalizedContentType || !price) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: contentId, contentType, price' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Validate that only rentable content types are allowed (backend validation)
+    const rentableTypes = ['movie', 'season', 'episode'];
+    if (!rentableTypes.includes(normalizedContentType)) {
+      return new Response(JSON.stringify({ 
+        error: `Content type "${normalizedContentType}" is not available for rental. Only movies, seasons, and episodes can be rented.` 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -92,8 +117,8 @@ serve(async (req) => {
       .select('id, expires_at')
       .eq('user_id', user.id)
       .eq('content_id', contentId)
-      .eq('content_type', contentType)
-      .eq('status', 'active')
+      .eq('content_type', normalizedContentType)
+      .eq('status', 'completed')
       .gte('expires_at', new Date().toISOString())
       .maybeSingle();
 
@@ -140,7 +165,7 @@ serve(async (req) => {
 
     const paymentMetadata: any = { 
       content_id: contentId, 
-      content_type: contentType,
+      content_type: normalizedContentType,
       original_price: price,
     };
     if (validatedCode) {
@@ -189,7 +214,8 @@ serve(async (req) => {
           p_wallet_id: wallet.wallet_id,
           p_amount: finalPrice,
           p_type: 'debit',
-          p_description: `Rental: ${contentType}${validatedCode ? ` (code: ${validatedCode.code})` : ''}`,
+          p_description: `Rental: ${normalizedContentType}${validatedCode ? ` (code: ${validatedCode.code})` : ''}`,
+
           p_payment_id: payment.id,
           p_metadata: paymentMetadata
         });
@@ -211,26 +237,41 @@ serve(async (req) => {
       // Fetch content-specific rental expiry duration
       let expiryHours = 48;
       
-      if (contentType === 'movie') {
-        const { data: movieData } = await supabase
+      if (normalizedContentType === 'movie') {
+        const { data: movieData, error: movieError } = await supabase
           .from('movies')
           .select('rental_expiry_duration')
           .eq('id', contentId)
-          .single();
+          .maybeSingle();
+        
+        if (movieError) {
+          console.error('Error fetching movie data:', movieError);
+          throw new Error(`Failed to fetch movie details: ${movieError.message}`);
+        }
         expiryHours = movieData?.rental_expiry_duration || 48;
-      } else if (contentType === 'season') {
-        const { data: seasonData } = await supabase
+      } else if (normalizedContentType === 'season') {
+        const { data: seasonData, error: seasonError } = await supabase
           .from('seasons')
           .select('rental_expiry_duration')
           .eq('id', contentId)
-          .single();
+          .maybeSingle();
+        
+        if (seasonError) {
+          console.error('Error fetching season data:', seasonError);
+          throw new Error(`Failed to fetch season details: ${seasonError.message}`);
+        }
         expiryHours = seasonData?.rental_expiry_duration || 336;
-      } else if (contentType === 'episode') {
-        const { data: episodeData } = await supabase
+      } else if (normalizedContentType === 'episode') {
+        const { data: episodeData, error: episodeError } = await supabase
           .from('episodes')
           .select('rental_expiry_duration')
           .eq('id', contentId)
-          .single();
+          .maybeSingle();
+        
+        if (episodeError) {
+          console.error('Error fetching episode data:', episodeError);
+          throw new Error(`Failed to fetch episode details: ${episodeError.message}`);
+        }
         expiryHours = episodeData?.rental_expiry_duration || 48;
       }
 
@@ -242,8 +283,8 @@ serve(async (req) => {
         .insert({
           user_id: user.id,
           content_id: contentId,
-          content_type: contentType,
-          amount: finalPrice / 100, // Convert from kobo to naira
+          content_type: normalizedContentType,
+          price: finalPrice, // Store in kobo to match the DB schema
           expires_at: expiresAt,
           status: 'active'
         });
@@ -273,7 +314,7 @@ serve(async (req) => {
       .from('payments')
       .insert({
         user_id: user.id,
-        amount: finalPrice * 100, // in kobo
+        amount: finalPrice, // in kobo
         purpose: 'rental',
         currency: 'NGN',
         provider: 'paystack',
@@ -294,14 +335,15 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email: profile?.email || user.email,
-        amount: finalPrice * 100, // in kobo
+        amount: Math.round(finalPrice), // DB price is in kobo; Paystack expects amount in kobo
         reference: payment.intent_id,
-        callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${contentType}/${contentId}?payment=success`,
+        callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${normalizedContentType}/${contentId}?payment=success`,
+
         metadata: {
           payment_id: payment.id,
           user_id: user.id,
           content_id: contentId,
-          content_type: contentType,
+          content_type: normalizedContentType,
           purpose: 'rental',
           ...(validatedCode ? {
             referral_code_id: validatedCode.id,
@@ -336,9 +378,43 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Wallet payment error:', error);
-    return new Response(JSON.stringify({ error: 'An error occurred processing your payment' }), {
-      status: 500,
+    console.error('Wallet payment error:', {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      hint: error.hint,
+      details: error.details,
+      stack: error.stack,
+    });
+    
+    // Determine appropriate error message and status
+    let errorMessage = 'An error occurred processing your payment';
+    let statusCode = 500;
+
+    if (error.message?.includes('Unauthorized')) {
+      errorMessage = 'Unauthorized access';
+      statusCode = 401;
+    } else if (error.message?.includes('Invalid referral code')) {
+      errorMessage = error.message;
+      statusCode = 400;
+    } else if (error.message?.includes('not available for rental')) {
+      errorMessage = error.message;
+      statusCode = 400;
+    } else if (error.message?.includes('Insufficient')) {
+      errorMessage = error.message;
+      statusCode = 400;
+    } else if (error.code === 'PGRST001' || error.status === 404) {
+      errorMessage = 'Required content or wallet information not found';
+      statusCode = 404;
+    } else if (error.code === '23505') {
+      errorMessage = 'Duplicate payment request detected';
+      statusCode = 409;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

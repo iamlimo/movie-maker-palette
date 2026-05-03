@@ -121,6 +121,56 @@ export type Database = {
           },
         ]
       }
+      email_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          external_id: string | null
+          id: string
+          recipient_email: string
+          sent_at: string | null
+          status: string
+          subject: string
+          template_type: string
+          ticket_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          recipient_email: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          template_type: string
+          ticket_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          template_type?: string
+          ticket_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_logs_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       episode_cast: {
         Row: {
           cast_crew_id: string
@@ -513,6 +563,56 @@ export type Database = {
             columns: ["genre_id"]
             isOneToOne: false
             referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_anomalies: {
+        Row: {
+          anomaly_type: string
+          created_at: string | null
+          id: string
+          message: string
+          paystack_data: Json | null
+          paystack_reference: string
+          rental_payment_id: string
+          resolution_notes: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          severity: string
+        }
+        Insert: {
+          anomaly_type: string
+          created_at?: string | null
+          id?: string
+          message: string
+          paystack_data?: Json | null
+          paystack_reference: string
+          rental_payment_id: string
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          severity?: string
+        }
+        Update: {
+          anomaly_type?: string
+          created_at?: string | null
+          id?: string
+          message?: string
+          paystack_data?: Json | null
+          paystack_reference?: string
+          rental_payment_id?: string
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_anomalies_rental_payment_id_fkey"
+            columns: ["rental_payment_id"]
+            isOneToOne: false
+            referencedRelation: "rental_payments"
             referencedColumns: ["id"]
           },
         ]
@@ -941,34 +1041,275 @@ export type Database = {
         }
         Relationships: []
       }
-      rentals: {
+      rental_access: {
+        Row: {
+          created_at: string
+          episode_id: string | null
+          expires_at: string
+          granted_at: string
+          id: string
+          metadata: Json
+          movie_id: string | null
+          rental_intent_id: string | null
+          rental_type: string
+          revoked_at: string | null
+          season_id: string | null
+          source: string
+          status: Database["public"]["Enums"]["rental_intent_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          episode_id?: string | null
+          expires_at: string
+          granted_at?: string
+          id?: string
+          metadata?: Json
+          movie_id?: string | null
+          rental_intent_id?: string | null
+          rental_type: string
+          revoked_at?: string | null
+          season_id?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["rental_intent_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          episode_id?: string | null
+          expires_at?: string
+          granted_at?: string
+          id?: string
+          metadata?: Json
+          movie_id?: string | null
+          rental_intent_id?: string | null
+          rental_type?: string
+          revoked_at?: string | null
+          season_id?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["rental_intent_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_access_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_access_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_access_rental_intent_id_fkey"
+            columns: ["rental_intent_id"]
+            isOneToOne: false
+            referencedRelation: "rental_intents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_access_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      rental_intents: {
+        Row: {
+          created_at: string
+          currency: string
+          discount_amount: number
+          episode_id: string | null
+          expires_at: string | null
+          failed_at: string | null
+          id: string
+          metadata: Json
+          movie_id: string | null
+          paid_at: string | null
+          payment_method: string
+          paystack_reference: string | null
+          price: number
+          provider_reference: string | null
+          referral_code: string | null
+          rental_type: string
+          season_id: string | null
+          status: Database["public"]["Enums"]["rental_intent_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          discount_amount?: number
+          episode_id?: string | null
+          expires_at?: string | null
+          failed_at?: string | null
+          id?: string
+          metadata?: Json
+          movie_id?: string | null
+          paid_at?: string | null
+          payment_method: string
+          paystack_reference?: string | null
+          price: number
+          provider_reference?: string | null
+          referral_code?: string | null
+          rental_type: string
+          season_id?: string | null
+          status?: Database["public"]["Enums"]["rental_intent_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          discount_amount?: number
+          episode_id?: string | null
+          expires_at?: string | null
+          failed_at?: string | null
+          id?: string
+          metadata?: Json
+          movie_id?: string | null
+          paid_at?: string | null
+          payment_method?: string
+          paystack_reference?: string | null
+          price?: number
+          provider_reference?: string | null
+          referral_code?: string | null
+          rental_type?: string
+          season_id?: string | null
+          status?: Database["public"]["Enums"]["rental_intent_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_intents_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_intents_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_intents_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_intents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      rental_payments: {
         Row: {
           amount: number
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          payment_channel: string | null
+          payment_status: string | null
+          paystack_access_code: string | null
+          paystack_reference: string | null
+          rental_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_channel?: string | null
+          payment_status?: string | null
+          paystack_access_code?: string | null
+          paystack_reference?: string | null
+          rental_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_channel?: string | null
+          payment_status?: string | null
+          paystack_access_code?: string | null
+          paystack_reference?: string | null
+          rental_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_payments_rental_id_fkey"
+            columns: ["rental_id"]
+            isOneToOne: false
+            referencedRelation: "rentals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rentals: {
+        Row: {
           content_id: string
           content_type: string
           created_at: string
           expires_at: string
           id: string
+          payment_method: string | null
+          price: number
           status: string
           user_id: string
         }
         Insert: {
-          amount: number
           content_id: string
           content_type: string
           created_at?: string
           expires_at: string
           id?: string
+          payment_method?: string | null
+          price: number
           status?: string
           user_id: string
         }
         Update: {
-          amount?: number
           content_id?: string
           content_type?: string
           created_at?: string
           expires_at?: string
           id?: string
+          payment_method?: string | null
+          price?: number
           status?: string
           user_id?: string
         }
@@ -1169,6 +1510,196 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ticket_activity_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          performed_by: string
+          ticket_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          performed_by: string
+          ticket_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          performed_by?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_activity_log_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_comments: {
+        Row: {
+          author_id: string
+          comment_text: string
+          created_at: string | null
+          id: string
+          is_internal: boolean | null
+          ticket_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          author_id: string
+          comment_text: string
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          ticket_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          author_id?: string
+          comment_text?: string
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          ticket_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_templates: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          internal_note_template: string | null
+          name: string
+          suggested_priority: string | null
+          title: string
+          updated_at: string | null
+          user_message_template: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          internal_note_template?: string | null
+          name: string
+          suggested_priority?: string | null
+          title: string
+          updated_at?: string | null
+          user_message_template?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          internal_note_template?: string | null
+          name?: string
+          suggested_priority?: string | null
+          title?: string
+          updated_at?: string | null
+          user_message_template?: string | null
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          assigned_team: string | null
+          assigned_to: string | null
+          attached_content_id: string | null
+          attached_payment_id: string | null
+          category: string
+          created_at: string | null
+          created_by: string
+          description: string | null
+          id: string
+          include_system_logs: boolean | null
+          internal_notes: string | null
+          is_admin_created: boolean | null
+          notification_sent: boolean | null
+          priority: string
+          resolved_at: string | null
+          status: string
+          template_used: string | null
+          ticket_number: string
+          title: string
+          updated_at: string | null
+          user_id: string
+          user_message: string
+          user_type: string
+        }
+        Insert: {
+          assigned_team?: string | null
+          assigned_to?: string | null
+          attached_content_id?: string | null
+          attached_payment_id?: string | null
+          category: string
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          id?: string
+          include_system_logs?: boolean | null
+          internal_notes?: string | null
+          is_admin_created?: boolean | null
+          notification_sent?: boolean | null
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          template_used?: string | null
+          ticket_number?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+          user_message: string
+          user_type?: string
+        }
+        Update: {
+          assigned_team?: string | null
+          assigned_to?: string | null
+          attached_content_id?: string | null
+          attached_payment_id?: string | null
+          category?: string
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          id?: string
+          include_system_logs?: boolean | null
+          internal_notes?: string | null
+          is_admin_created?: boolean | null
+          notification_sent?: boolean | null
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          template_used?: string | null
+          ticket_number?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          user_message?: string
+          user_type?: string
+        }
+        Relationships: []
       }
       transactions_ledger: {
         Row: {
@@ -1595,6 +2126,32 @@ export type Database = {
         Args: { season_id_param: string }
         Returns: number
       }
+      grant_rental_access: {
+        Args: {
+          p_content_id: string
+          p_content_type: string
+          p_expires_at: string
+          p_metadata?: Json
+          p_rental_intent_id?: string
+          p_rental_type: string
+          p_source?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      has_active_rental_access: {
+        Args: {
+          p_content_id: string
+          p_content_type: string
+          p_user_id: string
+        }
+        Returns: {
+          access_type: string
+          expires_at: string
+          has_access: boolean
+          rental_access_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1605,6 +2162,27 @@ export type Database = {
       log_finance_action: {
         Args: { p_action: string; p_details?: Json }
         Returns: string
+      }
+      process_wallet_rental_payment: {
+        Args: {
+          p_content_id: string
+          p_content_type: string
+          p_discount_amount?: number
+          p_expires_at: string
+          p_final_price: number
+          p_metadata?: Json
+          p_provider_reference?: string
+          p_referral_code?: string
+          p_user_id: string
+        }
+        Returns: {
+          discount_amount: number
+          expires_at: string
+          final_price: number
+          rental_access_id: string
+          rental_intent_id: string
+          wallet_balance: number
+        }[]
       }
       process_wallet_transaction: {
         Args: {
@@ -1643,6 +2221,7 @@ export type Database = {
       payment_status: "pending" | "completed" | "failed" | "refunded"
       producer_status: "pending" | "approved" | "rejected"
       promotion_type: "standard" | "promoted" | "coming_soon"
+      rental_intent_status: "pending" | "paid" | "failed"
       rental_status: "active" | "expired"
       submission_status: "pending" | "under_review" | "approved" | "rejected"
       submission_type: "movie" | "tv_show"
@@ -1788,6 +2367,7 @@ export const Constants = {
       payment_status: ["pending", "completed", "failed", "refunded"],
       producer_status: ["pending", "approved", "rejected"],
       promotion_type: ["standard", "promoted", "coming_soon"],
+      rental_intent_status: ["pending", "paid", "failed"],
       rental_status: ["active", "expired"],
       submission_status: ["pending", "under_review", "approved", "rejected"],
       submission_type: ["movie", "tv_show"],

@@ -18,10 +18,10 @@ export function BottomNav() {
   const isMobile = useIsMobile();
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
-  const { isIOS } = usePlatform();
+  const { isNative } = usePlatform();
 
-  // Hide bottom nav on iOS onboarding and login screens for unauthenticated users
-  if (isIOS && !user && !authLoading && (location.pathname === "/" || location.pathname === "/auth")) {
+  // Hide bottom nav during onboarding screen on native platforms (iOS and Android)
+  if (isNative && !user && !authLoading && location.pathname === "/") {
     return null;
   }
 
@@ -42,35 +42,41 @@ export function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border bottom-nav-safe"
     >
       <div className="flex items-center justify-around h-16 px-2 pb-1">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            onClick={handleTabPress}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-h-[60px] relative"
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative">
-                  <item.icon
-                    className={`w-7 h-7 ${
-                      isActive
-                        ? "text-primary"
-                        : "text-muted-foreground"
+        {navItems.map((item) => {
+          const isProfileTab = item.path === "/profile";
+          const targetPath =
+            isProfileTab && !user && !authLoading ? "/auth" : item.path;
+
+          return (
+            <NavLink
+              key={item.path}
+              to={targetPath}
+              onClick={handleTabPress}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-h-[60px] relative"
+            >
+              {({ isActive }) => (
+                <>
+                  <div className="relative">
+                    <item.icon
+                      className={`w-7 h-7 ${
+                        isActive
+                          ? "text-primary"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                  </div>
+                  <span
+                    className={`text-xs font-medium ${
+                      isActive ? "text-primary" : "text-muted-foreground"
                     }`}
-                  />
-                </div>
-                <span
-                  className={`text-xs font-medium ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </>
-            )}
-          </NavLink>
-        ))}
+                  >
+                    {item.label}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </div>
     </nav>
   );

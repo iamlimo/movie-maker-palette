@@ -47,10 +47,20 @@ export const useOfflineVideo = ({ contentId, contentType, rentalId }: UseOffline
 
     try {
       // Get signed video URL
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        throw new Error('Please sign in again to download this video');
+      }
+
       const { data, error } = await supabase.functions.invoke('get-video-url', {
         body: {
           movieId: contentId,
           expiryHours: 24
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         }
       });
 

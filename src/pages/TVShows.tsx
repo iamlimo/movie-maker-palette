@@ -118,11 +118,12 @@ const TVShows = () => {
                   <MovieCard
                     key={show.id}
                     id={show.id}
+                    slug={show.slug}
                     title={show.title}
                     year={show.release_date ? new Date(show.release_date).getFullYear() : 2024}
                     rating={parseFloat(show.rating || '0')}
                     duration=""
-                    price={`₦${show.price}`}
+                    price={show.price}
                     genre={show.genre?.name || 'Unknown'}
                     imageUrl={show.thumbnail_url || '/placeholder.svg'}
                     contentType="tv_show"

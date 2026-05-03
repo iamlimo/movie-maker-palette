@@ -109,7 +109,7 @@ export function DeleteAccountDialog({ walletBalance = 0, children }: DeleteAccou
       
       // Sign out and redirect
       await signOut();
-      window.location.href = '/';
+      window.location.replace('/auth');
       
     } catch (err) {
       console.error('Delete account error:', err);
