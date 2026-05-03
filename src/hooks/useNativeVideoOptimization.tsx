@@ -19,13 +19,15 @@ export const useNativeVideoOptimization = () => {
       const currentPlatform = Capacitor.getPlatform();
       setPlatform(currentPlatform as any);
 
-      // Check plugin availability
-      try {
-        const module = await import('@capacitor-community/video-player');
-        setSupportsNativePlayer(!!module.VideoPlayer);
-      } catch {
+      // Native player availability:
+      // - Android: custom ExoPlayer Capacitor plugin (registered as "ExoPlayer")
+      // - iOS: legacy capacitor-community/video-player if installed (best-effort)
+      if (currentPlatform === 'android') {
+        setSupportsNativePlayer(Capacitor.isPluginAvailable('ExoPlayer'));
+      } else if (currentPlatform === 'ios') {
+        setSupportsNativePlayer(Capacitor.isPluginAvailable('VideoPlayer'));
+      } else {
         setSupportsNativePlayer(false);
-        console.log('Native video player not available, will use web player');
       }
     };
 
@@ -76,8 +78,9 @@ export const useNativeVideoOptimization = () => {
     try {
       if (platform === 'ios') {
         // iOS uses native fullscreen
-        if (element.webkitEnterFullscreen) {
-          element.webkitEnterFullscreen();
+        const anyEl = element as any;
+        if (typeof anyEl.webkitEnterFullscreen === 'function') {
+          anyEl.webkitEnterFullscreen();
         }
       } else if (platform === 'android') {
         // Android uses standard fullscreen API
