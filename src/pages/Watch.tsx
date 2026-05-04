@@ -3,7 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
-import NativeVideoPlayer from "@/components/NativeVideoPlayer";
+import NativeVideoPlayer from "@/components/NativeVideoPlayer"; // Temporary - delete after SystemVideoPlayer ready
+import SystemVideoPlayer from "@/components/SystemVideoPlayer";
+
+import NativeVideoPlayer from "@/components/NativeVideoPlayer"; // Remove after full migration
 import { toast } from "@/hooks/use-toast";
 import { usePlatform } from "@/hooks/usePlatform";
 import { Loader2 } from "lucide-react";
@@ -40,7 +43,9 @@ const Watch = () => {
       let retryCount = 0;
       const maxRetries = 3;
       const retryDelay = 500; // ms
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
 
       if (!accessToken) {
@@ -55,7 +60,7 @@ const Watch = () => {
           body: { content_id: contentId, content_type: contentType },
           headers: {
             Authorization: `Bearer ${accessToken}`,
-          }
+          },
         });
 
         accessError = result.error;
@@ -68,7 +73,7 @@ const Watch = () => {
         retryCount++;
         if (retryCount < maxRetries) {
           // Wait before retrying to allow database to sync
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
         }
       }
 
@@ -133,7 +138,9 @@ const Watch = () => {
           .eq("user_id", user.id)
           .in("content_id", episodeIds);
 
-        const watchMap = (historyData || []).reduce<Record<string, { completed: boolean; progress: number }>>((map, entry: any) => {
+        const watchMap = (historyData || []).reduce<
+          Record<string, { completed: boolean; progress: number }>
+        >((map, entry: any) => {
           map[entry.content_id] = {
             completed: entry.completed,
             progress: entry.progress || 0,
@@ -141,10 +148,11 @@ const Watch = () => {
           return map;
         }, {});
 
-        const nextEpisode = episodesData.find((episode: any) => {
-          const history = watchMap[episode.id];
-          return !history || (!history.completed && history.progress < 90);
-        }) || episodesData[0];
+        const nextEpisode =
+          episodesData.find((episode: any) => {
+            const history = watchMap[episode.id];
+            return !history || (!history.completed && history.progress < 90);
+          }) || episodesData[0];
 
         navigate(`/watch/episode/${nextEpisode.id}`);
         return;
@@ -160,16 +168,17 @@ const Watch = () => {
 
       // Get video URL based on content type
       let videoUrlData: any;
-      
+
       if (contentType === "movie") {
         // Use get-video-url function for movies (generates signed URL)
-        const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
-          body: { movieId: contentId },
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          }
-        });
-        
+        const { data: urlData, error: urlError } =
+          await supabase.functions.invoke("get-video-url", {
+            body: { movieId: contentId },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+
         if (urlError || !urlData?.signedUrl) {
           // Fallback to direct URL from database
           videoUrlData = { url: contentData.video_url };
@@ -231,8 +240,20 @@ const Watch = () => {
               contentId={contentId!}
               contentType={contentType as any}
               videoUrl={videoUrl}
-              title={contentType === "movie" ? content.title : `${content.seasons?.tv_shows?.title || content.show_title || 'Show'} - Episode ${content.episode_number}`}
-              poster={contentType === "movie" ? content.thumbnail_url : content.seasons?.tv_shows?.thumbnail_url}
+              title={
+                contentType === "movie"
+                  ? content.title
+                  : `${
+                      content.seasons?.tv_shows?.title ||
+                      content.show_title ||
+                      "Show"
+                    } - Episode ${content.episode_number}`
+              }
+              poster={
+                contentType === "movie"
+                  ? content.thumbnail_url
+                  : content.seasons?.tv_shows?.thumbnail_url
+              }
               subtitleUrl={content.subtitle_url}
               autoPlay={true}
             />
@@ -242,7 +263,13 @@ const Watch = () => {
               src={videoUrl}
               contentId={contentId!}
               contentType={contentType!}
-              title={contentType === "movie" ? content.title : `${content.seasons?.tv_shows?.title || 'Show'} - Episode ${content.episode_number}`}
+              title={
+                contentType === "movie"
+                  ? content.title
+                  : `${content.seasons?.tv_shows?.title || "Show"} - Episode ${
+                      content.episode_number
+                    }`
+              }
               poster={content.thumbnail_url || content.poster_url}
               autoPlay={true}
               immersive={true}

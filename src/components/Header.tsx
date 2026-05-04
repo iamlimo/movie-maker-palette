@@ -118,20 +118,19 @@ const Header = () => {
           {user ? (
             <div className="flex items-center space-x-2 md:space-x-3">
               {/* Wallet Widget - Hide on iOS */}
-              {!isIOS && (
-                <Link to="/wallet">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
-                  >
-                    <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
-                    <span className="text-xs lg:text-sm font-medium">
-                      {walletLoading ? '...' : formatBalance()}
-                    </span>
-                  </Button>
-                </Link>
-              )}
+<Link to="/wallet">
+  <Button
+    variant="outline"
+    size="sm"
+    className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
+  >
+    <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+    <span className="text-xs lg:text-sm font-medium">
+      {walletLoading ? '...' : formatBalance()}
+    </span>
+  </Button>
+</Link>
+
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -286,16 +285,17 @@ const Header = () => {
             >
               Watchlist
             </Link>
-            {/* Hide Wallet link on iOS */}
-            {user && !isIOS && (
-              <Link
-                to="/wallet"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block text-muted-foreground hover:text-primary transition-smooth"
-              >
-                Wallet
-              </Link>
-            )}
+            {user && (
+  <Link
+    to="/wallet"
+    onClick={() => setIsMobileMenuOpen(false)}
+    className="block text-muted-foreground hover:text-primary transition-smooth"
+  >
+    Wallet
+  </Link>
+)}
+
+
 
             <div className="pt-4 border-t border-border">
               <Button

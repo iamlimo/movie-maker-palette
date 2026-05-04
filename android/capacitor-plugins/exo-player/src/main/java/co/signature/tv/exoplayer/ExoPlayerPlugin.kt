@@ -17,7 +17,7 @@ class ExoPlayerPlugin : Plugin() {
 
     private val listener = object : ExoPlayerManager.Listener {
         override fun onReady(durationMs: Long) {
-            notifyListeners("onReady", JSObject().put("duration", durationMs / 1000.0))
+            notifyListeners("onReady", JSObject().put("duration", durationMs / 1000.0).put("title", manager?.currentTitle ?: ""))
         }
         override fun onBuffering() { notifyListeners("onBuffering", JSObject()) }
         override fun onPlaying() { notifyListeners("onPlaying", JSObject()) }
@@ -30,6 +30,7 @@ class ExoPlayerPlugin : Plugin() {
             val data = JSObject()
                 .put("currentTime", positionMs / 1000.0)
                 .put("duration", durationMs / 1000.0)
+                .put("title", manager?.currentTitle ?: "")
             notifyListeners("onProgress", data)
         }
     }
@@ -49,11 +50,13 @@ class ExoPlayerPlugin : Plugin() {
         val startMs = (call.getDouble("startPositionMs") ?: 0.0).toLong()
         val subtitleUrl = call.getString("subtitleUrl")
         val subtitleLang = call.getString("subtitleLanguage")
+        val contentId = call.getString("contentId")
+        val contentType = call.getString("contentType")
 
         ensureManager()
         val pv = ensureContainer().ensureAttached()
         manager!!.attach(pv)
-        manager!!.load(url, type, startMs, subtitleUrl, subtitleLang)
+        manager!!.load(url, type, startMs, subtitleUrl, subtitleLang, contentId, contentType)
         call.resolve()
     }
 
@@ -109,11 +112,24 @@ class ExoPlayerPlugin : Plugin() {
         call.resolve(JSObject().put("currentTime", ms / 1000.0))
     }
 
-    @PluginMethod
+@PluginMethod
     fun setPlaybackRate(call: PluginCall) {
         val rate = (call.getDouble("rate") ?: 1.0).toFloat()
         manager?.setPlaybackRate(rate)
         call.resolve()
+    }
+
+    @PluginMethod
+    fun setTitle(call: PluginCall) {
+        val title = call.getString("title") ?: ""
+        manager?.setTitle(title)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun getTitle(call: PluginCall) {
+        val title = manager?.currentTitle ?: ""
+        call.resolve(JSObject().put("title", title))
     }
 
     override fun handleOnPause() {
