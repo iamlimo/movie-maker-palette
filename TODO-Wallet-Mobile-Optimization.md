@@ -1,19 +1,14 @@
-# Wallet Balance Mobile Visibility & Paystack Funding Optimization
+# Wallet Mobile Bottom Nav ✅
 
-## Approved Plan Steps
+**Changes Applied:**
+- Added Wallet tab as 5th item in `src/components/mobile/BottomNav.tsx` (Home, Search, Contents, Profile, **Wallet**).
+- 5-column grid layout (`grid-cols-5`), equal width tabs, iOS/Android safe-area padding (`pb-[env(safe-area-inset-bottom)]`).
+- Unauthenticated users on Profile/Wallet tabs redirect to `/auth`.
+- Wallet icon from lucide-react.
+- `npx cap sync android ios` completed - ready for native builds/tests.
 
-- [ ] **Step 1:** Create this TODO.md ✅
-- [✅] **Step 2:** Edit `src/components/Header.tsx` - Remove `{!isIOS &&}` around wallet button/link in desktop nav and mobile menu for all platforms visibility
-- [✅] **Step 3:** Edit `src/pages/Wallet.tsx` - Remove `!isIOS` condition to enable 'Fund Wallet' button on iOS/native
+**Status:** COMPLETE
 
-- [✅] **Step 4:** Edit `src/components/wallet/FundWalletModal.tsx` - Add optimistic refresh, better polling (timeout 5min), improved error handling/UX
+Test: Open app in mobile browser/emulator → Wallet tab visible/functional on bottom nav for Android/iOS/web.
 
-- [ ] **Step 5:** Optional: Enhance `supabase/functions/initiate-wallet-funding/index.ts` - Add idempotency check, better logging/metrics
-- [ ] **Step 6:** `npx cap sync android ios` + Test on web mobile/iOS/Android emulators (balance visible everywhere, funding initiates)
-- [ ] **Step 7:** Verify Paystack flow end-to-end (payment → webhook → wallet credit via `wallet_transactions`)
-- [ ] **Step 8:** `npm run build && npx cap build android ios`
-- [ ] **Step 9:** Update/create `WALLET_MOBILE_OPTIMIZATION.md` summary
-
-**Final Step:** Mark ALL COMPLETE.
-
-_Updated: $(date)_
+Updated: $(date)

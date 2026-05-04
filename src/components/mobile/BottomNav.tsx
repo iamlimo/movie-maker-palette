@@ -1,4 +1,4 @@
-import { Home, Search, Film, User } from "lucide-react";
+import { Home, Search, Film, User, Wallet } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 // import { motion } from "framer-motion";
 // import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -12,6 +12,7 @@ const navItems = [
   { icon: Search, label: "Search", path: "/movies" },
   { icon: Film, label: "Contents", path: "/watchlist" },
   { icon: User, label: "Profile", path: "/profile" },
+  { icon: Wallet, label: "Wallet", path: "/wallet" },
 ];
 
 export function BottomNav() {
@@ -41,9 +42,9 @@ export function BottomNav() {
     <nav 
       className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-border bottom-nav-safe"
     >
-      <div className="flex items-center justify-around h-16 px-2 pb-1">
+      <div className="grid grid-cols-5 h-16 px-4 pb-[env(safe-area-inset-bottom)] gap-2">
         {navItems.map((item) => {
-          const isProfileTab = item.path === "/profile";
+          const isProfileTab = item.path === "/profile" || item.path === "/wallet";
           const targetPath =
             isProfileTab && !user && !authLoading ? "/auth" : item.path;
 
@@ -52,7 +53,7 @@ export function BottomNav() {
               key={item.path}
               to={targetPath}
               onClick={handleTabPress}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-h-[60px] relative"
+              className="flex flex-col items-center justify-center gap-0.5 py-2 px-1 min-h-[60px] relative w-full"
             >
               {({ isActive }) => (
                 <>
