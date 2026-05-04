@@ -67,7 +67,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
           description: shouldUseRedirect ? "Redirecting to payment..." : "Complete your payment in the popup window",
         });
 
-        // Poll for payment completion
+        // Enhanced polling with timeout and error handling
         const pollPayment = setInterval(async () => {
           try {
             const { data: paymentData } = await supabase.functions.invoke('verify-payment', {
@@ -78,18 +78,36 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               clearInterval(pollPayment);
               refreshWallet();
               toast({
-                title: 'Wallet Funded!',
-                description: `${formatNaira(amount)} added to your wallet`,
+                title: 'Wallet Funded! 🎉',
+                description: `${formatNaira(amount)} successfully added`,
               });
               onClose();
               setAmount(0);
+              return;
+            } else if (paymentData?.payment?.status === 'failed') {
+              clearInterval(pollPayment);
+              toast({
+                title: 'Payment Failed',
+                description: 'Please try funding again or contact support.',
+                variant: 'destructive'
+              });
+              return;
             }
           } catch (pollError) {
             console.error('Payment polling error:', pollError);
           }
-        }, 3000);
+        }, 2000);
 
-        setTimeout(() => clearInterval(pollPayment), 300000);
+        // 5 minute timeout
+        const pollTimeout = setTimeout(() => {
+          clearInterval(pollPayment);
+          toast({
+            title: 'Payment Timeout',
+            description: 'Payment verification timed out. Check your wallet or try again.',
+            variant: 'destructive'
+          });
+        }, 300000);
+
       }
     } catch (error: any) {
       console.error('Wallet funding error:', error);

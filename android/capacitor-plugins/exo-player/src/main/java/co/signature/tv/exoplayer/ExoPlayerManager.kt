@@ -42,7 +42,8 @@ class ExoPlayerManager private constructor(context: Context) {
 
     private val appContext: Context = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var listener: Listener? = null
+private var listener: Listener? = null
+    private var currentTitle: String? = null
     private var progressRunnable: Runnable? = null
 
     val player: ExoPlayer
@@ -56,6 +57,7 @@ class ExoPlayerManager private constructor(context: Context) {
         player = ExoPlayer.Builder(appContext)
             .setTrackSelector(DefaultTrackSelector(appContext))
             .setLoadControl(loadControl)
+            .setLooper(Looper.getMainLooper())
             .build()
 
         player.addListener(object : Player.Listener {
@@ -80,7 +82,12 @@ class ExoPlayerManager private constructor(context: Context) {
 
     fun setListener(l: Listener?) { listener = l }
 
-    fun load(url: String, type: String?, startPositionMs: Long, subtitleUrl: String?, subtitleLang: String?) {
+    fun setTitle(title: String) {
+        currentTitle = title
+    }
+
+    fun load(url: String, type: String?, startPositionMs: Long, subtitleUrl: String?, subtitleLang: String?, contentId: String? = null, contentType: String? = null) {
+        android.util.Log.d("ExoPlayer", "Loading rented ${contentType ?: "content"} (ID: ${contentId ?: "unknown"}): $url")
         runOnMain {
             val uri = Uri.parse(url)
             val httpFactory = DefaultHttpDataSource.Factory()
@@ -178,7 +185,7 @@ class ExoPlayerManager private constructor(context: Context) {
     private fun buildCache(ctx: Context): SimpleCache {
         val cacheDir = File(ctx.cacheDir, "exoplayer-media")
         if (!cacheDir.exists()) cacheDir.mkdirs()
-        val evictor = LeastRecentlyUsedCacheEvictor(256L * 1024L * 1024L)
+val evictor = LeastRecentlyUsedCacheEvictor(512L * 1024L * 1024L)
         return SimpleCache(cacheDir, evictor, StandaloneDatabaseProvider(ctx))
     }
 

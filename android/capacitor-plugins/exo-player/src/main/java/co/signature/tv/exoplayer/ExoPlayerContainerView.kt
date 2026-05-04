@@ -22,8 +22,9 @@ class ExoPlayerContainerView(private val activity: Activity) {
             layoutParams = FrameLayout.LayoutParams(0, 0)
         }
         val pv = PlayerView(activity).apply {
-            useController = false
-            setShutterBackgroundColor(Color.BLACK)
+        useController = true
+        controllerAutoShow = true
+        setShutterBackgroundColor(Color.BLACK)
         }
         frame.addView(pv, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,

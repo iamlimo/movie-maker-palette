@@ -68,19 +68,14 @@ export default function Wallet() {
               </div>
             </CardHeader>
             <CardContent className="relative">
-              {!isIOS ? (
-                <Button 
-                  onClick={() => setIsFundModalOpen(true)}
-                  className="w-full sm:w-auto gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Fund Wallet
-                </Button>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Wallet funding is available on the Signature TV website.
-                </p>
-              )}
+              <Button 
+                onClick={() => setIsFundModalOpen(true)}
+                className="w-full sm:w-auto gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Fund Wallet
+              </Button>
+
             </CardContent>
           </Card>
 

@@ -1,13 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
-import { toast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { useRegisterSW } from "virtual:pwa-register/react";
+import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 export const useServiceWorker = () => {
+  if (Capacitor.isNativePlatform()) {
+    return {
+      isOnline: navigator.onLine,
+      needRefresh: false,
+      updateServiceWorker: () => {},
+    };
+  }
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [registration, setRegistration] =
+    useState<ServiceWorkerRegistration | null>(null);
   const hasShownUpdateToast = useRef(false);
 
   const {
@@ -20,7 +29,7 @@ export const useServiceWorker = () => {
       setRegistration(swRegistration ?? null);
     },
     onRegisterError(error) {
-      console.error('Service worker registration error:', error);
+      console.error("Service worker registration error:", error);
     },
   });
 
@@ -29,7 +38,7 @@ export const useServiceWorker = () => {
 
     const intervalId = window.setInterval(() => {
       registration.update().catch((error) => {
-        console.error('Service worker update check failed:', error);
+        console.error("Service worker update check failed:", error);
       });
     }, UPDATE_CHECK_INTERVAL_MS);
 
@@ -40,20 +49,20 @@ export const useServiceWorker = () => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
   useEffect(() => {
     if (offlineReady) {
       toast({
-        title: 'App ready for offline use',
-        description: 'Key assets are now cached for offline access.',
+        title: "App ready for offline use",
+        description: "Key assets are now cached for offline access.",
       });
       setOfflineReady(false);
     }
@@ -69,8 +78,9 @@ export const useServiceWorker = () => {
     hasShownUpdateToast.current = true;
 
     toast({
-      title: 'Update available',
-      description: 'A newer version is ready. Refresh now to load the latest UI and assets.',
+      title: "Update available",
+      description:
+        "A newer version is ready. Refresh now to load the latest UI and assets.",
       action: (
         <Button
           type="button"

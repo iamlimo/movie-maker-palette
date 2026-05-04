@@ -7,10 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
+import { Capacitor } from "@capacitor/core";
 import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { OfflineBanner } from "@/components/OfflineBanner";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -19,59 +18,59 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
-import { Analytics } from "@vercel/analytics/react"
-import { SpeedInsights } from "@vercel/speed-insights/react"
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
-// Lazy load non-critical routes for faster initial load
-const Profile = lazy(() => import('./pages/Profile'));
-const MoviePreview = lazy(() => import('./pages/MoviePreview'));
-const TVShowPreview = lazy(() => import('./pages/TVShowPreview'));
-const Movies = lazy(() => import('./pages/Movies'));
-const TVShows = lazy(() => import('./pages/TVShows'));
-const Genres = lazy(() => import('./pages/Genres'));
-const Watchlist = lazy(() => import('./pages/Watchlist'));
-const Wallet = lazy(() => import('./pages/Wallet'));
-const Help = lazy(() => import('./pages/Help'));
-const Contact = lazy(() => import('./pages/Contact'));
-const Terms = lazy(() => import('./pages/Terms'));
-const Docs = lazy(() => import('./pages/Docs'));
-const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
-const TermsAndConditions = lazy(() => import('./pages/GeneralTerms'));
-const Careers = lazy(() => import('./pages/Careers'));
-const JobApplication = lazy(() => import('./pages/JobApplication'));
-const Watch = lazy(() => import('./pages/Watch'));
+const Profile = lazy(() => import("./pages/Profile"));
+const MoviePreview = lazy(() => import("./pages/MoviePreview"));
+const TVShowPreview = lazy(() => import("./pages/TVShowPreview"));
+const Movies = lazy(() => import("./pages/Movies"));
+const TVShows = lazy(() => import("./pages/TVShows"));
+const Genres = lazy(() => import("./pages/Genres"));
+const Watchlist = lazy(() => import("./pages/Watchlist"));
+const Wallet = lazy(() => import("./pages/Wallet"));
+const Help = lazy(() => import("./pages/Help"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Docs = lazy(() => import("./pages/Docs"));
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+const TermsAndConditions = lazy(() => import("./pages/GeneralTerms"));
+const Careers = lazy(() => import("./pages/Careers"));
+const JobApplication = lazy(() => import("./pages/JobApplication"));
+const Watch = lazy(() => import("./pages/Watch"));
 
 // Lazy load ALL admin routes
-const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
-const AdminMovies = lazy(() => import('@/pages/admin/Movies'));
-const AddMovieNew = lazy(() => import('@/pages/admin/AddMovieNew'));
-const ViewMovie = lazy(() => import('@/pages/admin/ViewMovie'));
-const EditMovie = lazy(() => import('@/pages/admin/EditMovie'));
-const AdminTVShows = lazy(() => import('@/pages/admin/TVShows'));
-const AddTVShow = lazy(() => import('@/pages/admin/AddTVShow'));
-const AddSeason = lazy(() => import('@/pages/admin/AddSeason'));
-const AddEpisode = lazy(() => import('@/pages/admin/AddEpisode'));
-const EditSeason = lazy(() => import('@/pages/admin/EditSeason'));
-const EditEpisode = lazy(() => import('@/pages/admin/EditEpisode'));
-const ViewTVShow = lazy(() => import('@/pages/admin/ViewTVShow'));
-const EditTVShow = lazy(() => import('@/pages/admin/EditTVShow'));
-const Submissions = lazy(() => import('@/pages/admin/Submissions'));
-const Users = lazy(() => import('@/pages/admin/Users'));
-const Finance = lazy(() => import('@/pages/admin/Finance'));
-const AdminRentals = lazy(() => import('@/pages/admin/Rentals'));
-const Producers = lazy(() => import('@/pages/admin/Producers'));
-const Sections = lazy(() => import('@/pages/admin/Sections'));
-const HeroSlider = lazy(() => import('@/pages/admin/HeroSlider'));
-const Banners = lazy(() => import('@/pages/admin/Banners'));
-const Wallets = lazy(() => import('@/pages/admin/Wallets'));
-const Settings = lazy(() => import('@/pages/admin/Settings'));
-const JobListingsAdmin = lazy(() => import('@/pages/admin/JobListings'));
-const JobApplicationsAdmin = lazy(() => import('@/pages/admin/JobApplications'));
-const ReferralCodes = lazy(() => import('@/pages/admin/ReferralCodes'));
-const PushNotificationsAdmin = lazy(() => import('@/pages/admin/PushNotifications'));
-const CreateTicket = lazy(() => import('@/pages/admin/CreateTicket'));
-const TicketsList = lazy(() => import('@/pages/admin/TicketsList'));
-const TicketDetails = lazy(() => import('@/pages/admin/TicketDetails'));
+const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"));
+const AdminMovies = lazy(() => import("@/pages/admin/Movies"));
+const AddMovieNew = lazy(() => import("@/pages/admin/AddMovieNew"));
+const ViewMovie = lazy(() => import("@/pages/admin/ViewMovie"));
+const EditMovie = lazy(() => import("@/pages/admin/EditMovie"));
+const AdminTVShows = lazy(() => import("@/pages/admin/TVShows"));
+const AddTVShow = lazy(() => import("@/pages/admin/AddTVShow"));
+const AddSeason = lazy(() => import("@/pages/admin/AddSeason"));
+const AddEpisode = lazy(() => import("@/pages/admin/AddEpisode"));
+const EditSeason = lazy(() => import("@/pages/admin/EditSeason"));
+const EditEpisode = lazy(() => import("@/pages/admin/EditEpisode"));
+const ViewTVShow = lazy(() => import("@/pages/admin/ViewTVShow"));
+const EditTVShow = lazy(() => import("@/pages/admin/EditTVShow"));
+const Submissions = lazy(() => import("@/pages/admin/Submissions"));
+const Users = lazy(() => import("@/pages/admin/Users"));
+const Finance = lazy(() => import("@/pages/admin/Finance"));
+const AdminRentals = lazy(() => import("@/pages/admin/Rentals"));
+const Producers = lazy(() => import("@/pages/admin/Producers"));
+const Sections = lazy(() => import("@/pages/admin/Sections"));
+const HeroSlider = lazy(() => import("@/pages/admin/HeroSlider"));
+const Banners = lazy(() => import("@/pages/admin/Banners"));
+const Wallets = lazy(() => import("@/pages/admin/Wallets"));
+const Settings = lazy(() => import("@/pages/admin/Settings"));
+const JobListingsAdmin = lazy(() => import("@/pages/admin/JobListings"));
+const JobApplicationsAdmin = lazy(
+  () => import("@/pages/admin/JobApplications"),
+);
+const ReferralCodes = lazy(() => import("@/pages/admin/ReferralCodes"));
+const CreateTicket = lazy(() => import("@/pages/admin/CreateTicket"));
+const TicketsList = lazy(() => import("@/pages/admin/TicketsList"));
+const TicketDetails = lazy(() => import("@/pages/admin/TicketDetails"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,16 +87,22 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   useDeepLinking();
-  useServiceWorker();
-  usePushNotifications();
+  if (!Capacitor.isNativePlatform()) {
+    useServiceWorker();
+  }
 
   return (
     <>
-      <OfflineBanner />
       <Analytics />
       <SpeedInsights />
       <MobileRouteAnimator>
-        <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
+        <Suspense
+          fallback={
+            <div style={{ padding: "20px", textAlign: "center" }}>
+              Loading...
+            </div>
+          }
+        >
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -127,69 +132,68 @@ function AppContent() {
             <Route path="/careers" element={<Careers />} />
             <Route path="/careers/apply/:jobId" element={<JobApplication />} />
 
-          {/* Super Admin Routes */}
-          <Route
-            path="/admin"
-            element={
-              <SuperAdminRoute>
-                <AdminLayout />
-              </SuperAdminRoute>
-            }
-          >
-            <Route index element={<AdminDashboard />} />
-            <Route path="movies" element={<AdminMovies />} />
-            <Route path="movies/add" element={<AddMovieNew />} />
-            <Route path="movies/view/:id" element={<ViewMovie />} />
-            <Route path="movies/edit/:id" element={<EditMovie />} />
-            <Route path="tv-shows" element={<AdminTVShows />} />
-            <Route path="tv-shows/add" element={<AddTVShow />} />
-            <Route path="tv-shows/:showId/add-season" element={<AddSeason />} />
+            {/* Super Admin Routes */}
             <Route
-              path="tv-shows/:showId/seasons/:seasonId/add-episode"
-              element={<AddEpisode />}
-            />
-            <Route
-              path="tv-shows/:showId/seasons/:seasonId/edit"
-              element={<EditSeason />}
-            />
-            <Route
-              path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
-              element={<EditEpisode />}
-            />
-            
-            <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
-            <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
-            <Route path="submissions" element={<Submissions />} />
-            <Route path="users" element={<Users />} />
-            <Route path="finance" element={<Finance />} />
-            <Route path="rentals" element={<AdminRentals />} />
-            <Route path="producers" element={<Producers />} />
-            <Route path="sections" element={<Sections />} />
-            <Route path="hero-slider" element={<HeroSlider />} />
-            <Route path="banners" element={<Banners />} />
-            <Route path="wallets" element={<Wallets />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="job-listings" element={<JobListingsAdmin />} />
-            <Route path="applications" element={<JobApplicationsAdmin />} />
-            <Route path="referral-codes" element={<ReferralCodes />} />
-            <Route path="push-notifications" element={<PushNotificationsAdmin />} />
-            <Route path="tickets" element={<TicketsList />} />
-            <Route path="tickets/create" element={<CreateTicket />} />
-            <Route path="tickets/:ticketId" element={<TicketDetails />} />
-          </Route>
+              path="/admin"
+              element={
+                <SuperAdminRoute>
+                  <AdminLayout />
+                </SuperAdminRoute>
+              }
+            >
+              <Route index element={<AdminDashboard />} />
+              <Route path="movies" element={<AdminMovies />} />
+              <Route path="movies/add" element={<AddMovieNew />} />
+              <Route path="movies/view/:id" element={<ViewMovie />} />
+              <Route path="movies/edit/:id" element={<EditMovie />} />
+              <Route path="tv-shows" element={<AdminTVShows />} />
+              <Route path="tv-shows/add" element={<AddTVShow />} />
+              <Route
+                path="tv-shows/:showId/add-season"
+                element={<AddSeason />}
+              />
+              <Route
+                path="tv-shows/:showId/seasons/:seasonId/add-episode"
+                element={<AddEpisode />}
+              />
+              <Route
+                path="tv-shows/:showId/seasons/:seasonId/edit"
+                element={<EditSeason />}
+              />
+              <Route
+                path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
+                element={<EditEpisode />}
+              />
+
+              <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
+              <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
+              <Route path="submissions" element={<Submissions />} />
+              <Route path="users" element={<Users />} />
+              <Route path="finance" element={<Finance />} />
+              <Route path="rentals" element={<AdminRentals />} />
+              <Route path="producers" element={<Producers />} />
+              <Route path="sections" element={<Sections />} />
+              <Route path="hero-slider" element={<HeroSlider />} />
+              <Route path="banners" element={<Banners />} />
+              <Route path="wallets" element={<Wallets />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="job-listings" element={<JobListingsAdmin />} />
+              <Route path="applications" element={<JobApplicationsAdmin />} />
+              <Route path="referral-codes" element={<ReferralCodes />} />
+              <Route path="tickets" element={<TicketsList />} />
+              <Route path="tickets/create" element={<CreateTicket />} />
+              <Route path="tickets/:ticketId" element={<TicketDetails />} />
+            </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </MobileRouteAnimator>
-      <BottomNav /> 
-      <OfflineSyncStatus />
-       {/* this controls the syncing status badge that appears when the user is offline or has pending sync actions. It listens for online/offline events and updates the UI accordingly, showing a badge with the number of pending sync actions when offline, and a syncing animation when processing the queue. */}
-  
+      <BottomNav />
+      {!Capacitor.isNativePlatform() && <OfflineSyncStatus />}
+      {/* PWA offline sync - disabled on native */}
     </>
-
-    
   );
 }
 

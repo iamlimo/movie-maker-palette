@@ -1,28 +1,38 @@
-import { useNavigate } from 'react-router-dom';
-import { Play, X } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { useWatchHistory, WatchHistoryItem } from '@/hooks/useWatchHistory';
-import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
-import { formatNaira } from '@/lib/priceUtils';
+import { useNavigate } from "react-router-dom";
+import { Play, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { useWatchHistory, WatchHistoryItem } from "@/hooks/useWatchHistory";
+import { AlertTriangle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { formatNaira } from "@/lib/priceUtils";
 
 interface ContinueWatchingCardProps {
   item: WatchHistoryItem;
-  onPlay: () => void;
+  onAction: () => void;
   onRemove: () => void;
   canRemove: boolean;
+  isExpired: boolean;
 }
 
 const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
   item,
-  onPlay,
+  onAction,
   onRemove,
   canRemove,
+  isExpired,
 }) => {
   const formatTimeRemaining = (item: WatchHistoryItem) => {
-    if (item.playback_position !== undefined && item.video_duration && item.video_duration > 0) {
-      const remainingSeconds = Math.max(item.video_duration - item.playback_position, 0);
+    if (
+      item.playback_position !== undefined &&
+      item.video_duration &&
+      item.video_duration > 0
+    ) {
+      const remainingSeconds = Math.max(
+        item.video_duration - item.playback_position,
+        0,
+      );
       const remainingMinutes = Math.round(remainingSeconds / 60);
       if (remainingMinutes >= 60) {
         const hours = Math.floor(remainingMinutes / 60);
@@ -32,9 +42,12 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
       return `${remainingMinutes}m remaining`;
     }
 
-    if (!item.duration) return '';
+    if (!item.duration) return "";
     const watchedMinutes = (item.duration * item.progress) / 100;
-    const remainingMinutes = Math.max(Math.round(item.duration - watchedMinutes), 0);
+    const remainingMinutes = Math.max(
+      Math.round(item.duration - watchedMinutes),
+      0,
+    );
     if (remainingMinutes >= 60) {
       const hours = Math.floor(remainingMinutes / 60);
       const mins = remainingMinutes % 60;
@@ -44,10 +57,13 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
   };
 
   const progressValue = Math.min(100, Math.max(0, item.progress));
-  const priceLabel = item.price !== undefined && item.price !== null ? formatNaira(item.price) : null;
+  const priceLabel =
+    item.price !== undefined && item.price !== null
+      ? formatNaira(item.price)
+      : null;
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onPlay();
     }
@@ -58,7 +74,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
       className="group relative flex-shrink-0 w-[280px] sm:w-[320px] md:w-[340px] snap-start cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       role="button"
       tabIndex={0}
-      onClick={onPlay}
+      onClick={onAction}
       onKeyDown={handleKeyDown}
     >
       <div className="relative overflow-hidden rounded-lg bg-card transition-all duration-300 group-hover:ring-2 group-hover:ring-primary/50 group-hover:shadow-xl">
@@ -83,7 +99,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
               size="lg"
               onClick={(event) => {
                 event.stopPropagation();
-                onPlay();
+                onAction();
               }}
               className="rounded-full bg-white text-black hover:bg-white/90 hover:scale-105 transition-transform shadow-2xl"
             >
@@ -98,24 +114,33 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
                 onRemove();
               }
             }}
-            className={`absolute top-2 right-2 p-1.5 rounded-full text-white transition-opacity ${canRemove ? 'bg-black/60 opacity-0 group-hover:opacity-100 hover:bg-black/80' : 'bg-black/35 opacity-100 cursor-not-allowed'}`}
-            aria-label={canRemove ? "Remove from Continue Watching" : "Active rental cannot be removed"}
+            className={`absolute top-2 right-2 p-1.5 rounded-full text-white transition-opacity ${
+              canRemove
+                ? "bg-black/60 opacity-0 group-hover:opacity-100 hover:bg-black/80"
+                : "bg-black/35 opacity-100 cursor-not-allowed"
+            }`}
+            aria-label={
+              canRemove
+                ? "Remove from Continue Watching"
+                : "Active rental cannot be removed"
+            }
             disabled={!canRemove}
-            title={canRemove ? "Remove from Continue Watching" : "Active rental cannot be removed"}
+            title={
+              canRemove
+                ? "Remove from Continue Watching"
+                : "Active rental cannot be removed"
+            }
           >
             <X size={14} />
           </button>
 
           <div className="absolute bottom-0 left-0 right-0 p-3 space-y-2">
             <h3 className="font-semibold text-white text-sm line-clamp-1">
-              {item.title || 'Unknown Title'}
+              {item.title || "Unknown Title"}
             </h3>
 
             <div className="space-y-1">
-              <Progress
-                value={progressValue}
-                className="h-1 bg-white/20"
-              />
+              <Progress value={progressValue} className="h-1 bg-white/20" />
               <div className="flex items-center justify-between text-xs text-white/70">
                 <span>{Math.round(progressValue)}% watched</span>
                 <span>{formatTimeRemaining(item)}</span>
@@ -128,7 +153,9 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
           {priceLabel && (
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Rental price</span>
-              <span className="font-semibold text-foreground">{priceLabel}</span>
+              <span className="font-semibold text-foreground">
+                {priceLabel}
+              </span>
             </div>
           )}
 
@@ -152,7 +179,13 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
 const ContinueWatchingSection: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { continueWatching, loading, removeFromHistory, canRemoveFromHistory } = useWatchHistory();
+  const {
+    continueWatching,
+    loading,
+    removeFromHistory,
+    canRemoveFromHistory,
+    hasActiveAccess,
+  } = useWatchHistory();
 
   // Don't render if user is not logged in or no content to show
   if (!user || loading || continueWatching.length === 0) {
@@ -184,11 +217,11 @@ const ContinueWatchingSection: React.FC = () => {
         </div>
 
         {/* Horizontal scroll container */}
-        <div 
+        <div
           className={cn(
             "flex gap-3 md:gap-4 overflow-x-auto pb-4 -mx-4 px-4",
             "scrollbar-hide snap-x snap-mandatory scroll-smooth",
-            "md:scrollbar-default"
+            "md:scrollbar-default",
           )}
         >
           {continueWatching.map((item) => (
