@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { useExoPlayer } from "@/hooks/useExoPlayer";
-import { Loader2, AlertCircle, ChevronLeft, Play, Pause } from "lucide-react";
+import { Loader2, AlertCircle, ChevronLeft, Play, Pause, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface NativeVideoPlayerProps {
@@ -47,6 +47,16 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
 
   const exo = useExoPlayer();
+
+  const [retryKey, setRetryKey] = useState(0);
+
+  const handleRetry = async () => {
+    try {
+      await exo.release();
+    } catch {}
+    loadedRef.current = false;
+    setRetryKey((k) => k + 1);
+  };
 
   // Sync the native PlayerView rect to the placeholder div on Android.
   useEffect(() => {
@@ -139,6 +149,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     autoPlay,
     subtitleUrl,
     getLastPosition,
+    retryKey,
   ]);
 
   // Save position on unmount
@@ -194,10 +205,47 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
             </div>
           )}
-          {exo.state === "error" && exo.error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 p-4 text-center">
-              <AlertCircle className="h-10 w-10 text-destructive mb-2" />
-              <p className="text-sm text-foreground">{exo.error}</p>
+          {exo.state === "error" && (
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-black/80 via-black/90 to-black backdrop-blur-md animate-in fade-in zoom-in-95 duration-300"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative mb-4">
+                <div className="absolute inset-0 rounded-full bg-destructive/30 blur-2xl animate-pulse" />
+                <div className="relative h-16 w-16 rounded-full bg-destructive/15 border border-destructive/40 flex items-center justify-center">
+                  {/offline|network|connection/i.test(exo.error || "") ? (
+                    <WifiOff className="h-8 w-8 text-destructive" />
+                  ) : (
+                    <AlertCircle className="h-8 w-8 text-destructive" />
+                  )}
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-1">
+                Playback failed
+              </h3>
+              <p className="text-sm text-white/70 max-w-sm mb-5 leading-relaxed">
+                {exo.error ||
+                  "We couldn't start this video. Check your connection and try again."}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleRetry}
+                  className="gap-2 shadow-glow"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Retry
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate(-1)}
+                  className="gap-1 border-white/30 text-white hover:bg-white/10"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back
+                </Button>
+              </div>
             </div>
           )}
         </div>
