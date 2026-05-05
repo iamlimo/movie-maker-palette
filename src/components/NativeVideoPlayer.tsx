@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
-import { usePlayer } from "@/hooks/usePlayer";
+import { useExoPlayer } from "@/hooks/useExoPlayer";
 import { Loader2, AlertCircle, ChevronLeft, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -46,12 +46,33 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
   const [showControls, setShowControls] = useState(true);
 
-  const player = usePlayer();
+  const exo = useExoPlayer();
+
+  // Sync the native PlayerView rect to the placeholder div on Android.
+  useEffect(() => {
+    if (!isAndroid || !exo.isAvailable) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const sync = () => {
+      const r = el.getBoundingClientRect();
+      exo.setRect({ x: r.left, y: r.top, width: r.width, height: r.height }).catch(() => {});
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+    };
+  }, [isAndroid, exo.isAvailable, exo.setRect]);
 
   // ---- Android: position the native PlayerView over the React placeholder ----
   // Update rect logic preserved for compatibility - player.setRect not direct, assume exo.setRect available or adapt
 
-  // ---- Android: load video once ready ----
   useEffect(() => {
     if (!isAndroid || !exo.isAvailable || loadedRef.current) return;
     loadedRef.current = true;
@@ -72,7 +93,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
           throw new Error("Invalid video URL provided");
         }
 
-        const startPos = await getLastPosition();
+        const startPos = (await getLastPosition()) || 0;
         const startMs = startPos > 5 ? Math.floor(startPos * 1000) : 0;
         await exo.loadVideo({
           url: videoUrl,
@@ -80,9 +101,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
           startPositionMs: startMs,
           subtitleUrl: subtitleUrl || undefined,
           subtitleLanguage: subtitleUrl ? "en" : undefined,
-          contentId,
-          contentType,
-        });
+        } as any);
         // Delay play to correct thread
         setTimeout(async () => {
           if (autoPlay) await exo.play();
