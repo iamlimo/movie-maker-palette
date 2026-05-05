@@ -6,6 +6,7 @@ import { Capacitor } from "@capacitor/core";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlatform } from "@/hooks/usePlatform";
+import { isBottomNavRoute } from "@/lib/navigationUtils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
@@ -20,6 +21,11 @@ export function BottomNav() {
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { isNative } = usePlatform();
+
+  // Hide on routes that don't want a bottom nav (e.g. /watch, /admin, /auth)
+  if (!isBottomNavRoute(location.pathname)) {
+    return null;
+  }
 
   // Hide bottom nav during onboarding screen on native platforms (iOS and Android)
   if (isNative && !user && !authLoading && location.pathname === "/") {
