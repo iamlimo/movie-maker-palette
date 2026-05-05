@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { useExoPlayer } from "@/hooks/useExoPlayer";
-import { Loader2, AlertCircle, ChevronLeft, Play, Pause } from "lucide-react";
+import { Loader2, AlertCircle, ChevronLeft, Play, Pause, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface NativeVideoPlayerProps {
@@ -47,6 +47,16 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
 
   const exo = useExoPlayer();
+
+  const [retryKey, setRetryKey] = useState(0);
+
+  const handleRetry = async () => {
+    try {
+      await exo.release();
+    } catch {}
+    loadedRef.current = false;
+    setRetryKey((k) => k + 1);
+  };
 
   // Sync the native PlayerView rect to the placeholder div on Android.
   useEffect(() => {
@@ -139,6 +149,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     autoPlay,
     subtitleUrl,
     getLastPosition,
+    retryKey,
   ]);
 
   // Save position on unmount
