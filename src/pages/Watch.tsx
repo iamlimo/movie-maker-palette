@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
-import NativeVideoPlayer from "@/components/NativeVideoPlayer"; // Temporary - delete after SystemVideoPlayer ready
+import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 import SystemVideoPlayer from "@/components/SystemVideoPlayer";
-
-import NativeVideoPlayer from "@/components/NativeVideoPlayer"; // Remove after full migration
 import { toast } from "@/hooks/use-toast";
 import { usePlatform } from "@/hooks/usePlatform";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useFullscreenLandscape } from "@/hooks/useFullscreenLandscape";
 import { Loader2 } from "lucide-react";
 
 const Watch = () => {
@@ -16,10 +16,20 @@ const Watch = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isNative, isIOS, isAndroid } = usePlatform();
+  const isMobile = useIsMobile();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<any>(null);
+  const fullscreenContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-launch fullscreen + landscape lock once a playable video is loaded.
+  // Native (iOS/Android): orientation lock via @capacitor/screen-orientation.
+  // Mobile web: requestFullscreen on the container + best-effort orientation lock.
+  useFullscreenLandscape({
+    containerRef: fullscreenContainerRef,
+    enabled: !!videoUrl && (isNative || isMobile),
+  });
 
   useEffect(() => {
     if (!user) {
@@ -231,7 +241,7 @@ const Watch = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div ref={fullscreenContainerRef} className="min-h-screen bg-black">
       {videoUrl && content && (
         <>
           {/* Use Native Player on iOS/Android if available */}
