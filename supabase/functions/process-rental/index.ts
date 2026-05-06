@@ -389,6 +389,20 @@ async function createPaystackRental(
     user_name: profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Customer",
   };
 
+  // The DB has a unique partial index on (user_id, content_id) WHERE status='pending'.
+  // Mark any stale pending intents for the same user+content as failed before inserting.
+  const stalePendingFilter: Record<string, unknown> = {
+    user_id: input.userId,
+    status: "pending",
+  };
+  if (fields.movie_id) stalePendingFilter.movie_id = fields.movie_id;
+  if (fields.season_id) stalePendingFilter.season_id = fields.season_id;
+  if (fields.episode_id) stalePendingFilter.episode_id = fields.episode_id;
+  await supabase
+    .from("rental_intents")
+    .update({ status: "failed", failed_at: new Date().toISOString() })
+    .match(stalePendingFilter);
+
   const { data: intent, error: intentError } = await supabase
     .from("rental_intents")
     .insert({
