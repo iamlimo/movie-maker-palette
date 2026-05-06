@@ -616,6 +616,7 @@ serve(async (req: Request) => {
           contentType: normalizedType,
           price,
           finalPrice,
+          expiresAt,
           referralCode: referralCode || undefined,
           discountApplied,
           metadata: paymentMetadata,
