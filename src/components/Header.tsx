@@ -85,7 +85,7 @@ const Header = () => {
           </Link>
           <Link
             to="/about"
-            className="text-sm lg:text-base text-foreground hover:text-primary transition-smooth whitespace-nowrap"
+            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             About
           </Link>
