@@ -107,23 +107,26 @@ async function loadActiveRentalAccess(
 ): Promise<RentalAccessRow | null> {
   const now = new Date().toISOString();
 
-  let query = supabase
-    .from("rental_access")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("revoked_at", null)
-    .eq("status", "paid")
-    .gt("expires_at", now)
-    .order("expires_at", { ascending: false });
+  const baseQuery = () =>
+    supabase
+      .from("rental_access")
+      .select("*")
+      .eq("user_id", userId)
+      .is("revoked_at", null)
+      .eq("status", "paid")
+      .gt("expires_at", now)
+      .order("expires_at", { ascending: false });
 
-  const { data: byIntent, error: intentError } = await query.eq("rental_intent_id", rentalIntentId).maybeSingle();
+  const { data: byIntent, error: intentError } = await baseQuery()
+    .eq("rental_intent_id", rentalIntentId)
+    .maybeSingle();
   if (!intentError && byIntent) {
     return byIntent as RentalAccessRow;
   }
 
   const fields = buildContentFields(contentId, contentType);
 
-  const { data: byContent, error: contentError } = await query
+  const { data: byContent, error: contentError } = await baseQuery()
     .or(
       [
         fields.movie_id ? `movie_id.eq.${fields.movie_id}` : null,
@@ -349,6 +352,32 @@ Deno.serve(async (req) => {
           }),
           { headers: corsHeaders },
         );
+      }
+
+      // Mirror to legacy `rentals` table for backward compatibility (best-effort, idempotent).
+      try {
+        const contentTypeForLegacy = rentalIntent.rental_type;
+        const { data: existingLegacy } = await supabase
+          .from("rentals")
+          .select("id")
+          .eq("user_id", rentalIntent.user_id)
+          .eq("content_id", contentId)
+          .eq("content_type", contentTypeForLegacy)
+          .gte("expires_at", new Date().toISOString())
+          .maybeSingle();
+        if (!existingLegacy) {
+          await supabase.from("rentals").insert({
+            user_id: rentalIntent.user_id,
+            content_id: contentId,
+            content_type: contentTypeForLegacy,
+            price: rentalIntent.price,
+            expires_at: accessRow.expires_at,
+            status: "completed",
+            payment_method: "paystack",
+          });
+        }
+      } catch (legacyError) {
+        console.warn("Legacy rentals mirror failed:", legacyError);
       }
 
       console.log(

@@ -1,70 +1,75 @@
-# Fix: Bottom Nav Overlap + Auto-Fullscreen Landscape Playback
+## Root cause
 
-Two related fixes targeting the Watch experience across mobile web, Android (ExoPlayer), and iOS (AVPlayer).
+The new rental architecture (`rental_intents` → `rental_access`) is wired up correctly in `paystack-webhook`, `verify-payment`, and `rental-access`, but **`process-rental` never writes to it**. It only inserts into the legacy `payments` and `rentals` tables.
 
-## Problem 1 — Bottom nav blocks player controls
+Result for Paystack flow:
+1. User clicks Rent → `process-rental` creates a `payments` row, calls Paystack, returns `authorizationUrl`.
+2. User pays. Paystack fires `charge.success` to `paystack-webhook`.
+3. Webhook calls `loadRentalIntentByReference()` → **returns null** because no `rental_intents` row exists.
+4. Webhook logs "Intent not found", exits without granting access.
+5. `rental-access` (called by `Watch.tsx`) queries `rental_access` via `has_active_rental_access` RPC → empty → user is denied.
+6. Frontend `usePaystackRentalVerification` polls `verify-payment`, which also can't find an intent → stays `pending` forever.
 
-`BottomNav` is a `fixed bottom-0` 64px+safe-area bar rendered globally in `src/App.tsx`. On `/watch/:type/:id` it overlays the video controls (web `VideoPlayer`, native overlay in `NativeVideoPlayer`). `isBottomNavRoute()` in `src/lib/navigationUtils.ts` currently allows it everywhere except `/admin` and `/auth`.
+Confirmed by DB: `rental_intents` and `rental_access` are both empty (0 rows) while `payments` has 133 rental entries, many `paystack` + `pending` and never finalised.
 
-**Fix:** Exclude `/watch` from `isBottomNavRoute()` so the bar is hidden on the watch page for every platform.
+Two secondary bugs that would also prevent webhook success even if the intent existed:
 
-```ts
-// src/lib/navigationUtils.ts
-if (pathname.startsWith("/watch")) return false;
-```
+- `paystack-webhook.loadActiveRentalAccess` and `verify-payment.loadActiveRentalAccess` use `.eq("revoked_at", null)`. PostgREST treats this as `revoked_at = 'null'::text`, which never matches a real NULL. Must be `.is("revoked_at", null)`. (The dispute branch already uses `.is(...)` correctly.)
+- The Paystack `query.or(...)` chain in webhook also reuses the same builder twice (`query.eq(...).maybeSingle()` then later `query.or(...)`), which double-applies filters. Needs separate query instances.
 
-Then update `BottomNav` to consult `isBottomNavRoute(location.pathname)` and return `null` when false (currently it only checks the onboarding case). This guarantees both Header and BottomNav stay consistent.
+## Fix (no new functions/components)
 
-## Problem 2 — Auto-launch fullscreen landscape on native + mobile web
+### 1. `supabase/functions/process-rental/index.ts`
 
-Desired behavior the moment `Watch.tsx` mounts with a valid video:
+Replace `createWalletRental` and `createPaystackRental` so they write to the new schema while keeping the existing response shape (so the frontend keeps working unchanged).
 
-- **Android (Capacitor + ExoPlayer):** lock orientation to landscape, hide system bars (immersive), expand the native `ExoPlayerContainerView` to cover the full screen. Restore portrait + bars on unmount / back.
-- **iOS (Capacitor + AVPlayer / video-player plugin):** request landscape via `@capacitor/screen-orientation`; the AVPlayer plugin already presents fullscreen — ensure it's invoked immediately on load (not behind a tap) and orientation locks before presentation.
-- **Mobile web:** on `Watch.tsx` mount, if `useIsMobile()` is true, call `containerRef.current.requestFullscreen()` on the `VideoPlayer` and `screen.orientation.lock('landscape')` (best-effort, wrapped in try/catch — Safari iOS will silently no-op, which is acceptable). Release on unmount.
+**Wallet path:** call existing DB function `process_wallet_rental_payment` (already in the database). It atomically:
+- locks the wallet, deducts balance,
+- inserts `rental_intents` (status `paid`),
+- inserts `rental_access` (status `paid`, with `expires_at`).
 
-### Implementation steps
+After it succeeds, also insert a `payments` row + `wallet_transactions` row for ledger continuity (existing admin/finance pages depend on it). Keep referral-code recording.
 
-1. **Add dependency:** `@capacitor/screen-orientation` (Capacitor 7 compatible). Run `npx cap sync` after install (user step).
+Return `{ success, paymentMethod: 'wallet', rentalId: rental_intent_id, paymentId, walletBalance, rentalExpiresAt }` — same shape `OptimizedRentalCheckout` already consumes.
 
-2. **New hook `src/hooks/useFullscreenLandscape.tsx`:**
-   - Detect platform via existing `usePlatform()` + `useIsMobile()`.
-   - On mount: lock landscape (native via plugin, web via `screen.orientation.lock`), and on web request fullscreen on a passed-in element ref.
-   - On Android: also call a new `setImmersive(true)` method on the ExoPlayer plugin (see step 4) and resize the native PlayerView to full screen (pass `{x:0,y:0,width:screen.width,height:screen.height}` to existing `setRect`).
-   - On unmount: unlock orientation, exit fullscreen, restore immersive=false, restore previous rect.
+**Paystack path:** before calling Paystack, insert a `rental_intents` row with:
+- `user_id`, `rental_type`, `movie_id`/`season_id`/`episode_id`,
+- `price = finalPrice` (kept in **naira** to match webhook's `expectedAmount = price * 100` calculation, since `payments.amount` is also stored in naira here),
+- `currency: 'NGN'`, `payment_method: 'paystack'`, `status: 'pending'`,
+- `expires_at` = computed rental expiry (so webhook uses the right value),
+- `metadata` carrying content_id/type, referral info, original price.
 
-3. **Wire hook into `Watch.tsx`:** call `useFullscreenLandscape({ containerRef, enabled: !!videoUrl })`. For web fallback, pass the `VideoPlayer`'s container ref (lift ref via a forwardRef wrapper or wrap `<VideoPlayer>` in a div ref we control). Simpler: wrap both branches in a `<div ref={watchRef} className="w-screen h-screen">` and target that for web fullscreen.
+Use the new intent's `id` as the Paystack `reference` and store it in both `provider_reference` and `paystack_reference`. Keep the `payments` insert too, but link it to the intent via `metadata.rental_intent_id` so `verify-payment.loadRentalIntent` resolves it.
 
-4. **Android ExoPlayer plugin additions** (`android/capacitor-plugins/exo-player/`):
-   - `ExoPlayerPlugin.kt`: add `@PluginMethod fun setImmersive(call)` that on the UI thread sets `WindowInsetsControllerCompat(window, decorView).hide(systemBars())` and locks `activity.requestedOrientation = SCREEN_ORIENTATION_SENSOR_LANDSCAPE`. A matching `exitImmersive` restores `SCREEN_ORIENTATION_UNSPECIFIED` and shows bars.
-   - Update `src/plugins/exo-player.ts` interface with `setImmersive({enabled})` and `setOrientation({mode})`.
-   - In `NativeVideoPlayer.tsx`, on mount call `ExoPlayer.setImmersive({enabled:true})` then `setRect` with full window size (use `window.innerWidth/innerHeight * devicePixelRatio`). On back/unmount call the inverse.
+Return `{ success, paymentMethod: 'paystack', rentalId: intent.id, paymentId, authorizationUrl, paystackReference }`.
 
-5. **iOS:** add a small wrapper around the existing `@capacitor-community/video-player` (still used on iOS per current routing) that calls `ScreenOrientation.lock({orientation:'landscape'})` immediately before `play()`, and `unlock()` on dismissal/unmount. AVPlayer's built-in fullscreen UI then takes over. No native Swift changes needed.
+Update `hasExistingRentalAccess` to call the `has_active_rental_access` RPC (single source of truth) and only fall back to the legacy `rentals` query if the RPC errors.
 
-6. **Mobile web `VideoPlayer.tsx`:** when `immersive` prop is true AND `useIsMobile()`, after the video element is ready trigger `containerRef.current.requestFullscreen()` and `screen.orientation.lock('landscape')` inside a user-gesture-safe path. Since `Watch.tsx` is reached via tap from the rent/play button, the gesture is preserved if we do it inside the same React event chain. For the autoplay case we'll attempt it in `onLoadedMetadata`; failures are swallowed (Safari).
+### 2. `supabase/functions/paystack-webhook/index.ts`
 
-7. **Cleanup + safety:**
-   - Always wrap orientation/fullscreen calls in try/catch.
-   - Restore portrait orientation on `Watch.tsx` unmount and on browser back.
-   - Hide `BottomNav` (already covered by step 1) and Header on `/watch` to avoid layout reflow under the player on web.
+- Change every `.eq("revoked_at", null)` to `.is("revoked_at", null)` in `loadActiveRentalAccess`.
+- Refactor `loadActiveRentalAccess` to build a fresh query for the by-content lookup instead of reusing the by-intent builder (avoids stacked filters).
+- After the existing intent update, also insert a row into the legacy `rentals` table (status `completed`, expires_at, content_id/type) so legacy code paths and admin views keep working. Make it idempotent (check first or swallow unique violations).
 
-## Files changed
+### 3. `supabase/functions/verify-payment/index.ts`
 
-```text
-src/lib/navigationUtils.ts          # exclude /watch from bottom nav
-src/components/mobile/BottomNav.tsx # respect isBottomNavRoute
-src/components/Header.tsx           # hide on /watch
-src/hooks/useFullscreenLandscape.tsx (new)
-src/pages/Watch.tsx                 # use new hook, wrap in fullscreen container
-src/components/VideoPlayer.tsx      # mobile-web auto fullscreen on mount
-src/components/NativeVideoPlayer.tsx# call setImmersive + full-screen rect
-src/plugins/exo-player.ts           # add setImmersive / setOrientation types
-android/.../ExoPlayerPlugin.kt      # implement setImmersive / orientation
-package.json                        # add @capacitor/screen-orientation
-```
+- Same `.eq("revoked_at", null)` → `.is("revoked_at", null)` fix in `loadActiveRentalAccess`.
+- In `loadRentalIntent`, also try resolving by `payment.intent_id` (currently only checks `metadata.rental_intent_id`, but `process-rental` historically wrote the reference there).
 
-## Notes / caveats
+### 4. Backfill the stuck Paystack `payments` rows (one-off migration)
 
-- iOS Safari mobile web cannot programmatically lock orientation; the user will see fullscreen but rotation remains device-controlled. This is a platform limitation, not a bug.
-- Capacitor sync (`npx cap sync android ios`) is required after the plugin and dependency changes — user must run this before the next native build.
+Add a SQL migration that, for each `payments` row with `purpose='rental'`, `provider='paystack'`, `enhanced_status` in (`pending`,`initiated`):
+
+- create a matching `rental_intents` row (status `pending`, content fields from `metadata`, `provider_reference = intent_id`),
+- store the new intent id back into `payments.metadata.rental_intent_id`.
+
+This lets `verify-payment` resolve historical orders so users who already paid (or who retry) recover access. Skip rows older than 7 days to limit blast radius.
+
+No frontend changes required — `useOptimizedRentals.processRental`, `OptimizedRentalCheckout`, and `usePaystackRentalVerification` already speak the right shape. `Watch.tsx`'s call to `rental-access` will start succeeding once `rental_access` rows are populated.
+
+## Technical notes
+
+- All amounts in `process-rental`, `payments`, `rental_intents.price`, and `wallets.balance` are currently stored in **naira** (not kobo) per the existing data; webhook multiplies by 100 only to compare against Paystack's kobo amount. Don't change units — just stay consistent.
+- `process_wallet_rental_payment` exists as a SECURITY DEFINER RPC and already enforces single-active-rental and atomic balance deduction. Reuse it instead of re-implementing in the function.
+- `has_active_rental_access` RPC handles episode→season delegation, so `hasExistingRentalAccess` collapses to a single RPC call.
+- Paystack webhook URL must be configured in the Paystack dashboard to point at `…/functions/v1/paystack-webhook` (already present in `supabase/config.toml` with `verify_jwt = false`). No change needed if it's already set; mention to user to confirm.
