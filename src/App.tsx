@@ -37,6 +37,7 @@ const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsAndConditions = lazy(() => import("./pages/GeneralTerms"));
 const Careers = lazy(() => import("./pages/Careers"));
 const JobApplication = lazy(() => import("./pages/JobApplication"));
+const AboutUs = lazy(() => import("./pages/AboutUs"));
 const Watch = lazy(() => import("./pages/Watch"));
 
 // Lazy load ALL admin routes
@@ -87,9 +88,12 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   useDeepLinking();
-  if (!Capacitor.isNativePlatform()) {
-    useServiceWorker();
+  useServiceWorker();
+  if (Capacitor.isNativePlatform()) {
+    // Service worker is effectively no-op on native platforms.
+    // This keeps hooks order stable.
   }
+
 
   return (
     <>
@@ -127,6 +131,8 @@ function AppContent() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/docs" element={<Docs />} />
+            <Route path="/about" element={<AboutUs />} />
+
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/general-terms" element={<TermsAndConditions />} />
             <Route path="/careers" element={<Careers />} />
