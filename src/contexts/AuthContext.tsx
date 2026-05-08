@@ -16,8 +16,10 @@ interface UserProfile {
   updated_at: string;
 }
 
+import type { AppRole } from '@/lib/rbac';
+
 interface UserRole {
-  role: 'user' | 'admin' | 'super_admin';
+  role: AppRole;
 }
 
 interface AuthContextType {
