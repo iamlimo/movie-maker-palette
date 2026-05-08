@@ -23,14 +23,14 @@ Deno.serve(async (req) => {
       return errorResponse('Unauthorized', 401);
     }
 
-    // Check if user is super admin
-    const { data: isSuperAdmin, error: roleError } = await supabase.rpc('has_role', {
+    // Allow super_admin or accounting staff to adjust wallets.
+    const { data: isAuthorized, error: roleError } = await supabase.rpc('has_any_role', {
       _user_id: user.id,
-      _role: 'super_admin'
+      _roles: ['super_admin', 'accounting'],
     });
 
-    if (roleError || !isSuperAdmin) {
-      return errorResponse('Forbidden: Super admin access required', 403);
+    if (roleError || !isAuthorized) {
+      return errorResponse('Forbidden: Super admin or accounting access required', 403);
     }
 
     const { targetUserId, amount, type, reason } = await req.json();
