@@ -12,6 +12,8 @@ import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
+import RoleRoute from "@/components/RoleRoute";
+import { STAFF_ROLES } from "@/lib/rbac";
 import AdminLayout from "@/components/admin/AdminLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -142,53 +144,53 @@ function AppContent() {
             <Route
               path="/admin"
               element={
-                <SuperAdminRoute>
+                <RoleRoute roles={STAFF_ROLES} redirectTo="/">
                   <AdminLayout />
-                </SuperAdminRoute>
+                </RoleRoute>
               }
             >
               <Route index element={<AdminDashboard />} />
-              <Route path="movies" element={<AdminMovies />} />
-              <Route path="movies/add" element={<AddMovieNew />} />
-              <Route path="movies/view/:id" element={<ViewMovie />} />
-              <Route path="movies/edit/:id" element={<EditMovie />} />
-              <Route path="tv-shows" element={<AdminTVShows />} />
-              <Route path="tv-shows/add" element={<AddTVShow />} />
+              <Route path="movies" element={<RoleRoute page="movies"><AdminMovies /></RoleRoute>} />
+              <Route path="movies/add" element={<RoleRoute page="movies"><AddMovieNew /></RoleRoute>} />
+              <Route path="movies/view/:id" element={<RoleRoute page="movies"><ViewMovie /></RoleRoute>} />
+              <Route path="movies/edit/:id" element={<RoleRoute page="movies"><EditMovie /></RoleRoute>} />
+              <Route path="tv-shows" element={<RoleRoute page="tvshows"><AdminTVShows /></RoleRoute>} />
+              <Route path="tv-shows/add" element={<RoleRoute page="tvshows"><AddTVShow /></RoleRoute>} />
               <Route
                 path="tv-shows/:showId/add-season"
-                element={<AddSeason />}
+                element={<RoleRoute page="tvshows"><AddSeason /></RoleRoute>}
               />
               <Route
                 path="tv-shows/:showId/seasons/:seasonId/add-episode"
-                element={<AddEpisode />}
+                element={<RoleRoute page="tvshows"><AddEpisode /></RoleRoute>}
               />
               <Route
                 path="tv-shows/:showId/seasons/:seasonId/edit"
-                element={<EditSeason />}
+                element={<RoleRoute page="tvshows"><EditSeason /></RoleRoute>}
               />
               <Route
                 path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
-                element={<EditEpisode />}
+                element={<RoleRoute page="tvshows"><EditEpisode /></RoleRoute>}
               />
 
-              <Route path="tv-shows/view/:id" element={<ViewTVShow />} />
-              <Route path="tv-shows/edit/:id" element={<EditTVShow />} />
-              <Route path="submissions" element={<Submissions />} />
-              <Route path="users" element={<Users />} />
-              <Route path="finance" element={<Finance />} />
-              <Route path="rentals" element={<AdminRentals />} />
-              <Route path="producers" element={<Producers />} />
-              <Route path="sections" element={<Sections />} />
-              <Route path="hero-slider" element={<HeroSlider />} />
-              <Route path="banners" element={<Banners />} />
-              <Route path="wallets" element={<Wallets />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="job-listings" element={<JobListingsAdmin />} />
-              <Route path="applications" element={<JobApplicationsAdmin />} />
-              <Route path="referral-codes" element={<ReferralCodes />} />
-              <Route path="tickets" element={<TicketsList />} />
-              <Route path="tickets/create" element={<CreateTicket />} />
-              <Route path="tickets/:ticketId" element={<TicketDetails />} />
+              <Route path="tv-shows/view/:id" element={<RoleRoute page="tvshows"><ViewTVShow /></RoleRoute>} />
+              <Route path="tv-shows/edit/:id" element={<RoleRoute page="tvshows"><EditTVShow /></RoleRoute>} />
+              <Route path="submissions" element={<RoleRoute page="submissions"><Submissions /></RoleRoute>} />
+              <Route path="users" element={<RoleRoute page="users"><Users /></RoleRoute>} />
+              <Route path="finance" element={<RoleRoute page="finance"><Finance /></RoleRoute>} />
+              <Route path="rentals" element={<RoleRoute page="rentals"><AdminRentals /></RoleRoute>} />
+              <Route path="producers" element={<RoleRoute page="producers"><Producers /></RoleRoute>} />
+              <Route path="sections" element={<RoleRoute page="sections"><Sections /></RoleRoute>} />
+              <Route path="hero-slider" element={<RoleRoute page="hero-slider"><HeroSlider /></RoleRoute>} />
+              <Route path="banners" element={<RoleRoute page="banners"><Banners /></RoleRoute>} />
+              <Route path="wallets" element={<RoleRoute page="wallets"><Wallets /></RoleRoute>} />
+              <Route path="settings" element={<SuperAdminRoute><Settings /></SuperAdminRoute>} />
+              <Route path="job-listings" element={<RoleRoute page="job-listings"><JobListingsAdmin /></RoleRoute>} />
+              <Route path="applications" element={<RoleRoute page="job-applications"><JobApplicationsAdmin /></RoleRoute>} />
+              <Route path="referral-codes" element={<RoleRoute page="referral-codes"><ReferralCodes /></RoleRoute>} />
+              <Route path="tickets" element={<RoleRoute page="tickets"><TicketsList /></RoleRoute>} />
+              <Route path="tickets/create" element={<RoleRoute page="tickets"><CreateTicket /></RoleRoute>} />
+              <Route path="tickets/:ticketId" element={<RoleRoute page="tickets"><TicketDetails /></RoleRoute>} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
