@@ -47,67 +47,91 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/hooks/useRole';
+import { ROLE_LABELS, type PageKey } from '@/lib/rbac';
+import { Badge } from '@/components/ui/badge';
 
-const sidebarItems = [
-  { title: 'Dashboard', url: '/admin', icon: BarChart3, end: true },
-  { 
-    title: 'Content Management', 
-    icon: Film, 
+type SubItem = { title: string; url: string; icon: any; page: PageKey };
+type Item = {
+  title: string;
+  icon: any;
+  url?: string;
+  end?: boolean;
+  page?: PageKey;
+  submenu?: SubItem[];
+};
+
+const sidebarItems: Item[] = [
+  { title: 'Dashboard', url: '/admin', icon: BarChart3, end: true, page: 'dashboard' },
+  {
+    title: 'Content Management',
+    icon: Film,
     submenu: [
-      { title: 'Movies', url: '/admin/movies', icon: Film },
-      { title: 'TV Shows', url: '/admin/tv-shows', icon: Tv },
-    ]
+      { title: 'Movies', url: '/admin/movies', icon: Film, page: 'movies' },
+      { title: 'TV Shows', url: '/admin/tv-shows', icon: Tv, page: 'tvshows' },
+    ],
   },
-  { 
-    title: 'Homepage Management', 
-    icon: Home, 
+  {
+    title: 'Homepage Management',
+    icon: Home,
     submenu: [
-      { title: 'Sections', url: '/admin/sections', icon: Grid3X3 },
-      { title: 'Hero Slider', url: '/admin/hero-slider', icon: Image },
-      { title: 'Banners & CTAs', url: '/admin/banners', icon: Megaphone },
-    ]
+      { title: 'Sections', url: '/admin/sections', icon: Grid3X3, page: 'sections' },
+      { title: 'Hero Slider', url: '/admin/hero-slider', icon: Image, page: 'hero-slider' },
+      { title: 'Banners & CTAs', url: '/admin/banners', icon: Megaphone, page: 'banners' },
+    ],
   },
-  { 
-    title: 'User Management', 
-    icon: Users, 
+  {
+    title: 'User Management',
+    icon: Users,
     submenu: [
-      { title: 'Users', url: '/admin/users', icon: Users },
-      { title: 'Producers', url: '/admin/producers', icon: UserCheck },
-      { title: 'Submissions', url: '/admin/submissions', icon: FileText },
-    ]
+      { title: 'Users', url: '/admin/users', icon: Users, page: 'users' },
+      { title: 'Producers', url: '/admin/producers', icon: UserCheck, page: 'producers' },
+      { title: 'Submissions', url: '/admin/submissions', icon: FileText, page: 'submissions' },
+    ],
   },
-  { title: 'Finance', url: '/admin/finance', icon: DollarSign },
-  { title: 'Rental Tracking', url: '/admin/rentals', icon: CreditCard },
-  { title: 'Wallets', url: '/admin/wallets', icon: Wallet },
-  { title: 'Referral Codes', url: '/admin/referral-codes', icon: Tag },
-  { title: 'Push Notifications', url: '/admin/push-notifications', icon: Bell },
-  { 
-    title: 'Support', 
-    icon: AlertCircle, 
+  { title: 'Finance', url: '/admin/finance', icon: DollarSign, page: 'finance' },
+  { title: 'Rental Tracking', url: '/admin/rentals', icon: CreditCard, page: 'rentals' },
+  { title: 'Wallets', url: '/admin/wallets', icon: Wallet, page: 'wallets' },
+  { title: 'Referral Codes', url: '/admin/referral-codes', icon: Tag, page: 'referral-codes' },
+  { title: 'Push Notifications', url: '/admin/push-notifications', icon: Bell, page: 'push-notifications' },
+  {
+    title: 'Support',
+    icon: AlertCircle,
     submenu: [
-      { title: 'Tickets', url: '/admin/tickets', icon: AlertCircle },
-      { title: 'Create Ticket', url: '/admin/tickets/create', icon: FileText },
-    ]
+      { title: 'Tickets', url: '/admin/tickets', icon: AlertCircle, page: 'tickets' },
+      { title: 'Create Ticket', url: '/admin/tickets/create', icon: FileText, page: 'tickets' },
+    ],
   },
-  { 
-    title: 'Careers', 
-    icon: Briefcase, 
+  {
+    title: 'Careers',
+    icon: Briefcase,
     submenu: [
-      { title: 'Job Listings', url: '/admin/job-listings', icon: Briefcase },
-      { title: 'Applications', url: '/admin/applications', icon: ClipboardList },
-    ]
+      { title: 'Job Listings', url: '/admin/job-listings', icon: Briefcase, page: 'job-listings' },
+      { title: 'Applications', url: '/admin/applications', icon: ClipboardList, page: 'job-applications' },
+    ],
   },
-  { title: 'Settings', url: '/admin/settings', icon: Settings },
+  { title: 'Settings', url: '/admin/settings', icon: Settings, page: 'settings' },
 ];
 
 function AppSidebar() {
   const location = useLocation();
   const { profile, signOut } = useAuth();
+  const { canAccess, userRole } = useRole();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
   const isSubmenuActive = (submenu: any[]) => {
     return submenu.some(item => location.pathname.startsWith(item.url));
   };
+
+  const visibleItems = sidebarItems
+    .map((item) => {
+      if (item.submenu) {
+        const subs = item.submenu.filter((s) => canAccess(s.page));
+        return subs.length ? { ...item, submenu: subs } : null;
+      }
+      return item.page && canAccess(item.page) ? item : null;
+    })
+    .filter(Boolean) as Item[];
 
   return (
     <Sidebar collapsible="icon">
@@ -129,7 +153,7 @@ function AppSidebar() {
           <SidebarGroupLabel>Administration</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {sidebarItems.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   {item.submenu ? (
                     <Collapsible 
@@ -168,7 +192,7 @@ function AppSidebar() {
                       isActive={item.end ? location.pathname === item.url : location.pathname.startsWith(item.url)}
                       tooltip={item.title}
                     >
-                      <NavLink to={item.url} end={item.end}>
+                      <NavLink to={item.url!} end={item.end}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </NavLink>
@@ -197,8 +221,13 @@ function AppSidebar() {
                     <span className="truncate font-semibold">
                       {profile?.name || 'Admin'}
                     </span>
-                    <span className="truncate text-xs">
-                      {profile?.email || 'admin@example.com'}
+                    <span className="truncate text-xs flex items-center gap-1">
+                      {userRole && (
+                        <Badge variant="secondary" className="px-1.5 py-0 text-[10px] h-4">
+                          {ROLE_LABELS[userRole]}
+                        </Badge>
+                      )}
+                      <span className="truncate">{profile?.email || ''}</span>
                     </span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />
