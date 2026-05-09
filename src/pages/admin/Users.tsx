@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download } from 'lucide-react';
+import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download, Headphones, TrendingUp, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatNaira } from '@/lib/priceUtils';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
@@ -18,7 +18,6 @@ import { UserDetailModal } from '@/components/admin/UserDetailModal';
 import { Link } from 'react-router-dom';
 import { useRole } from '@/hooks/useRole';
 import { ROLE_LABELS, type AppRole } from '@/lib/rbac';
-import { Headphones, TrendingUp, Calculator } from 'lucide-react';
 
 // Helper function to convert kobo to naira
 const koboToNaira = (kobo: number): number => {
