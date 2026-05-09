@@ -16,6 +16,9 @@ import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
 import { UserDetailModal } from '@/components/admin/UserDetailModal';
 import { Link } from 'react-router-dom';
+import { useRole } from '@/hooks/useRole';
+import { ROLE_LABELS, type AppRole } from '@/lib/rbac';
+import { Headphones, TrendingUp, Calculator } from 'lucide-react';
 
 // Helper function to convert kobo to naira
 const koboToNaira = (kobo: number): number => {
@@ -38,15 +41,12 @@ interface UserWallet {
   balance: number;
 }
 
-interface UserRole {
-  role: 'user' | 'admin' | 'super_admin';
-  user_id: string;
-}
-
 interface UserWithRole extends UserProfile {
-  role: 'user' | 'admin' | 'super_admin';
+  role: AppRole;
   wallet_balance: number;
 }
+
+const ASSIGNABLE_ROLES: AppRole[] = ['user', 'support', 'sales', 'accounting', 'admin', 'super_admin'];
 
 export default function Users() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -55,7 +55,7 @@ export default function Users() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
-  const [newRole, setNewRole] = useState<'user' | 'admin' | 'super_admin'>('user');
+  const [newRole, setNewRole] = useState<AppRole>('user');
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -63,6 +63,8 @@ export default function Users() {
   const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
+  const { canDo, isSuperAdmin } = useRole();
+  const canManageRoles = canDo('manage-roles');
 
   const exportUsers = (format: 'csv' | 'xlsx') => {
     const dataToExport = filteredUsers.length > 0 ? filteredUsers : users;
