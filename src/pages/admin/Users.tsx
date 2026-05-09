@@ -9,13 +9,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download } from 'lucide-react';
+import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download, Headphones, TrendingUp, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatNaira } from '@/lib/priceUtils';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import { DeleteUserDialog } from '@/components/admin/DeleteUserDialog';
 import { UserDetailModal } from '@/components/admin/UserDetailModal';
 import { Link } from 'react-router-dom';
+import { useRole } from '@/hooks/useRole';
+import { ROLE_LABELS, type AppRole } from '@/lib/rbac';
 
 // Helper function to convert kobo to naira
 const koboToNaira = (kobo: number): number => {
@@ -38,15 +40,12 @@ interface UserWallet {
   balance: number;
 }
 
-interface UserRole {
-  role: 'user' | 'admin' | 'super_admin';
-  user_id: string;
-}
-
 interface UserWithRole extends UserProfile {
-  role: 'user' | 'admin' | 'super_admin';
+  role: AppRole;
   wallet_balance: number;
 }
+
+const ASSIGNABLE_ROLES: AppRole[] = ['user', 'support', 'sales', 'accounting', 'admin', 'super_admin'];
 
 export default function Users() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -55,7 +54,7 @@ export default function Users() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
-  const [newRole, setNewRole] = useState<'user' | 'admin' | 'super_admin'>('user');
+  const [newRole, setNewRole] = useState<AppRole>('user');
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -63,6 +62,8 @@ export default function Users() {
   const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
+  const { canDo, isSuperAdmin } = useRole();
+  const canManageRoles = canDo('manage-roles');
 
   const exportUsers = (format: 'csv' | 'xlsx') => {
     const dataToExport = filteredUsers.length > 0 ? filteredUsers : users;
@@ -287,26 +288,29 @@ export default function Users() {
         return <Crown className="h-4 w-4" />;
       case 'admin':
         return <ShieldCheck className="h-4 w-4" />;
+      case 'support':
+        return <Headphones className="h-4 w-4" />;
+      case 'sales':
+        return <TrendingUp className="h-4 w-4" />;
+      case 'accounting':
+        return <Calculator className="h-4 w-4" />;
       default:
         return <Shield className="h-4 w-4" />;
     }
   };
 
   const getRoleBadge = (role: string) => {
-    const variants = {
-      'super_admin': 'gradient-accent',
-      'admin': 'gradient-card',
-      'user': 'default'
+    const roleStyles: Record<string, string> = {
+      super_admin: 'bg-gradient-to-r from-primary/20 to-accent/20 text-primary border-primary/20',
+      admin: 'bg-gradient-to-r from-accent/20 to-primary/20 text-accent border-accent/20',
+      support: 'bg-blue-500/15 text-blue-500 border-blue-500/20',
+      sales: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20',
+      accounting: 'bg-amber-500/15 text-amber-500 border-amber-500/20',
     };
-    
     return (
-      <Badge variant="secondary" className={cn(
-        "flex items-center gap-1",
-        variants[role as keyof typeof variants] === 'gradient-accent' && 'bg-gradient-to-r from-primary/20 to-accent/20 text-primary border-primary/20',
-        variants[role as keyof typeof variants] === 'gradient-card' && 'bg-gradient-to-r from-accent/20 to-primary/20 text-accent border-accent/20'
-      )}>
+      <Badge variant="secondary" className={cn('flex items-center gap-1', roleStyles[role])}>
         {getRoleIcon(role)}
-        {role.replace('_', ' ').toUpperCase()}
+        {(ROLE_LABELS[role as AppRole] ?? role).toUpperCase()}
       </Badge>
     );
   };
@@ -464,6 +468,9 @@ export default function Users() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="support">Support</SelectItem>
+                  <SelectItem value="sales">Sales</SelectItem>
+                  <SelectItem value="accounting">Accounting</SelectItem>
                   <SelectItem value="user">User</SelectItem>
                 </SelectContent>
               </Select>
@@ -562,10 +569,12 @@ export default function Users() {
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openRoleDialog(user)}>
-                            <Shield className="h-4 w-4 mr-2" />
-                            Change Role
-                          </DropdownMenuItem>
+                          {canManageRoles && (
+                            <DropdownMenuItem onClick={() => openRoleDialog(user)}>
+                              <Shield className="h-4 w-4 mr-2" />
+                              Change Role
+                            </DropdownMenuItem>
+                          )}
                           <Link to={`/admin/wallets?user=${user.user_id}`}>
                             <DropdownMenuItem>
                               <WalletIcon className="h-4 w-4 mr-2" />
@@ -636,33 +645,31 @@ export default function Users() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           
-          <div className="py-4">
+          <div className="py-4 space-y-2">
             <label className="text-sm font-medium mb-2 block">Select New Role:</label>
-            <Select value={newRole} onValueChange={(value: 'user' | 'admin' | 'super_admin') => setNewRole(value)}>
+            <Select value={newRole} onValueChange={(value: AppRole) => setNewRole(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="user">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    User
-                  </div>
-                </SelectItem>
-                <SelectItem value="admin">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4" />
-                    Admin
-                  </div>
-                </SelectItem>
-                <SelectItem value="super_admin">
-                  <div className="flex items-center gap-2">
-                    <Crown className="h-4 w-4" />
-                    Super Admin
-                  </div>
-                </SelectItem>
+                {ASSIGNABLE_ROLES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    <div className="flex items-center gap-2">
+                      {getRoleIcon(r)}
+                      {ROLE_LABELS[r]}
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {newRole === 'super_admin' && 'Full access to all admin features and settings.'}
+              {newRole === 'admin' && 'Manages content, users, and operations.'}
+              {newRole === 'support' && 'Handles tickets, jobs, and user assistance.'}
+              {newRole === 'sales' && 'Manages marketing, sections, banners, and referral codes.'}
+              {newRole === 'accounting' && 'Manages payments, payouts, refunds, and wallets.'}
+              {newRole === 'user' && 'Standard customer account.'}
+            </p>
           </div>
 
           <AlertDialogFooter>
