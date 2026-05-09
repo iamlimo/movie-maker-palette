@@ -252,15 +252,18 @@ export default function Users() {
           description: `User role updated to ${newRole} successfully.`
         });
         
-        // Update local state
-        setUsers(prev => prev.map(user => 
-          user.user_id === selectedUser.user_id 
+        // Optimistic local update for snappy UI
+        setUsers(prev => prev.map(user =>
+          user.user_id === selectedUser.user_id
             ? { ...user, role: newRole }
             : user
         ));
-        
+
         setShowRoleDialog(false);
         setSelectedUser(null);
+
+        // Refresh from server to ensure list reflects authoritative state
+        await fetchUsers();
       } else {
         throw new Error((data && typeof data === 'object' && 'error' in data ? data.error as string : null) || 'Failed to update user role');
       }
