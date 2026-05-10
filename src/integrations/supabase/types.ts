@@ -1140,6 +1140,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rental_access_rental_intent_id_fkey"
+            columns: ["rental_intent_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_entitlements"
+            referencedColumns: ["intent_id"]
+          },
+          {
             foreignKeyName: "rental_access_season_id_fkey"
             columns: ["season_id"]
             isOneToOne: false
@@ -2197,7 +2204,22 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_user_entitlements: {
+        Row: {
+          access_id: string | null
+          access_status: string | null
+          content_id: string | null
+          content_type: string | null
+          expires_at: string | null
+          intent_id: string | null
+          intent_status: string | null
+          payment_method: string | null
+          revoked_at: string | null
+          state: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_existing_rental: {
