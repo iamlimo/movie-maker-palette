@@ -1,14 +1,14 @@
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Play, Lock, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Play, Lock, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { formatNaira } from '@/lib/priceUtils';
 import { useState } from 'react';
 import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
 import { useNavigate } from 'react-router-dom';
 import { usePlatform } from '@/hooks/usePlatform';
-import { toast } from '@/hooks/use-toast';
+import { RentalCountdown } from './RentalCountdown';
+import { STATE_LABEL } from '@/lib/rentalStates';
 
 interface OptimizedRentalButtonProps {
   contentId: string;
@@ -27,11 +27,11 @@ export const OptimizedRentalButton = ({
 }: OptimizedRentalButtonProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { checkAccess } = useOptimizedRentals();
-  const { isIOS, isAndroid, isWeb } = usePlatform();
+  const { getEntitlement, refresh } = useEntitlements();
+  const { isIOS } = usePlatform();
   const [showCheckout, setShowCheckout] = useState(false);
 
-  const access = checkAccess(contentId, contentType);
+  const entitlement = getEntitlement(contentId, contentType);
 
   if (!user) {
     return (
@@ -46,8 +46,8 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  // iOS users cannot rent from mobile app - show information instead
-  if (isIOS) {
+  // iOS native app cannot rent — Reader app compliance.
+  if (isIOS && entitlement.state !== 'ACTIVE') {
     return (
       <div className="space-y-2">
         <Button
@@ -65,39 +65,74 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  // User has access
-  if (access.hasAccess) {
+  const watchPath = `/watch/${contentType === 'season' ? 'season' : contentType === 'episode' ? 'episode' : 'movie'}/${contentId}`;
+
+  // ACTIVE — Watch Now + countdown.
+  if (entitlement.state === 'ACTIVE') {
     return (
       <div className="space-y-2">
         <Button
-          onClick={() =>
-            navigate(`/watch/${contentType === 'season' ? 'season' : 'episode'}/${contentId}`)
-          }
+          onClick={() => navigate(watchPath)}
           variant="default"
           className="w-full bg-green-600 hover:bg-green-700"
         >
           <Play className="h-4 w-4 mr-2" />
           Watch Now
         </Button>
-        {access.timeRemaining && (
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {access.timeRemaining.formatted}
-          </div>
-        )}
+        <div className="flex justify-center">
+          <RentalCountdown
+            expiresAt={entitlement.expiresAt}
+            onExpire={refresh}
+            className="text-muted-foreground"
+          />
+        </div>
       </div>
     );
   }
 
-  // Android and Web users can rent
+  // PAYMENT_PENDING / PAYMENT_VERIFICATION — show non-interactive status.
+  if (entitlement.state === 'PAYMENT_PENDING' || entitlement.state === 'PAYMENT_VERIFICATION') {
+    return (
+      <Button disabled variant="secondary" className="w-full">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        {STATE_LABEL[entitlement.state]}
+      </Button>
+    );
+  }
+
+  // REVOKED — informational, no rent CTA.
+  if (entitlement.state === 'REVOKED') {
+    return (
+      <Button disabled variant="secondary" className="w-full">
+        <AlertCircle className="h-4 w-4 mr-2" />
+        Access Revoked
+      </Button>
+    );
+  }
+
+  // NOT_RENTED / EXPIRED / FAILED / REFUNDED → can rent.
+  const isReRent = entitlement.state === 'EXPIRED' || entitlement.state === 'REFUNDED';
+  const isRetry = entitlement.state === 'FAILED';
+
   return (
     <>
       <Button
         onClick={() => setShowCheckout(true)}
         className="w-full"
+        variant={isRetry ? 'destructive' : 'default'}
       >
-        <Lock className="h-4 w-4 mr-2" />
-        Rent {contentType === 'season' ? 'Season' : 'Episode'} - {formatNaira(price)}
+        {isReRent ? (
+          <RotateCcw className="h-4 w-4 mr-2" />
+        ) : isRetry ? (
+          <AlertCircle className="h-4 w-4 mr-2" />
+        ) : (
+          <Lock className="h-4 w-4 mr-2" />
+        )}
+        {isReRent
+          ? `Rent Again - ${formatNaira(price)}`
+          : isRetry
+            ? `Retry Payment - ${formatNaira(price)}`
+            : `Rent ${contentType === 'season' ? 'Season' : contentType === 'episode' ? 'Episode' : 'Movie'} - ${formatNaira(price)}`}
       </Button>
 
       <OptimizedRentalCheckout
@@ -108,6 +143,7 @@ export const OptimizedRentalButton = ({
         price={price}
         title={title}
         onSuccess={() => {
+          refresh();
           onRentalSuccess?.();
         }}
       />
