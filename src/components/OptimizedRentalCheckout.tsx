@@ -42,7 +42,7 @@ interface OptimizedRentalCheckoutProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contentId: string;
-  contentType: 'episode' | 'season';
+  contentType: 'movie' | 'episode' | 'season';
   price: number;
   title: string;
   onSuccess?: () => void;
