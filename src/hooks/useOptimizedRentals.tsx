@@ -4,7 +4,7 @@ import type { Tables } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/hooks/useWallet';
 
-export type RentalType = 'episode' | 'season';
+export type RentalType = 'movie' | 'episode' | 'season';
 export type PaymentMethod = 'wallet' | 'paystack';
 
 export type RentalRecord = Tables<'rentals'>;
