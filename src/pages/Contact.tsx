@@ -62,8 +62,8 @@ const Contact = () => {
       icon: Mail,
       title: "Email Support",
       description: "Send us an email anytime",
-      value: "signaturepicturesnetwork@gmail.com",
-      action: "mailto:signaturepicturesnetwork@gmail.com",
+      value: "support@signaturepicture.co",
+      action: "mailto:support@signaturepicture.co",
     },
     {
       icon: Phone,

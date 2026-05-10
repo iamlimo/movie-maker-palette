@@ -43,7 +43,7 @@ class ExoPlayerManager private constructor(context: Context) {
     private val appContext: Context = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
 private var listener: Listener? = null
-    private var currentTitle: String? = null
+    internal var currentTitle: String? = null
     private var progressRunnable: Runnable? = null
 
     val player: ExoPlayer
