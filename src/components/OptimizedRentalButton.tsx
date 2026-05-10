@@ -12,7 +12,7 @@ import { STATE_LABEL } from '@/lib/rentalStates';
 
 interface OptimizedRentalButtonProps {
   contentId: string;
-  contentType: 'episode' | 'season';
+  contentType: 'movie' | 'episode' | 'season';
   price: number;
   title: string;
   onRentalSuccess?: () => void;
