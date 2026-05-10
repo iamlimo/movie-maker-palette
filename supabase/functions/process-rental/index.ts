@@ -155,8 +155,22 @@ async function hasExistingRentalAccess(
   contentId: string,
   contentType: RentalContentType,
 ): Promise<boolean> {
-  const now = new Date().toISOString();
+  // Prefer the canonical RPC which understands episode->season delegation
+  try {
+    const { data, error } = await supabase.rpc("has_active_rental_access", {
+      p_user_id: userId,
+      p_content_id: contentId,
+      p_content_type: contentType,
+    });
+    if (!error && data) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row && (row as Record<string, unknown>).has_access === true) return true;
+    }
+  } catch (rpcError) {
+    console.warn("has_active_rental_access RPC failed, falling back to legacy lookup:", rpcError);
+  }
 
+  const now = new Date().toISOString();
   const rentalQuery = supabase
     .from("rentals")
     .select("id")
@@ -202,6 +216,14 @@ async function hasExistingRentalAccess(
   return !!seasonRental && !seasonRentalError;
 }
 
+function buildContentFields(contentId: string, contentType: RentalContentType) {
+  return {
+    movie_id: contentType === "movie" ? contentId : null,
+    season_id: contentType === "season" ? contentId : null,
+    episode_id: contentType === "episode" ? contentId : null,
+  };
+}
+
 async function createWalletRental(
   supabase: ReturnType<typeof createClient>,
   input: {
@@ -216,29 +238,44 @@ async function createWalletRental(
     metadata: Record<string, unknown>;
   },
 ) {
-  const { data: wallet, error: walletError } = await supabase
+  // Atomic: lock wallet, deduct, insert rental_intent + rental_access in a single RPC.
+  const { data: rpcData, error: rpcError } = await supabase.rpc("process_wallet_rental_payment", {
+    p_user_id: input.userId,
+    p_content_id: input.contentId,
+    p_content_type: input.contentType,
+    p_final_price: input.finalPrice,
+    p_expires_at: input.expiresAt,
+    p_metadata: input.metadata,
+    p_referral_code: input.referralCode ?? null,
+    p_discount_amount: input.discountApplied,
+    p_provider_reference: null,
+  });
+
+  if (rpcError) throw rpcError;
+  const row = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as
+    | { rental_intent_id: string; rental_access_id: string | null; wallet_balance: number }
+    | null;
+  if (!row?.rental_intent_id) throw new Error("Failed to process wallet rental");
+
+  const updatedBalance = Number(row.wallet_balance ?? 0);
+
+  // Mirror to legacy `payments` + `wallet_transactions` for the admin/finance views.
+  const { data: wallet } = await supabase
     .from("wallets")
-    .select("wallet_id, balance, user_id")
+    .select("wallet_id, balance")
     .eq("user_id", input.userId)
     .maybeSingle();
 
-  if (walletError) throw walletError;
-  if (!wallet) throw new Error("Wallet not found");
+  const walletRow = (wallet as WalletRow | null) ?? null;
+  const balanceBefore = updatedBalance + input.finalPrice;
 
-  const walletRow = wallet as WalletRow;
-  const currentBalance = Number(walletRow.balance ?? 0);
-
-  if (currentBalance < input.finalPrice) {
-    throw new Error("Insufficient wallet balance");
-  }
-
-  const updatedBalance = currentBalance - input.finalPrice;
-  const paymentId = crypto.randomUUID();
   const paymentMetadata = {
     ...input.metadata,
     payment_method: "wallet",
     payment_channel: "wallet",
     amount_paid: input.finalPrice,
+    rental_intent_id: row.rental_intent_id,
+    rental_access_id: row.rental_access_id,
   };
 
   const { data: payment, error: paymentError } = await supabase
@@ -252,7 +289,7 @@ async function createWalletRental(
       method: "wallet",
       enhanced_status: "completed",
       status: "completed",
-      intent_id: paymentId,
+      intent_id: row.rental_intent_id,
       transaction_type: "rental",
       transaction_date: new Date().toISOString(),
       metadata: paymentMetadata,
@@ -262,31 +299,20 @@ async function createWalletRental(
 
   if (paymentError) throw paymentError;
 
-  if (input.finalPrice > 0) {
-    const { error: walletUpdateError } = await supabase
-      .from("wallets")
-      .update({
-        balance: updatedBalance,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("wallet_id", walletRow.wallet_id);
-
-    if (walletUpdateError) throw walletUpdateError;
-
+  if (input.finalPrice > 0 && walletRow?.wallet_id) {
     const { error: walletTransactionError } = await supabase
       .from("wallet_transactions")
       .insert({
         wallet_id: walletRow.wallet_id,
         amount: input.finalPrice,
-        balance_before: currentBalance,
+        balance_before: balanceBefore,
         balance_after: updatedBalance,
         transaction_type: "debit",
         description: `Rental: ${input.contentType}${input.referralCode ? ` (code: ${input.referralCode})` : ""}`,
         payment_id: payment.id,
         metadata: paymentMetadata,
       });
-
-    if (walletTransactionError) throw walletTransactionError;
+    if (walletTransactionError) console.warn("wallet_transactions insert failed:", walletTransactionError);
   }
 
   if (input.referralCode) {
@@ -297,25 +323,21 @@ async function createWalletRental(
       .maybeSingle();
 
     if (referralCodeData) {
-      const { error: referralUseError } = await supabase.from("referral_code_uses").insert({
+      await supabase.from("referral_code_uses").insert({
         code_id: referralCodeData.id,
         user_id: input.userId,
         payment_id: payment.id,
         discount_applied: input.discountApplied,
       });
-
-      if (referralUseError) throw referralUseError;
-
-      const { error: referralUpdateError } = await supabase
+      await supabase
         .from("referral_codes")
         .update({ times_used: Number(referralCodeData.times_used ?? 0) + 1 })
         .eq("id", referralCodeData.id);
-
-      if (referralUpdateError) throw referralUpdateError;
     }
   }
 
-  const { data: rental, error: rentalError } = await supabase
+  // Mirror to legacy `rentals` for backward compatibility (best-effort).
+  await supabase
     .from("rentals")
     .insert({
       user_id: input.userId,
@@ -324,16 +346,12 @@ async function createWalletRental(
       price: input.finalPrice,
       expires_at: input.expiresAt,
       status: "completed",
-    })
-    .select("id")
-    .single();
-
-  if (rentalError) throw rentalError;
-  if (!rental) throw new Error("Failed to create rental record");
+      payment_method: "wallet",
+    });
 
   return {
     paymentId: payment.id,
-    rentalId: rental.id,
+    rentalId: row.rental_intent_id,
     walletBalance: updatedBalance,
   };
 }
@@ -346,6 +364,7 @@ async function createPaystackRental(
     contentType: RentalContentType;
     price: number;
     finalPrice: number;
+    expiresAt: string;
     referralCode?: string;
     discountApplied: number;
     metadata: Record<string, unknown>;
@@ -362,10 +381,56 @@ async function createPaystackRental(
     return { error: "User profile not found", status: 404 };
   }
 
-  const intentId = crypto.randomUUID();
+  // Create the rental_intent FIRST so the webhook can find it by reference.
+  const fields = buildContentFields(input.contentId, input.contentType);
+  const intentMetadata = {
+    ...input.metadata,
+    payment_method: "paystack",
+    user_name: profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Customer",
+  };
+
+  // The DB has a unique partial index on (user_id, content_id) WHERE status='pending'.
+  // Mark any stale pending intents for the same user+content as failed before inserting.
+  const stalePendingFilter: Record<string, unknown> = {
+    user_id: input.userId,
+    status: "pending",
+  };
+  if (fields.movie_id) stalePendingFilter.movie_id = fields.movie_id;
+  if (fields.season_id) stalePendingFilter.season_id = fields.season_id;
+  if (fields.episode_id) stalePendingFilter.episode_id = fields.episode_id;
+  await supabase
+    .from("rental_intents")
+    .update({ status: "failed", failed_at: new Date().toISOString() })
+    .match(stalePendingFilter);
+
+  const { data: intent, error: intentError } = await supabase
+    .from("rental_intents")
+    .insert({
+      user_id: input.userId,
+      ...fields,
+      rental_type: input.contentType,
+      price: Math.round(input.finalPrice),
+      currency: "NGN",
+      payment_method: "paystack",
+      status: "pending",
+      referral_code: input.referralCode ?? null,
+      discount_amount: Math.round(input.discountApplied),
+      expires_at: input.expiresAt,
+      metadata: intentMetadata,
+    })
+    .select("id")
+    .single();
+
+  if (intentError || !intent) {
+    console.error("rental_intent insert failed:", intentError);
+    return { error: "Failed to create rental intent", status: 500 };
+  }
+
+  const intentId = intent.id;
   const paymentMetadata = {
     ...input.metadata,
     payment_method: "paystack",
+    rental_intent_id: intentId,
     user_name: profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Customer",
   };
 
@@ -389,6 +454,7 @@ async function createPaystackRental(
     .single();
 
   if (paymentError) {
+    await supabase.from("rental_intents").delete().eq("id", intentId);
     throw paymentError;
   }
 
@@ -400,11 +466,12 @@ async function createPaystackRental(
     },
     body: JSON.stringify({
       email: profile.email,
-      amount: Math.round(input.finalPrice),
+      // Paystack expects kobo. Our internal prices are in NGN.
+      amount: Math.round(input.finalPrice * 100),
       reference: intentId,
-      callback_url: `${SUPABASE_URL}/functions/v1/verify-payment`,
       metadata: {
         payment_id: payment.id,
+        rental_intent_id: intentId,
         user_id: input.userId,
         content_id: input.contentId,
         content_type: input.contentType,
@@ -427,6 +494,10 @@ async function createPaystackRental(
         error_message: error?.message || "Failed to initialize payment",
       })
       .eq("id", payment.id);
+    await supabase
+      .from("rental_intents")
+      .update({ status: "failed", failed_at: new Date().toISOString() })
+      .eq("id", intentId);
 
     return { error: "Failed to initialize payment", status: 500 };
   }
@@ -441,10 +512,18 @@ async function createPaystackRental(
     })
     .eq("id", payment.id);
 
+  await supabase
+    .from("rental_intents")
+    .update({
+      provider_reference: paystackData.data.reference,
+      paystack_reference: paystackData.data.reference,
+    })
+    .eq("id", intentId);
+
   return {
     success: true,
     paymentMethod: "paystack" as const,
-    rentalId: payment.id,
+    rentalId: intentId,
     paymentId: payment.id,
     authorizationUrl: paystackData.data.authorization_url,
     paystackReference: paystackData.data.reference,
@@ -551,6 +630,7 @@ serve(async (req: Request) => {
           contentType: normalizedType,
           price,
           finalPrice,
+          expiresAt,
           referralCode: referralCode || undefined,
           discountApplied,
           metadata: paymentMetadata,

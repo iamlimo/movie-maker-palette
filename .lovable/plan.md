@@ -1,99 +1,149 @@
+## Rental System UX & Architecture Optimization
 
-# Custom ExoPlayer Capacitor Plugin for Android
+Goal: deliver a premium, deterministic, OTT-grade rental experience using the existing edge functions, hooks, and components — by consolidating duplicates, formalizing entitlement states, and making the backend the single source of truth.
 
-## Goal
-Replace the unreliable `@capacitor-community/video-player` dependency with a purpose-built Capacitor plugin (`exo-player`) backed by AndroidX Media3 ExoPlayer for high-performance HLS/MP4 streaming on Android. iOS keeps the existing AVPlayer-style path; web keeps the existing `VideoPlayer.tsx` (video.js).
+---
 
-## Scope of Work
+### 1. Audit findings (current pain points)
 
-### 1. New local Capacitor plugin: `android/capacitor-plugins/exo-player/`
-Created as a sibling Gradle module included from `android/settings.gradle` and wired into `android/app/build.gradle`. Source-only — no npm publish needed.
+**Duplication / drift:**
+- Two parallel rental hooks: `useRentals` (reads legacy `rentals` table) and `useOptimizedRentals` (also reads `rentals`). Neither reads the canonical `rental_access` table that edge functions write to.
+- Three rental UI surfaces: `RentalButton` (683 lines), `OptimizedRentalButton`, `RentalBottomSheet` + `OptimizedRentalCheckout` (862 lines). Behavior diverges (iOS gating, Paystack handling, referral codes).
+- Two verification edge functions: `verify-payment` and `verify-rental-payment`. Two table families: legacy `rentals`/`rental_payments` and new `rental_intents`/`rental_access`.
 
-**Kotlin files** (`co.signature.tv.exoplayer`):
-- `ExoPlayerPlugin.kt` — `@CapacitorPlugin(name = "ExoPlayer")`. Bridges JS calls and emits events.
-- `ExoPlayerManager.kt` — Singleton wrapping a single reusable `ExoPlayer` instance (Media3 1.4.x). Handles HLS via `HlsMediaSource.Factory`, progressive MP4 via `ProgressiveMediaSource.Factory`, ABR via default `DefaultTrackSelector`, and a `SimpleCache` (256 MB LRU under `cacheDir/media`) for partial offline + resume.
-- `ExoPlayerContainerView.kt` — A `FrameLayout` hosting a Media3 `PlayerView` that overlays the Capacitor WebView (positioned via JS-supplied rect). Touch passthrough disabled when active.
-- `PlayerLifecycleObserver.kt` — Implements `DefaultLifecycleObserver` to pause on background and resume foreground; releases on activity destroy.
+**State model gaps:**
+- Frontend uses booleans (`hasAccess`, `isPaid`) instead of an explicit state machine. No first-class `PAYMENT_PENDING`, `PAYMENT_VERIFICATION`, `FAILED`, `REVOKED` surfaced in UI.
+- Countdown is computed from whichever table the hook happens to query; `rentals.expires_at` and `rental_access.expires_at` can diverge.
 
-**JS-callable methods** (all `@PluginMethod`):
-`initPlayer`, `load({ url, type?, startPositionMs?, subtitleUrl?, subtitleLanguage? })`, `play`, `pause`, `seekTo({ position })`, `stop`, `release`, `setRect({ x, y, width, height })`, `getDuration`, `getCurrentTime`, `setPlaybackRate({ rate })`, `selectAudioTrack({ index })`, `getAudioTracks`.
+**Playback access:**
+- `Watch.tsx` / `EpisodePlayer` check access via the legacy hook; `get-video-url` validates against `rental_access`. Possible mismatch where UI says "Watch" but URL signing fails (or vice versa).
+- No graceful in-player expiry: timer is purely visual, no forced pause + overlay.
 
-**Emitted events** (`notifyListeners`):
-`onReady`, `onBuffering`, `onPlaying`, `onPaused`, `onEnded`, `onError { code, message }`, `onProgress { currentTime, duration }` (250 ms tick on main thread via `Handler(Looper.getMainLooper())`).
+**Payment trust:**
+- Paystack flow relies partly on frontend polling `verify-payment`; webhook is authoritative but client occasionally optimistically grants UI access before webhook lands.
 
-**Source detection**: `.m3u8` → HLS, otherwise progressive. Optional `type` override.
+---
 
-### 2. Gradle wiring
-- `android/settings.gradle` — `include ':capacitor-plugin-exo-player'` + `projectDir`.
-- `android/capacitor-plugins/exo-player/build.gradle` — Kotlin Android library, `compileSdk 35`, `minSdk 23`, depends on:
-  - `androidx.media3:media3-exoplayer:1.4.1`
-  - `androidx.media3:media3-exoplayer-hls:1.4.1`
-  - `androidx.media3:media3-ui:1.4.1`
-  - `androidx.media3:media3-datasource-okhttp:1.4.1`
-  - `androidx.media3:media3-datasource-cronet:1.4.1` (optional, kept off by default)
-  - `project(':capacitor-android')`
-- `android/app/build.gradle` — `implementation project(':capacitor-plugin-exo-player')`.
-- `android/app/src/main/AndroidManifest.xml` — add `android:usesCleartextTraffic="false"` already implicit; add `android:hardwareAccelerated="true"` on `<application>` and `WAKE_LOCK` permission for long playback.
-- Plugin auto-registered via Capacitor 7 reflection (no `MainActivity` edits needed).
+### 2. Target architecture (reuse existing pieces)
 
-### 3. TypeScript bridge & React hook
-- `src/plugins/exo-player.ts` — `registerPlugin<ExoPlayerPlugin>('ExoPlayer')` with full typed interface (methods + event names).
-- `src/hooks/useExoPlayer.tsx` — Returns `{ loadVideo, play, pause, seekTo, stop, release, currentTime, duration, state, isBuffering }`. Wires plugin listeners, throttles `onProgress` into React state, persists `currentTime` to `watch_history` via existing `useVideoProgress` every 30 s, and resumes from saved position on `loadVideo`.
+**Single source of truth:** `rental_intents` (payment lifecycle) + `rental_access` (entitlement). Legacy `rentals` table becomes read-only / deprecated for new writes.
 
-### 4. Integration into existing UI
-- `src/components/NativeVideoPlayer.tsx` — On Android, mount a transparent `<div ref>` sized via `getBoundingClientRect()`; pass that rect to `ExoPlayer.setRect` so the native `PlayerView` overlays it (in-page, not forced fullscreen). iOS branch unchanged. Existing back/exit, watermark text, completion tracking (`useWatchHistory.markAsCompleted`) preserved.
-- `src/components/EpisodePlayer.tsx` — When `Capacitor.getPlatform() === 'android'`, render `NativeVideoPlayer` instead of `<video>`; web path unchanged.
-- `src/pages/Watch.tsx` — Already routes Android → `NativeVideoPlayer`; no change.
-
-### 5. Cleanup
-- Remove the `@capacitor-community/video-player` dynamic `import()` calls in `NativeVideoPlayer.tsx` (Android path) and `useNativeVideoOptimization.tsx` (capability check switches to `Capacitor.isPluginAvailable('ExoPlayer')`).
-- iOS branch in `NativeVideoPlayer.tsx` keeps its dynamic import (still works there if installed) OR falls back gracefully — left untouched per scope.
-- No package.json changes required (plugin is local).
-
-### 6. Lifecycle & memory safety
-- `ExoPlayerManager` holds a `WeakReference` to the host Activity.
-- `onPause` of host activity → `player.pause()`, save position; `onResume` → no auto-play (JS controls).
-- `onDestroy` → `player.release()`, detach `PlayerView`, cancel progress handler.
-- Single instance reused across loads (`setMediaItem` + `prepare`) — no leaks from per-video allocation.
-
-## Performance Targets (Met by Design)
-- Fast start: HLS LowLatency disabled by default but `DefaultLoadControl` tuned with `bufferForPlaybackMs = 1500`, `bufferForPlaybackAfterRebufferMs = 3000`, `minBufferMs = 15000`, `maxBufferMs = 50000` — first frame typically <1.5 s on LTE.
-- ABR: Media3's default adaptive track selection over HLS variants.
-- Caching: `SimpleCache` (LRU, 256 MB) + `CacheDataSource.Factory` so re-watched/seeked segments don't re-download.
-- Resume: position written every 30 s and on pause/end via existing `useVideoProgress` → `watch_history.playback_position`.
-
-## Files Modified / Created
+**Entitlement state machine** (derived on backend, surfaced as a single enum to frontend):
 
 ```text
-android/
-  settings.gradle                                              [modified]
-  app/build.gradle                                             [modified]
-  app/src/main/AndroidManifest.xml                             [modified: WAKE_LOCK]
-  capacitor-plugins/exo-player/
-    build.gradle                                               [new]
-    src/main/AndroidManifest.xml                               [new]
-    src/main/java/co/signature/tv/exoplayer/
-      ExoPlayerPlugin.kt                                       [new]
-      ExoPlayerManager.kt                                      [new]
-      ExoPlayerContainerView.kt                                [new]
-      PlayerLifecycleObserver.kt                               [new]
-src/
-  plugins/exo-player.ts                                        [new]
-  hooks/useExoPlayer.tsx                                       [new]
-  hooks/useNativeVideoOptimization.tsx                         [modified]
-  components/NativeVideoPlayer.tsx                             [modified: Android branch]
-  components/EpisodePlayer.tsx                                 [modified: Android branch]
+NOT_RENTED ─► PAYMENT_PENDING ─► PAYMENT_VERIFICATION ─► ACTIVE ─► EXPIRED
+                   │                      │                │
+                   ▼                      ▼                ▼
+                FAILED                 FAILED          REVOKED / REFUNDED
 ```
 
-## Out of Scope
-- iOS native rewrite (existing path retained; can be a follow-up using AVPlayer in a sibling plugin module).
-- DRM (Widevine) — plugin architected to add `DrmSessionManager` later without API changes.
-- Full offline downloads UI — caching layer is in place; download manager is a follow-up.
-- Removing the `@capacitor-community/video-player` npm dep (it isn't actually installed in `package.json` — only dynamically imported with a guarded fallback, so nothing to uninstall).
+Mapping (no schema change required, derived from existing columns):
+- `rental_intents.status = pending` + `payment_method = wallet` → `PAYMENT_PENDING` (transient, usually instant)
+- `rental_intents.status = pending` + `payment_method = paystack` → `PAYMENT_VERIFICATION`
+- `rental_intents.status = paid` + `rental_access.status = paid` + `expires_at > now()` → `ACTIVE`
+- `rental_access.expires_at <= now()` → `EXPIRED`
+- `rental_intents.status = failed` → `FAILED`
+- `rental_access.revoked_at IS NOT NULL` → `REVOKED`
+- `payments.status = refunded` linked via intent → `REFUNDED`
 
-## Verification Steps After Build
-1. `npx cap sync android` runs cleanly.
-2. Android Studio Gradle sync resolves Media3 1.4.1.
-3. Rent + open a movie on Android → first frame <2 s, native ExoPlayer overlays in-page.
-4. Background app mid-playback → returns paused at same position.
-5. Re-open same title → resumes from saved seconds.
+**Backend canonical access check:** keep `has_active_rental_access()` Postgres function (already exists). All hooks query it via a thin RPC wrapper instead of joining tables client-side.
+
+---
+
+### 3. Frontend consolidation
+
+**Hooks (collapse 2 → 1):**
+- Delete `useRentals.tsx`. Keep `useOptimizedRentals.tsx`, rewrite to:
+  - Query `rental_access` (not `rentals`) joined with latest `rental_intents` per content.
+  - Expose: `getEntitlement(contentId, contentType) → { state, expiresAt, intentId, secondsRemaining }` (state machine enum above).
+  - Subscribe to both `rental_access` and `rental_intents` realtime channels for the user.
+  - Server-time skew correction: fetch `now()` from Supabase once on mount, use `Date.now() - skew` for countdowns.
+- Keep `usePaystackRentalVerification` but simplify: it only polls `verify-payment` until intent reaches a terminal state, then resolves.
+
+**Components (collapse 4 → 2):**
+- Delete `RentalButton.tsx` (legacy) and `RentalBottomSheet.tsx`.
+- Keep `OptimizedRentalButton.tsx` as the single CTA — extend it to render dynamic states from the entitlement enum (`Rent Now`, `Confirming Payment…`, `Watch Now` + countdown, `Rental Expired` + `Rent Again`).
+- Keep `OptimizedRentalCheckout.tsx` as the only modal/bottom-sheet. Trim it to a clean 2-step flow (Summary → Payment method) and reuse it for both web and mobile via responsive Sheet/Dialog.
+- Update `MoviePreview.tsx`, `TVShowPreview.tsx`, `EpisodePlayer.tsx`, `Profile.tsx` to import only `OptimizedRentalButton` + `OptimizedRentalCheckout`.
+- `ActiveRentalCard.tsx` stays (My Rentals dashboard) but reads from the new entitlement hook.
+
+**Countdown component (new, small):** `<RentalCountdown expiresAt={...} onExpire={...} />` — single shared formatter (`2d 4h`, `18h 14m`, `42m`, `Expires soon`). Used in detail page, player overlay, and My Rentals.
+
+**Player expiry handling:** in `VideoPlayer` / `NativeVideoPlayer`, accept an `expiresAt` prop. Internal interval (per-second near expiry, per-minute otherwise):
+- T-5min: toast warning.
+- T-0: pause player, dispatch `onRentalExpired` → parent shows full-screen overlay with "Rental Expired" + "Rent Again" CTA. No black screen, no reload.
+
+---
+
+### 4. Backend optimization (no new edge functions)
+
+Reuse and tighten existing functions:
+
+- **`process-rental`** (entry point): keep as-is for both wallet and Paystack initialization. Add idempotency check — if an open `rental_intents` row exists for (user, content) within last 5 min, return it instead of creating a duplicate (prevents double-tap duplicates).
+- **`wallet-payment`**: already transactional via `process_wallet_rental_payment` RPC. Confirm it always returns the new `rental_access.id` so frontend transitions straight to ACTIVE without polling.
+- **`paystack-webhook`**: authoritative grant. Verify HMAC (already done), idempotency on `paystack_reference` (already enforced via unique reference on intent). Ensure it calls `grant_rental_access` only after intent flips to `paid`.
+- **`verify-payment`**: becomes the only client-facing verification endpoint. Returns `{ state, expiresAt, rentalAccessId }` shaped to the entitlement state machine. Mark `verify-rental-payment` as deprecated and route any remaining callers here, then delete only after no references remain.
+- **`rental-access`** + **`get-video-url`**: ensure both rely on `has_active_rental_access()` so playback authorization and UI authorization can never disagree.
+
+**Audit + anomalies:** existing `payment_anomalies` and `finance_audit_logs` tables are sufficient; ensure webhook + wallet flows write to them on every state transition (most already do — verify and patch gaps).
+
+---
+
+### 5. UX flow (final shape)
+
+1. **Detail page** loads → `useOptimizedRentals().getEntitlement()` returns one of the 8 states → `OptimizedRentalButton` renders the matching CTA + countdown.
+2. **Rent Now** opens `OptimizedRentalCheckout` (Summary → Payment method).
+3. **Wallet path:** confirm → `process-rental` (wallet) → atomic debit + entitlement → modal shows success animation (existing `PaymentSuccessAnimation`) → auto-route to `/watch/...`.
+4. **Paystack path:** confirm → redirect to Paystack → return URL hits a small handler that calls `verify-payment` polling → state transitions PAYMENT_VERIFICATION → ACTIVE → success animation → route to `/watch/...`.
+5. **Playback:** `Watch.tsx` calls `get-video-url`; on 403 expired, show overlay (no crash). Player receives `expiresAt` and handles T-5min toast + T-0 pause + overlay.
+6. **My Rentals (Profile):** lists ACTIVE + EXPIRED with countdown and one-click `Rent Again` (re-opens checkout pre-filled).
+
+---
+
+### 6. Edge cases covered
+
+- Double-tap on Rent → idempotent intent reuse.
+- Paystack webhook arrives before user returns → `verify-payment` immediately resolves ACTIVE.
+- User returns but webhook delayed → polling shows PAYMENT_VERIFICATION until webhook lands or 5 min timeout → FAILED with "Try again" CTA.
+- Wallet debit succeeds but entitlement insert fails → RPC is transactional, both rollback.
+- Expired during playback → graceful pause + overlay.
+- Re-rent of expired content → existing `grant_rental_access` already releases expired row first.
+- Refund issued → `payments.status = refunded` cascades to REFUNDED state in UI.
+- Clock skew on device → server-time anchor correction.
+
+---
+
+### 7. Deliverables (phased, credit-aware)
+
+**Phase 1 — Backend tighten (1 migration, no new functions):**
+- Add a thin Postgres view `v_user_entitlements` that returns `(user_id, content_id, content_type, state, expires_at, intent_id, access_id)` derived from `rental_intents` + `rental_access`. Hooks query this view.
+- Add idempotency guard inside `process-rental` (code edit, no new function).
+- Standardize `verify-payment` response shape.
+
+**Phase 2 — Hook + countdown:**
+- Rewrite `useOptimizedRentals` to use the view; delete `useRentals`.
+- Add `RentalCountdown` component + shared `formatRentalRemaining` util.
+
+**Phase 3 — UI consolidation:**
+- Extend `OptimizedRentalButton` with all 8 states.
+- Slim `OptimizedRentalCheckout` to 2-step flow.
+- Migrate `MoviePreview`, `TVShowPreview`, `EpisodePlayer`, `Profile` to the consolidated components.
+- Delete `RentalButton.tsx` and `RentalBottomSheet.tsx`.
+
+**Phase 4 — Player expiry:**
+- Add `expiresAt` prop + warning/expiry overlay to `VideoPlayer` and `NativeVideoPlayer`. Wire through `Watch.tsx` and `EpisodePlayer`.
+
+**Phase 5 — Cleanup:**
+- Delete `verify-rental-payment` once no callers remain.
+- Mark legacy `rentals` table read-only via comment + remove writers.
+
+---
+
+### Technical details
+
+- **No new edge functions.** All changes are: 1 migration (view + optional idempotency index), edits to `process-rental` and `verify-payment` response shape, frontend refactor.
+- **State enum** lives in `src/lib/rentalStates.ts` (new ~30-line file) and is the only place the 8 states are defined.
+- **Realtime:** subscribe to `rental_access` and `rental_intents` filtered by `user_id`; debounced refetch of the view.
+- **Security:** view exposed via RLS (user sees own rows only); video URL signing keeps `has_active_rental_access` as the gate; webhook HMAC unchanged.
+
+This delivers the OTT-grade flow you described while reusing every existing edge function and removing ~1,500 lines of duplicated frontend code.

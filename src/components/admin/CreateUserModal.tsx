@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Mail, User, Key, Shield } from 'lucide-react';
+import { ROLE_LABELS, type AppRole } from '@/lib/rbac';
 
 interface CreateUserModalProps {
   open: boolean;
@@ -18,7 +19,7 @@ export const CreateUserModal = ({ open, onOpenChange, onUserCreated }: CreateUse
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'user' | 'admin' | 'super_admin'>('user');
+  const [role, setRole] = useState<AppRole>('user');
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
 
@@ -143,14 +144,17 @@ export const CreateUserModal = ({ open, onOpenChange, onUserCreated }: CreateUse
               <Shield className="h-4 w-4" />
               Role
             </Label>
-            <Select value={role} onValueChange={(value: 'user' | 'admin' | 'super_admin') => setRole(value)} disabled={isCreating}>
+            <Select value={role} onValueChange={(value: AppRole) => setRole(value)} disabled={isCreating}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="user">User</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="user">{ROLE_LABELS.user}</SelectItem>
+                <SelectItem value="support">{ROLE_LABELS.support}</SelectItem>
+                <SelectItem value="sales">{ROLE_LABELS.sales}</SelectItem>
+                <SelectItem value="accounting">{ROLE_LABELS.accounting}</SelectItem>
+                <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
+                <SelectItem value="super_admin">{ROLE_LABELS.super_admin}</SelectItem>
               </SelectContent>
             </Select>
           </div>

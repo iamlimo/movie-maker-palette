@@ -195,6 +195,17 @@ async function loadRentalIntent(
 
       if (!error && data) return data as RentalIntentRow;
     }
+
+    // Legacy payments stored the rental_intent uuid in payments.intent_id
+    const intentId = (payment as PaymentRow & { intent_id?: string }).intent_id;
+    if (intentId) {
+      const { data, error } = await supabase
+        .from("rental_intents")
+        .select("*")
+        .eq("id", intentId)
+        .maybeSingle();
+      if (!error && data) return data as RentalIntentRow;
+    }
   }
 
   return null;
@@ -207,33 +218,34 @@ async function loadActiveRentalAccess(
   contentType: RentalContentType,
   intentId: string | null,
 ): Promise<RentalAccessRow | null> {
-  let query = supabase
-    .from("rental_access")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("revoked_at", null)
-    .eq("status", "paid")
-    .gt("expires_at", new Date().toISOString())
-    .order("expires_at", { ascending: false });
+  const baseQuery = () =>
+    supabase
+      .from("rental_access")
+      .select("*")
+      .eq("user_id", userId)
+      .is("revoked_at", null)
+      .eq("status", "paid")
+      .gt("expires_at", new Date().toISOString())
+      .order("expires_at", { ascending: false });
 
   if (intentId) {
-    const { data, error } = await query.eq("rental_intent_id", intentId).maybeSingle();
+    const { data, error } = await baseQuery().eq("rental_intent_id", intentId).maybeSingle();
     if (!error && data) return data as RentalAccessRow;
   }
 
   if (contentId) {
     if (contentType === "movie") {
-      const { data, error } = await query.eq("movie_id", contentId).maybeSingle();
+      const { data, error } = await baseQuery().eq("movie_id", contentId).maybeSingle();
       if (!error && data) return data as RentalAccessRow;
     }
 
     if (contentType === "season") {
-      const { data, error } = await query.eq("season_id", contentId).maybeSingle();
+      const { data, error } = await baseQuery().eq("season_id", contentId).maybeSingle();
       if (!error && data) return data as RentalAccessRow;
     }
 
     if (contentType === "episode") {
-      const { data, error } = await query.eq("episode_id", contentId).maybeSingle();
+      const { data, error } = await baseQuery().eq("episode_id", contentId).maybeSingle();
       if (!error && data) return data as RentalAccessRow;
     }
   }

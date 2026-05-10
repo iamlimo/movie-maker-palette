@@ -778,6 +778,30 @@ export type Database = {
         }
         Relationships: []
       }
+      permissions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          module: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          module: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          module?: string
+          name?: string
+        }
+        Relationships: []
+      }
       producers: {
         Row: {
           bio: string | null
@@ -1116,6 +1140,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rental_access_rental_intent_id_fkey"
+            columns: ["rental_intent_id"]
+            isOneToOne: false
+            referencedRelation: "v_user_entitlements"
+            referencedColumns: ["intent_id"]
+          },
+          {
             foreignKeyName: "rental_access_season_id_fkey"
             columns: ["season_id"]
             isOneToOne: false
@@ -1312,6 +1343,60 @@ export type Database = {
           price?: number
           status?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          permission_id: string
+          role_id: string
+        }
+        Insert: {
+          permission_id: string
+          role_id: string
+        }
+        Update: {
+          permission_id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1935,6 +2020,7 @@ export type Database = {
           created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
+          role_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -1942,6 +2028,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          role_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -1949,10 +2036,19 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          role_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wallet_transactions: {
         Row: {
@@ -2108,7 +2204,22 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_user_entitlements: {
+        Row: {
+          access_id: string | null
+          access_status: string | null
+          content_id: string | null
+          content_type: string | null
+          expires_at: string | null
+          intent_id: string | null
+          intent_status: string | null
+          payment_method: string | null
+          revoked_at: string | null
+          state: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_existing_rental: {
@@ -2152,6 +2263,13 @@ export type Database = {
           rental_access_id: string
         }[]
       }
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2159,6 +2277,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_staff: { Args: { _user_id: string }; Returns: boolean }
       log_finance_action: {
         Args: { p_action: string; p_details?: Json }
         Returns: string
@@ -2208,7 +2327,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "user" | "admin" | "super_admin"
+      app_role:
+        | "user"
+        | "admin"
+        | "super_admin"
+        | "support"
+        | "sales"
+        | "accounting"
       content_status: "pending" | "approved" | "rejected"
       content_type: "movie" | "episode" | "season"
       enhanced_payment_status:
@@ -2353,7 +2478,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["user", "admin", "super_admin"],
+      app_role: [
+        "user",
+        "admin",
+        "super_admin",
+        "support",
+        "sales",
+        "accounting",
+      ],
       content_status: ["pending", "approved", "rejected"],
       content_type: ["movie", "episode", "season"],
       enhanced_payment_status: [

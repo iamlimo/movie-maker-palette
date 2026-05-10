@@ -55,17 +55,23 @@ const Header = () => {
     }
   };
   return (
-    <header className={cn(
-      "fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border",
-      showBottomNav && "md:block hidden",
-      isNative && isIOS && "pt-[env(safe-area-inset-top)]",
-      isNative && isAndroid && "pt-1"
-    )}>
+    <header
+      className={cn(
+        "fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border",
+        showBottomNav && "md:block hidden",
+        isNative && isIOS && "pt-[env(safe-area-inset-top)]",
+        isNative && isAndroid && "pt-1",
+      )}
+    >
       <div className="container mx-auto px-3 sm:px-4 lg:px-6 h-14 md:h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-2 flex-shrink-0">
           <Link to="/">
-            <img src="/signature-tv-logo.png" alt="Logo" className="h-10 md:h-12" />
+            <img
+              src="/signature-tv-logo.png"
+              alt="Logo"
+              className="h-10 md:h-12"
+            />
           </Link>
         </div>
 
@@ -76,6 +82,12 @@ const Header = () => {
             className="text-sm lg:text-base text-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             Home
+          </Link>
+          <Link
+            to="/about"
+            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
+          >
+            About
           </Link>
           <Link
             to="/movies"
@@ -118,19 +130,18 @@ const Header = () => {
           {user ? (
             <div className="flex items-center space-x-2 md:space-x-3">
               {/* Wallet Widget - Hide on iOS */}
-<Link to="/wallet">
-  <Button
-    variant="outline"
-    size="sm"
-    className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
-  >
-    <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
-    <span className="text-xs lg:text-sm font-medium">
-      {walletLoading ? '...' : formatBalance()}
-    </span>
-  </Button>
-</Link>
-
+              <Link to="/wallet">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
+                >
+                  <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                  <span className="text-xs lg:text-sm font-medium">
+                    {walletLoading ? "..." : formatBalance()}
+                  </span>
+                </Button>
+              </Link>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -202,7 +213,9 @@ const Header = () => {
                 className="hidden xl:flex text-muted-foreground hover:text-destructive h-8 px-2"
               >
                 <LogOut className="h-4 w-4 mr-1.5" />
-                <span className="text-sm">{isSigningOut ? "Signing Out..." : "Sign Out"}</span>
+                <span className="text-sm">
+                  {isSigningOut ? "Signing Out..." : "Sign Out"}
+                </span>
               </Button>
             </div>
           ) : (
@@ -286,16 +299,14 @@ const Header = () => {
               Watchlist
             </Link>
             {user && (
-  <Link
-    to="/wallet"
-    onClick={() => setIsMobileMenuOpen(false)}
-    className="block text-muted-foreground hover:text-primary transition-smooth"
-  >
-    Wallet
-  </Link>
-)}
-
-
+              <Link
+                to="/wallet"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block text-muted-foreground hover:text-primary transition-smooth"
+              >
+                Wallet
+              </Link>
+            )}
 
             <div className="pt-4 border-t border-border">
               <Button
