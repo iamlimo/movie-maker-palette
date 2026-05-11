@@ -46,6 +46,7 @@ import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useRentals } from '@/hooks/useRentals';
+import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import ContentCarousel, { ContentCarouselItem } from '@/components/ContentCarousel';
@@ -60,6 +61,7 @@ const Profile = () => {
   const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
   const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
   const { activeRentals, formatTimeRemaining, fetchRentals } = useRentals();
+  const { processRental } = useOptimizedRentals();
   const { isIOS } = usePlatform();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -185,8 +187,33 @@ const Profile = () => {
 
   const stats = getDashboardStats();
 
-  const handleContinueWatching = (contentType: 'movie' | 'episode', contentId: string) => {
-    navigate(`/watch/${contentType}/${contentId}`);
+  const handleContinueWatching = async (contentType: 'movie' | 'episode', contentId: string) => {
+    // Check if user has active rental access
+    const item = continueWatching.find(item =>
+      item.content_type === contentType && item.content_id === contentId
+    );
+
+    if (item && item.rental_status === 'active') {
+      navigate(`/watch/${contentType}/${contentId}`);
+    } else {
+      // No active rental, redirect to rental flow
+      navigate(`/watch/${contentType}/${contentId}`);
+    }
+  };
+
+  const handleRentContent = async (contentType: 'movie' | 'episode', contentId: string) => {
+    try {
+      // For now, navigate to the content page which should handle the rental flow
+      // In a full implementation, this would trigger the rental process
+      navigate(`/watch/${contentType}/${contentId}`);
+    } catch (error) {
+      console.error('Error handling rent:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process rental request",
+        variant: "destructive",
+      });
+    }
   };
 
   const availableGenres = [
@@ -347,7 +374,13 @@ const Profile = () => {
                         <ContentCarouselItem key={item.id} minWidth="220px" className="max-w-xs w-full">
                           <WatchProgressCard
                             item={item}
-                            onPlay={() => handleContinueWatching(item.content_type, item.content_id)}
+                            onPlay={() => {
+                              if (item.rental_status === 'active') {
+                                handleContinueWatching(item.content_type, item.content_id);
+                              } else {
+                                handleRentContent(item.content_type, item.content_id);
+                              }
+                            }}
                             onRemove={() => removeFromHistory(item.id)}
                             onMarkCompleted={() => markAsCompleted(item.content_type, item.content_id)}
                           />
@@ -754,24 +787,57 @@ const Profile = () => {
                             <div className="absolute bottom-2 left-2 right-2">
                               <Progress value={item.progress} className="h-1" />
                             </div>
+                            {/* Rental status indicator */}
+                            <div className="absolute top-2 right-2">
+                              {item.rental_status === "active" && item.time_remaining && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {item.time_remaining.formatted}
+                                </Badge>
+                              )}
+                              {item.rental_status === "expired" && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Expired
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           <CardContent className="p-4">
                             <p className="font-medium text-sm truncate">{item.title}</p>
                             <p className="text-xs text-muted-foreground">
                               {Math.round(item.progress)}% complete • {item.content_type}
                             </p>
+                            {item.rental_status === "expired" && (
+                              <p className="text-xs text-red-500 mt-1">
+                                Rental expired - rent again to continue watching
+                              </p>
+                            )}
                             <div className="flex justify-between items-center mt-2">
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 onClick={() => removeFromHistory(item.id)}
                               >
                                 Remove
                               </Button>
-                              <Button size="sm" onClick={() => handleContinueWatching(item.content_type, item.content_id)}>
-                                <Play size={12} className="mr-1" />
-                                Continue
-                              </Button>
+                              {item.rental_status === "active" ? (
+                                <Button size="sm" onClick={() => handleContinueWatching(item.content_type, item.content_id)}>
+                                  <Play size={12} className="mr-1" />
+                                  Continue
+                                </Button>
+                              ) : item.rental_status === "expired" ? (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => handleRentContent(item.content_type, item.content_id)}
+                                >
+                                  Rent Again
+                                </Button>
+                              ) : (
+                                <Button size="sm" onClick={() => handleContinueWatching(item.content_type, item.content_id)}>
+                                  <Play size={12} className="mr-1" />
+                                  Continue
+                                </Button>
+                              )}
                             </div>
                           </CardContent>
                         </Card>

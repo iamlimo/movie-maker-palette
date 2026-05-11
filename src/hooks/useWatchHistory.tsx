@@ -27,6 +27,14 @@ export interface WatchHistoryItem {
   price?: number;
   genre?: string;
   preview_slug?: string;
+  // Rental status information
+  rental_status: "active" | "expired" | "none";
+  expires_at?: string;
+  time_remaining?: {
+    hours: number;
+    minutes: number;
+    formatted: string;
+  };
 }
 
 export const useWatchHistory = () => {
@@ -54,6 +62,134 @@ export const useWatchHistory = () => {
     try {
       setLoading(true);
 
+      // Use the new edge function to get continue watching with rental status
+      const { data: continueWatchingData, error: continueError } = await supabase.functions.invoke(
+        "get-continue-watching"
+      );
+
+      if (continueError) {
+        console.error("Error fetching continue watching:", continueError);
+        // Fallback to old method if edge function fails
+        await fetchWatchHistoryFallback();
+        return;
+      }
+
+      const continueWatchingItems = continueWatchingData || [];
+
+      // Get completed items separately
+      const { data: completedData, error: completedError } = await supabase
+        .from("watch_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("completed", true)
+        .order("last_watched_at", { ascending: false });
+
+      if (completedError) {
+        console.error("Error fetching completed items:", completedError);
+      }
+
+      // Enrich completed items with content details
+      const enrichedCompleted = await Promise.all(
+        (completedData || []).map(async (item) => {
+          let contentDetails = {};
+
+          if (item.content_type === "movie") {
+            const { data: movieData } = await supabase
+              .from("movies")
+              .select(
+                "title, thumbnail_url, duration, price, genre_id, genres(name)",
+              )
+              .eq("id", item.content_id)
+              .single();
+
+            if (movieData) {
+              contentDetails = {
+                title: movieData.title,
+                thumbnail_url: movieData.thumbnail_url,
+                duration: movieData.duration,
+                price: movieData.price,
+                genre: movieData.genres?.name,
+              };
+            }
+          } else if (item.content_type === "episode") {
+            const { data: episodeData } = await supabase
+              .from("episodes")
+              .select(
+                `
+                title,
+                duration,
+                price,
+                season_id,
+                seasons!inner(
+                  id,
+                  tv_shows!inner(
+                    title,thumbnail_url,
+                    genre_id,
+                    genres(name)
+                  )
+                )
+              `,
+              )
+              .eq("id", item.content_id)
+              .single();
+
+            if (episodeData) {
+              contentDetails = {
+                title: `${episodeData.seasons.tv_shows.title} - ${episodeData.title}`,
+                thumbnail_url: episodeData.seasons.tv_shows.thumbnail_url,
+                duration: episodeData.duration,
+                price: episodeData.price,
+                genre: episodeData.seasons.tv_shows.genres?.name,
+                season_id: episodeData.season_id || episodeData.seasons.id,
+              };
+            }
+          }
+
+          return { ...item, ...contentDetails, rental_status: "none" as const };
+        }),
+      );
+
+      const typedContinueWatching = continueWatchingItems as WatchHistoryItem[];
+      const typedCompleted = enrichedCompleted as WatchHistoryItem[];
+
+      // Combine all watch history
+      const allHistory = [...typedContinueWatching, ...typedCompleted];
+      setWatchHistory(allHistory);
+      setContinueWatching(typedContinueWatching);
+      setCompletedItems(typedCompleted);
+
+      // Cache watched content for offline access
+      try {
+        for (const item of allHistory) {
+          await dbCache.set(`content_${item.content_id}`, {
+            id: item.content_id,
+            contentType: item.content_type,
+            title: item.title || "Unknown",
+            thumbnail_url: item.thumbnail_url,
+            duration: item.duration,
+            progress: item.progress,
+            cachedAt: Date.now(),
+            metadata: item,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to cache content to IndexedDB:", error);
+      }
+    } catch (error) {
+      console.error("Error fetching watch history:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load watch history",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fallback method for backward compatibility
+  const fetchWatchHistoryFallback = async () => {
+    try {
       const { data, error } = await supabase
         .from("watch_history")
         .select("*")
@@ -97,8 +233,7 @@ export const useWatchHistory = () => {
                 seasons!inner(
                   id,
                   tv_shows!inner(
-                    title,
-                    thumbnail_url,
+                    title,thumbnail_url,
                     genre_id,
                     genres(name)
                   )
@@ -120,7 +255,7 @@ export const useWatchHistory = () => {
             }
           }
 
-          return { ...item, ...contentDetails };
+          return { ...item, ...contentDetails, rental_status: "none" as const };
         }),
       );
 
@@ -154,14 +289,7 @@ export const useWatchHistory = () => {
         console.error("Failed to cache content to IndexedDB:", error);
       }
     } catch (error) {
-      console.error("Error fetching watch history:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load watch history",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      console.error("Error in fallback fetch:", error);
     }
   };
 

@@ -88,7 +88,12 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
             className="rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-white/30"
           >
             <Play size={24} className="mr-2 fill-current" />
-            {item.progress > 0 ? 'Continue' : 'Play'}
+            {item.rental_status === "active"
+              ? (item.progress > 0 ? 'Continue' : 'Play')
+              : item.rental_status === "expired"
+              ? 'Rent Again'
+              : (item.progress > 0 ? 'Continue' : 'Play')
+            }
           </Button>
         </div>
 
@@ -96,6 +101,16 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
         {item.completed && (
           <Badge className="absolute top-2 left-2 bg-green-500/80 text-white">
             Completed
+          </Badge>
+        )}
+        {item.rental_status === "active" && item.time_remaining && (
+          <Badge className="absolute top-2 left-2 bg-blue-500/80 text-white">
+            {item.time_remaining.formatted}
+          </Badge>
+        )}
+        {item.rental_status === "expired" && (
+          <Badge className="absolute top-2 left-2 bg-red-500/80 text-white">
+            Expired
           </Badge>
         )}
 
@@ -114,10 +129,15 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
             {onPlay && (
               <DropdownMenuItem onClick={onPlay}>
                 <Play size={16} className="mr-2" />
-                {item.progress > 0 ? 'Continue Watching' : 'Start Watching'}
+                {item.rental_status === "active"
+                  ? (item.progress > 0 ? 'Continue Watching' : 'Start Watching')
+                  : item.rental_status === "expired"
+                  ? 'Rent Again'
+                  : (item.progress > 0 ? 'Continue Watching' : 'Start Watching')
+                }
               </DropdownMenuItem>
             )}
-            {!item.completed && onMarkCompleted && (
+            {!item.completed && onMarkCompleted && item.rental_status === "active" && (
               <DropdownMenuItem onClick={onMarkCompleted}>
                 <Clock size={16} className="mr-2" />
                 Mark as Completed
@@ -170,6 +190,12 @@ const WatchProgressCard: React.FC<WatchProgressCardProps> = ({
               {formatDistanceToNow(new Date(item.last_watched_at), { addSuffix: true })}
             </span>
           </div>
+
+          {item.rental_status === "expired" && (
+            <div className="text-xs text-red-500 font-medium">
+              Rental expired - rent again to continue
+            </div>
+          )}
 
           {item.price !== undefined && item.price !== null && (
             <div className="text-xs font-medium text-primary">
