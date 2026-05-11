@@ -112,7 +112,7 @@ const Header = () => {
             to="/about"
             className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
-            About
+            About Us
           </Link>
         </nav>
 
