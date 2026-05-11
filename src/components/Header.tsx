@@ -83,12 +83,7 @@ const Header = () => {
           >
             Home
           </Link>
-          <Link
-            to="/about"
-            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
-          >
-            About
-          </Link>
+         
           <Link
             to="/movies"
             className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
@@ -112,6 +107,12 @@ const Header = () => {
             className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
             Watchlist
+          </Link>
+           <Link
+            to="/about"
+            className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
+          >
+            About Us
           </Link>
         </nav>
 
