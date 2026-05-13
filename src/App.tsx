@@ -33,7 +33,7 @@ const Watchlist = lazy(() => import("./pages/Watchlist"));
 const Wallet = lazy(() => import("./pages/Wallet"));
 const Help = lazy(() => import("./pages/Help"));
 const Contact = lazy(() => import("./pages/Contact"));
-const Terms = lazy(() => import("./pages/Terms"));
+const Terms = lazy(() => import("./pages/Terms"));  
 const Docs = lazy(() => import("./pages/Docs"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsAndConditions = lazy(() => import("./pages/GeneralTerms"));
@@ -41,6 +41,7 @@ const Careers = lazy(() => import("./pages/Careers"));
 const JobApplication = lazy(() => import("./pages/JobApplication"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const Watch = lazy(() => import("./pages/Watch"));
+
 
 // Lazy load ALL admin routes
 const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"));

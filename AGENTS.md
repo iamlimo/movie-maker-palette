@@ -1,4 +1,4 @@
-# Signature TV - AI Agent Customization Guide
+# Signature TV 
 
 **Project**: Signature TV (Video Streaming Platform)  
 **Status**: Production-Ready  
@@ -87,7 +87,7 @@
 
 ### Rental Payment Processing
 
-**[process-rental/](supabase/functions/process-rental/)**
+**[process-rental/](supabase/functions/procecss-rental/)**
 - Entry point for all rental flows
 - Takes: userId, contentId, contentType, price, paymentMethod, referralCode
 - Returns: Rental details or error
