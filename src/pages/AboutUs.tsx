@@ -57,7 +57,7 @@ const AboutUs = () => {
               </div>
 
               <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-                Signature TV About
+                About Signature TV
               </h1>
               <p className="mt-4 text-lg md:text-xl text-muted-foreground max-w-2xl text-pretty">
                 An innovative digital platform under the Signature Pictures
