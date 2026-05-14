@@ -115,12 +115,14 @@ const EditEpisode = () => {
       setEpisode(episodeData);
 
       // Populate form with existing data
+      // Convert price from kobo to naira for display
+      const priceInNaira = episodeData.price ? episodeData.price / 100 : 0;
       setFormData({
         episode_number: episodeData.episode_number,
         title: episodeData.title,
         description: episodeData.description || "",
         duration: episodeData.duration || 0,
-        price: episodeData.price || 0,
+        price: priceInNaira,
         rental_expiry_duration: episodeData.rental_expiry_duration || 48,
         status: episodeData.status,
         release_date: episodeData.release_date || ""
@@ -184,6 +186,8 @@ const EditEpisode = () => {
 
     try {
       // Update episode data
+      // Convert price from naira to kobo for storage
+      const priceInKobo = formData.price > 0 ? Math.round(formData.price * 100) : 0;
       const { error } = await supabase
         .from('episodes')
         .update({
@@ -191,7 +195,7 @@ const EditEpisode = () => {
           title: formData.title.trim(),
           description: formData.description.trim() || null,
           duration: formData.duration || null,
-          price: formData.price || 0,
+          price: priceInKobo,
           rental_expiry_duration: formData.rental_expiry_duration || 48,
           video_url: videoUrl,
           thumbnail_url: thumbnailUrl || null,

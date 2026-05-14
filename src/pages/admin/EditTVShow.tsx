@@ -185,7 +185,7 @@ export default function EditTVShow() {
           content_warnings: formData.content_warnings.length > 0 ? formData.content_warnings : null,
           viewer_discretion: formData.viewer_discretion || null,
           cast_info: formData.cast_info || null,
-          price: formData.price,
+          price: formData.price > 0 ? Math.round(formData.price * 100) : 0,
           status: formData.status,
           release_date: formData.release_date || null,
           trailer_url: formData.trailer_url || null,
