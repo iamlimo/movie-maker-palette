@@ -64,13 +64,15 @@ serve(async (req) => {
     }
 
     // Create season record
+    // Convert price from naira to kobo (admin enters naira, DB stores kobo)
+    const priceInKobo = price > 0 ? Math.round(price * 100) : 0;
     const { data: season, error: seasonError } = await supabase
       .from('seasons')
       .insert({
         tv_show_id,
         season_number,
         description: description || null,
-        price: price || 0,
+        price: priceInKobo,
         rental_expiry_duration: rental_expiry_duration || 336
       })
       .select()

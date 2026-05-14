@@ -466,8 +466,8 @@ async function createPaystackRental(
     },
     body: JSON.stringify({
       email: profile.email,
-      // Paystack expects kobo. Our internal prices are in NGN.
-      amount: Math.round(input.finalPrice * 100),
+      // Paystack expects kobo. Internal prices are already stored/passed in kobo.
+      amount: Math.round(input.finalPrice),
       reference: intentId,
       metadata: {
         payment_id: payment.id,

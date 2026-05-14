@@ -107,6 +107,8 @@ serve(async (req) => {
     thumbnailUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/episode-thumbnails/${thumbnailData.path}`;
 
     // Create episode record
+    // Convert price from naira to kobo (admin enters naira, DB stores kobo)
+    const priceInKobo = price > 0 ? Math.round(price * 100) : 0;
     const { data: episode, error: episodeError } = await supabase
       .from('episodes')
       .insert({
@@ -115,7 +117,7 @@ serve(async (req) => {
         title,
         description: description || null,
         duration: duration || null,
-        price: price || 0,
+        price: priceInKobo,
         video_url: videoUrl,
         thumbnail_url: thumbnailUrl,
         status: 'approved'

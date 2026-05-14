@@ -89,10 +89,12 @@ const EditSeason = () => {
       setSeason(seasonData);
 
       // Populate form with existing data
+      // Convert price from kobo to naira for display
+      const priceInNaira = seasonData.price ? seasonData.price / 100 : 0;
       setFormData({
         season_number: seasonData.season_number,
         description: seasonData.description || "",
-        price: seasonData.price || 0,
+        price: priceInNaira,
         rental_expiry_duration: seasonData.rental_expiry_duration || 336,
         status: seasonData.status || 'pending'
       });
@@ -141,12 +143,14 @@ const EditSeason = () => {
 
     try {
       // Update season data
+      // Convert price from naira to kobo for storage
+      const priceInKobo = formData.price > 0 ? Math.round(formData.price * 100) : 0;
       const { error } = await supabase
         .from('seasons')
         .update({
           season_number: formData.season_number,
           description: formData.description || null,
-          price: formData.price || 0,
+          price: priceInKobo,
           rental_expiry_duration: formData.rental_expiry_duration || 336,
           status: formData.status
         })

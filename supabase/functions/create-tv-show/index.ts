@@ -88,7 +88,9 @@ serve(async (req) => {
     const releaseDate = formData.get('release_date') as string;
     const language = formData.get('language') as string;
     const rating = formData.get('rating') as string;
-    const price = parseFloat(formData.get('price') as string || '0');
+    const priceNaira = parseFloat(formData.get('price') as string || '0');
+    // Convert from naira to kobo (admin enters naira, DB stores kobo)
+    const price = priceNaira > 0 ? Math.round(priceNaira * 100) : 0;
     
     // Extract files and URLs (new upload flow)
     const posterFile = formData.get('poster') as File;
