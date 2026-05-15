@@ -8,6 +8,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 
 const ALLOWED_ORIGINS = [
   "https://signaturetv.co",
+  "https://www.signaturetv.co",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
@@ -16,19 +17,42 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:3000",
 ];
 
-function getCorsHeaders(origin?: string): Record<string, string> {
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || "")
-    ? (origin || "https://signaturetv.co")
-    : "https://signaturetv.co";
+function isAllowedOrigin(origin: string) {
+  if (!origin) return false;
 
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, idempotency-key",
-    "Content-Type": "application/json",
-  };
+  // Allow explicit origins
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    return true;
+  }
+
+  // Allow ALL Vercel preview deployments
+  if (
+    origin.includes(".vercel.app") &&
+    origin.startsWith("https://")
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
+function getCorsHeaders(origin?: string): Record<string, string> {
+  const resolvedOrigin =
+    origin && isAllowedOrigin(origin)
+      ? origin
+      : "https://signaturetv.co";
+
+  return {
+    "Access-Control-Allow-Origin": resolvedOrigin,
+    "Access-Control-Allow-Methods":
+      "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, idempotency-key",
+    "Access-Control-Allow-Credentials": "true",
+    "Content-Type": "application/json",
+    "Vary": "Origin",
+  };
+}
 function createResponse(data: unknown, status = 200, origin?: string) {
   return new Response(JSON.stringify(data), { status, headers: getCorsHeaders(origin) });
 }

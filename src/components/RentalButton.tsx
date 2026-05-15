@@ -278,7 +278,23 @@ const RentalButton = ({
         throw primaryError;
       }
 
-      if (error) throw new Error(error.message || "Payment initiation failed");
+      // Check for invoke-level errors
+      if (error) {
+        console.error('Supabase invoke error:', error);
+        throw new Error(error.message || "Payment initiation failed");
+      }
+
+      // Check if response contains an error field (edge function returned error response)
+      if (data && typeof data === 'object' && 'error' in data && data.error) {
+        console.error('Edge function returned error:', data.error);
+        throw new Error(data.error as string);
+      }
+
+      // Validate response contains expected fields
+      if (!data) {
+        console.error('No data returned from edge function');
+        throw new Error("Invalid response from payment service");
+      }
 
       if (data?.payment_method === "wallet") {
         await fetchRentals();

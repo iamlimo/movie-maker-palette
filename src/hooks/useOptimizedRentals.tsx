@@ -148,15 +148,42 @@ export const useOptimizedRentals = () => {
           },
         });
 
+        // Check for invoke errors
         if (error) {
+          console.error('Edge function error:', error);
           return {
             success: false,
             error: error.message || 'Payment processing failed',
           };
         }
 
+        // Check if response contains an error (edge function returned error response)
+        if (data && data.error) {
+          console.error('Edge function returned error:', data.error);
+          return {
+            success: false,
+            error: data.error,
+          };
+        }
+
+        // Validate response structure
+        if (!data || typeof data !== 'object') {
+          console.error('Invalid response from edge function:', data);
+          return {
+            success: false,
+            error: 'Invalid response from payment service',
+          };
+        }
+
         if (paymentMethod === 'wallet') {
           // Wallet payment successful
+          if (!data.rentalId) {
+            console.error('Missing rentalId in wallet payment response:', data);
+            return {
+              success: false,
+              error: 'Payment processed but rental ID not returned',
+            };
+          }
           await fetchRentals();
           await refreshWallet();
           return {
@@ -165,6 +192,13 @@ export const useOptimizedRentals = () => {
           };
         } else if (paymentMethod === 'paystack') {
           // Return authorization URL for Paystack
+          if (!data.rentalId || !data.authorizationUrl) {
+            console.error('Missing rentalId or authorizationUrl in paystack response:', data);
+            return {
+              success: false,
+              error: 'Paystack setup failed - missing required fields',
+            };
+          }
           return {
             success: true,
             rentalId: data.rentalId,
