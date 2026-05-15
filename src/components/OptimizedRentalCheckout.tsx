@@ -88,8 +88,18 @@ export const OptimizedRentalCheckout = ({
   const isMobileBrowser =
     /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
 
-  const finalPrice = discount ? Math.max(0, price - discount.amount) : price;
-  const canPayWithWallet = canAfford(finalPrice);
+  const subTotal = discount ? Math.max(0, price - discount.amount) : price;
+
+  // VAT: 7.5% (mandatory)
+  const VAT_RATE = 0.075;
+  const vatAmount = Math.round(subTotal * VAT_RATE);
+  const totalToPay = subTotal + vatAmount;
+
+  // Backward-compatible alias for the rest of this component.
+  // All payment + wallet checks must use the VAT-inclusive total.
+  const finalPrice = totalToPay;
+
+  const canPayWithWallet = canAfford(totalToPay);
   const canProceed = paymentMethod === 'wallet' ? canPayWithWallet : paymentMethod === 'paystack';
 
   const redirectToWatch = () => {
@@ -492,8 +502,8 @@ export const OptimizedRentalCheckout = ({
 
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Price</span>
-              <span className="text-foreground">{formatNaira(price)}</span>
+              <span>Subtotal</span>
+              <span className="text-foreground">{formatNaira(subTotal)}</span>
             </div>
 
             {discount && (

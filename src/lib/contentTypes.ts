@@ -80,14 +80,14 @@ export function isRentableContentType(contentType: ContentType): contentType is 
 export function getDefaultRentalDuration(contentType: ContentType): number {
   switch (contentType) {
     case 'movie':
-      return 48; // 2 days
+      return 48; // 48 hours
     case 'season':
-      return 336; // 14 days
+      return 168; // 7 days
     case 'episode':
-      return 48; // 2 days
+      return 48; // 48 hours
     case 'tv':
     default:
-      return 336; // 14 days (shouldn't be rented, but default to season duration)
+      return 168; // fallback
   }
 }
 
