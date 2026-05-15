@@ -91,6 +91,8 @@ export const OptimizedRentalButton = ({
   }
 
   // PAYMENT_PENDING / PAYMENT_VERIFICATION — show non-interactive status.
+  // NOTE: This state should only be short-lived. If verification ends up cancelled/failed,
+  // the entitlement state will become FAILED/REVOKED/etc.
   if (entitlement.state === 'PAYMENT_PENDING' || entitlement.state === 'PAYMENT_VERIFICATION') {
     return (
       <Button disabled variant="secondary" className="w-full">
@@ -99,6 +101,7 @@ export const OptimizedRentalButton = ({
       </Button>
     );
   }
+
 
   // REVOKED — informational, no rent CTA.
   if (entitlement.state === 'REVOKED') {
@@ -117,7 +120,14 @@ export const OptimizedRentalButton = ({
   return (
     <>
       <Button
-        onClick={() => setShowCheckout(true)}
+        onClick={async () => {
+          // If we got stuck in a pending/verification state, force entitlement refresh.
+          // This ensures cancelled/failed payments revert to rent/try-again CTA.
+          if (entitlement.state === 'PAYMENT_PENDING' || entitlement.state === 'PAYMENT_VERIFICATION') {
+            await refresh();
+          }
+          setShowCheckout(true);
+        }}
         className="w-full"
         variant={isRetry ? 'destructive' : 'default'}
       >

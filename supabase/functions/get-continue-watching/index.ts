@@ -170,13 +170,17 @@ serve(async (req: Request) => {
           rentalStatus = "none";
         }
 
-        enrichedItems.push({
-          ...item,
-          ...contentDetails,
-          rental_status: rentalStatus,
-          expires_at: expiresAt,
-          time_remaining: timeRemaining,
-        });
+        // Only include items with active rentals in continue watching
+        // Expired items are excluded from this view
+        if (rentalStatus === "active") {
+          enrichedItems.push({
+            ...item,
+            ...contentDetails,
+            rental_status: rentalStatus,
+            expires_at: expiresAt,
+            time_remaining: timeRemaining,
+          });
+        }
 
       } catch (error) {
         console.error(`Error processing item ${item.id}:`, error);

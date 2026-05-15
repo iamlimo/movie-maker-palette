@@ -74,7 +74,7 @@ const MoviePreview = () => {
       setError(null);
 
       // Try slug first, fall back to id (UUID)
-      let query = supabase
+      const query = supabase
         .from("movies")
         .select(
           `

@@ -19,33 +19,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Film,
-  Tv,
-  DollarSign,
-  User,
-  Calendar,
-  RefreshCw,
   Download,
+  RefreshCw,
   Search,
   AlertCircle,
   CheckCircle,
   Clock,
   XCircle,
-  MoreVertical,
   SendIcon,
-  ShieldAlert,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatNaira } from "@/lib/priceUtils";
 import { useRole } from "@/hooks/useRole";
 import { Navigate } from "react-router-dom";
+
+type RentalContentType = "movie" | "tv" | "episode" | "season";
+type RentalStatus = "active" | "expired";
 
 interface RentalRecord {
   id: string;
@@ -54,38 +44,42 @@ interface RentalRecord {
   user_name: string;
   content_id: string;
   content_title: string;
-  content_type: "movie" | "tv" | "episode" | "season";
-  amount: number; // Amount in lowest denomination (kobo)
-  status: "active" | "expired";
+  content_type: RentalContentType;
+  amount: number;
+  status: RentalStatus;
   created_at: string;
   expires_at: string;
-  // Payment tracking fields
   payment_status?:
     | "pending"
     | "completed"
     | "failed"
     | "disputed"
     | "amount_mismatch";
-  payment_channel?: string; // 'card', 'bank_transfer', 'ussd'
+  payment_channel?: string;
   paystack_reference?: string;
 }
 
-const statusConfig = {
-  active: {
-    label: "Active",
-    color: "bg-green-100",
-    textColor: "text-green-800",
-    icon: CheckCircle,
-  },
-  expired: {
-    label: "Expired",
-    color: "bg-gray-100",
-    textColor: "text-gray-800",
-    icon: AlertCircle,
-  },
-};
+type IconComponent = (props: { className?: string }) => JSX.Element;
+const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: IconComponent }> =
+  {
+    active: {
+      label: "Active",
+      color: "bg-green-100",
+      textColor: "text-green-800",
+      icon: CheckCircle,
+    },
+    expired: {
+      label: "Expired",
+      color: "bg-gray-100",
+      textColor: "text-gray-800",
+      icon: AlertCircle,
+    },
+  };
 
-const paymentStatusConfig = {
+const paymentStatusConfig: Record<
+  NonNullable<RentalRecord["payment_status"]> | "pending",
+  { label: string; color: string; textColor: string; icon: any }
+> = {
   pending: {
     label: "Pending",
     color: "bg-blue-100",
@@ -118,40 +112,34 @@ const paymentStatusConfig = {
   },
 };
 
-const paymentMethodConfig = {
-  wallet: { label: "Wallet", badge: "default" },
-  paystack: { label: "Paystack", badge: "secondary" },
-};
-
-const paymentChannelConfig: Record<string, { label: string; icon: any }> = {
-  card: { label: "Debit/Credit Card", icon: "💳" },
-  bank_transfer: { label: "Bank Transfer", icon: "🏧" },
-  ussd: { label: "USSD", icon: "📱" },
-};
-
 export default function Rentals() {
   const { isSuperAdmin } = useRole();
+
   const [rentals, setRentals] = useState<RentalRecord[]>([]);
   const [filteredRentals, setFilteredRentals] = useState<RentalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [contentTypeFilter, setContentTypeFilter] = useState("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  if (!isSuperAdmin()) {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
+  const isAuthorized = isSuperAdmin();
+
+  useEffect(() => {
+    void fetchRentals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchRentals = async () => {
     setIsLoading(true);
     try {
-      // Fetch rentals first (without relationship select)
       const { data: rentalsData, error: rentalsError } = await supabase
         .from("rentals")
         .select("*")
@@ -161,42 +149,39 @@ export default function Rentals() {
       if (!rentalsData || rentalsData.length === 0) {
         setRentals([]);
         setFilteredRentals([]);
-        setIsLoading(false);
         return;
       }
 
-      // Extract unique user IDs and rental IDs
-      const userIds = [...new Set(rentalsData.map((r) => r.user_id))];
-      const rentalIds = rentalsData.map((r) => r.id);
+      const userIds = [...new Set(rentalsData.map((r: { user_id: string }) => r.user_id))] as string[];
+      const rentalIds = rentalsData.map((r: { id: string }) => r.id);
 
-      // Try to fetch payment data for all rentals (may not exist yet)
-      let paymentMap = new Map();
+      // payment data is optional for admin display
+      type PaymentRow = { payment_status?: RentalRecord["payment_status"]; payment_channel?: string; paystack_reference?: string };
+      let paymentMap = new Map<string, PaymentRow>();
       try {
         const { data: paymentData, error: paymentError } = await supabase
           .from("rental_payments")
           .select(
-            "rental_id, payment_status, payment_channel, paystack_reference, metadata",
+            "rental_id, payment_status, payment_channel, paystack_reference",
           )
           .in("rental_id", rentalIds);
 
-        // If rental_payments table doesn't exist, continue without payment data
         if (paymentData) {
-          paymentMap = new Map(paymentData.map((p) => [p.rental_id, p]));
+          paymentMap = new Map(
+            (paymentData as Array<{ rental_id: string; payment_status?: RentalRecord["payment_status"]; payment_channel?: string; paystack_reference?: string }>).map(
+              (p) => [p.rental_id, p],
+            ),
+          );
         } else if (paymentError) {
-          // Log warning but continue - table may not be deployed yet
           console.warn(
-            "Notice: Payment data not available (rental_payments table may not be deployed yet)",
+            "Notice: Payment data not available (rental_payments table missing?)",
             paymentError?.message,
           );
         }
-      } catch (paymentError) {
-        // Silently continue if payment fetch fails - table doesn't exist yet
-        console.warn(
-          "Notice: Skipping payment data (rental_payments table not deployed yet)",
-        );
+      } catch (e) {
+        console.warn("Notice: Skipping payment data", e);
       }
 
-      // Fetch profiles for all users
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
         .select("user_id, name, email")
@@ -204,90 +189,48 @@ export default function Rentals() {
 
       if (profilesError) throw profilesError;
 
-      // Create a map of user_id -> profile for quick lookup
       const profileMap = new Map(
-        (profilesData || []).map((p) => [p.user_id, p]),
+        (profilesData || []).map(
+          (p: { user_id: string; name?: string; email?: string }) => [p.user_id, p],
+        ),
       );
 
-      const data = rentalsData;
-      if (data && data.length > 0) {
-        const movieIds = data
-          .filter((r) => r.content_type === "movie")
-          .map((r) => r.content_id);
-        const tvIds = data
-          .filter((r) => r.content_type === "tv")
-          .map((r) => r.content_id);
-        const episodeIds = data
-          .filter((r) => r.content_type === "episode")
-          .map((r) => r.content_id);
+      const formattedRentals: RentalRecord[] = (rentalsData as Array<{
+        id: string | number;
+        user_id: string;
+        content_id: string;
+        content_title?: string | null;
+        content_type: RentalContentType | string;
+        amount?: number | null;
+        status?: RentalStatus | string;
+        created_at: string;
+        expires_at: string;
+      }>).map((r) => {
+        const contentType = r.content_type as RentalContentType;
 
-        const [moviesData, tvShowsData, episodesData] = await Promise.all([
-          movieIds.length > 0
-            ? supabase.from("movies").select("id, title").in("id", movieIds)
-            : Promise.resolve({ data: [] }),
-          tvIds.length > 0
-            ? supabase.from("tv_shows").select("id, title").in("id", tvIds)
-            : Promise.resolve({ data: [] }),
-          episodeIds.length > 0
-            ? supabase
-                .from("episodes")
-                .select(
-                  "id, title, season:season_id (tv_show:tv_show_id (title))",
-                )
-                .in("id", episodeIds)
-            : Promise.resolve({ data: [] }),
-        ]);
+        return {
+          id: String(r.id),
+          user_id: String(r.user_id),
+          user_email: profileMap.get(r.user_id)?.email || "Unknown User",
+          user_name: profileMap.get(r.user_id)?.name || "Unknown User",
+          content_id: String(r.content_id),
+          content_title: String(r.content_title || "Unknown Content"),
+          content_type: contentType,
+          amount: typeof r.amount === "number" ? r.amount : 0,
+          status: (r.status as RentalStatus) || "expired",
+          created_at: String(r.created_at),
+          expires_at: String(r.expires_at),
+          payment_status: paymentMap.get(r.id)?.payment_status,
+          payment_channel: paymentMap.get(r.id)?.payment_channel,
+          paystack_reference: paymentMap.get(r.id)?.paystack_reference,
+        };
+        },
+      );
 
-        const titleMap = new Map<string, string>();
-
-        moviesData.data?.forEach((m) => {
-          titleMap.set(`movie-${m.id}`, m.title);
-        });
-
-        tvShowsData.data?.forEach((tv) => {
-          titleMap.set(`tv-${tv.id}`, tv.title);
-        });
-
-        episodesData.data?.forEach((ep) => {
-          const seasonData = ep.season as any;
-          const showData = seasonData?.tv_show as any;
-          const showTitle = showData?.title || "Unknown";
-          titleMap.set(`episode-${ep.id}`, `${showTitle} - ${ep.title}`);
-        });
-
-        const formattedRentals: RentalRecord[] = data.map((rental) => {
-          // Get payment info from payment map (separate query result)
-          const payment = paymentMap.get(rental.id);
-
-          // Get user profile info from the map
-          const userProfile = profileMap.get(rental.user_id);
-
-          return {
-            id: rental.id,
-            user_id: rental.user_id,
-            user_email: userProfile?.email || "Unknown User",
-            user_name: userProfile?.name || "Unknown User",
-            content_id: rental.content_id,
-            content_title:
-              titleMap.get(`${rental.content_type}-${rental.content_id}`) ||
-              "Unknown Content",
-            content_type: rental.content_type,
-            amount: rental.amount || 0,
-            status: rental.status,
-            created_at: rental.created_at,
-            expires_at: rental.expires_at,
-            // Payment tracking fields
-            payment_status: payment?.payment_status,
-            payment_channel: payment?.payment_channel,
-            paystack_reference: payment?.paystack_reference,
-          };
-        });
-
-        setRentals(formattedRentals);
-        setFilteredRentals(formattedRentals);
-      }
-    } catch (error) {
-      console.error("Error fetching rentals:", error);
+      setRentals(formattedRentals);
+      setFilteredRentals(formattedRentals);
+    } catch (e) {
+      console.error("Error fetching rentals:", e);
       toast({
         title: "Error",
         description: "Failed to fetch rental data",
@@ -299,96 +242,42 @@ export default function Rentals() {
   };
 
   const syncPaystackPayments = async () => {
-    setIsSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        "sync-paystack-payments",
-        {
-          body: { action: "sync_all" },
-        },
-      );
-
-      if (error) throw error;
-
-      const { synced, anomalies_detected } = data;
-      toast({
-        title: "Sync Complete",
-        description: `${synced} payments synced. ${anomalies_detected} anomalies detected.`,
-      });
-
-      // Refresh the rentals data after sync
-      await fetchRentals();
-    } catch (error) {
-      console.error("Error syncing payments:", error);
-      toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync payments with Paystack",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSyncing(false);
-    }
+    // Archived: sync-paystack-payments Edge Function
+    toast({
+      title: "Sync Unavailable",
+      description:
+        "Payment sync has been archived and is not available in this admin panel.",
+      variant: "destructive",
+    });
   };
-
-  useEffect(() => {
-    fetchRentals();
-
-    // Set up real-time subscription for rentals table changes
-    const subscription = supabase
-      .channel("rentals-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // Subscribe to all events (INSERT, UPDATE, DELETE)
-          schema: "public",
-          table: "rentals",
-        },
-        (payload) => {
-          console.log("Rental change detected:", payload);
-          // Refresh the rentals data when changes occur
-          fetchRentals();
-        },
-      )
-      .subscribe();
-
-    // Cleanup subscription on unmount
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     let filtered = rentals;
 
-    // Search filter
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (r) =>
-          r.user_email.toLowerCase().includes(query) ||
-          r.user_name.toLowerCase().includes(query) ||
-          r.content_title.toLowerCase().includes(query),
+          r.user_email.toLowerCase().includes(q) ||
+          r.user_name.toLowerCase().includes(q) ||
+          r.content_title.toLowerCase().includes(q),
       );
     }
 
-    // Status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter((r) => r.status === statusFilter);
     }
 
-    // Content type filter
     if (contentTypeFilter !== "all") {
       filtered = filtered.filter((r) => r.content_type === contentTypeFilter);
     }
 
-    // Payment status filter
     if (paymentStatusFilter !== "all") {
       filtered = filtered.filter(
-        (r) => r.payment_status === paymentStatusFilter,
+        (r) => (r.payment_status ?? "pending") === paymentStatusFilter,
       );
     }
 
-    // Date range filter
     if (startDate) {
       const start = new Date(startDate);
       filtered = filtered.filter((r) => new Date(r.created_at) >= start);
@@ -401,7 +290,7 @@ export default function Rentals() {
     }
 
     setFilteredRentals(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
+    setCurrentPage(1);
   }, [
     searchQuery,
     statusFilter,
@@ -412,12 +301,11 @@ export default function Rentals() {
     rentals,
   ]);
 
-  const calculateStats = () => {
+  const stats = (() => {
     const total = rentals.length;
     const totalRevenue = rentals.reduce((sum, r) => sum + (r.amount || 0), 0);
     const active = rentals.filter((r) => r.status === "active").length;
     const expired = rentals.filter((r) => r.status === "expired").length;
-
     return {
       total,
       totalRevenue,
@@ -425,9 +313,7 @@ export default function Rentals() {
       expired,
       averagePrice: total > 0 ? totalRevenue / total : 0,
     };
-  };
-
-  const stats = calculateStats();
+  })();
 
   const exportReport = () => {
     const csv = [
@@ -474,13 +360,15 @@ export default function Rentals() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `rental-tracking-${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
+    a.download = `rental-tracking-${new Date().toISOString().split("T")[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
+
+  if (!isAuthorized) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   if (isLoading) {
     return (
@@ -492,13 +380,11 @@ export default function Rentals() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Rental Tracking</h1>
           <p className="text-muted-foreground">
-            Monitor all rental transactions with detailed user and payment
-            information
+            Monitor all rental transactions with detailed user and payment information
           </p>
         </div>
         <Badge variant="outline" className="flex items-center gap-1">
@@ -507,7 +393,6 @@ export default function Rentals() {
         </Badge>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -523,33 +408,25 @@ export default function Rentals() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Revenue
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatNaira(stats.totalRevenue)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              From all rentals
-            </p>
+            <div className="text-2xl font-bold">{formatNaira(stats.totalRevenue)}</div>
+            <p className="text-xs text-muted-foreground mt-1">From all rentals</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <CheckCircle className="h-4 w-4" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Active Rentals
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.active}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Currently active
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Currently active</p>
           </CardContent>
         </Card>
 
@@ -560,15 +437,12 @@ export default function Rentals() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatNaira(stats.averagePrice)}
-            </div>
+            <div className="text-2xl font-bold">{formatNaira(stats.averagePrice)}</div>
             <p className="text-xs text-muted-foreground mt-1">Per rental</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters and Search */}
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
@@ -596,10 +470,7 @@ export default function Rentals() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={contentTypeFilter}
-              onValueChange={setContentTypeFilter}
-            >
+            <Select value={contentTypeFilter} onValueChange={setContentTypeFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Content type" />
               </SelectTrigger>
@@ -612,10 +483,7 @@ export default function Rentals() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={paymentStatusFilter}
-              onValueChange={setPaymentStatusFilter}
-            >
+            <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Payment status" />
               </SelectTrigger>
@@ -635,32 +503,18 @@ export default function Rentals() {
             </Button>
           </div>
 
-          {/* Date Range Filters */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="text-sm font-medium">From Date</label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1"
-              />
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1" />
             </div>
             <div>
               <label className="text-sm font-medium">To Date</label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1"
-              />
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1" />
             </div>
             <div>
               <label className="text-sm font-medium">Page Size</label>
-              <Select
-                value={pageSize.toString()}
-                onValueChange={(val) => setPageSize(parseInt(val))}
-              >
+              <Select value={pageSize.toString()} onValueChange={(val) => setPageSize(parseInt(val))}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -688,12 +542,7 @@ export default function Rentals() {
           </div>
 
           <div className="flex justify-between items-center">
-            <Button
-              onClick={syncPaystackPayments}
-              disabled={isSyncing}
-              variant="secondary"
-              className="gap-2"
-            >
+            <Button onClick={syncPaystackPayments} disabled={isSyncing} variant="secondary" className="gap-2">
               {isSyncing ? (
                 <>
                   <RefreshCw className="h-4 w-4 animate-spin" />
@@ -714,7 +563,6 @@ export default function Rentals() {
         </CardContent>
       </Card>
 
-      {/* Rentals Table */}
       <Card>
         <CardHeader>
           <CardTitle>
@@ -737,54 +585,28 @@ export default function Rentals() {
                   <TableHead>Expires</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {filteredRentals.length > 0 ? (
                   filteredRentals
                     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                     .map((rental) => {
-                      const statusInfo = statusConfig[rental.status] || {
-                        label: "Unknown",
-                        color: "bg-gray-100",
-                        textColor: "text-gray-800",
-                        icon: Clock,
-                      };
-                      const StatusIcon = statusInfo?.icon || Clock;
-                      const paymentStatusInfo = paymentStatusConfig[
-                        rental.payment_status || "pending"
-                      ] || {
-                        label: "Unknown",
-                        color: "bg-gray-100",
-                        textColor: "text-gray-800",
-                        icon: Clock,
-                      };
-                      const PaymentStatusIcon =
-                        paymentStatusInfo?.icon || Clock;
-                      const paymentChannelInfo =
-                        paymentChannelConfig[rental.payment_channel || ""] ||
-                        null;
+                      const statusInfo = statusConfig[rental.status];
+                      const paymentStatusInfo =
+                        paymentStatusConfig[(rental.payment_status ?? "pending") as keyof typeof paymentStatusConfig] ??
+                        paymentStatusConfig.pending;
 
                       return (
                         <TableRow key={rental.id}>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="font-medium">
-                                {rental.user_name}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {rental.user_email}
-                              </span>
+                              <span className="font-medium">{rental.user_name}</span>
+                              <span className="text-sm text-muted-foreground">{rental.user_email}</span>
                             </div>
                           </TableCell>
                           <TableCell className="max-w-xs">
                             <div className="flex items-start gap-2">
-                              {rental.content_type === "movie" ? (
-                                <Film className="h-4 w-4 mt-1 flex-shrink-0" />
-                              ) : (
-                                <Tv className="h-4 w-4 mt-1 flex-shrink-0" />
-                              )}
-                              <span className="break-words">
-                                {rental.content_title}
-                              </span>
+                              <span className="break-words">{rental.content_title}</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -796,35 +618,23 @@ export default function Rentals() {
                             {formatNaira(rental.amount || 0)}
                           </TableCell>
                           <TableCell>
-                            {rental.payment_status ? (
-                              <Badge
-                                className={`${paymentStatusInfo.color} ${paymentStatusInfo.textColor} flex items-center gap-1 w-fit`}
-                              >
-                                <PaymentStatusIcon className="h-3 w-3" />
-                                {paymentStatusInfo.label}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                —
-                              </span>
-                            )}
+                            <Badge
+                              className={`${paymentStatusInfo.color} ${paymentStatusInfo.textColor} flex items-center gap-1 w-fit`}
+                            >
+                              <paymentStatusInfo.icon className="h-3 w-3" />
+                              {paymentStatusInfo.label}
+                            </Badge>
                           </TableCell>
                           <TableCell>
-                            {paymentChannelInfo ? (
-                              <Badge variant="secondary">
-                                {paymentChannelInfo.label}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                —
-                              </span>
-                            )}
+                            <span className="text-muted-foreground text-sm">
+                              {rental.payment_channel || "—"}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <Badge
                               className={`${statusInfo.color} ${statusInfo.textColor} flex items-center gap-1 w-fit`}
                             >
-                              <StatusIcon className="h-3 w-3" />
+                              <statusInfo.icon className="h-3 w-3" />
                               {statusInfo.label}
                             </Badge>
                           </TableCell>
@@ -837,13 +647,9 @@ export default function Rentals() {
                         </TableRow>
                       );
                     })
-                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                 ) : (
                   <TableRow>
-                    <TableCell
-                      colSpan={12}
-                      className="text-center py-8 text-muted-foreground"
-                    >
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No rental records found
                     </TableCell>
                   </TableRow>
@@ -852,18 +658,15 @@ export default function Rentals() {
             </Table>
           </div>
 
-          {/* Pagination Controls */}
           {filteredRentals.length > 0 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <div className="text-sm text-muted-foreground">
                 Showing{" "}
-                {Math.min(
-                  (currentPage - 1) * pageSize + 1,
-                  filteredRentals.length,
-                )}{" "}
+                {Math.min((currentPage - 1) * pageSize + 1, filteredRentals.length)}{" "}
                 to {Math.min(currentPage * pageSize, filteredRentals.length)} of{" "}
                 {filteredRentals.length}
               </div>
+
               <div className="flex gap-2">
                 <Button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -873,45 +676,14 @@ export default function Rentals() {
                 >
                   Previous
                 </Button>
-                {Array.from({
-                  length: Math.ceil(filteredRentals.length / pageSize),
-                })
-                  .map((_, i) => i + 1)
-                  .filter((page) => {
-                    const diff = Math.abs(page - currentPage);
-                    return (
-                      diff === 0 ||
-                      diff === 1 ||
-                      page === 1 ||
-                      page === Math.ceil(filteredRentals.length / pageSize)
-                    );
-                  })
-                  .map((page, idx, arr) => (
-                    <div key={page}>
-                      {idx > 0 && arr[idx - 1] !== page - 1 && (
-                        <span className="px-2">...</span>
-                      )}
-                      <Button
-                        onClick={() => setCurrentPage(page)}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                      >
-                        {page}
-                      </Button>
-                    </div>
-                  ))}
+
                 <Button
                   onClick={() =>
                     setCurrentPage((p) =>
-                      Math.min(
-                        Math.ceil(filteredRentals.length / pageSize),
-                        p + 1,
-                      ),
+                      Math.min(Math.ceil(filteredRentals.length / pageSize), p + 1),
                     )
                   }
-                  disabled={
-                    currentPage === Math.ceil(filteredRentals.length / pageSize)
-                  }
+                  disabled={currentPage === Math.ceil(filteredRentals.length / pageSize)}
                   variant="outline"
                   size="sm"
                 >

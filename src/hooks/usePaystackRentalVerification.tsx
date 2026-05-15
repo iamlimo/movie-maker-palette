@@ -130,7 +130,7 @@ function normalizeVerificationResponse(raw: VerificationResponse): PaymentStatus
 export const usePaystackRentalVerification = () => {
   const [verifying, setVerifying] = useState(false);
   const [pollCount, setPollCount] = useState(0);
-  const maxPolls = 60; // Maximum 60 polls (5 minutes with 5-second interval)
+  const maxPolls = 24; // Maximum 24 polls (2 minutes with 5-second interval) - reasonable timeout
   const pollInterval = 5000; // 5 seconds
 
   const verifyPayment = useCallback(async (rentalId: string, reference?: string): Promise<PaymentStatus> => {
@@ -178,6 +178,8 @@ export const usePaystackRentalVerification = () => {
       };
 
       let currentPoll = 0;
+      let consecutiveUnknowns = 0; // Track consecutive "unknown" responses
+      const maxConsecutiveUnknowns = 3; // Stop after 3 unknown responses
 
       while (currentPoll < maxPolls) {
         status = await verifyPayment(rentalId, reference);
@@ -185,7 +187,24 @@ export const usePaystackRentalVerification = () => {
         setPollCount(currentPoll + 1);
 
         if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+          // Success or definite failure - stop polling
+          consecutiveUnknowns = 0;
           break;
+        }
+
+        if (status.status === 'unknown') {
+          consecutiveUnknowns++;
+          // If we get multiple unknown responses, treat as timeout
+          if (consecutiveUnknowns >= maxConsecutiveUnknowns) {
+            status = {
+              success: false,
+              status: 'pending',
+              message: 'Payment status could not be determined. Please check your bank app or contact support.',
+            };
+            break;
+          }
+        } else {
+          consecutiveUnknowns = 0;
         }
 
         await new Promise((resolve) => setTimeout(resolve, pollInterval));

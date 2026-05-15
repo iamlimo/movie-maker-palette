@@ -23,6 +23,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+type ProcessRentalResponse = {
+  payment_method?: "wallet" | "paystack" | string | null;
+  authorization_url?: string | null;
+  payment_id?: string | number | null;
+  id?: string | number | null;
+  discount_applied?: number | null;
+};
+
 interface RentalButtonProps {
   contentId: string;
   contentType: "movie" | "tv" | "season" | "episode" | "tv_show";
@@ -48,10 +56,16 @@ const RentalButton = ({
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   const [showIOSDialog, setShowIOSDialog] = useState(false);
-  
+
   // Referral code state for desktop
-  const [referralInput, setReferralInput] = useState('');
-  const [referralDiscount, setReferralDiscount] = useState<{ code: string; codeId: string; discountType: 'percentage' | 'fixed'; discountValue: number; discountAmount: number } | null>(null);
+  const [referralInput, setReferralInput] = useState("");
+  const [referralDiscount, setReferralDiscount] = useState<{
+    code: string;
+    codeId: string;
+    discountType: "percentage" | "fixed";
+    discountValue: number;
+    discountAmount: number;
+  } | null>(null);
   const [validatingCode, setValidatingCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
 
@@ -93,7 +107,9 @@ const RentalButton = ({
       }
 
       const hours = Math.floor(remaining / (1000 * 60 * 60));
-      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const minutes = Math.floor(
+        (remaining % (1000 * 60 * 60)) / (1000 * 60),
+      );
 
       if (hours > 24) {
         const days = Math.floor(hours / 24);
@@ -115,7 +131,7 @@ const RentalButton = ({
     if (isNative) {
       try {
         await Haptics.impact({ style: ImpactStyle.Light });
-      } catch (error) {
+      } catch {
         console.log("Haptic feedback not available");
       }
     }
@@ -124,7 +140,7 @@ const RentalButton = ({
   const validateCode = async () => {
     if (!referralInput.trim()) return;
     if (!user) {
-      setCodeError('Please sign in to use referral codes');
+      setCodeError("Please sign in to use referral codes");
       return;
     }
 
@@ -133,69 +149,83 @@ const RentalButton = ({
     try {
       const code = referralInput.trim().toUpperCase();
       const { data, error } = await supabase
-        .from('referral_codes')
-        .select('id, code, discount_type, discount_value, max_uses, times_used, max_uses_per_user, min_purchase_amount, valid_until, is_active')
-        .eq('code', code)
-        .eq('is_active', true)
+        .from("referral_codes")
+        .select(
+          "id, code, discount_type, discount_value, max_uses, times_used, max_uses_per_user, min_purchase_amount, valid_until, is_active",
+        )
+        .eq("code", code)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (error || !data) {
-        setCodeError('This referral code is not valid');
+        setCodeError("This referral code is not valid");
         return;
       }
 
-      // Check expiry
       if (data.valid_until && new Date(data.valid_until) < new Date()) {
-        setCodeError('This code has expired');
+        setCodeError("This code has expired");
         return;
       }
 
-      // Check max uses
       if (data.max_uses && data.times_used >= data.max_uses) {
-        setCodeError('This code is no longer available');
+        setCodeError("This code is no longer available");
         return;
       }
 
-      // Check min purchase
       if (data.min_purchase_amount > 0 && price < data.min_purchase_amount) {
-        setCodeError(`Minimum purchase required: ${formatNaira(data.min_purchase_amount)}`);
+        setCodeError(
+          `Minimum purchase required: ${formatNaira(data.min_purchase_amount)}`,
+        );
         return;
       }
 
-      // Check per-user usage limit
       const { count: userUsageCount } = await supabase
-        .from('referral_code_uses')
-        .select('id', { count: 'exact', head: true })
-        .eq('code_id', data.id)
-        .eq('user_id', user.id);
+        .from("referral_code_uses")
+        .select("id", { count: "exact", head: true })
+        .eq("code_id", data.id)
+        .eq("user_id", user.id);
 
-      if (userUsageCount !== null && userUsageCount >= data.max_uses_per_user) {
-        setCodeError(`You've already used this code ${data.max_uses_per_user} time${data.max_uses_per_user > 1 ? 's' : ''}`);
+      if (
+        userUsageCount !== null &&
+        userUsageCount >= data.max_uses_per_user
+      ) {
+        setCodeError(
+          `You've already used this code ${data.max_uses_per_user} time${
+            data.max_uses_per_user > 1 ? "s" : ""
+          }`,
+        );
         return;
       }
 
-      const discountAmount = data.discount_type === 'percentage'
-        ? Math.floor(price * data.discount_value / 100)
-        : Math.min(data.discount_value, price);
+      const discountAmount =
+        data.discount_type === "percentage"
+          ? Math.floor((price * data.discount_value) / 100)
+          : Math.min(data.discount_value, price);
 
       setReferralDiscount({
         code: data.code,
         codeId: data.id,
-        discountType: data.discount_type as 'percentage' | 'fixed',
+        discountType: data.discount_type as "percentage" | "fixed",
         discountValue: data.discount_value,
         discountAmount,
       });
 
-      toast({ title: '✨ Discount Applied!', description: `Save ${formatNaira(discountAmount)}` });
+      toast({
+        title: "✨ Discount Applied!",
+        description: `Save ${formatNaira(discountAmount)}`,
+      });
     } catch (err) {
-      console.error('Error validating code:', err);
-      setCodeError('Error validating code. Please try again.');
+      console.error("Error validating code:", err);
+      setCodeError("Error validating code. Please try again.");
     } finally {
       setValidatingCode(false);
     }
   };
 
-  const handleRent = async (useWallet: boolean = false, referralCode?: string) => {
+  const handleRent = async (
+    useWalletFlag: boolean = false,
+    referralCode?: string,
+  ) => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -205,8 +235,7 @@ const RentalButton = ({
       return;
     }
 
-    // Prevent wallet payment if wallet hasn't loaded yet
-    if (useWallet && isLoading) {
+    if (useWalletFlag && isLoading) {
       toast({
         title: "Wallet Loading",
         description: "Please wait for your wallet to load",
@@ -215,7 +244,6 @@ const RentalButton = ({
       return;
     }
 
-    // Check for existing rental before payment
     if (hasAccess) {
       toast({
         title: "Already Rented",
@@ -225,63 +253,45 @@ const RentalButton = ({
     }
 
     setIsLoading(true);
-    setPaymentMethod(useWallet ? "wallet" : "card");
+    setPaymentMethod(useWalletFlag ? "wallet" : "card");
 
     try {
-      let data, error;
+      let data: ProcessRentalResponse | null = null;
+      let error: { message?: string } | null = null;
 
-      // Try primary payment method
       try {
-        const response = await supabase.functions.invoke("wallet-payment", {
+        const response = await supabase.functions.invoke("process-rental", {
           body: {
+            userId: user.id,
             contentId,
             contentType: normalizedContentType,
-            price, // price already in kobo from database
-            useWallet,
+            price,
+            paymentMethod: useWalletFlag ? "wallet" : "paystack",
             ...(referralCode ? { referralCode } : {}),
           },
         });
-        data = response.data;
-        error = response.error;
-      } catch (primaryError: any) {
-        console.error("wallet-payment failed, trying fallback:", primaryError);
 
-        // Fallback to create-payment for card payments only
-        if (!useWallet) {
-          const fallbackResponse = await supabase.functions.invoke(
-            "create-payment",
-            {
-              body: {
-                userId: user.id,
-                contentId,
-                contentType: normalizedContentType,
-                price,
-                ...(referralCode ? { referralCode } : {}),
-              },
-            },
-          );
-          data = fallbackResponse.data;
-          error = fallbackResponse.error;
-        } else {
-          throw new Error(
-            "Wallet payment service unavailable. Please try card payment.",
-          );
-        }
+        data = response.data as ProcessRentalResponse;
+        error = response.error as { message?: string } | null;
+      } catch (primaryError) {
+        console.error("process-rental failed:", primaryError);
+        throw primaryError;
       }
 
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Payment initiation failed");
 
-      if (data.payment_method === "wallet") {
-        // Wallet payment successful
+      if (data?.payment_method === "wallet") {
         await fetchRentals();
         refreshWallet();
         await triggerHaptic();
         setShowBottomSheet(false);
-        
-        if (referralCode && data.discount_applied > 0) {
+
+        if (referralCode && (data.discount_applied ?? 0) > 0) {
           toast({
             title: "🎉 Payment Successful!",
-            description: `You saved ${formatNaira(data.discount_applied)}. Start watching now!`,
+            description: `You saved ${formatNaira(
+              data.discount_applied ?? 0,
+            )}. Start watching now!`,
           });
         } else {
           toast({
@@ -289,16 +299,24 @@ const RentalButton = ({
             description: `You can now watch ${title}`,
           });
         }
-        
-        // Redirect immediately to watch page for immersive fullscreen playback
-        navigate(`/watch/${contentType}/${contentId}`);
-      } else if (data.payment_method === "paystack" || data.authorization_url) {
-        // Open Paystack checkout
-        const authUrl = data.authorization_url;
-        const paymentId = data.payment_id || data.id;
-        const discountApplied = data.discount_applied || 0;
 
-        // On mobile, redirect instead of popup
+        navigate(`/watch/${contentType}/${contentId}`);
+      } else if (
+        data?.payment_method === "paystack" ||
+        data?.authorization_url
+      ) {
+        const authUrl = data?.authorization_url ?? null;
+        const paymentId = (data?.payment_id ?? data?.id ?? null) as
+          | string
+          | number
+          | null;
+
+        const discountApplied = data?.discount_applied ?? 0;
+
+        if (!authUrl || paymentId === null) {
+          throw new Error("Payment initiation failed");
+        }
+
         if (shouldUseRedirect) {
           window.location.href = authUrl;
         } else {
@@ -306,23 +324,23 @@ const RentalButton = ({
         }
 
         setShowBottomSheet(false);
-        
+
         let toastTitle = "Payment Initiated";
         let toastDescription = shouldUseRedirect
           ? "Redirecting to payment..."
           : "Complete your payment in the popup window";
-        
+
         if (referralCode && discountApplied > 0) {
           toastTitle = "✨ Discount Applied!";
-          toastDescription = `Saving ${formatNaira(discountApplied)}. ${shouldUseRedirect ? "Complete payment to start watching" : "Proceed in popup"}`;
+          toastDescription = `Saving ${formatNaira(discountApplied)}. ${
+            shouldUseRedirect
+              ? "Complete payment to start watching"
+              : "Proceed in popup"
+          }`;
         }
-        
-        toast({
-          title: toastTitle,
-          description: toastDescription,
-        });
 
-        // Poll for payment completion
+        toast({ title: toastTitle, description: toastDescription });
+
         const pollPayment = setInterval(async () => {
           try {
             const { data: paymentData } = await supabase.functions.invoke(
@@ -336,18 +354,19 @@ const RentalButton = ({
               clearInterval(pollPayment);
               await fetchRentals();
               await triggerHaptic();
-              
-              // Show success with discount info
-              const discountInfo = paymentData.payment?.metadata?.discount_amount
-                ? ` You saved ${formatNaira(paymentData.payment.metadata.discount_amount)}!`
-                : '';
-              
+
+              const discountInfo =
+                paymentData.payment?.metadata?.discount_amount
+                  ? ` You saved ${formatNaira(
+                      paymentData.payment.metadata.discount_amount,
+                    )}!`
+                  : "";
+
               toast({
                 title: "🎬 Payment Successful!",
                 description: `Ready to watch ${title}${discountInfo}`,
               });
-              
-              // Redirect immediately to watch page for immersive fullscreen playback
+
               navigate(`/watch/${contentType}/${contentId}`);
             }
           } catch (pollError) {
@@ -357,12 +376,14 @@ const RentalButton = ({
 
         setTimeout(() => clearInterval(pollPayment), 300000);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Rental error:", error);
 
+      const message = error instanceof Error ? error.message : String(error);
+
       if (
-        error.message?.includes("Insufficient") ||
-        error.message?.includes("balance")
+        message.includes("Insufficient") ||
+        message.includes("balance")
       ) {
         const priceInNaira = price / 100;
         toast({
@@ -372,7 +393,7 @@ const RentalButton = ({
           })} but have ${formatBalance()}`,
           variant: "destructive",
         });
-      } else if (error.message?.includes("Active rental exists")) {
+      } else if (message.includes("Active rental exists")) {
         toast({
           title: "Already Rented",
           description: "You already have an active rental for this content",
@@ -380,7 +401,7 @@ const RentalButton = ({
       } else {
         toast({
           title: "Payment Failed",
-          description: error.message || "Failed to initiate payment",
+          description: message || "Failed to initiate payment",
           variant: "destructive",
         });
       }
@@ -393,16 +414,15 @@ const RentalButton = ({
   if (hasAccess) {
     return (
       <div className="space-y-2">
-        <Button 
-          variant="default" 
-          size="lg" 
+        <Button
+          variant="default"
+          size="lg"
           className="w-full touch-target"
           onClick={() => navigate(`/watch/${contentType}/${contentId}`)}
         >
           <Play className="h-5 w-5 mr-2" />
           Watch Now
         </Button>
-        {/* Hide rental time remaining on iOS */}
         {!isIOS && timeRemaining && (
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
@@ -413,7 +433,6 @@ const RentalButton = ({
     );
   }
 
-  // iOS without access: Show informational dialog per Apple App Store IAP guidelines (3.1.1)
   if (isIOS) {
     return (
       <>
@@ -427,18 +446,15 @@ const RentalButton = ({
           More Information
         </Button>
 
-        {/* iOS Rental Required Dialog - Compliant with App Store 3.1.3(a) */}
         <Dialog open={showIOSDialog} onOpenChange={setShowIOSDialog}>
           <DialogContent className="w-[90%] max-w-sm">
             <DialogHeader>
               <DialogTitle>Rental Required</DialogTitle>
               <DialogDescription className="text-base leading-relaxed pt-2">
                 This content is available to users who have already rented it.
-                {user ? (
-                  " Your current account does not have access to this content."
-                ) : (
-                  " Please log in with your existing Signature TV account."
-                )}
+                {user
+                  ? " Your current account does not have access to this content."
+                  : " Please log in with your existing Signature TV account."}
               </DialogDescription>
             </DialogHeader>
 
@@ -448,7 +464,7 @@ const RentalButton = ({
                   variant="default"
                   onClick={() => {
                     setShowIOSDialog(false);
-                    window.location.href = '/auth';
+                    window.location.href = "/auth";
                   }}
                   className="w-full"
                 >
@@ -473,35 +489,33 @@ const RentalButton = ({
     contentType === "season"
       ? "Full season access"
       : contentType === "episode"
-      ? "48-hour rental"
-      : "48-hour rental";
+        ? "48-hour rental"
+        : "48-hour rental";
 
   const priceInNaira = price / 100;
   const canAffordRental = canAfford(price);
-  
-  // Calculate final price for desktop view with referral discount
-  const finalPrice = referralDiscount ? Math.max(0, price - referralDiscount.discountAmount) : price;
+
+  const finalPrice = referralDiscount
+    ? Math.max(0, price - referralDiscount.discountAmount)
+    : price;
   const canAffordFinal = canAfford(finalPrice);
-  const savingsAmount = referralDiscount ? referralDiscount.discountAmount : 0;
-  const savingsPercent = referralDiscount && referralDiscount.discountType === 'percentage' 
-    ? referralDiscount.discountValue 
-    : Math.round((savingsAmount / price) * 100);
+  const savingsAmount = referralDiscount
+    ? referralDiscount.discountAmount
+    : 0;
 
   const handleOpenSheet = async () => {
     await triggerHaptic();
-    // Refresh wallet balance to ensure latest balance is used for payment options
     await refreshWallet();
     setShowBottomSheet(true);
   };
 
   return (
     <>
-      {/* Prevent renting TV shows directly - users must rent seasons or episodes */}
       {!isRentable ? (
         <div className="text-center p-4 bg-muted rounded-lg">
           <p className="text-sm text-muted-foreground">
             This content is not available for direct rental.
-            {normalizedContentType === 'tv' && (
+            {normalizedContentType === "tv" && (
               <span className="block mt-1">
                 Browse individual seasons or episodes to rent.
               </span>
@@ -514,41 +528,46 @@ const RentalButton = ({
             <div className="text-center">
               <div className="text-2xl font-bold">{formatNaira(finalPrice)}</div>
               {referralDiscount && (
-                <div className="text-sm line-through text-muted-foreground">{formatNaira(price)}</div>
+                <div className="text-sm line-through text-muted-foreground">
+                  {formatNaira(price)}
+                </div>
               )}
               <div className="text-sm text-muted-foreground">{rentalDuration}</div>
             </div>
 
-            {/* Wallet Balance Display */}
             {user && (
               <div className="text-center text-sm text-muted-foreground">
-                Wallet Balance:{" "}
-                <span className="font-medium">{formatBalance()}</span>
+                Wallet Balance: <span className="font-medium">{formatBalance()}</span>
               </div>
             )}
 
-            {/* Desktop Referral Code Section - Available on desktop browsers, hidden on native iOS apps */}
             {!isNative && !isMobileBrowser && (
               <div className="space-y-2 p-3 bg-secondary rounded-lg">
                 {referralDiscount ? (
                   <div className="flex items-center justify-between p-2 bg-green-500/10 border border-green-500/30 rounded text-sm">
                     <div className="flex items-center gap-2 flex-1">
                       <Check className="h-4 w-4 text-green-600" />
-                      <code className="font-mono font-semibold text-green-700 dark:text-green-300">{referralDiscount.code}</code>
-                      {referralDiscount.discountType === 'percentage' ? (
-                        <span className="text-xs font-medium text-green-600 dark:text-green-400">-{referralDiscount.discountValue}%</span>
+                      <code className="font-mono font-semibold text-green-700 dark:text-green-300">
+                        {referralDiscount.code}
+                      </code>
+                      {referralDiscount.discountType === "percentage" ? (
+                        <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                          -{referralDiscount.discountValue}%
+                        </span>
                       ) : (
-                        <span className="text-xs font-medium text-green-600 dark:text-green-400">-{formatNaira(referralDiscount.discountAmount)}</span>
+                        <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                          -{formatNaira(referralDiscount.discountAmount)}
+                        </span>
                       )}
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setReferralDiscount(null);
-                        setReferralInput('');
+                        setReferralInput("");
                         setCodeError(null);
-                      }} 
+                      }}
                       className="h-6 w-6 p-0 hover:bg-red-500/10 hover:text-red-500"
                     >
                       <X className="h-3 w-3" />
@@ -565,17 +584,25 @@ const RentalButton = ({
                         }}
                         placeholder="Enter referral code"
                         className="font-mono text-sm uppercase tracking-widest"
-                        onKeyDown={(e) => e.key === 'Enter' && !validatingCode && validateCode()}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" &&
+                          !validatingCode &&
+                          validateCode()
+                        }
                         disabled={validatingCode}
                       />
-                      <Button 
-                        onClick={validateCode} 
-                        disabled={validatingCode || !referralInput.trim()} 
-                        variant="outline" 
+                      <Button
+                        onClick={validateCode}
+                        disabled={validatingCode || !referralInput.trim()}
+                        variant="outline"
                         size="sm"
                         className="px-3"
                       >
-                        {validatingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                        {validatingCode ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Apply"
+                        )}
                       </Button>
                     </div>
                     {codeError && (
@@ -589,7 +616,6 @@ const RentalButton = ({
               </div>
             )}
 
-            {/* Main Rent Button - Opens bottom sheet on mobile, inline on desktop */}
             {isNative || isMobileBrowser ? (
               <Button
                 onClick={handleOpenSheet}
@@ -601,8 +627,7 @@ const RentalButton = ({
                 <Play className="h-5 w-5 mr-2" />
                 Rent for {formatNaira(price)}
               </Button>
-            ) : /* Desktop - inline payment options */
-            user && canAffordFinal ? (
+            ) : user && canAffordFinal ? (
               <div className="space-y-2">
                 <Button
                   onClick={() => handleRent(true, referralDiscount?.code)}
@@ -637,8 +662,7 @@ const RentalButton = ({
               <div className="space-y-2">
                 {user && !canAffordFinal && (
                   <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
-                    Add {formatNaira(finalPrice - balance)} to your wallet for instant
-                    checkout
+                    Add {formatNaira(finalPrice - balance)} to your wallet for instant checkout
                   </div>
                 )}
                 <Button
@@ -659,7 +683,6 @@ const RentalButton = ({
             )}
           </div>
 
-          {/* Mobile Bottom Sheet */}
           <RentalBottomSheet
             isOpen={showBottomSheet}
             onClose={() => setShowBottomSheet(false)}

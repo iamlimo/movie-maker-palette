@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
         });
         
         // Build a more informative error message
-        let errorDetails = {
+        const errorDetails = {
           error: 'Access denied. Purchase or rent this movie to watch.',
           debug: {
             movieId,
