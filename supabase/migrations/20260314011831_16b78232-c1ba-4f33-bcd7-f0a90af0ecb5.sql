@@ -1,1 +1,0 @@
-UPDATE wallets SET balance = 0, updated_at = now();

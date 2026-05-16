@@ -211,3 +211,108 @@ export class RentalValidationError extends Error {
     this.name = 'RentalValidationError';
   }
 }
+
+/**
+ * PHASE 2: Unified content resolver
+ * 
+ * Resolves ANY content type to a normalized structure.
+ * This is the SINGLE TRUTH SOURCE for content fetching in the rental system.
+ * 
+ * @param contentType - Normalized content type
+ * @param contentId - ID of the content
+ * @param supabase - Supabase client
+ * @returns Resolved content with pricing and rental duration
+ */
+export async function resolveContent(
+  contentType: ContentType,
+  contentId: string,
+  supabase: any
+): Promise<{
+  id: string;
+  type: ContentType;
+  title: string;
+  price: number;
+  rental_expiry_duration: number; // in hours
+  currency: string;
+  video_url?: string;
+}> {
+  console.log(`[resolveContent] Resolving ${contentType}/${contentId}`);
+  
+  try {
+    if (contentType === 'movie') {
+      const { data, error } = await supabase
+        .from('movies')
+        .select('id, title, price, rental_expiry_duration, video_url')
+        .eq('id', contentId)
+        .maybeSingle();
+
+      if (error || !data) throw new Error(`Movie not found: ${contentId}`);
+      
+      return {
+        id: data.id,
+        type: 'movie',
+        title: data.title,
+        price: data.price || 0,
+        rental_expiry_duration: data.rental_expiry_duration || 48,
+        currency: 'NGN',
+        video_url: data.video_url,
+      };
+    }
+
+    if (contentType === 'season') {
+      const { data, error } = await supabase
+        .from('seasons')
+        .select(`id, season_number, rental_expiry_duration, price, tv_shows(id, title)`)
+        .eq('id', contentId)
+        .maybeSingle();
+
+      if (error || !data) throw new Error(`Season not found: ${contentId}`);
+      
+      const tvShow = (data as any).tv_shows;
+      const seasonTitle = tvShow?.title ? `${tvShow.title} - Season ${data.season_number}` : `Season ${data.season_number}`;
+      
+      return {
+        id: data.id,
+        type: 'season',
+        title: seasonTitle,
+        price: data.price || 0,
+        rental_expiry_duration: data.rental_expiry_duration || 168,
+        currency: 'NGN',
+      };
+    }
+
+    if (contentType === 'episode') {
+      const { data, error } = await supabase
+        .from('episodes')
+        .select(`id, episode_number, rental_expiry_duration, price, video_url, seasons(season_number, tv_shows(id, title))`)
+        .eq('id', contentId)
+        .maybeSingle();
+
+      if (error || !data) throw new Error(`Episode not found: ${contentId}`);
+      
+      const season = (data as any).seasons;
+      const tvShow = season?.tv_shows;
+      const episodeTitle = tvShow?.title 
+        ? `${tvShow.title} - S${season.season_number}E${data.episode_number}`
+        : `Episode ${data.episode_number}`;
+      
+      return {
+        id: data.id,
+        type: 'episode',
+        title: episodeTitle,
+        price: data.price || 0,
+        rental_expiry_duration: data.rental_expiry_duration || 48,
+        currency: 'NGN',
+        video_url: data.video_url,
+      };
+    }
+
+    throw new ContentTypeError(`Unsupported content type for resolution: ${contentType}`, contentType);
+  } catch (error) {
+    console.error(`[resolveContent] Error:`, error);
+    throw new ContentTypeError(
+      `Failed to resolve ${contentType}/${contentId}: ${error instanceof Error ? error.message : String(error)}`,
+      contentType
+    );
+  }
+}

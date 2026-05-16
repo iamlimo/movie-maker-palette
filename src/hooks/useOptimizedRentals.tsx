@@ -7,11 +7,24 @@ import { useWallet } from '@/hooks/useWallet';
 export type RentalType = 'movie' | 'episode' | 'season';
 export type PaymentMethod = 'wallet' | 'paystack';
 
-export type RentalRecord = Tables<'rentals'>;
+// Source of truth: rental_intents + rental_access unified view
+export interface RentalEntitlement {
+  user_id: string;
+  content_id: string;
+  content_type: string;
+  access_id: string | null;
+  intent_id: string | null;
+  expires_at: string | null;
+  payment_method: string | null;
+  intent_status: string | null;
+  access_status: string | null;
+  revoked_at: string | null;
+  state: 'ACTIVE' | 'REVOKED' | 'EXPIRED' | 'PAYMENT_PENDING' | 'PAYMENT_VERIFICATION' | 'FAILED' | 'NOT_RENTED';
+}
 
 export interface RentalAccess {
   hasAccess: boolean;
-  rental: RentalRecord | null;
+  entitlement: RentalEntitlement | null;
   timeRemaining: {
     hours: number;
     minutes: number;
@@ -22,55 +35,61 @@ export interface RentalAccess {
 export const useOptimizedRentals = () => {
   const { user } = useAuth();
   const { canAfford, refreshWallet } = useWallet();
-  const [rentals, setRentals] = useState<RentalRecord[]>([]);
+  const [entitlements, setEntitlements] = useState<RentalEntitlement[]>([]);
   const [loading, setLoading] = useState(false);
-  const rentalsChannelNameRef = useRef(
-    `rentals-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const entitlementsChannelNameRef = useRef(
+    `entitlements-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   );
 
-  // Fetch active rentals for user
-  const fetchRentals = useCallback(async () => {
+  // Fetch all entitlements from unified v_user_entitlements view
+  // This is the single source of truth: union of rental_intents + rental_access
+  const fetchEntitlements = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('rentals')
+        .from('v_user_entitlements')
         .select('*')
         .eq('user_id', user.id)
-        .in('status', ['completed', 'active'])
-        .gte('expires_at', new Date().toISOString())
-        .order('expires_at', { ascending: true });
+        .order('expires_at', { ascending: true, nullsLast: true });
 
       if (error) throw error;
-      setRentals(data || []);
+      
+      // Log the fetched entitlements for debugging (PHASE 8 logging)
+      console.log('[useOptimizedRentals] Fetched entitlements:', {
+        count: data?.length || 0,
+        user_id: user.id,
+        states: data?.map(e => e.state) || [],
+      });
+      
+      setEntitlements((data || []) as RentalEntitlement[]);
     } catch (error) {
-      console.error('Error fetching rentals:', error);
+      console.error('[useOptimizedRentals] Error fetching entitlements:', error);
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  // Check if user has access to specific content
+  // Check if user has ACTIVE access to specific content
   const checkAccess = useCallback((contentId: string, contentType: RentalType): RentalAccess => {
-    const rental = rentals.find(
-      (r) =>
-        r.content_id === contentId &&
-        r.content_type === contentType &&
-        (r.status === 'completed' || r.status === 'active') &&
-        new Date(r.expires_at) > new Date()
+    const entitlement = entitlements.find(
+      (e) =>
+        e.content_id === contentId &&
+        e.content_type === contentType &&
+        e.state === 'ACTIVE'
     );
 
-    if (!rental) {
+    if (!entitlement || !entitlement.expires_at) {
       return {
         hasAccess: false,
-        rental: null,
+        entitlement: null,
         timeRemaining: null,
       };
     }
 
     const now = new Date().getTime();
-    const expiresAt = new Date(rental.expires_at).getTime();
+    const expiresAt = new Date(entitlement.expires_at).getTime();
     const remaining = expiresAt - now;
 
     const hours = Math.floor(remaining / (1000 * 60 * 60));
@@ -88,23 +107,22 @@ export const useOptimizedRentals = () => {
 
     return {
       hasAccess: true,
-      rental,
+      entitlement,
       timeRemaining: { hours, minutes, formatted },
     };
-  }, [rentals]);
+  }, [entitlements]);
 
   // Check if season purchase unlocks all episodes
   const checkSeasonAccess = useCallback((seasonId: string): boolean => {
-    return rentals.some(
-      (r) =>
-        r.content_id === seasonId &&
-        r.content_type === 'season' &&
-        (r.status === 'completed' || r.status === 'active') &&
-        new Date(r.expires_at) > new Date()
+    return entitlements.some(
+      (e) =>
+        e.content_id === seasonId &&
+        e.content_type === 'season' &&
+        e.state === 'ACTIVE'
     );
-  }, [rentals]);
+  }, [entitlements]);
 
-  // Process rental payment
+  // Process rental payment (remains the same)
   const processRental = useCallback(
     async (
       contentId: string,
@@ -184,7 +202,7 @@ export const useOptimizedRentals = () => {
               error: 'Payment processed but rental ID not returned',
             };
           }
-          await fetchRentals();
+          await fetchEntitlements();
           await refreshWallet();
           return {
             success: true,
@@ -219,25 +237,27 @@ export const useOptimizedRentals = () => {
         };
       }
     },
-    [user, canAfford, fetchRentals, refreshWallet]
+    [user, canAfford, fetchEntitlements, refreshWallet]
   );
 
-  // Set up real-time subscription
+  // Set up real-time subscription to rental_access changes (not legacy rentals table)
+  // This listens to the canonical source of truth
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
-      .channel(rentalsChannelNameRef.current)
+      .channel(entitlementsChannelNameRef.current)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'rentals',
+          table: 'rental_access',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          fetchRentals();
+        (payload) => {
+          console.log('[useOptimizedRentals] Rental access changed:', payload.eventType);
+          fetchEntitlements();
         }
       )
       .subscribe();
@@ -245,17 +265,43 @@ export const useOptimizedRentals = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchRentals]);
+  }, [user, fetchEntitlements]);
+
+  // Also listen to rental_intents for payment pending state changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`intents-${user.id}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'rental_intents',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('[useOptimizedRentals] Rental intent changed:', payload.eventType);
+          fetchEntitlements();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchEntitlements]);
 
   // Initial fetch
   useEffect(() => {
-    fetchRentals();
-  }, [fetchRentals]);
+    fetchEntitlements();
+  }, [fetchEntitlements]);
 
   return {
-    rentals,
+    entitlements,
     loading,
-    fetchRentals,
+    fetchEntitlements,
     checkAccess,
     checkSeasonAccess,
     processRental,
