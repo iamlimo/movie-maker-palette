@@ -25,6 +25,14 @@ interface EntitlementRow {
  * realtime channels, and exposes a deterministic state-machine lookup.
  */
 export function useEntitlements() {
+const normalizeType = (t: string): RentalContentType => {
+  const v = t.toLowerCase();
+  if (v.includes('movie')) return 'movie';
+  if (v.includes('episode')) return 'episode';
+  if (v.includes('season')) return 'season';
+  return v as RentalContentType;
+};
+
   const { user } = useAuth();
   const [entitlements, setEntitlements] = useState<Entitlement[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,12 +64,29 @@ export function useEntitlements() {
       const mapped: Entitlement[] = (data || []).map((row) => ({
         state: (row.state as RentalState) || 'NOT_RENTED',
         contentId: row.content_id,
-        contentType: row.content_type as RentalContentType,
+        // contentType: row.content_type as RentalContentType,
+        contentType: normalizeType(row.content_type),
         expiresAt: row.expires_at,
         intentId: row.intent_id,
         accessId: row.access_id,
         paymentMethod: row.payment_method,
       }));
+      
+      // Debug logging for payment verification states
+      const verifyingEntitlements = mapped.filter(e => e.state === 'PAYMENT_VERIFICATION' || e.state === 'PAYMENT_PENDING');
+      if (verifyingEntitlements.length > 0) {
+        console.log('[useEntitlements] ⏳ Payment verification states found:', {
+          count: verifyingEntitlements.length,
+          items: verifyingEntitlements.map(e => ({
+            contentId: e.contentId,
+            contentType: e.contentType,
+            state: e.state,
+            paymentMethod: e.paymentMethod,
+            intentId: e.intentId,
+          })),
+        });
+      }
+      
       setEntitlements(mapped);
     } catch (err) {
       console.error('[useEntitlements] fetch failed', err);

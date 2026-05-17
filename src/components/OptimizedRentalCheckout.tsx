@@ -88,13 +88,23 @@ export const OptimizedRentalCheckout = ({
   const isMobileBrowser =
     /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
 
-  const finalPrice = discount ? Math.max(0, price - discount.amount) : price;
-  const canPayWithWallet = canAfford(finalPrice);
+  const subTotal = discount ? Math.max(0, price - discount.amount) : price;
+
+  // VAT: 7.5% (mandatory)
+  const VAT_RATE = 0.075;
+  const vatAmount = Math.round(subTotal * VAT_RATE);
+  const totalToPay = subTotal + vatAmount;
+
+  // Backward-compatible alias for the rest of this component.
+  // All payment + wallet checks must use the VAT-inclusive total.
+  const finalPrice = totalToPay;
+
+  const canPayWithWallet = canAfford(totalToPay);
   const canProceed = paymentMethod === 'wallet' ? canPayWithWallet : paymentMethod === 'paystack';
 
   const redirectToWatch = () => {
     onOpenChange(false);
-    onSuccess?.();
+    // Note: onSuccess is already called before this function in payment success paths
 
     if (contentType === 'season') {
       navigate(`/watch/season/${contentId}`);
@@ -228,10 +238,13 @@ export const OptimizedRentalCheckout = ({
           console.warn('Could not refresh rentals:', e);
         }
 
+        // CRITICAL: Call onSuccess before redirecting so parent component can update state
+        onSuccess?.();
         setIsRedirecting(true);
 
         setTimeout(() => {
           setPaymentStatus({ show: false, status: 'processing', message: '' });
+          onOpenChange(false);
           redirectToWatch();
         }, 1000);
         return;
@@ -247,22 +260,31 @@ export const OptimizedRentalCheckout = ({
           channel: result.payment?.channel,
           details: result.payment,
         });
+        setIsProcessing(false);
         return;
       }
+
+      // Cancelled, failed, or unknown status
+      const failureMessage = 
+        result.status === 'cancelled'
+          ? 'Payment was cancelled. Please try again if you want to watch this content.'
+          : result.message || 'Payment verification failed. Please try again.';
 
       setPaymentStatus({
         show: true,
         status: 'failed',
-        message: result.message || 'Payment verification failed. Please try again.',
+        message: failureMessage,
         rentalId,
         details: result.payment,
       });
 
       toast({
         title: 'Payment failed',
-        description: result.message || 'Could not verify payment',
+        description: failureMessage,
         variant: 'destructive',
       });
+      
+      setIsProcessing(false);
     } catch (error) {
       console.error('Payment verification error:', error);
       setPaymentStatus({
@@ -271,6 +293,7 @@ export const OptimizedRentalCheckout = ({
         message: 'An error occurred while verifying payment',
         rentalId,
       });
+      setIsProcessing(false);
     }
   };
 
@@ -330,10 +353,13 @@ export const OptimizedRentalCheckout = ({
           console.warn('Could not refresh wallet/rentals:', e);
         }
 
+        // CRITICAL: Call onSuccess before redirecting so parent component can update state
+        onSuccess?.();
         setIsRedirecting(true);
 
         setTimeout(() => {
           setPaymentStatus({ show: false, status: 'processing', message: '' });
+          onOpenChange(false);
           redirectToWatch();
         }, 700);
         return;
@@ -364,8 +390,15 @@ export const OptimizedRentalCheckout = ({
             }
           }, 1000);
 
-          setTimeout(() => clearInterval(checkWindow), 600000);
+          // Safety timeout: verify payment after 10 minutes max (Paystack shouldn't take longer)
+          setTimeout(() => {
+            clearInterval(checkWindow);
+            if (!paymentStatus.show) {
+              handlePaystackPaymentReturn(result.rentalId!);
+            }
+          }, 600000);
         } else {
+          // Mobile: wait 2 seconds before verifying (allows time for return)
           setTimeout(() => {
             handlePaystackPaymentReturn(result.rentalId!);
           }, 2000);
@@ -469,8 +502,8 @@ export const OptimizedRentalCheckout = ({
 
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Price</span>
-              <span className="text-foreground">{formatNaira(price)}</span>
+              <span>Subtotal</span>
+              <span className="text-foreground">{formatNaira(subTotal)}</span>
             </div>
 
             {discount && (

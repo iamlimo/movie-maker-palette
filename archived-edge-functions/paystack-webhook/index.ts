@@ -354,12 +354,34 @@ Deno.serve(async (req) => {
         );
       }
 
-      // PHASE 7: LEGACY CLEANUP
-      // Do NOT mirror to legacy `rentals` table anymore.
-      // All access grants now go to canonical rental_access table.
-      // Legacy table is read-only for backward compatibility during deprecation window.
+      // Mirror to legacy `rentals` table for backward compatibility (best-effort, idempotent).
+      try {
+        const contentTypeForLegacy = rentalIntent.rental_type;
+        const { data: existingLegacy } = await supabase
+          .from("rentals")
+          .select("id")
+          .eq("user_id", rentalIntent.user_id)
+          .eq("content_id", contentId)
+          .eq("content_type", contentTypeForLegacy)
+          .gte("expires_at", new Date().toISOString())
+          .maybeSingle();
+        if (!existingLegacy) {
+          await supabase.from("rentals").insert({
+            user_id: rentalIntent.user_id,
+            content_id: contentId,
+            content_type: contentTypeForLegacy,
+            price: rentalIntent.price,
+            expires_at: accessRow.expires_at,
+            status: "completed",
+            payment_method: "paystack",
+          });
+        }
+      } catch (legacyError) {
+        console.warn("Legacy rentals mirror failed:", legacyError);
+      }
+
       console.log(
-        `✅ Payment confirmed and rental access granted: intent_id=${rentalIntent.id}, access_id=${accessRow.id}, channel=${paymentChannel}, (skipped legacy rental mirror)`
+        `✅ Payment confirmed and rental access granted: intent_id=${rentalIntent.id}, access_id=${accessRow.id}, channel=${paymentChannel}`,
       );
 
       return new Response(

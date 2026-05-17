@@ -3,9 +3,10 @@ import { Play, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { useWatchHistory, WatchHistoryItem } from "@/hooks/useWatchHistory";
-import { AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+
 import { cn } from "@/lib/utils";
+
 import { formatNaira } from "@/lib/priceUtils";
 
 interface ContinueWatchingCardProps {
@@ -187,10 +188,17 @@ const ContinueWatchingSection: React.FC = () => {
     hasActiveAccess,
   } = useWatchHistory();
 
-  // Don't render if user is not logged in or no content to show
-  if (!user || loading || continueWatching.length === 0) {
+  // Show both active and expired rentals in Continue Watching.
+  // Expired rentals will prompt the user to rent again.
+  const visibleItems = continueWatching.filter(
+    (item) => item.rental_status === "active" || item.rental_status === "expired",
+  );
+
+  // Don't render if user is not logged in or no relevant content to show
+  if (!user || loading || visibleItems.length === 0) {
     return null;
   }
+
 
   const handlePlay = (item: WatchHistoryItem) => {
     // Navigate to the actual watch page instead of preview
@@ -224,8 +232,9 @@ const ContinueWatchingSection: React.FC = () => {
             "md:scrollbar-default",
           )}
         >
-          {continueWatching.map((item) => (
+          {visibleItems.map((item) => (
             <ContinueWatchingCard
+
               key={item.id}
               item={item}
               onPlay={() => handlePlay(item)}

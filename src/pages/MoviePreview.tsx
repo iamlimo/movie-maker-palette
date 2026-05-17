@@ -8,7 +8,8 @@ import Header from "@/components/Header";
 import ContentHero from "@/components/ContentHero";
 import AutoPlayMediaPlayer from "@/components/AutoPlayMediaPlayer";
 import RecommendationsSection from "@/components/RecommendationsSection";
-import RentalButton from "@/components/RentalButton";
+// import RentalButton from "@/components/RentalButton";
+import { OptimizedRentalButton } from "@/components/OptimizedRentalButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "@/hooks/use-toast";
@@ -74,7 +75,7 @@ const MoviePreview = () => {
       setError(null);
 
       // Try slug first, fall back to id (UUID)
-      let query = supabase
+      const query = supabase
         .from("movies")
         .select(
           `
@@ -314,13 +315,15 @@ const MoviePreview = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Rental Actions */}
-            <RentalButton
-              contentId={movie.id}
-              contentType="movie"
-              price={movie.price}
-              title={movie.title}
-            />
-
+          <OptimizedRentalButton
+  contentId={movie.id}
+  contentType="movie"
+  price={movie.price} // IMPORTANT: confirm currency consistency
+  title={movie.title}
+  onRentalSuccess={() => {
+    // optional: refresh UI state if needed
+  }}
+/>
             {/* Watchlist Action */}
             <div className="p-6 rounded-xl border border-border bg-card">
               <Button

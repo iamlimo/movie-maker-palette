@@ -1,7 +1,10 @@
-/// <reference path="../deno.d.ts" />
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { corsHeaders, jsonResponse, handleOptions, errorResponse } from "../_shared/cors.ts";
 import { authenticateUser } from "../_shared/auth.ts";
+
+declare const Deno: {
+  env: { get: (key: string) => string | undefined };
+};
 
 type RentalContentType = "movie" | "season" | "episode";
 type PaymentStatus = "completed" | "pending" | "failed" | "cancelled" | "unknown";
@@ -277,48 +280,22 @@ async function grantAccessIfNeeded(
   intent: RentalIntentRow,
   payment: PaymentRow | null,
 ): Promise<RentalAccessRow | null> {
+  // Clean architecture rebuild rule (Full Reset: B):
+  // verify-payment must be READ-ONLY for entitlement.
+  // Webhook (paystack-webhook) / wallet RPC are the only writers.
   const contentInfo = extractContentInfo(intent, payment);
   if (!contentInfo.contentId) return null;
 
-  const existingAccess = await loadActiveRentalAccess(
+  return await loadActiveRentalAccess(
     supabase,
     intent.user_id,
     contentInfo.contentId,
     contentInfo.contentType,
     intent.id,
   );
-
-  if (existingAccess) return existingAccess;
-
-  const { data: grantedAccessId, error } = await supabase.rpc("grant_rental_access", {
-    p_user_id: intent.user_id,
-    p_content_id: contentInfo.contentId,
-    p_content_type: contentInfo.contentType,
-    p_rental_type: intent.rental_type,
-    p_expires_at: intent.expires_at || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-    p_rental_intent_id: intent.id,
-    p_source: "rental",
-    p_metadata: intent.metadata || {},
-  });
-
-  if (error) {
-    console.error("Grant access RPC error:", error);
-    return null;
-  }
-
-  if (!grantedAccessId) return null;
-
-  const { data, error: accessError } = await supabase
-    .from("rental_access")
-    .select("*")
-    .eq("id", grantedAccessId)
-    .maybeSingle();
-
-  if (accessError || !data) return null;
-  return data as RentalAccessRow;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const optionsResponse = handleOptions(req);
   if (optionsResponse) return optionsResponse;
 
@@ -357,7 +334,7 @@ serve(async (req) => {
       return errorResponse("Access denied", 403);
     }
 
-    const intentStatus = rentalIntent ? normalizePaymentStatus(rentalIntent.status) : null;
+    let intentStatus = rentalIntent ? normalizePaymentStatus(rentalIntent.status) : null;
     const paymentStatus = payment
       ? normalizePaymentStatus(payment.enhanced_status || payment.status)
       : null;
@@ -409,113 +386,57 @@ serve(async (req) => {
     let paystackResult: Record<string, unknown> | null = null;
     if (shouldVerifyWithPaystack) {
       paystackResult = await verifyWithPaystack(referenceToVerify);
+      
+      if (!paystackResult) {
+        console.warn(
+          `⚠️  Paystack API verification returned null for reference: ${referenceToVerify}. Will rely on webhook + intent status.`
+        );
+      } else {
+        console.log(`✅ Paystack API verification succeeded: status=${paystackResult?.status}`);
+      }
+    }
+
+    // CRITICAL: Re-fetch rental_intent to catch webhook updates that may have arrived
+    // This handles the race condition where webhook updates the status between our initial load and Paystack verification
+    let refreshedRentalIntent = rentalIntent;
+    if (rentalIntent && shouldVerifyWithPaystack) {
+      const { data: refreshedIntent, error: refreshError } = await supabase
+        .from("rental_intents")
+        .select("*")
+        .eq("id", rentalIntent.id)
+        .maybeSingle();
+
+      if (!refreshError && refreshedIntent) {
+        refreshedRentalIntent = refreshedIntent as RentalIntentRow;
+        const freshStatus = normalizePaymentStatus(refreshedRentalIntent.status);
+        
+        // Log if status changed (indicates webhook has processed)
+        if (freshStatus !== intentStatus) {
+          console.log(
+            `🔄 Webhook update detected: rental_intent status changed from "${intentStatus}" to "${freshStatus}" (raw: ${refreshedRentalIntent.status})`
+          );
+        }
+        
+        // Re-calculate intentStatus with refreshed data
+        intentStatus = freshStatus;
+      }
     }
 
     const paystackStatus = String((paystackResult?.status as string | undefined) || "").toLowerCase();
     const paystackSuccessful = ["success", "successful", "completed", "paid"].includes(paystackStatus);
     const paystackFailed = ["failed", "abandoned", "cancelled", "canceled", "reversed"].includes(paystackStatus);
 
-    if (rentalIntent && paystackSuccessful && intentStatus !== "completed") {
-      const now = new Date().toISOString();
-
-      await supabase
-        .from("rental_intents")
-        .update({
-          status: "paid",
-          paid_at: now,
-          provider_reference: referenceToVerify,
-          paystack_reference: referenceToVerify,
-          updated_at: now,
-        })
-        .eq("id", rentalIntent.id);
-
-      if (payment) {
-        await supabase
-          .from("payments")
-          .update({
-            enhanced_status: "completed",
-            status: "completed",
-            provider_reference: referenceToVerify,
-          })
-          .eq("id", payment.id);
-      }
-
-      const grantedAccess = await grantAccessIfNeeded(supabase, rentalIntent, payment);
-
-      return jsonResponse({
-        success: true,
-        payment: {
-          id: payment?.id || rentalIntent.id,
-          channel: rentalIntent.payment_method || payment?.provider || "paystack",
-          status: "completed",
-          message: "Payment verified and access granted",
-          enhanced_status: "completed",
-          provider_reference: referenceToVerify,
-        },
-        rental: buildRentalSummary(grantedAccess),
-        related_records: {
-          rental_access: grantedAccess ? [grantedAccess] : [],
-        },
-      });
+    // Log cancelled/failed payments for debugging
+    if (paystackFailed) {
+      console.warn(`❌ Payment cancelled/failed: reference=${referenceToVerify}, status=${paystackStatus}`);
     }
 
-    if (rentalIntent && paystackFailed && intentStatus !== "failed") {
-      const now = new Date().toISOString();
+    // Full Reset (B) rule: verify-payment must be READ-ONLY.
+    // It must NOT update rental_intents/payments or grant entitlement.
+    // Webhook (paystack-webhook) is the only authoritative writer.
 
-      await supabase
-        .from("rental_intents")
-        .update({
-          status: "failed",
-          failed_at: now,
-          updated_at: now,
-        })
-        .eq("id", rentalIntent.id);
-
-      if (payment) {
-        await supabase
-          .from("payments")
-          .update({
-            enhanced_status: "failed",
-            status: "failed",
-            provider_reference: referenceToVerify,
-          })
-          .eq("id", payment.id);
-      }
-
-      return jsonResponse({
-        success: false,
-        payment: {
-          id: payment?.id || rentalIntent.id,
-          channel: rentalIntent.payment_method || payment?.provider || "paystack",
-          status: "failed",
-          message: "Payment failed or was cancelled",
-          enhanced_status: "failed",
-          provider_reference: referenceToVerify,
-        },
-        rental: null,
-        message: "Payment failed or was cancelled",
-      });
-    }
-
-    if (rentalIntent && intentStatus === "completed") {
-      const grantedAccess = await grantAccessIfNeeded(supabase, rentalIntent, payment);
-
-      return jsonResponse({
-        success: true,
-        payment: {
-          id: payment?.id || rentalIntent.id,
-          channel: rentalIntent.payment_method || payment?.provider || "rental",
-          status: "completed",
-          message: "Rental intent already completed",
-          enhanced_status: "completed",
-          provider_reference: rentalIntent.provider_reference || payment?.provider_reference,
-        },
-        rental: buildRentalSummary(grantedAccess || rentalIntent),
-        related_records: {
-          rental_access: grantedAccess ? [grantedAccess] : [],
-        },
-      });
-    }
+    // If webhook already granted access, it will be visible via loadActiveRentalAccess above.
+    // We still compute a status summary for the UI.
 
     if (paymentStatus === "completed" && payment) {
       return jsonResponse({
@@ -554,17 +475,18 @@ serve(async (req) => {
             enhanced_status: payment.enhanced_status,
             provider_reference: payment.provider_reference,
           }
-        : rentalIntent
+        : rentalIntent && refreshedRentalIntent
           ? {
-              id: rentalIntent.id,
-              channel: rentalIntent.payment_method,
+              id: refreshedRentalIntent.id,
+              channel: refreshedRentalIntent.payment_method,
               status: intentStatus || "unknown",
               message: "Rental intent lookup completed",
-              enhanced_status: rentalIntent.status,
-              provider_reference: rentalIntent.provider_reference || rentalIntent.paystack_reference,
+              enhanced_status: refreshedRentalIntent.status,
+              provider_reference:
+                refreshedRentalIntent.provider_reference || refreshedRentalIntent.paystack_reference,
             }
           : null,
-      rental: buildRentalSummary(activeAccess || rentalIntent),
+      rental: buildRentalSummary(activeAccess || refreshedRentalIntent),
       related_records: activeAccess ? { rental_access: [activeAccess] } : null,
       message:
         status === "pending"

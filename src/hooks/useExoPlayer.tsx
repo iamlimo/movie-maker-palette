@@ -82,7 +82,7 @@ export function useExoPlayer(options?: { onProgress?: (currentTime: number, dura
       // Release native player on unmount.
       ExoPlayer.release().catch(() => {});
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [isAvailable]);
 
   const loadVideo = useCallback(async (opts: ExoPlayerLoadOptions) => {

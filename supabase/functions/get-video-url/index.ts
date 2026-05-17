@@ -158,45 +158,67 @@ Deno.serve(async (req) => {
         console.error('Purchase check error:', purchaseError);
       }
 
-      // Check if user has active rental
-      // Use maybeSingle() which returns null if no result instead of throwing an error
-      const { data: rental, error: rentalError } = await supabase
-        .from('rentals')
-        .select('id, expires_at, user_id, content_id, content_type, status')
+      // PHASE 6: Check canonical rental_access table first
+      // This is the source of truth for active rental access
+      const now = new Date().toISOString();
+      const { data: rentalAccess, error: rentalAccessError } = await supabase
+        .from('rental_access')
+        .select('id, expires_at, status')
         .eq('user_id', user.id)
-        .eq('content_id', movieId)
-        .eq('content_type', 'movie')
-        .eq('status', 'completed')
-        .gte('expires_at', new Date().toISOString())
+        .eq('movie_id', movieId)
+        .eq('status', 'paid')
+        .is('revoked_at', null)
+        .gt('expires_at', now)
         .maybeSingle();
 
-      console.log('Rental check for user:', {
+      if (rentalAccessError && rentalAccessError.code !== 'PGRST116') {
+        console.error('Rental access check error:', rentalAccessError);
+      }
+
+      // Fallback: check legacy rentals table for backward compatibility
+      let legacyRental = null;
+      if (!rentalAccess) {
+        const { data: rental, error: rentalError } = await supabase
+          .from('rentals')
+          .select('id, expires_at, user_id, content_id, content_type, status')
+          .eq('user_id', user.id)
+          .eq('content_id', movieId)
+          .eq('content_type', 'movie')
+          .eq('status', 'completed')
+          .gte('expires_at', new Date().toISOString())
+          .maybeSingle();
+
+        if (rentalError && rentalError.code !== 'PGRST116') {
+          console.error('Legacy rental check error:', rentalError);
+        }
+        legacyRental = rental;
+      }
+
+      console.log('Access check for user:', {
         userId: user.id,
         movieId,
-        hasRental: !!rental,
-        rentalData: rental,
-        rentalError: rentalError ? { code: rentalError.code, message: rentalError.message } : null,
+        hasRentalAccess: !!rentalAccess,
+        hasLegacyRental: !!legacyRental,
         hasPurchase: !!purchase,
-        currentTime: new Date().toISOString()
+        currentTime: now
       });
 
-      if (!purchase && !rental) {
+      if (!purchase && !rentalAccess && !legacyRental) {
         console.error('Access denied:', {
           userId: user.id,
           movieId,
           hasPurchase: !!purchase,
-          hasRental: !!rental,
-          rentalError: rentalError?.message,
-          purchaseError: purchaseError?.message
+          hasRentalAccess: !!rentalAccess,
+          hasLegacyRental: !!legacyRental,
         });
         
         // Build a more informative error message
-        let errorDetails = {
+        const errorDetails = {
           error: 'Access denied. Purchase or rent this movie to watch.',
           debug: {
             movieId,
             hasPurchase: !!purchase,
-            hasRental: !!rental,
+            hasRentalAccess: !!rentalAccess,
             movieStatus: movie?.status
           }
         };
