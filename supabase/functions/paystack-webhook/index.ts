@@ -257,9 +257,16 @@ Deno.serve(async (req) => {
         });
       }
 
-      const expectedAmount = Math.round(Number(rentalIntent.price || 0) * 100);
+      const expectedAmount = Math.round(Number(rentalIntent.price || 0));
       if (paidAmount < expectedAmount) {
-        console.warn(`Amount mismatch: received ${paidAmount}, expected ${expectedAmount}`);
+        console.log(`[Webhook Amount Check] Reference: ${paymentReference}`);
+        console.log(`  - Paystack paid amount: ${paidAmount}`);
+        console.log(`  - Rental intent price: ${rentalIntent.price}`);
+        console.log(`  - Expected amount: ${expectedAmount}`);
+        console.log(
+          `  - Amount check result: ${paidAmount >= expectedAmount ? "PASS ✅" : "FAIL ❌"}`,
+        );
+
         await supabase
           .from("rental_intents")
           .update({
