@@ -6,6 +6,7 @@ import { formatNaira } from '@/lib/priceUtils';
 import { useState } from 'react';
 import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { usePlatform } from '@/hooks/usePlatform';
 import { RentalCountdown } from './RentalCountdown';
 import { STATE_LABEL } from '@/lib/rentalStates';
@@ -33,6 +34,21 @@ export const OptimizedRentalButton = ({
 
   const entitlement = getEntitlement(contentId, contentType);
 
+  // Auto-refresh when in payment verification state
+  // useEntitlements already has realtime subscriptions, but add explicit refresh
+  // to handle cases where webhook is delayed
+  useEffect(() => {
+    if (entitlement.state === 'PAYMENT_VERIFICATION') {
+      // Set a timeout to force refresh after 30 seconds (Paystack can take a moment)
+      // This is a safety net, not the primary refresh mechanism
+      const timeout = setTimeout(() => {
+        console.log('[OptimizedRentalButton] Payment verification timeout - forcing refresh');
+        refresh();
+      }, 30000);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [entitlement.state, refresh]);
   if (!user) {
     return (
       <Button
@@ -93,16 +109,6 @@ export const OptimizedRentalButton = ({
   // PAYMENT_PENDING / PAYMENT_VERIFICATION — show non-interactive status.
   // NOTE: This state should only be short-lived. If verification ends up cancelled/failed,
   // the entitlement state will become FAILED/REVOKED/etc.
-  if (entitlement.state === 'PAYMENT_PENDING' || entitlement.state === 'PAYMENT_VERIFICATION') {
-    return (
-      <Button disabled variant="secondary" className="w-full">
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        {STATE_LABEL[entitlement.state]}
-      </Button>
-    );
-  }
-
-
   // REVOKED — informational, no rent CTA.
   if (entitlement.state === 'REVOKED') {
     return (
