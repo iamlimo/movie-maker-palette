@@ -55,7 +55,6 @@ export default defineConfig(({ mode }) => ({
         registerType: "autoUpdate",
         includeAssets: [
           "favicon.ico",
-          "manifest.webmanifest",
           "offline.html",
           "pwa-icon.svg",
           "robots.txt",
