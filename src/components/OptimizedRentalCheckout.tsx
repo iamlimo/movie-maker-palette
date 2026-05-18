@@ -502,7 +502,7 @@ export const OptimizedRentalCheckout = ({
 
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Subtotal</span>
+              <span>Subtotal + VAT</span>
               <span className="text-foreground">{formatNaira(subTotal)}</span>
             </div>
 
