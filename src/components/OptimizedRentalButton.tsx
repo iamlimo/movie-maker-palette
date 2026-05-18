@@ -7,6 +7,7 @@ import { useEntitlements } from '@/hooks/useEntitlements';
 import { formatNaira } from '@/lib/priceUtils';
 import { usePlatform } from '@/hooks/usePlatform';
 import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
+import { canRent } from '@/lib/rentalStates';
 
 interface OptimizedRentalButtonProps {
   contentId: string;
@@ -68,16 +69,16 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  if (entitlement.state === 'REVOKED') {
+  if (!canRent(entitlement)) {
     return (
       <Button disabled variant="secondary" className="w-full">
         <AlertCircle className="h-4 w-4 mr-2" />
-        Access Revoked
+        {entitlement.state === 'REVOKED' ? 'Access Revoked' : 'Rental Unavailable'}
       </Button>
     );
   }
 
-  const isReRent = entitlement.state === 'EXPIRED' || entitlement.state === 'REFUNDED';
+  const isReRent = entitlement.state === 'EXPIRED' || entitlement.state === 'REFUNDED' || entitlement.state === 'REVOKED';
   const isRetry = entitlement.state === 'FAILED';
 
   return (
