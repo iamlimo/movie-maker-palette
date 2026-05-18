@@ -34,7 +34,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { toast } from "@/hooks/use-toast";
-import EpisodePlayer from "@/components/EpisodePlayer";
 import { OptimizedRentalButton } from "@/components/OptimizedRentalButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatNaira } from "@/lib/priceUtils";
@@ -113,7 +112,6 @@ const TVShowPreview = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
-  const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
 
   const [seasonAccess, setSeasonAccess] = useState<{ [seasonId: string]: boolean }>({});
   const [episodeAccess, setEpisodeAccess] = useState<{ [episodeId: string]: boolean }>({});
@@ -606,7 +604,6 @@ const TVShowPreview = () => {
 
                   <div className="grid gap-3">
                     {(episodes[currentSeason?.id || season.id] || []).map((episode, index) => {
-                      const nextEpisode = (episodes[currentSeason?.id || season.id] || [])[index + 1];
                       const hasEpisodeAccess = !!episodeAccess[episode.id];
                       const hasSeasonAccess = !!seasonAccess[currentSeason?.id || ""];
                       const hasAnyAccess = hasEpisodeAccess || hasSeasonAccess;
@@ -692,7 +689,7 @@ const TVShowPreview = () => {
                                       <Button
                                         variant="default"
                                         size="sm"
-                                        onClick={() => setSelectedEpisode(episode)}
+                                        onClick={() => navigate(`/watch/episode/${episode.id}`)}
                                         className="bg-green-600 hover:bg-green-700 text-white animate-in fade-in-50 duration-500"
                                       >
                                         <Play className="h-4 w-4 mr-1" />
@@ -712,21 +709,6 @@ const TVShowPreview = () => {
                               </div>
                             </div>
                           </div>
-
-                          {selectedEpisode?.id === episode.id && (
-                            <div className="mt-4">
-                              <EpisodePlayer
-                                episodeId={episode.id}
-                                seasonId={currentSeason?.id || ""}
-                                title={episode.title}
-                                price={episode.price}
-                                posterUrl={episode.thumbnail_url}
-                                subtitleUrl={episode.subtitle_url}
-                                nextEpisodeId={nextEpisode?.id}
-                                autoPlay={true}
-                              />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
