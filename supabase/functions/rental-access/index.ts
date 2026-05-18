@@ -18,6 +18,7 @@ interface QueryResult<T> {
 interface SupabaseQuery<T> {
   select(columns: string): SupabaseQuery<T>;
   eq(column: string, value: unknown): SupabaseQuery<T>;
+  is(column: string, value: unknown): SupabaseQuery<T>;
   in(column: string, values: unknown[]): SupabaseQuery<T>;
   gt(column: string, value: unknown): SupabaseQuery<T>;
   gte(column: string, value: unknown): SupabaseQuery<T>;
@@ -51,9 +52,6 @@ interface LegacyRentalRow {
 
 interface EpisodeSeasonRow {
   season_id: string | null;
-  seasons?: {
-    tv_show_id: string | null;
-  } | null;
 }
 
 interface SeasonRow {
@@ -137,10 +135,11 @@ async function findDirectRentalAccess(
       .select("*")
       .eq("user_id", userId)
       .eq(column, value)
-      .eq("revoked_at", null)
+      .is("revoked_at", null)
       .eq("status", "paid")
       .gt("expires_at", now)
-      .order("expires_at", { ascending: false });
+      .order("expires_at", { ascending: false })
+      .limit(1);
 
   if (contentType === "movie") {
     const { data, error } = await buildQuery("movie_id", contentId).maybeSingle();
@@ -266,7 +265,7 @@ async function checkAccess(user: AuthUser, supabase: SupabaseClientLike, content
     if (normalizedType === "episode") {
       const { data: episodeData } = await supabase
         .from<EpisodeSeasonRow>("episodes")
-        .select("season_id, seasons(tv_show_id)")
+        .select("season_id")
         .eq("id", contentId)
         .maybeSingle();
 
@@ -311,12 +310,18 @@ async function checkAccess(user: AuthUser, supabase: SupabaseClientLike, content
           });
         }
 
-        if (episodeData.seasons?.tv_show_id) {
+        const { data: seasonData } = await supabase
+          .from<SeasonRow>("seasons")
+          .select("tv_show_id")
+          .eq("id", seasonId)
+          .maybeSingle();
+
+        if (seasonData?.tv_show_id) {
           const { data: showPurchase } = await supabase
             .from<PurchaseRow>("purchases")
             .select("*")
             .eq("user_id", user.id)
-            .eq("content_id", episodeData.seasons.tv_show_id)
+            .eq("content_id", seasonData.tv_show_id)
             .in("content_type", ["tv", "tv_show"])
             .maybeSingle();
 

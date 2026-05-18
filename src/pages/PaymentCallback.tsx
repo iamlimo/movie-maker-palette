@@ -69,14 +69,44 @@ export default function PaymentCallback() {
 
     const verifyPayment = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: {
-            rentalId: callbackData.rentalId,
-            rental_intent_id: callbackData.rentalId,
-            payment_id: callbackData.paymentId || callbackData.reference,
-            reference: callbackData.reference,
-          },
-        });
+        let data: any = null;
+        let error: any = null;
+
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          const result = await supabase.functions.invoke('verify-payment', {
+            body: {
+              rentalId: callbackData.rentalId,
+              rental_intent_id: callbackData.rentalId,
+              payment_id: callbackData.paymentId,
+              reference: callbackData.reference,
+            },
+          });
+
+          data = result.data;
+          error = result.error;
+
+          const paymentStatus = String(
+            data?.payment?.status ||
+              data?.payment?.enhanced_status ||
+              data?.paystack_status?.status ||
+              data?.rental?.status ||
+              '',
+          ).toLowerCase();
+
+          const hasActiveRental =
+            (Array.isArray(data?.related_records?.rental_access) &&
+              data.related_records.rental_access.length > 0);
+
+          if (
+            !error &&
+            (hasActiveRental ||
+              ['failed', 'cancelled', 'canceled', 'rejected'].includes(paymentStatus))
+          ) {
+            break;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, 800));
+        }
 
         if (error) {
           finish('pending', 'Payment received. Final confirmation may take a moment.');
@@ -91,7 +121,11 @@ export default function PaymentCallback() {
             '',
         ).toLowerCase();
 
-        if (['completed', 'success', 'successful', 'paid'].includes(paymentStatus)) {
+        const hasActiveRental =
+          Array.isArray(data?.related_records?.rental_access) &&
+          data.related_records.rental_access.length > 0;
+
+        if (hasActiveRental) {
           finish('completed', 'Payment confirmed. Closing this window...');
           return;
         }

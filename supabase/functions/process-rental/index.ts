@@ -532,7 +532,8 @@ async function createPaystackRental(
         `?kind=rental&rentalId=${encodeURIComponent(intentId)}` +
         `&paymentId=${encodeURIComponent(payment.id)}` +
         `&contentType=${encodeURIComponent(input.contentType)}` +
-        `&contentId=${encodeURIComponent(input.contentId)}`,
+        `&contentId=${encodeURIComponent(input.contentId)}` +
+        `&returnTo=${encodeURIComponent(`/watch/${input.contentType}/${input.contentId}`)}`,
       email: profile.email,
       // Paystack expects kobo. Internal prices are already stored/passed in kobo.
       amount: Math.round(input.finalPrice),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -115,6 +115,40 @@ export const OptimizedRentalCheckout = ({
     navigate(watchPath);
   };
 
+  const verifyPaystackAccess = useCallback(
+    async (callbackData: Record<string, unknown>) => {
+      setPaymentStatus({
+        show: true,
+        status: 'verifying',
+        message: 'Confirming payment and activating your rental...',
+      });
+
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: {
+          rentalId: callbackData.rentalId,
+          rental_intent_id: callbackData.rentalId,
+          payment_id: callbackData.paymentId,
+          reference: callbackData.reference,
+        },
+      });
+
+      if (error) throw error;
+
+      const hasActiveRental =
+        (Array.isArray(data?.related_records?.rental_access) &&
+          data.related_records.rental_access.length > 0);
+
+      if (hasActiveRental) {
+        await refreshWallet();
+        await refreshEntitlements();
+        return true;
+      }
+
+      return false;
+    },
+    [refreshEntitlements, refreshWallet],
+  );
+
   useEffect(() => {
     if (!open) {
       setPaymentMethod(null);
@@ -175,23 +209,32 @@ export const OptimizedRentalCheckout = ({
 
   useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
       const data = event.data as any;
       if (!data || data.type !== 'paystack:callback') return;
 
-      if (data.status === 'completed') {
-        setPaymentStatus({ show: false, status: 'processing', message: '' });
+      if (data.status === 'completed' || data.status === 'pending') {
         onOpenChange(false);
 
         try {
-          await refreshWallet();
-          await refreshEntitlements();
-        } catch (e) {
-          // ignore
-          console.warn('PaymentCallback refresh failed:', e);
+          const hasAccess = await verifyPaystackAccess(data);
+
+          if (hasAccess) {
+            setPaymentStatus({ show: false, status: 'processing', message: '' });
+            onSuccess?.();
+            navigate(watchPath);
+            return;
+          }
+        } catch (error) {
+          console.warn('PaymentCallback verification failed:', error);
         }
 
-        onSuccess?.();
-        navigate(watchPath);
+        setPaymentStatus({
+          show: true,
+          status: 'pending',
+          message: 'Payment received. Access is still being confirmed. Please try Watch Now again shortly.',
+        });
       }
 
       if (data.status === 'failed') {
@@ -201,7 +244,7 @@ export const OptimizedRentalCheckout = ({
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [navigate, onOpenChange, onSuccess, refreshEntitlements, refreshWallet, watchPath]);
+  }, [navigate, onOpenChange, onSuccess, verifyPaystackAccess, watchPath]);
 
   const handlePayment = async () => {
     if (!user || !paymentMethod) return;

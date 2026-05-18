@@ -98,28 +98,33 @@ serve(async (req: Request) => {
               title,
               duration,
               price,
-              season_id,
-              seasons!inner(
-                id,
-                tv_shows!inner(
-                  title,
-                  thumbnail_url,
-                  genre_id,
-                  genres(name)
-                )
-              )
+              season_id
             `)
             .eq("id", item.content_id)
             .single();
 
           if (episodeData) {
+            const { data: seasonData } = await supabase
+              .from("seasons")
+              .select("id, tv_show_id")
+              .eq("id", episodeData.season_id)
+              .maybeSingle();
+
+            const { data: showData } = seasonData?.tv_show_id
+              ? await supabase
+                  .from("tv_shows")
+                  .select("title, thumbnail_url, genre_id, genres(name)")
+                  .eq("id", seasonData.tv_show_id)
+                  .maybeSingle()
+              : { data: null };
+
             contentDetails = {
-              title: `${episodeData.seasons.tv_shows.title} - ${episodeData.title}`,
-              thumbnail_url: episodeData.seasons.tv_shows.thumbnail_url,
+              title: `${showData?.title || "Episode"} - ${episodeData.title}`,
+              thumbnail_url: showData?.thumbnail_url,
               duration: episodeData.duration,
               price: episodeData.price,
-              genre: episodeData.seasons.tv_shows.genres?.name,
-              season_id: episodeData.season_id || episodeData.seasons.id,
+              genre: showData?.genres?.name,
+              season_id: episodeData.season_id || seasonData?.id,
             };
           }
         }

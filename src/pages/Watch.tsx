@@ -105,7 +105,7 @@ const Watch = () => {
       } else if (contentType === "episode") {
         const { data } = await supabase
           .from("episodes")
-          .select("*, seasons(tv_shows(title, slug))")
+          .select("*")
           .eq("id", contentId)
           .single();
         contentData = data;
@@ -113,7 +113,7 @@ const Watch = () => {
         // Seasons are rented as a package but are not directly playable.
         const { data: seasonData, error: seasonError } = await supabase
           .from("seasons")
-          .select("id, season_number, tv_shows(slug)")
+          .select("id, season_number, tv_show_id")
           .eq("id", contentId)
           .single();
 
@@ -132,8 +132,14 @@ const Watch = () => {
 
         if (episodesError || !episodesData || episodesData.length === 0) {
           console.error("Season episodes fetch error:", episodesError);
-          if (seasonData.tv_shows?.slug) {
-            navigate(`/tvshow/${seasonData.tv_shows.slug}`);
+          const { data: showData } = await supabase
+            .from("tv_shows")
+            .select("slug")
+            .eq("id", seasonData.tv_show_id)
+            .maybeSingle();
+
+          if (showData?.slug) {
+            navigate(`/tvshow/${showData.slug}`);
             return;
           }
           setError("Season not found");
