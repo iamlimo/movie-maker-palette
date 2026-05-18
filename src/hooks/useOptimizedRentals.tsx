@@ -306,6 +306,26 @@ export const useOptimizedRentals = () => {
     fetchEntitlements();
   }, [fetchEntitlements]);
 
+  useEffect(() => {
+    const handlePaystackCallback = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== 'paystack:callback') return;
+      fetchEntitlements();
+    };
+
+    const handleFocus = () => {
+      fetchEntitlements();
+    };
+
+    window.addEventListener('message', handlePaystackCallback);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('message', handlePaystackCallback);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchEntitlements]);
+
   return {
     entitlements,
     loading,
