@@ -395,6 +395,59 @@ Deno.serve(async (req) => {
         videoUrl: videoUrl.substring(0, 100) + '...' // Truncate for logging
       });
 
+      // Check if this is a Backblaze API endpoint URL (b2_download_file_by_id)
+      const isB2ApiDownloadUrl = videoUrl.includes('/b2api/') && videoUrl.includes('b2_download_file_by_id');
+      
+      if (isB2ApiDownloadUrl) {
+        console.log('Detected Backblaze API download endpoint, using directly:', videoUrl);
+        
+        // For b2_download_file_by_id endpoints, we can use them directly with auth token
+        const authResponse = await fetch(`${BACKBLAZE_API_URL}/b2api/v2/b2_authorize_account`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${btoa(`${b2KeyId}:${b2AppKey}`)}`
+          }
+        });
+
+        if (!authResponse.ok) {
+          const authErrorBody = await authResponse.text();
+          console.error('Backblaze authorization failed for API endpoint:', {
+            status: authResponse.status,
+            body: authErrorBody
+          });
+          return new Response(
+            JSON.stringify({ error: 'Failed to authorize with Backblaze', details: authErrorBody }),
+            { status: 500, headers: corsHeaders }
+          );
+        }
+
+        const authData: B2AuthResponse = await authResponse.json();
+        
+        // For b2_download_file_by_id, we just need to add the Authorization header
+        // The URL already has the fileId parameter
+        const signedUrl = `${videoUrl}&Authorization=${authData.authorizationToken}`;
+        const expiresAt = new Date(Date.now() + 7200 * 1000).toISOString(); // 2 hour expiry
+        
+        console.log('Successfully generated signed URL for B2 API endpoint');
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            signedUrl,
+            expiresAt,
+            message: 'Video URL generated successfully (Backblaze API)',
+            source: 'backblaze-api'
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Cache-Control': 'public, max-age=7200',
+              'X-Signed-Url-Expires': expiresAt
+            }
+          }
+        );
+      }
+
       // Extract file path (remove domain and bucket from full URL)
       let filePath = videoUrl;
       if (videoUrl.includes('://')) {
