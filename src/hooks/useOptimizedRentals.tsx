@@ -38,8 +38,15 @@ export const useOptimizedRentals = () => {
   const [entitlements, setEntitlements] = useState<RentalEntitlement[]>([]);
   const [loading, setLoading] = useState(false);
   const entitlementsChannelNameRef = useRef(
-    `entitlements-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    `entitlements-${Math.random().toString(36).slice(2, 10)}`
   );
+
+  const intentsChannelNameRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (user && !intentsChannelNameRef.current) {
+      intentsChannelNameRef.current = `intents-${user.id}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+  }, [user]);
 
   // Fetch all entitlements from unified v_user_entitlements view
   // This is the single source of truth: union of rental_intents + rental_access
@@ -52,7 +59,7 @@ export const useOptimizedRentals = () => {
         .from('v_user_entitlements')
         .select('*')
         .eq('user_id', user.id)
-        .order('expires_at', { ascending: true, nullsLast: true });
+        .order('expires_at', { ascending: true });
 
       if (error) throw error;
       
@@ -272,7 +279,8 @@ export const useOptimizedRentals = () => {
     if (!user) return;
 
     const channel = supabase
-      .channel(`intents-${user.id}-${Date.now()}`)
+      .channel(intentsChannelNameRef.current ?? `intents-${user.id}-${Math.random().toString(36).slice(2, 10)}`)
+
       .on(
         'postgres_changes',
         {
