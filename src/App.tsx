@@ -31,6 +31,7 @@ const TVShows = lazy(() => import("./pages/TVShows"));
 const Genres = lazy(() => import("./pages/Genres"));
 const Watchlist = lazy(() => import("./pages/Watchlist"));
 const Wallet = lazy(() => import("./pages/Wallet"));
+const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
 const Help = lazy(() => import("./pages/Help"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Terms = lazy(() => import("./pages/Terms"));  
@@ -130,6 +131,7 @@ function AppContent() {
             <Route path="/genres" element={<Genres />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/wallet" element={<Wallet />} />
+            <Route path="/payment/callback" element={<PaymentCallback />} />
             <Route path="/help" element={<Help />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/terms" element={<Terms />} />

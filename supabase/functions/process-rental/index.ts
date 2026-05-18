@@ -66,6 +66,10 @@ function createResponse(data: unknown, status = 200, origin?: string) {
   return new Response(JSON.stringify(data), { status, headers: getCorsHeaders(origin) });
 }
 
+function getFrontendOrigin(origin?: string) {
+  return origin && isAllowedOrigin(origin) ? origin : "https://signaturetv.co";
+}
+
 interface ProcessRentalRequest {
   userId: string;
   contentId: string;
@@ -523,6 +527,12 @@ async function createPaystackRental(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
+      callback_url:
+        `${getFrontendOrigin(origin)}/payment/callback` +
+        `?kind=rental&rentalId=${encodeURIComponent(intentId)}` +
+        `&paymentId=${encodeURIComponent(payment.id)}` +
+        `&contentType=${encodeURIComponent(input.contentType)}` +
+        `&contentId=${encodeURIComponent(input.contentId)}`,
       email: profile.email,
       // Paystack expects kobo. Internal prices are already stored/passed in kobo.
       amount: Math.round(input.finalPrice),

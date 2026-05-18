@@ -8,6 +8,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const ALLOWED_ORIGINS = new Set([
+  'https://signaturetv.co',
+  'https://www.signaturetv.co',
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:8080',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+]);
+
+function getFrontendOrigin(req: Request) {
+  const origin = req.headers.get('origin') || '';
+
+  if (ALLOWED_ORIGINS.has(origin)) return origin;
+  if (origin.startsWith('https://') && origin.includes('.vercel.app')) return origin;
+
+  return 'https://signaturetv.co';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -88,7 +108,10 @@ serve(async (req) => {
         email: profile?.email || user.email,
         amount: amount,
         reference: payment.intent_id,
-        callback_url: `${new URL(req.url).origin}/wallet?payment=success`,
+        callback_url:
+          `${getFrontendOrigin(req)}/payment/callback` +
+          `?kind=wallet&paymentId=${encodeURIComponent(payment.id)}` +
+          `&returnTo=${encodeURIComponent('/wallet')}`,
         metadata: {
           payment_id: payment.id,
           user_id: user.id,
