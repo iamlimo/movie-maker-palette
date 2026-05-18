@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -115,6 +115,32 @@ export const OptimizedRentalCheckout = ({
     navigate(watchPath);
   };
 
+  const waitForRentalAccess = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+
+    if (!accessToken) return false;
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const { data } = await supabase.functions.invoke('rental-access', {
+        body: {
+          content_id: contentId,
+          content_type: contentType,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (data?.has_access) return true;
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    }
+
+    return false;
+  }, [contentId, contentType]);
+
   useEffect(() => {
     if (!open) {
       setPaymentMethod(null);
@@ -179,9 +205,11 @@ export const OptimizedRentalCheckout = ({
       if (!data || data.type !== 'paystack:callback') return;
 
       if (data.status === 'completed') {
-        // Close the pending dialog and unlock.
-        setPaymentStatus({ show: false, status: 'processing', message: '' });
-        onOpenChange(false);
+        setPaymentStatus({
+          show: true,
+          status: 'verifying',
+          message: 'Payment confirmed. Activating your rental...',
+        });
 
         try {
           await refreshWallet();
@@ -191,8 +219,22 @@ export const OptimizedRentalCheckout = ({
           console.warn('PaymentCallback refresh failed:', e);
         }
 
-        onSuccess?.();
-        navigate(watchPath);
+        const hasAccess = await waitForRentalAccess();
+        await refreshEntitlements();
+
+        if (hasAccess) {
+          setPaymentStatus({ show: false, status: 'processing', message: '' });
+          onOpenChange(false);
+          onSuccess?.();
+          navigate(watchPath);
+          return;
+        }
+
+        setPaymentStatus({
+          show: true,
+          status: 'pending',
+          message: 'Payment is confirmed, but access is still activating. Please wait a moment and try again.',
+        });
       }
 
       if (data.status === 'failed') {
@@ -202,7 +244,7 @@ export const OptimizedRentalCheckout = ({
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [navigate, onOpenChange, onSuccess, refreshEntitlements, refreshWallet, watchPath]);
+  }, [navigate, onOpenChange, onSuccess, refreshEntitlements, refreshWallet, waitForRentalAccess, watchPath]);
 
   const handlePayment = async () => {
     if (!user || !paymentMethod) return;
