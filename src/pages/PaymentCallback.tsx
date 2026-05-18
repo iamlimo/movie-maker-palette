@@ -8,10 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 type CallbackStatus = 'verifying' | 'completed' | 'pending' | 'failed';
 
 const CLOSE_DELAY_MS = 900;
-const VERIFY_ATTEMPTS = 10;
-const VERIFY_DELAY_MS = 1200;
-
-const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
@@ -73,57 +69,39 @@ export default function PaymentCallback() {
 
     const verifyPayment = async () => {
       try {
-        for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
-          const { data, error } = await supabase.functions.invoke('verify-payment', {
-            body: {
-              rentalId: callbackData.rentalId,
-              rental_intent_id: callbackData.rentalId,
-              payment_id: callbackData.paymentId || callbackData.reference,
-              reference: callbackData.reference,
-            },
-          });
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: {
+            rentalId: callbackData.rentalId,
+            rental_intent_id: callbackData.rentalId,
+            payment_id: callbackData.paymentId || callbackData.reference,
+            reference: callbackData.reference,
+          },
+        });
 
-          if (error) {
-            if (attempt < VERIFY_ATTEMPTS) {
-              await delay(VERIFY_DELAY_MS);
-              continue;
-            }
-            finish('pending', 'Payment received. Final confirmation may take a moment.');
-            return;
-          }
-
-          const paymentStatus = String(
-            data?.payment?.status ||
-              data?.payment?.enhanced_status ||
-              data?.paystack_status?.status ||
-              data?.rental?.status ||
-              '',
-          ).toLowerCase();
-
-          const hasRentalAccess =
-            Array.isArray(data?.related_records?.rental_access) &&
-            data.related_records.rental_access.length > 0;
-
-          if (['failed', 'cancelled', 'canceled', 'rejected'].includes(paymentStatus)) {
-            finish('failed', 'Payment was not completed.');
-            return;
-          }
-
-          if (['completed', 'success', 'successful', 'paid'].includes(paymentStatus) && hasRentalAccess) {
-            finish('completed', 'Payment confirmed. Closing this window...');
-            return;
-          }
-
-          if (['completed', 'success', 'successful', 'paid'].includes(paymentStatus)) {
-            setMessage('Payment confirmed. Activating your rental...');
-          }
-
-          if (attempt < VERIFY_ATTEMPTS) {
-            await delay(VERIFY_DELAY_MS);
-          }
+        if (error) {
+          finish('pending', 'Payment received. Final confirmation may take a moment.');
+          return;
         }
 
-        finish('pending', 'Payment confirmed, but access is still activating. Please refresh in a moment.');
+        const paymentStatus = String(
+          data?.payment?.status ||
+            data?.payment?.enhanced_status ||
+            data?.paystack_status?.status ||
+            data?.rental?.status ||
+            '',
+        ).toLowerCase();
+
+        if (['completed', 'success', 'successful', 'paid'].includes(paymentStatus)) {
+          finish('completed', 'Payment confirmed. Closing this window...');
+          return;
+        }
+
+        if (['failed', 'cancelled', 'canceled', 'rejected'].includes(paymentStatus)) {
+          finish('failed', 'Payment was not completed.');
+          return;
+        }
+
+        finish('pending', 'Payment is still being confirmed. You can close this window.');
       } catch (error) {
         console.error('Payment callback verification failed:', error);
         finish('pending', 'Payment received. Final confirmation may take a moment.');
