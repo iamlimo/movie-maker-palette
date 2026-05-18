@@ -80,7 +80,7 @@ const EpisodePlayer = ({
         setHasAccess(false);
       }
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Access check error:', error);
       setHasAccess(false);
     } finally {
@@ -255,7 +255,7 @@ const EpisodePlayer = ({
           <div className="space-y-2">
             <RentalButton
               contentId={episodeId}
-              contentType="tv"
+              contentType="episode"
               price={price}
               title={`Episode: ${title}`}
             />

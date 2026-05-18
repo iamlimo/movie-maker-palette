@@ -2,8 +2,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { jsonResponse, handleOptions, errorResponse } from "../_shared/cors.ts";
 import { authenticateUser } from "../_shared/auth.ts";
+import { normalizeContentType, type RentalContentType } from "../_shared/rental.ts";
 
-type RentalContentType = "movie" | "season" | "episode";
 type RentalAccessType = "rental" | "purchase" | "free" | null;
 
 interface AuthUser {
@@ -100,14 +100,6 @@ serve(async (req: Request) => {
   }
 });
 
-function normalizeContentType(contentType: string): RentalContentType {
-  const lowerType = String(contentType).toLowerCase().trim();
-  if (lowerType === "tv_show" || lowerType === "tv") return "season";
-  if (lowerType === "movie" || lowerType === "season" || lowerType === "episode") {
-    return lowerType;
-  }
-  return "season";
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -270,7 +262,7 @@ async function checkAccess(user: AuthUser, supabase: SupabaseClientLike, content
       });
     }
 
-    // For episodes, check if season rental/purchase exists
+    // For episodes, check if parent season rental/purchase exists (canonical rental_access first)
     if (normalizedType === "episode") {
       const { data: episodeData } = await supabase
         .from<EpisodeSeasonRow>("episodes")
@@ -281,16 +273,16 @@ async function checkAccess(user: AuthUser, supabase: SupabaseClientLike, content
       if (episodeData?.season_id) {
         const seasonId = episodeData.season_id;
 
-        // Check season rental
+        // Check parent season rental using canonical rental_access
         const { data: seasonRental } = await supabase
-          .from<LegacyRentalRow>("rentals")
-          .select("*")
+          .from<RentalAccessRow>("rental_access")
+          .select("id, expires_at, status, revoked_at, user_id")
           .eq("user_id", user.id)
-          .eq("content_id", seasonId)
-          .eq("content_type", "season")
-          .in("status", ["completed", "active", "paid"])
-          .gte("expires_at", now)
-          .limit(1)
+          .eq("season_id", seasonId)
+          .eq("status", "paid")
+          .eq("revoked_at", null)
+          .gt("expires_at", now)
+          .order("expires_at", { ascending: false })
           .maybeSingle();
 
         if (seasonRental) {
@@ -298,6 +290,7 @@ async function checkAccess(user: AuthUser, supabase: SupabaseClientLike, content
             has_access: true,
             access_type: "rental",
             expires_at: seasonRental.expires_at,
+            rental_access_id: seasonRental.id,
           });
         }
 

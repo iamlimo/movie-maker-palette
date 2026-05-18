@@ -3,7 +3,12 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -27,7 +32,7 @@ import AutoPlayMediaPlayer from "@/components/AutoPlayMediaPlayer";
 import RecommendationsSection from "@/components/RecommendationsSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
-import { useOptimizedRentals } from "@/hooks/useOptimizedRentals";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { toast } from "@/hooks/use-toast";
 import EpisodePlayer from "@/components/EpisodePlayer";
 import { OptimizedRentalButton } from "@/components/OptimizedRentalButton";
@@ -88,116 +93,118 @@ const TVShowPreview = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const preloadedData = location.state?.preloadedData;
-  
+
   const { user } = useAuth();
   const { isIOS } = usePlatform();
+  const isMobile = useIsMobile();
+
   const {
     favorites,
     toggleFavorite,
     loading: favoritesLoading,
   } = useFavorites();
-  const { checkAccess: checkAccessOptimized, checkSeasonAccess, rentals, fetchRentals } = useOptimizedRentals();
-  const isMobile = useIsMobile();
+
+  const { checkAccess, refresh: refreshEntitlements } = useEntitlements();
+
   const [tvShow, setTVShow] = useState<TVShow | null>(preloadedData || null);
   const [seasons, setSeasons] = useState<Season[]>([]);
-  const [episodes, setEpisodes] = useState<{ [seasonId: string]: Episode[] }>(
-    {}
-  );
+  const [episodes, setEpisodes] = useState<{ [seasonId: string]: Episode[] }>({});
   const [loading, setLoading] = useState(!preloadedData);
   const [error, setError] = useState<string | null>(null);
+
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
-  const [seasonAccess, setSeasonAccess] = useState<{
-    [seasonId: string]: boolean;
-  }>({});
-  const [episodeAccess, setEpisodeAccess] = useState<{
-    [episodeId: string]: boolean;
-  }>({});
+
+  const [seasonAccess, setSeasonAccess] = useState<{ [seasonId: string]: boolean }>({});
+  const [episodeAccess, setEpisodeAccess] = useState<{ [episodeId: string]: boolean }>({});
+
   const [activeTab, setActiveTab] = useState("overview");
   const [isSticky, setIsSticky] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
 
   const isFavorite = tvShow
     ? favorites.some(
-        (fav) => fav.content_id === tvShow.id && fav.content_type === "tv_show"
+        (fav) => fav.content_id === tvShow.id && fav.content_type === "tv_show",
       )
     : false;
 
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (!element) return;
+    const offset = 80;
+    const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: elementPosition - offset, behavior: "smooth" });
+    setActiveTab(sectionId);
+  };
+
+  const computeAccess = (
+    seasonsData: Season[],
+    episodesMap: { [seasonId: string]: Episode[] },
+  ) => {
+    const newSeasonAccess: { [seasonId: string]: boolean } = {};
+    const newEpisodeAccess: { [episodeId: string]: boolean } = {};
+
+    seasonsData.forEach((season) => {
+      newSeasonAccess[season.id] = checkAccess(season.id, "season");
+    });
+
+    Object.entries(episodesMap).forEach(([_, episodeList]) => {
+      episodeList.forEach((episode) => {
+        // backend enforces season -> episode inheritance for rental access.
+        // So we just check episode access directly.
+        newEpisodeAccess[episode.id] = checkAccess(episode.id, "episode");
+      });
+    });
+
+    setSeasonAccess(newSeasonAccess);
+    setEpisodeAccess(newEpisodeAccess);
+  };
+
   useEffect(() => {
-    if (slug) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      fetchTVShowData(slug);
-    }
+    if (!slug) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    fetchTVShowData(slug);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  // Re-check access whenever rentals change (when user completes a rental)
   useEffect(() => {
-    if (user && Object.keys(episodes).length > 0 && seasons.length > 0) {
-      checkSeasonAndEpisodeAccess(seasons, episodes);
+    // recompute when entitlements update (re-render comes from hook subscription)
+    if (user && seasons.length > 0 && Object.keys(episodes).length > 0) {
+      computeAccess(seasons, episodes);
     }
-  }, [rentals, user]);
-
-  // Ensure access states are checked when episodes and seasons load
-  useEffect(() => {
-    if (user && Object.keys(episodes).length > 0 && seasons.length > 0) {
-      checkSeasonAndEpisodeAccess(seasons, episodes);
-    }
-  }, [user, Object.keys(episodes).length, seasons.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, seasons, episodes, checkAccess]);
 
   useEffect(() => {
-    if (seasons.length > 0) {
-      const hasSelectedSeason = seasons.some(
-        (season) => season.season_number === selectedSeason
-      );
-
-      if (!hasSelectedSeason) {
-        setSelectedSeason(seasons[0].season_number);
-      }
-    }
+    if (seasons.length === 0) return;
+    const hasSelectedSeason = seasons.some(
+      (season) => season.season_number === selectedSeason,
+    );
+    if (!hasSelectedSeason) setSelectedSeason(seasons[0].season_number);
   }, [seasons, selectedSeason]);
 
-  // Sticky nav on scroll
   useEffect(() => {
     const handleScroll = () => {
-      if (navRef.current) {
-        const navTop = navRef.current.offsetTop;
-        setIsSticky(window.scrollY > navTop - 64);
-      }
+      if (!navRef.current) return;
+      const navTop = navRef.current.offsetTop;
+      setIsSticky(window.scrollY > navTop - 64);
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, [tvShow]);
 
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      const offset = 80;
-      const elementPosition =
-        element.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo({ top: elementPosition - offset, behavior: "smooth" });
-      setActiveTab(sectionId);
-    }
-  };
-
   const handleRentalSuccess = async () => {
-    // Refresh rentals data from server and wait for state update
     try {
-      await fetchRentals();
-      // Small delay to ensure state is updated in React
-      await new Promise(resolve => setTimeout(resolve, 150));
-    } catch (error) {
-      console.warn('Could not refresh rentals:', error);
+      await refreshEntitlements();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      computeAccess(seasons, episodes);
+    } catch (e) {
+      console.warn("Could not refresh entitlements:", e);
     }
-    
-    // Refresh access states when rental is successful
-    if (Object.keys(episodes).length > 0 && seasons.length > 0) {
-      await checkSeasonAndEpisodeAccess(seasons, episodes);
-    }
-    
-    // Show success notification
+
     toast({
-      title: '✅ Rental Successful!',
-      description: 'You can now watch all episodes in this season.',
+      title: "✅ Rental Successful!",
+      description: "You can now watch the content you rented.",
     });
   };
 
@@ -206,9 +213,11 @@ const TVShowPreview = () => {
       setLoading(true);
       setError(null);
 
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId);
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          slugOrId,
+        );
 
-      // Fetch TV show details
       const { data: showData, error: showError } = await supabase
         .from("tv_shows")
         .select(
@@ -219,7 +228,7 @@ const TVShowPreview = () => {
           landscape_poster_url,
           slider_cover_url,
           trailer_url
-        `
+        `,
         )
         .eq(isUUID ? "id" : "slug", slugOrId)
         .eq("status", "approved")
@@ -230,7 +239,6 @@ const TVShowPreview = () => {
 
       setTVShow(showData);
 
-      // Fetch seasons (only approved ones for users)
       const { data: seasonsData, error: seasonsError } = await supabase
         .from("seasons")
         .select("*")
@@ -239,76 +247,40 @@ const TVShowPreview = () => {
         .order("season_number");
 
       if (seasonsError) throw seasonsError;
+
       setSeasons(seasonsData || []);
 
-      // Fetch episodes for all seasons
-      if (seasonsData && seasonsData.length > 0) {
-        const episodesPromises = seasonsData.map((season) =>
-          supabase
-            .from("episodes")
-            .select(
-              `
-              *,
-              thumbnail_url,
-              video_url
+      if (!seasonsData?.length) return;
+
+      const episodesPromises = seasonsData.map((season) =>
+        supabase
+          .from("episodes")
+          .select(
             `
-            )
-            .eq("season_id", season.id)
-            .eq("status", "approved")
-            .order("episode_number")
-        );
+            *,
+            thumbnail_url,
+            video_url
+          `,
+          )
+          .eq("season_id", season.id)
+          .eq("status", "approved")
+          .order("episode_number"),
+      );
 
-        const episodesResults = await Promise.all(episodesPromises);
-        const episodesMap: { [seasonId: string]: Episode[] } = {};
+      const episodesResults = await Promise.all(episodesPromises);
+      const episodesMap: { [seasonId: string]: Episode[] } = {};
+      seasonsData.forEach((season, index) => {
+        episodesMap[season.id] = (episodesResults[index].data as Episode[]) || [];
+      });
 
-        seasonsData.forEach((season, index) => {
-          episodesMap[season.id] = episodesResults[index].data || [];
-        });
+      setEpisodes(episodesMap);
 
-        setEpisodes(episodesMap);
-
-        // Check access for seasons and episodes if user is logged in
-        if (user) {
-          await checkSeasonAndEpisodeAccess(seasonsData, episodesMap);
-        }
-      }
-    } catch (error: any) {
-      console.error("Error fetching TV show:", error);
-      setError(error.message || "Failed to load TV show");
+      if (user) computeAccess(seasonsData || [], episodesMap);
+    } catch (err: any) {
+      console.error("Error fetching TV show:", err);
+      setError(err.message || "Failed to load TV show");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const checkSeasonAndEpisodeAccess = async (
-    seasonsData: Season[],
-    episodesMap: { [seasonId: string]: Episode[] }
-  ) => {
-    if (!user) return;
-
-    try {
-      // Check season access using optimized rentals
-      const newSeasonAccess: { [seasonId: string]: boolean } = {};
-      seasonsData.forEach((season) => {
-        const access = checkAccessOptimized(season.id, "season");
-        newSeasonAccess[season.id] = access.hasAccess;
-      });
-
-      // Check episode access - also checks if parent season is rented
-      const newEpisodeAccess: { [episodeId: string]: boolean } = {};
-      Object.entries(episodesMap).forEach(([seasonId, episodeList]) => {
-        const seasonRented = newSeasonAccess[seasonId];
-        episodeList.forEach((episode) => {
-          const episodeAccess = checkAccessOptimized(episode.id, "episode");
-          // User has access if they rented the episode OR the season
-          newEpisodeAccess[episode.id] = episodeAccess.hasAccess || seasonRented;
-        });
-      });
-
-      setSeasonAccess(newSeasonAccess);
-      setEpisodeAccess(newEpisodeAccess);
-    } catch (error) {
-      console.error("Error checking access:", error);
     }
   };
 
@@ -330,7 +302,7 @@ const TVShowPreview = () => {
           ? `${tvShow.title} has been removed from your watchlist.`
           : `${tvShow.title} has been added to your watchlist.`,
       });
-    } catch (error) {
+    } catch (e) {
       toast({
         title: "Error",
         description: "Failed to update watchlist. Please try again.",
@@ -344,7 +316,7 @@ const TVShowPreview = () => {
       <div className="min-h-screen">
         <Header />
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="w-8 h-8 border-4 border-primary border-l-transparent rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-4 border-primary border-l-transparent rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -358,8 +330,7 @@ const TVShowPreview = () => {
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">TV Show Not Found</h1>
             <p className="text-muted-foreground mb-6">
-              {error ||
-                "The TV show you're looking for doesn't exist or is not available."}
+              {error || "The TV show you're looking for doesn't exist or is not available."}
             </p>
             <Button onClick={() => navigate("/")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -379,7 +350,6 @@ const TVShowPreview = () => {
     <div className="min-h-screen">
       <Header />
 
-      {/* Content Hero Section */}
       <ContentHero
         title={tvShow.title}
         description={tvShow.description || ""}
@@ -390,13 +360,9 @@ const TVShowPreview = () => {
           ""
         }
         rating={tvShow.rating || undefined}
-        year={
-          tvShow.release_date
-            ? new Date(tvShow.release_date).getFullYear()
-            : undefined
-        }
+        year={tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : undefined}
         genre={tvShow.genre?.name}
-        price={isIOS ? undefined : tvShow.price} // Hide price on iOS
+        price={isIOS ? undefined : tvShow.price}
         language={tvShow.language || undefined}
         onBack={() => navigate("/")}
         onToggleFavorite={handleToggleFavorite}
@@ -406,7 +372,6 @@ const TVShowPreview = () => {
         cast_info={tvShow.cast_info || ""}
       />
 
-      {/* Auto-play Media Player */}
       <AutoPlayMediaPlayer
         trailerUrl={tvShow.trailer_url || undefined}
         posterUrl={
@@ -420,7 +385,6 @@ const TVShowPreview = () => {
         contentType="tv_show"
       />
 
-      {/* Sticky Navigation */}
       <div
         ref={navRef}
         className={`${
@@ -429,10 +393,7 @@ const TVShowPreview = () => {
       >
         <div className="container mx-auto px-4">
           {isMobile ? (
-            <Select
-              value={activeTab}
-              onValueChange={(val) => scrollToSection(val)}
-            >
+            <Select value={activeTab} onValueChange={(val) => scrollToSection(val)}>
               <SelectTrigger className="w-full h-12 border-0 focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
@@ -466,22 +427,17 @@ const TVShowPreview = () => {
         </div>
       </div>
 
-      {/* Overview Section */}
       <div id="overview" className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             <div>
               <h2 className="text-2xl font-bold mb-4">About This Show</h2>
-              <p className="text-muted-foreground leading-relaxed mb-6">
-                {tvShow.description}
-              </p>
+              <p className="text-muted-foreground leading-relaxed mb-6">{tvShow.description}</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">First Aired</p>
                   <p className="font-semibold">
-                    {tvShow.release_date
-                      ? new Date(tvShow.release_date).getFullYear()
-                      : "Unknown"}
+                    {tvShow.release_date ? new Date(tvShow.release_date).getFullYear() : "Unknown"}
                   </p>
                 </div>
                 <div>
@@ -498,12 +454,9 @@ const TVShowPreview = () => {
               </div>
             </div>
 
-            {/* Production Information */}
             {(tvShow.director || tvShow.production_company) && (
               <div className="mb-6 pb-6 border-b">
-                <h3 className="text-lg font-semibold mb-3">
-                  Production Details
-                </h3>
+                <h3 className="text-lg font-semibold mb-3">Production Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {tvShow.director && (
                     <div>
@@ -513,9 +466,7 @@ const TVShowPreview = () => {
                   )}
                   {tvShow.production_company && (
                     <div>
-                      <p className="text-sm text-muted-foreground">
-                        Production Company
-                      </p>
+                      <p className="text-sm text-muted-foreground">Production Company</p>
                       <p className="font-medium">{tvShow.production_company}</p>
                     </div>
                   )}
@@ -523,17 +474,12 @@ const TVShowPreview = () => {
               </div>
             )}
 
-            {/* Content Warnings */}
             {tvShow.content_warnings && tvShow.content_warnings.length > 0 && (
               <div className="mb-6 pb-6 border-b">
                 <h3 className="text-lg font-semibold mb-3">Content Warnings</h3>
                 <div className="flex flex-wrap gap-2">
                   {tvShow.content_warnings.map((warning, index) => (
-                    <Badge
-                      key={index}
-                      variant="destructive"
-                      className="capitalize"
-                    >
+                    <Badge key={index} variant="destructive" className="capitalize">
                       {warning}
                     </Badge>
                   ))}
@@ -542,7 +488,6 @@ const TVShowPreview = () => {
             )}
           </div>
 
-          {/* Sidebar - Desktop Only - Hide pricing on iOS */}
           {!isIOS && (
             <div className="hidden lg:block space-y-6">
               <div className="p-6 rounded-xl border bg-card">
@@ -558,8 +503,7 @@ const TVShowPreview = () => {
                         {formatNaira(currentSeason.price)}
                       </p>
                       <p className="text-xs text-muted-foreground mb-3">
-                        {currentEpisodes.length} episodes •{" "}
-                        {currentSeason.rental_expiry_duration}h access
+                        {currentEpisodes.length} episodes • {currentSeason.rental_expiry_duration}h access
                       </p>
                       <OptimizedRentalButton
                         contentId={currentSeason.id}
@@ -570,15 +514,13 @@ const TVShowPreview = () => {
                       />
                     </div>
                     <div className="p-4 rounded-lg border">
-                      <p className="text-sm font-semibold mb-1">
-                        Individual Episodes
-                      </p>
+                      <p className="text-sm font-semibold mb-1">Individual Episodes</p>
                       <p className="text-xl font-bold mb-2">
                         From{" "}
                         {formatNaira(
-                          currentEpisodes.length > 0
+                          currentEpisodes.length
                             ? Math.min(...currentEpisodes.map((e) => e.price))
-                            : 0
+                            : 0,
                         )}
                       </p>
                       <Button
@@ -596,7 +538,6 @@ const TVShowPreview = () => {
           )}
         </div>
 
-        {/* Mobile Pricing - Below Overview - Hide on iOS */}
         {!isIOS && currentSeason && (
           <div className="lg:hidden mt-8 p-4 rounded-xl border bg-card">
             <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
@@ -618,15 +559,13 @@ const TVShowPreview = () => {
                 />
               </div>
               <div className="p-3 rounded-lg border">
-                <p className="text-sm font-semibold mb-1">
-                  Individual Episodes
-                </p>
+                <p className="text-sm font-semibold mb-1">Individual Episodes</p>
                 <p className="text-lg font-bold mb-2">
                   From{" "}
                   {formatNaira(
-                    currentEpisodes.length > 0
+                    currentEpisodes.length
                       ? Math.min(...currentEpisodes.map((e) => e.price))
-                      : 0
+                      : 0,
                   )}
                 </p>
                 <Button
@@ -643,66 +582,52 @@ const TVShowPreview = () => {
         )}
       </div>
 
-      {/* Episodes Section */}
       {seasons.length > 0 && (
         <div
           id="episodes-section"
           className="container mx-auto px-4 py-12 border-t border-border"
         >
           <h2 className="text-2xl font-bold mb-6">Episodes</h2>
-          <Tabs
-            value={selectedSeason.toString()}
-            onValueChange={(value) => setSelectedSeason(parseInt(value))}
-          >
+          <Tabs value={selectedSeason.toString()} onValueChange={(value) => setSelectedSeason(parseInt(value))}>
             <TabsList className="w-full justify-start">
-              {seasons.map((season) => {
-                const seasonEpisodes = episodes[season.id] || [];
-                return (
-                  <TabsTrigger
-                    key={season.id}
-                    value={season.season_number.toString()}
-                  >
-                    Season {season.season_number} ({seasonEpisodes.length})
-                  </TabsTrigger>
-                );
-              })}
+              {seasons.map((season) => (
+                <TabsTrigger key={season.id} value={season.season_number.toString()}>
+                  Season {season.season_number} ({(episodes[season.id] || []).length})
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             {seasons.map((season) => (
-              <TabsContent
-                key={season.id}
-                value={season.season_number.toString()}
-              >
+              <TabsContent key={season.id} value={season.season_number.toString()}>
                 <div className="space-y-4 mt-4">
                   {season.description && (
-                    <p className="text-muted-foreground mb-4">
-                      {season.description}
-                    </p>
+                    <p className="text-muted-foreground mb-4">{season.description}</p>
                   )}
 
                   <div className="grid gap-3">
-                    {currentEpisodes.map((episode, index) => {
-                      const hasEpisodeAccess = episodeAccess[episode.id];
-                      const hasSeasonAccess =
-                        seasonAccess[currentSeason?.id || ""];
+                    {(episodes[currentSeason?.id || season.id] || []).map((episode, index) => {
+                      const nextEpisode = (episodes[currentSeason?.id || season.id] || [])[index + 1];
+                      const hasEpisodeAccess = !!episodeAccess[episode.id];
+                      const hasSeasonAccess = !!seasonAccess[currentSeason?.id || ""];
                       const hasAnyAccess = hasEpisodeAccess || hasSeasonAccess;
-                      const nextEpisode = currentEpisodes[index + 1];
 
                       return (
                         <div key={episode.id} className="space-y-3">
                           <div className="group p-4 rounded-lg border bg-card hover:bg-accent/50 hover:border-primary/50 transition-all">
                             <div className="flex flex-col sm:flex-row gap-4">
                               {episode.thumbnail_url && (
-                                <div className={`relative w-full sm:w-40 aspect-video rounded overflow-hidden flex-shrink-0 transition-all duration-300 ${
-                                  hasAnyAccess ? 'ring-2 ring-green-500/50' : ''
-                                }`}>
+                                <div
+                                  className={`relative w-full sm:w-40 aspect-video rounded overflow-hidden flex-shrink-0 transition-all duration-300 ${
+                                    hasAnyAccess ? "ring-2 ring-green-500/50" : ""
+                                  }`}
+                                >
                                   <img
                                     src={episode.thumbnail_url}
                                     alt={episode.title}
                                     className="w-full h-full object-cover"
                                     loading="lazy"
                                     onError={(e) => {
-                                      e.currentTarget.src = "/placeholder.svg";
+                                      (e.currentTarget as HTMLImageElement).src = "/placeholder.svg";
                                     }}
                                   />
                                   {!hasAnyAccess && (
@@ -722,11 +647,14 @@ const TVShowPreview = () => {
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                      <h4 className={`font-semibold transition-colors ${
-                                        hasAnyAccess ? 'text-green-600' : 'group-hover:text-primary'
-                                      }`}>
+                                      <h4
+                                        className={`font-semibold transition-colors ${
+                                          hasAnyAccess ? "text-green-600" : "group-hover:text-primary"
+                                        }`}
+                                      >
                                         {episode.episode_number}. {episode.title}
                                       </h4>
+
                                       {hasSeasonAccess && !hasEpisodeAccess && (
                                         <Badge variant="default" className="text-xs py-1 px-2 bg-green-600 hover:bg-green-700">
                                           ✓ Available
@@ -738,10 +666,10 @@ const TVShowPreview = () => {
                                         </Badge>
                                       )}
                                     </div>
+
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                                       <Clock className="h-3 w-3" />
                                       <span>{episode.duration}m</span>
-                                      {/* Hide episode price on iOS or when season rental already covers it */}
                                       {!isIOS && !hasSeasonAccess && (
                                         <>
                                           <span>•</span>
@@ -751,6 +679,7 @@ const TVShowPreview = () => {
                                         </>
                                       )}
                                     </div>
+
                                     {episode.description && (
                                       <p className="text-sm text-muted-foreground line-clamp-2">
                                         {episode.description}
@@ -763,9 +692,7 @@ const TVShowPreview = () => {
                                       <Button
                                         variant="default"
                                         size="sm"
-                                        onClick={() =>
-                                          setSelectedEpisode(episode)
-                                        }
+                                        onClick={() => setSelectedEpisode(episode)}
                                         className="bg-green-600 hover:bg-green-700 text-white animate-in fade-in-50 duration-500"
                                       >
                                         <Play className="h-4 w-4 mr-1" />
@@ -804,7 +731,7 @@ const TVShowPreview = () => {
                       );
                     })}
 
-                    {currentEpisodes.length === 0 && (
+                    {(!episodes[currentSeason?.id || season.id] || (episodes[currentSeason?.id || season.id] || []).length === 0) && (
                       <p className="text-center text-muted-foreground py-8">
                         No episodes available for this season.
                       </p>
@@ -817,7 +744,6 @@ const TVShowPreview = () => {
         </div>
       )}
 
-      {/* Show Info */}
       <div className="p-6 rounded-xl border border-border bg-card">
         <h3 className="font-semibold mb-4">Show Information</h3>
         <div className="space-y-3">
@@ -825,9 +751,7 @@ const TVShowPreview = () => {
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
               First aired{" "}
-              {tvShow.release_date
-                ? new Date(tvShow.release_date).toLocaleDateString()
-                : "Unknown"}
+              {tvShow.release_date ? new Date(tvShow.release_date).toLocaleDateString() : "Unknown"}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -853,9 +777,7 @@ const TVShowPreview = () => {
           )}
           {tvShow.rating && (
             <div className="pt-3 border-t">
-              <p className="text-sm text-muted-foreground mb-2">
-                Content Rating
-              </p>
+              <p className="text-sm text-muted-foreground mb-2">Content Rating</p>
               <Badge variant="outline" className="font-semibold">
                 {tvShow.rating}
               </Badge>
@@ -864,7 +786,6 @@ const TVShowPreview = () => {
         </div>
       </div>
 
-      {/* Recommendations */}
       <div
         id="similar-section"
         className="container mx-auto px-4 py-12 border-t border-border"

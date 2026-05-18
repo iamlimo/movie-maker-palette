@@ -1,15 +1,12 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Play, Lock, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
+import { Play, Lock, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { formatNaira } from '@/lib/priceUtils';
-import { useState } from 'react';
-import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
 import { usePlatform } from '@/hooks/usePlatform';
-import { RentalCountdown } from './RentalCountdown';
-import { STATE_LABEL } from '@/lib/rentalStates';
+import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
 
 interface OptimizedRentalButtonProps {
   contentId: string;
@@ -33,44 +30,21 @@ export const OptimizedRentalButton = ({
   const [showCheckout, setShowCheckout] = useState(false);
 
   const entitlement = getEntitlement(contentId, contentType);
+  const watchPath = `/watch/${contentType}/${contentId}`;
 
-  // Auto-refresh when in payment verification state
-  // useEntitlements already has realtime subscriptions, but add explicit refresh
-  // to handle cases where webhook is delayed
-  useEffect(() => {
-    if (entitlement.state === 'PAYMENT_VERIFICATION') {
-      // Set a timeout to force refresh after 30 seconds (Paystack can take a moment)
-      // This is a safety net, not the primary refresh mechanism
-      const timeout = setTimeout(() => {
-        console.log('[OptimizedRentalButton] Payment verification timeout - forcing refresh');
-        refresh();
-      }, 30000);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [entitlement.state, refresh]);
   if (!user) {
     return (
-      <Button
-        onClick={() => navigate('/auth')}
-        variant="default"
-        className="w-full"
-      >
+      <Button onClick={() => navigate('/auth')} variant="default" className="w-full">
         <Lock className="h-4 w-4 mr-2" />
         Sign In to Rent
       </Button>
     );
   }
 
-  // iOS native app cannot rent — Reader app compliance.
   if (isIOS && entitlement.state !== 'ACTIVE') {
     return (
       <div className="space-y-2">
-        <Button
-          disabled
-          variant="secondary"
-          className="w-full opacity-50 cursor-not-allowed"
-        >
+        <Button disabled variant="secondary" className="w-full opacity-50 cursor-not-allowed">
           <AlertCircle className="h-4 w-4 mr-2" />
           Unavailable on iOS App
         </Button>
@@ -81,35 +55,19 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  const watchPath = `/watch/${contentType === 'season' ? 'season' : contentType === 'episode' ? 'episode' : 'movie'}/${contentId}`;
-
-  // ACTIVE — Watch Now + countdown.
   if (entitlement.state === 'ACTIVE') {
     return (
-      <div className="space-y-2">
-        <Button
-          onClick={() => navigate(watchPath)}
-          variant="default"
-          className="w-full bg-green-600 hover:bg-green-700"
-        >
-          <Play className="h-4 w-4 mr-2" />
-          Watch Now
-        </Button>
-        <div className="flex justify-center">
-          <RentalCountdown
-            expiresAt={entitlement.expiresAt}
-            onExpire={refresh}
-            className="text-muted-foreground"
-          />
-        </div>
-      </div>
+      <Button
+        onClick={() => navigate(watchPath)}
+        variant="default"
+        className="w-full bg-green-600 hover:bg-green-700"
+      >
+        <Play className="h-4 w-4 mr-2" />
+        Watch Now
+      </Button>
     );
   }
 
-  // PAYMENT_PENDING / PAYMENT_VERIFICATION — show non-interactive status.
-  // NOTE: This state should only be short-lived. If verification ends up cancelled/failed,
-  // the entitlement state will become FAILED/REVOKED/etc.
-  // REVOKED — informational, no rent CTA.
   if (entitlement.state === 'REVOKED') {
     return (
       <Button disabled variant="secondary" className="w-full">
@@ -119,7 +77,6 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  // NOT_RENTED / EXPIRED / FAILED / REFUNDED → can rent.
   const isReRent = entitlement.state === 'EXPIRED' || entitlement.state === 'REFUNDED';
   const isRetry = entitlement.state === 'FAILED';
 
@@ -127,8 +84,6 @@ export const OptimizedRentalButton = ({
     <>
       <Button
         onClick={async () => {
-          // If we got stuck in a pending/verification state, force entitlement refresh.
-          // This ensures cancelled/failed payments revert to rent/try-again CTA.
           if (entitlement.state === 'PAYMENT_PENDING' || entitlement.state === 'PAYMENT_VERIFICATION') {
             await refresh();
           }
@@ -166,3 +121,5 @@ export const OptimizedRentalButton = ({
     </>
   );
 };
+
+export default OptimizedRentalButton;

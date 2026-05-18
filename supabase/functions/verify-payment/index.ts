@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { corsHeaders, jsonResponse, handleOptions, errorResponse } from "../_shared/cors.ts";
 import { authenticateUser } from "../_shared/auth.ts";
+import { normalizeContentType as normalizeContentTypeShared } from "../_shared/rental.ts";
+
+
 
 declare const Deno: {
   env: { get: (key: string) => string | undefined };
@@ -80,13 +83,8 @@ function buildRentalSummary(record: { id: string; status: string; expires_at?: s
   };
 }
 
-function normalizeContentType(contentType: unknown): RentalContentType {
-  const value = String(contentType || "").toLowerCase().trim();
+// normalizeContentType moved to shared helper
 
-  if (value === "season" || value === "episode") return value;
-  if (value === "tv" || value === "tv_show") return "season";
-  return "movie";
-}
 
 function normalizePaymentStatus(status: string | null | undefined): PaymentStatus {
   const value = String(status || "").toLowerCase().trim();
@@ -108,6 +106,8 @@ function extractIdentifiers(url: URL, body: Record<string, unknown> = {}): Reque
 }
 
 function extractContentInfo(intent: RentalIntentRow | null, payment: PaymentRow | null) {
+  // Using shared helper for strict normalization.
+
   const metadata = (intent?.metadata || payment?.metadata || {}) as Record<string, unknown>;
 
   const contentId =
@@ -117,15 +117,25 @@ function extractContentInfo(intent: RentalIntentRow | null, payment: PaymentRow 
     (metadata.content_id as string | undefined) ||
     null;
 
+  // shared helper expects unknown, but in this file we keep a local alias type.
+  // Cast to the local RentalContentType union.
   const contentType = intent?.rental_type
     ? intent.rental_type
-    : normalizeContentType(metadata.content_type);
+    : (normalizeContentTypeShared(String((metadata as any).content_type ?? "movie")) as RentalContentType);
+
+
+
+
+
+
+
 
   return {
     contentId,
     contentType,
   };
 }
+
 
 async function hasRole(supabase: any, userId: string, role: string) {
   const { data, error } = await supabase

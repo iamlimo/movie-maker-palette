@@ -1,18 +1,12 @@
-# Capacitor v8 Upgrade - COMPLETE ✅
+# Rental Flow Refactor TODO
 
-## Final Status
-
-- [x] Step 1: Edit package.json to upgrade all @capacitor/\* packages to ^8.0.0+
-- [x] Step 2: Clean up lockfiles and node_modules
-- [x] Step 3: Run npm install (completed successfully)
-- [x] Step 4: Run npx cap sync (completed successfully)
-- [x] Step 5: Verify npm run build (✓ succeeded, dist/ generated)
-- [x] Step 6: Native sync complete
-
-**The npm build error is fixed!** All Capacitor packages upgraded to v8, peer dependency conflict resolved. `npm run build` now works. Native projects (Android/iOS) synced.
-
-## Next (optional)
-
-- Test native builds: `npx cap open android` or `ios`
-- Address npm audit warnings: `npm audit fix`
-- Deploy: `npm run deploy:mobile`
+- [x] Read the concerned frontend and backend rental files
+- [x] Identify polling/duplicate-access logic
+- [x] Locate the actual rental hook files and integration points
+- [x] Find all live references to the legacy rental/payment-verification components
+- [x] Read remaining callers that depend on the legacy rental button
+- [x] Remove polling-based verification from rental components and hook
+- [ ] Simplify access decisions to backend entitlements only
+- [ ] Update TV/Movie/Episode rental call sites to use the canonical flow
+- [ ] Remove or deprecate legacy polling verification hook
+- [ ] Verify TypeScript/build and confirm rental UI behavior
