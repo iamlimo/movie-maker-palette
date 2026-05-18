@@ -20,6 +20,7 @@ const Watch = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState("Access Denied");
   const [content, setContent] = useState<any>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -38,6 +39,7 @@ const Watch = () => {
     }
 
     if (!contentType || !contentId) {
+      setErrorTitle("Access Denied");
       setError("Invalid content");
       setLoading(false);
       return;
@@ -59,6 +61,7 @@ const Watch = () => {
       const accessToken = session?.access_token;
 
       if (!accessToken) {
+        setErrorTitle("Access Denied");
         setError("Please sign in again to continue");
         setLoading(false);
         return;
@@ -88,6 +91,13 @@ const Watch = () => {
       }
 
       if (accessError || !accessData?.has_access) {
+        console.error("Watch access check failed:", {
+          contentId,
+          contentType,
+          accessError,
+          accessData,
+        });
+        setErrorTitle("Access Denied");
         setError("You don't have access to this content");
         setLoading(false);
         return;
@@ -119,6 +129,7 @@ const Watch = () => {
 
         if (seasonError || !seasonData) {
           console.error("Season fetch error:", seasonError);
+          setErrorTitle("Video Unavailable");
           setError("Season not found");
           setLoading(false);
           return;
@@ -142,6 +153,7 @@ const Watch = () => {
             navigate(`/tvshow/${showData.slug}`);
             return;
           }
+          setErrorTitle("Video Unavailable");
           setError("Season not found");
           setLoading(false);
           return;
@@ -175,6 +187,7 @@ const Watch = () => {
       }
 
       if (!contentData) {
+        setErrorTitle("Video Unavailable");
         setError("Content not found");
         setLoading(false);
         return;
@@ -206,6 +219,7 @@ const Watch = () => {
           await supabase.functions.invoke("get-video-url", {
             body: {
               contentId,
+              episodeId: contentId,
               contentType: "episode",
               expiryHours: 24,
             },
@@ -215,6 +229,13 @@ const Watch = () => {
           });
 
         if (urlError || !urlData?.signedUrl) {
+          console.error("Episode video URL generation failed:", {
+            contentId,
+            contentType,
+            urlError,
+            urlData,
+          });
+          setErrorTitle("Video Unavailable");
           setError(urlData?.error || urlError?.message || "Failed to load video");
           setLoading(false);
           return;
@@ -224,6 +245,12 @@ const Watch = () => {
       }
 
       if (!videoUrlData?.url) {
+        console.error("Watch video URL missing:", {
+          contentId,
+          contentType,
+          videoUrlData,
+        });
+        setErrorTitle("Video Unavailable");
         setError("Failed to load video");
         setLoading(false);
         return;
@@ -233,6 +260,7 @@ const Watch = () => {
       setLoading(false);
     } catch (err: any) {
       console.error("Error loading content:", err);
+      setErrorTitle("Video Unavailable");
       setError("Failed to load content");
       setLoading(false);
     }
@@ -250,7 +278,7 @@ const Watch = () => {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center text-white">
-          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+          <h1 className="text-2xl font-bold mb-4">{errorTitle}</h1>
           <p className="mb-4">{error}</p>
           <button
             onClick={() => navigate(-1)}

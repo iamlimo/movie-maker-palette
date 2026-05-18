@@ -63,6 +63,9 @@ verify_jwt = false
 [functions.generate-trailer-url]
 verify_jwt = false
 
+[functions.get-video-url]
+verify_jwt = false
+
 [functions.initiate-wallet-funding]
 verify_jwt = true
 

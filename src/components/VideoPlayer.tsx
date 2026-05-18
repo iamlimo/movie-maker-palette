@@ -8,8 +8,6 @@ import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { VideoPlayerControls } from './VideoPlayerControls';
 import { MovieInfoOverlay } from './MovieInfoOverlay';
 
-const SUPABASE_URL = "https://tsfwlereofjlxhjsarap.supabase.co";
-
 // Client-side URL cache
 const urlCache = new Map<string, { url: string; expiresAt: Date; source: string }>();
 
@@ -174,10 +172,7 @@ export const VideoPlayer = ({
         return;
       }
 
-      let finalUrl = data.signedUrl;
-      if (data.source === 'backblaze') {
-        finalUrl = `${SUPABASE_URL}/functions/v1/get-video-url?movieId=${movieId}&stream=true`;
-      }
+      const finalUrl = data.signedUrl;
 
       // Cache the URL
       const expiresAt = new Date(data.expiresAt);
