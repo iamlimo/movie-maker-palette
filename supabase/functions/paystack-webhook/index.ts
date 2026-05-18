@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
-type RentalContentType = "movie" | "season" | "episode";
+import { normalizeContentType, type RentalContentType } from "../_shared/rental.ts";
 
 interface RentalIntentRow {
   id: string;
@@ -41,14 +41,6 @@ interface RentalAccessRow {
   rental_intent_id: string | null;
   source: string | null;
   metadata: Record<string, unknown> | null;
-}
-
-function normalizeContentType(value: unknown): RentalContentType {
-  const normalized = String(value || "").toLowerCase().trim();
-
-  if (normalized === "season" || normalized === "episode") return normalized;
-  if (normalized === "tv" || normalized === "tv_show") return "season";
-  return "movie";
 }
 
 function buildContentFields(contentId: string, contentType: RentalContentType) {
@@ -257,9 +249,16 @@ Deno.serve(async (req) => {
         });
       }
 
-      const expectedAmount = Math.round(Number(rentalIntent.price || 0) * 100);
+      const expectedAmount = Math.round(Number(rentalIntent.price || 0));
       if (paidAmount < expectedAmount) {
-        console.warn(`Amount mismatch: received ${paidAmount}, expected ${expectedAmount}`);
+        console.log(`[Webhook Amount Check] Reference: ${paymentReference}`);
+        console.log(`  - Paystack paid amount: ${paidAmount}`);
+        console.log(`  - Rental intent price: ${rentalIntent.price}`);
+        console.log(`  - Expected amount: ${expectedAmount}`);
+        console.log(
+          `  - Amount check result: ${paidAmount >= expectedAmount ? "PASS ✅" : "FAIL ❌"}`,
+        );
+
         await supabase
           .from("rental_intents")
           .update({

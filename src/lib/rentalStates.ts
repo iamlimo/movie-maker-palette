@@ -15,6 +15,7 @@ export type RentalState =
 
 export type RentalContentType = 'movie' | 'season' | 'episode';
 
+
 export interface Entitlement {
   state: RentalState;
   contentId: string;

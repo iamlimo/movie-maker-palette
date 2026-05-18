@@ -46,8 +46,11 @@ import { useWatchHistory } from '@/hooks/useWatchHistory';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useRentals } from '@/hooks/useRentals';
-import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
+
+
+
 import { format, formatDistanceToNow } from 'date-fns';
+
 import { cn } from '@/lib/utils';
 import ContentCarousel, { ContentCarouselItem } from '@/components/ContentCarousel';
 import WatchProgressCard from '@/components/WatchProgressCard';
@@ -61,7 +64,7 @@ const Profile = () => {
   const { continueWatching, completedItems, watchHistory, loading: historyLoading, updateWatchProgress, removeFromHistory, markAsCompleted, refetch: refetchHistory } = useWatchHistory();
   const { favorites, loading: favoritesLoading, refetch: refetchFavorites } = useFavorites();
   const { activeRentals, formatTimeRemaining, fetchRentals } = useRentals();
-  const { processRental } = useOptimizedRentals();
+
   const { isIOS } = usePlatform();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
