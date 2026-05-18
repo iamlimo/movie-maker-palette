@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+
 import { useNavigate } from 'react-router-dom';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -170,6 +172,37 @@ export const OptimizedRentalCheckout = ({
       setValidatingCode(false);
     }
   };
+
+  useEffect(() => {
+    const onMessage = async (event: MessageEvent) => {
+      const data = event.data as any;
+      if (!data || data.type !== 'paystack:callback') return;
+
+      if (data.status === 'completed') {
+        // Close the pending dialog and unlock.
+        setPaymentStatus({ show: false, status: 'processing', message: '' });
+        onOpenChange(false);
+
+        try {
+          await refreshWallet();
+          await refreshEntitlements();
+        } catch (e) {
+          // ignore
+          console.warn('PaymentCallback refresh failed:', e);
+        }
+
+        onSuccess?.();
+        navigate(watchPath);
+      }
+
+      if (data.status === 'failed') {
+        setPaymentStatus({ show: true, status: 'failed', message: 'Payment failed. Please try again.' });
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [navigate, onOpenChange, onSuccess, refreshEntitlements, refreshWallet, watchPath]);
 
   const handlePayment = async () => {
     if (!user || !paymentMethod) return;
