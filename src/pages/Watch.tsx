@@ -196,8 +196,25 @@ const Watch = () => {
           videoUrlData = { url: urlData.signedUrl };
         }
       } else if (contentType === "episode") {
-        // For episodes, use direct video URL from database
-        videoUrlData = { url: contentData.video_url };
+        const { data: urlData, error: urlError } =
+          await supabase.functions.invoke("get-video-url", {
+            body: {
+              contentId,
+              contentType: "episode",
+              expiryHours: 24,
+            },
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+
+        if (urlError || !urlData?.signedUrl) {
+          setError(urlData?.error || urlError?.message || "Failed to load video");
+          setLoading(false);
+          return;
+        }
+
+        videoUrlData = { url: urlData.signedUrl };
       }
 
       if (!videoUrlData?.url) {

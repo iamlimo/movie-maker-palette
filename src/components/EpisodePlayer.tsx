@@ -109,14 +109,31 @@ const EpisodePlayer = ({
 
   const loadVideoUrl = async () => {
     try {
-      const { data, error } = await supabase
-        .from('episodes')
-        .select('video_url')
-        .eq('id', episodeId)
-        .single();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
 
-      if (error) throw error;
-      setVideoUrl(data.video_url);
+      if (!accessToken) {
+        throw new Error('Missing session token');
+      }
+
+      const { data, error } = await supabase.functions.invoke('get-video-url', {
+        body: {
+          contentId: episodeId,
+          contentType: 'episode',
+          expiryHours: 24,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (error || !data?.signedUrl) {
+        throw new Error(data?.error || error?.message || 'Failed to generate video URL');
+      }
+
+      setVideoUrl(data.signedUrl);
     } catch (error) {
       console.error('Error loading video URL:', error);
     }

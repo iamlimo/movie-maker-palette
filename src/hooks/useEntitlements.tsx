@@ -166,9 +166,21 @@ const normalizeType = (t: string): RentalContentType => {
 
   const getEntitlement = useCallback(
     (contentId: string, contentType: RentalContentType): Entitlement => {
-      const found = entitlements.find(
-        (e) => e.contentId === contentId && e.contentType === contentType,
-      );
+      const statePriority: Record<RentalState, number> = {
+        ACTIVE: 0,
+        PAYMENT_VERIFICATION: 1,
+        PAYMENT_PENDING: 2,
+        FAILED: 3,
+        EXPIRED: 4,
+        REVOKED: 5,
+        REFUNDED: 6,
+        NOT_RENTED: 7,
+      };
+
+      const found = entitlements
+        .filter((e) => e.contentId === contentId && e.contentType === contentType)
+        .sort((a, b) => statePriority[a.state] - statePriority[b.state])[0];
+
       return found ?? NOT_RENTED_ENTITLEMENT(contentId, contentType);
     },
     [entitlements],
