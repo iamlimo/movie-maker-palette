@@ -596,6 +596,39 @@ serve(async (req: Request) => {
       }
     }
 
+    if ((intentStatus === "completed" || paymentStatus === "completed") && refreshedRentalIntent) {
+      const repairedAccess = await grantAccessIfNeeded(supabase, refreshedRentalIntent, payment);
+
+      if (repairedAccess) {
+        return jsonResponse({
+          success: true,
+          payment: payment
+            ? {
+                id: payment.id,
+                channel: payment.provider,
+                status: "completed",
+                message: "Payment completed and rental access is active",
+                enhanced_status: payment.enhanced_status,
+                provider_reference: payment.provider_reference,
+              }
+            : {
+                id: refreshedRentalIntent.id,
+                channel: refreshedRentalIntent.payment_method,
+                status: "completed",
+                message: "Payment completed and rental access is active",
+                enhanced_status: refreshedRentalIntent.status,
+                provider_reference:
+                  refreshedRentalIntent.provider_reference || refreshedRentalIntent.paystack_reference,
+              },
+          rental: buildRentalSummary(repairedAccess),
+          related_records: {
+            rental_access: [repairedAccess],
+          },
+          message: "Rental access is active",
+        });
+      }
+    }
+
     if (paymentStatus === "completed" && payment) {
       return jsonResponse({
         success: true,

@@ -17,12 +17,22 @@ interface B2SignedUrlResponse {
   authorizationToken: string;
 }
 
+type VideoContentType = 'movie' | 'episode';
+
+interface VideoContent {
+  id: string;
+  video_url: string | null;
+  status: string | null;
+  contentType: VideoContentType;
+  season_id?: string | null;
+}
+
 // Bandwidth tracking - stored in-memory for this function instance
 const bandwidthTracker = {
   dailyDownloads: 0,
   lastReset: new Date().toDateString(),
   limit: 1024 * 1024 * 1024, // 1 GB in bytes
-  
+
   reset() {
     const today = new Date().toDateString();
     if (today !== this.lastReset) {
@@ -31,18 +41,18 @@ const bandwidthTracker = {
       console.log('Daily bandwidth counter reset');
     }
   },
-  
+
   addDownload(bytes: number) {
     this.reset();
     this.dailyDownloads += bytes;
     return this.dailyDownloads;
   },
-  
+
   getRemainingBandwidth(): number {
     this.reset();
     return Math.max(0, this.limit - this.dailyDownloads);
   },
-  
+
   isLimitExceeded(): boolean {
     this.reset();
     return this.dailyDownloads >= this.limit;
@@ -72,7 +82,7 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid authentication token' }),
@@ -83,50 +93,72 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const movieIdFromUrl = url.searchParams.get('movieId');
     const isStreamingRequest = url.searchParams.get('stream') === 'true';
-    
-    // Get movieId from either URL params (for streaming) or request body
-    let movieId = movieIdFromUrl;
+
+    // Get content identifier from either URL params (for streaming) or request body
+    let contentId = movieIdFromUrl;
+    let contentType: VideoContentType = 'movie';
     let expiryHours = 24;
-    
-    if (!movieId) {
+
+    if (!contentId) {
       // Try to get from request body
       const body = await req.json().catch(() => ({}));
-      movieId = body.movieId;
+      contentId = body.movieId || body.contentId || body.episodeId;
+      contentType = body.contentType === 'episode' ? 'episode' : 'movie';
       expiryHours = body.expiryHours || 24;
     }
 
-    if (!movieId) {
+    if (!contentId) {
       return new Response(
-        JSON.stringify({ error: 'Movie ID is required' }),
+        JSON.stringify({ error: 'Content ID is required' }),
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Get movie details
-    const { data: movie, error: movieError } = await supabase
-      .from('movies')
-      .select('id, video_url, status, price')
-      .eq('id', movieId)
-      .single();
+    let content: VideoContent | null = null;
+    let contentError: unknown = null;
 
-    console.log('Movie lookup:', {
-      movieId,
-      found: !!movie,
-      status: movie?.status,
-      hasVideoUrl: !!movie?.video_url,
-      movieError: movieError ? { code: movieError.code, message: movieError.message } : null
+    if (contentType === 'episode') {
+      const { data, error } = await supabase
+        .from('episodes')
+        .select('id, video_url, status, season_id')
+        .eq('id', contentId)
+        .single();
+
+      content = data ? { ...data, contentType: 'episode' } : null;
+      contentError = error;
+    } else {
+      const { data, error } = await supabase
+        .from('movies')
+        .select('id, video_url, status, price')
+        .eq('id', contentId)
+        .single();
+
+      content = data ? { ...data, contentType: 'movie' } : null;
+      contentError = error;
+    }
+
+    console.log('Video content lookup:', {
+      contentId,
+      contentType,
+      found: !!content,
+      status: content?.status,
+      hasVideoUrl: !!content?.video_url,
+      contentError: contentError ? {
+        code: (contentError as { code?: string }).code,
+        message: (contentError as { message?: string }).message
+      } : null
     });
 
-    if (movieError || !movie) {
+    if (contentError || !content) {
       return new Response(
-        JSON.stringify({ error: 'Movie not found' }),
+        JSON.stringify({ error: 'Content not found' }),
         { status: 404, headers: corsHeaders }
       );
     }
 
-    if (movie.status !== 'approved') {
+    if (content.status !== 'approved') {
       return new Response(
-        JSON.stringify({ error: 'Movie not available', status: movie.status }),
+        JSON.stringify({ error: 'Content not available', status: content.status }),
         { status: 403, headers: corsHeaders }
       );
     }
@@ -145,14 +177,15 @@ Deno.serve(async (req) => {
     const isSuperAdmin = roleData?.role === 'super_admin';
 
     if (!isSuperAdmin) {
-      // Check if user has purchased the movie
-      const { data: purchase, error: purchaseError } = await supabase
+      const { data: purchase, error: purchaseError } = contentType === 'movie'
+        ? await supabase
         .from('purchases')
         .select('id')
         .eq('user_id', user.id)
-        .eq('content_id', movieId)
+        .eq('content_id', contentId)
         .eq('content_type', 'movie')
-        .maybeSingle();
+        .maybeSingle()
+        : { data: null, error: null };
 
       if (purchaseError && purchaseError.code !== 'PGRST116') {
         console.error('Purchase check error:', purchaseError);
@@ -161,15 +194,51 @@ Deno.serve(async (req) => {
       // PHASE 6: Check canonical rental_access table first
       // This is the source of truth for active rental access
       const now = new Date().toISOString();
-      const { data: rentalAccess, error: rentalAccessError } = await supabase
+      let rentalAccess = null;
+      let rentalAccessError = null;
+
+      if (contentType === 'episode') {
+        const { data, error } = await supabase
+          .from('rental_access')
+          .select('id, expires_at, status')
+          .eq('user_id', user.id)
+          .eq('episode_id', contentId)
+          .eq('status', 'paid')
+          .is('revoked_at', null)
+          .gt('expires_at', now)
+          .maybeSingle();
+
+        rentalAccess = data;
+        rentalAccessError = error;
+
+        if (!rentalAccess && content.season_id) {
+          const { data: seasonRental, error: seasonRentalError } = await supabase
+            .from('rental_access')
+            .select('id, expires_at, status')
+            .eq('user_id', user.id)
+            .eq('season_id', content.season_id)
+            .eq('status', 'paid')
+            .is('revoked_at', null)
+            .gt('expires_at', now)
+            .maybeSingle();
+
+          rentalAccess = seasonRental;
+          rentalAccessError = seasonRentalError;
+        }
+      } else {
+        const { data, error } = await supabase
         .from('rental_access')
         .select('id, expires_at, status')
         .eq('user_id', user.id)
-        .eq('movie_id', movieId)
+          .eq('movie_id', contentId)
         .eq('status', 'paid')
         .is('revoked_at', null)
         .gt('expires_at', now)
         .maybeSingle();
+
+        rentalAccess = data;
+        rentalAccessError = error;
+      }
 
       if (rentalAccessError && rentalAccessError.code !== 'PGRST116') {
         console.error('Rental access check error:', rentalAccessError);
@@ -177,12 +246,12 @@ Deno.serve(async (req) => {
 
       // Fallback: check legacy rentals table for backward compatibility
       let legacyRental = null;
-      if (!rentalAccess) {
+      if (!rentalAccess && contentType === 'movie') {
         const { data: rental, error: rentalError } = await supabase
           .from('rentals')
           .select('id, expires_at, user_id, content_id, content_type, status')
           .eq('user_id', user.id)
-          .eq('content_id', movieId)
+          .eq('content_id', contentId)
           .eq('content_type', 'movie')
           .eq('status', 'completed')
           .gte('expires_at', new Date().toISOString())
@@ -196,7 +265,8 @@ Deno.serve(async (req) => {
 
       console.log('Access check for user:', {
         userId: user.id,
-        movieId,
+        contentId,
+        contentType,
         hasRentalAccess: !!rentalAccess,
         hasLegacyRental: !!legacyRental,
         hasPurchase: !!purchase,
@@ -206,23 +276,25 @@ Deno.serve(async (req) => {
       if (!purchase && !rentalAccess && !legacyRental) {
         console.error('Access denied:', {
           userId: user.id,
-          movieId,
+          contentId,
+          contentType,
           hasPurchase: !!purchase,
           hasRentalAccess: !!rentalAccess,
           hasLegacyRental: !!legacyRental,
         });
-        
+
         // Build a more informative error message
         const errorDetails = {
           error: 'Access denied. Purchase or rent this movie to watch.',
           debug: {
-            movieId,
+            contentId,
+            contentType,
             hasPurchase: !!purchase,
             hasRentalAccess: !!rentalAccess,
-            movieStatus: movie?.status
+            contentStatus: content?.status
           }
         };
-        
+
         return new Response(
           JSON.stringify(errorDetails),
           { status: 403, headers: corsHeaders }
@@ -230,14 +302,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!movie.video_url) {
+    if (!content.video_url) {
       return new Response(
         JSON.stringify({ error: 'Video file not available' }),
         { status: 404, headers: corsHeaders }
       );
     }
 
-    const videoUrl = movie.video_url;
+    const videoUrl = content.video_url;
 
     // Check if it's a Backblaze URL (must contain backblaze domains)
     const isBackblazeUrl = videoUrl.includes('backblazeb2.com') || videoUrl.includes('b2cdn.com');
@@ -257,10 +329,10 @@ Deno.serve(async (req) => {
           hasBucketId: !!b2BucketId,
           videoUrl
         });
-        
+
         // Fall back to Supabase storage
         console.log('Attempting Supabase storage fallback for Backblaze URL:', videoUrl);
-        
+
         // Extract potential file path from Backblaze URL for Supabase storage
         let supabaseFilePath = videoUrl;
         try {
@@ -276,7 +348,7 @@ Deno.serve(async (req) => {
           console.error('Failed to parse Backblaze URL for Supabase fallback:', parseError);
           supabaseFilePath = videoUrl; // Use as-is if parsing fails
         }
-        
+
         const expiresIn = expiryHours * 3600;
         const { data: signedUrlData, error: signedUrlError } = await supabase.storage
           .from('videos')
@@ -285,7 +357,7 @@ Deno.serve(async (req) => {
         if (signedUrlError) {
           console.error('Supabase fallback failed:', signedUrlError);
           return new Response(
-            JSON.stringify({ 
+            JSON.stringify({
               error: 'Video temporarily unavailable',
               details: 'Storage configuration issue - video cannot be accessed at this time. Please configure Backblaze credentials or ensure videos exist in Supabase storage.',
               debug: {
@@ -309,11 +381,11 @@ Deno.serve(async (req) => {
             message: 'Video URL generated via Supabase (Backblaze credentials missing)',
             source: 'supabase-fallback'
           }),
-          { 
-            headers: { 
-              ...corsHeaders, 
+          {
+            headers: {
+              ...corsHeaders,
               'Cache-Control': 'public, max-age=3600'
-            } 
+            }
           }
         );
       }
@@ -373,14 +445,14 @@ Deno.serve(async (req) => {
 
       if (!authResponse.ok) {
         const authErrorBody = await authResponse.text();
-        
+
         // Check if it's a bandwidth limit error (503 Service Unavailable or 429 Too Many Requests)
         if (authResponse.status === 503 || authResponse.status === 429) {
           console.warn('Backblaze bandwidth limit likely exceeded', {
             status: authResponse.status,
             statusText: authResponse.statusText
           });
-          
+
           // Fall back to Supabase storage
           console.log('Falling back to Supabase storage due to B2 bandwidth limit');
           const expiresIn = expiryHours * 3600;
@@ -390,7 +462,7 @@ Deno.serve(async (req) => {
 
           if (signedUrlError) {
             return new Response(
-              JSON.stringify({ 
+              JSON.stringify({
                 error: 'Backblaze bandwidth exceeded and Supabase fallback failed',
                 details: signedUrlError.message
               }),
@@ -407,16 +479,16 @@ Deno.serve(async (req) => {
               message: 'Video URL generated via Supabase (Backblaze bandwidth limited)',
               source: 'supabase-fallback'
             }),
-            { 
-              headers: { 
-                ...corsHeaders, 
+            {
+              headers: {
+                ...corsHeaders,
                 'X-Bandwidth-Limited': 'true',
                 'Cache-Control': 'public, max-age=3600'
-              } 
+              }
             }
           );
         }
-        
+
         console.error('Backblaze authorization failed', {
           status: authResponse.status,
           statusText: authResponse.statusText,
@@ -447,14 +519,14 @@ Deno.serve(async (req) => {
 
       if (!downloadAuthResponse.ok) {
         const downloadErrorBody = await downloadAuthResponse.text();
-        
+
         // Check if it's a bandwidth limit error
         if (downloadAuthResponse.status === 503 || downloadAuthResponse.status === 429) {
           console.warn('Backblaze download bandwidth limit likely exceeded', {
             status: downloadAuthResponse.status,
             statusText: downloadAuthResponse.statusText
           });
-          
+
           // Fall back to Supabase storage
           console.log('Falling back to Supabase storage due to B2 bandwidth limit');
           const expiresIn = expiryHours * 3600;
@@ -464,7 +536,7 @@ Deno.serve(async (req) => {
 
           if (signedUrlError) {
             return new Response(
-              JSON.stringify({ 
+              JSON.stringify({
                 error: 'Backblaze bandwidth exceeded and Supabase fallback failed',
                 details: signedUrlError.message
               }),
@@ -481,16 +553,16 @@ Deno.serve(async (req) => {
               message: 'Video URL generated via Supabase (Backblaze bandwidth limited)',
               source: 'supabase-fallback'
             }),
-            { 
-              headers: { 
-                ...corsHeaders, 
+            {
+              headers: {
+                ...corsHeaders,
                 'X-Bandwidth-Limited': 'true',
                 'Cache-Control': 'public, max-age=3600'
-              } 
+              }
             }
           );
         }
-        
+
         console.error('Backblaze download authorization failed', {
           status: downloadAuthResponse.status,
           statusText: downloadAuthResponse.statusText,
@@ -512,7 +584,7 @@ Deno.serve(async (req) => {
       // Check if this is a direct video request (not just URL generation)
       if (isStreamingRequest) {
         console.log('Proxying video request to avoid CORS issues');
-        
+
         try {
           const videoResponse = await fetch(signedUrl, {
             headers: {
@@ -569,12 +641,12 @@ Deno.serve(async (req) => {
           message: 'Video URL generated successfully (Backblaze)',
           source: 'backblaze'
         }),
-        { 
-          headers: { 
-            ...corsHeaders, 
+        {
+          headers: {
+            ...corsHeaders,
             'Cache-Control': `public, max-age=${validDurationInSeconds}`,
             'X-Signed-Url-Expires': expiresAt
-          } 
+          }
         }
       );
 
@@ -603,12 +675,12 @@ Deno.serve(async (req) => {
           message: 'Video URL generated successfully (Supabase)',
           source: 'supabase'
         }),
-        { 
-          headers: { 
-            ...corsHeaders, 
+        {
+          headers: {
+            ...corsHeaders,
             'Cache-Control': `public, max-age=${expiresIn}`,
             'X-Signed-Url-Expires': expiresAt
-          } 
+          }
         }
       );
     }
@@ -620,7 +692,7 @@ Deno.serve(async (req) => {
       type: typeof error
     });
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Internal server error',
         details: error instanceof Error ? error.message : String(error)
       }),
