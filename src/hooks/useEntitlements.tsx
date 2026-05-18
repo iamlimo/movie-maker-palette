@@ -38,7 +38,7 @@ const normalizeType = (t: string): RentalContentType => {
   const [loading, setLoading] = useState(false);
   const [serverSkewMs, setServerSkewMs] = useState(0);
   const channelName = useRef(
-    `entitlements-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    `entitlements-${Math.random().toString(36).slice(2, 8)}`,
   );
 
   const fetchEntitlements = useCallback(async () => {
