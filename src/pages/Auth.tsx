@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { usePlatform } from "@/hooks/usePlatform";
 import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
@@ -45,6 +45,7 @@ const Auth = () => {
   const [signupData, setSignupData] = useState({
     name: "",
     email: "",
+    phoneNumber: "",
     password: "",
     confirmPassword: "",
   });
@@ -117,6 +118,7 @@ const Auth = () => {
         signupData.email,
         signupData.password,
         signupData.name,
+        signupData.phoneNumber,
       );
 
       if (error) {
@@ -144,6 +146,7 @@ const Auth = () => {
         setSignupData({
           name: "",
           email: "",
+          phoneNumber: "",
           password: "",
           confirmPassword: "",
         });
@@ -421,6 +424,28 @@ const Auth = () => {
                           }
                           className="pl-10 bg-background/50 border-border focus:border-primary"
                           required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-phone" className="text-foreground">
+                        Phone Number <span className="text-muted-foreground text-xs">(optional)</span>
+                      </Label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="signup-phone"
+                          type="tel"
+                          placeholder="e.g. +234 800 000 0000"
+                          value={signupData.phoneNumber}
+                          onChange={(e) =>
+                            setSignupData({
+                              ...signupData,
+                              phoneNumber: e.target.value,
+                            })
+                          }
+                          className="pl-10 bg-background/50 border-border focus:border-primary"
                         />
                       </div>
                     </div>

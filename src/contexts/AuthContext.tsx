@@ -32,6 +32,7 @@ interface AuthContextType {
     email: string,
     password: string,
     name?: string,
+    phoneNumber?: string,
   ) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -215,6 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     email: string,
     password: string,
     name?: string,
+    phoneNumber?: string,
   ) => {
     const redirectUrl = `${window.location.origin}/`;
 
@@ -225,6 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         emailRedirectTo: redirectUrl,
         data: {
           name: name || '',
+          phone_number: phoneNumber || '',
         },
       },
     });
