@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { usePlatform } from "@/hooks/usePlatform";
 import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
@@ -45,6 +45,7 @@ const Auth = () => {
   const [signupData, setSignupData] = useState({
     name: "",
     email: "",
+    phoneNumber: "",
     password: "",
     confirmPassword: "",
   });
@@ -117,6 +118,7 @@ const Auth = () => {
         signupData.email,
         signupData.password,
         signupData.name,
+        signupData.phoneNumber,
       );
 
       if (error) {
