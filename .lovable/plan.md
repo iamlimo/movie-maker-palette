@@ -1,149 +1,77 @@
-## Rental System UX & Architecture Optimization
+## Root cause
 
-Goal: deliver a premium, deterministic, OTT-grade rental experience using the existing edge functions, hooks, and components — by consolidating duplicates, formalizing entitlement states, and making the backend the single source of truth.
+Three things broke the app at the database/routing layer; the frontend itself is mostly intact.
 
----
+1. **`/` route points to `Maintenance`** in `src/App.tsx` — the real landing (`Index`) is no longer mounted, which is why the homepage is empty (no hero slider, no movie/TV sections).
+2. **The `on_auth_user_created` trigger on `auth.users` was dropped** (see `supabase/migrations/20260630_remove_handle_new_user_and_trigger.sql`). No trigger means new signups never get a `profiles` row, never get a `wallets` row, and never receive the 400 NGN signup bonus — that is why signup "behaves abnormally".
+3. **RLS is enabled on almost every table but the policies are missing.** A query of `pg_policies` returns policies for only `profiles`, `user_roles`, and `wallets`. Every other table (`movies`, `tv_shows`, `seasons`, `episodes`, `sections`, `content_sections`, `slider_items`, `banners`, `genres`, `rentals`, `rental_intents`, `rental_access`, `payments`, `referral_codes`, `job_listings`, `wallet_transactions`, `favorites`, `watch_history`, …) has RLS on with zero policies, so PostgREST returns empty arrays for reads and rejects every insert. That single fact explains:
+   - Empty landing page (movies/tv/sections/slider_items unreadable),
+   - Admin can't create or view hero slider / movies / TV shows,
+   - Admin can't see rentals, finance, or job listings,
+   - `new row violates row-level security policy for table "referral_codes"` when admin tries to create a referral code.
+4. Additionally `profiles`, `user_roles`, and `wallets` currently have `rowsecurity = false` (RLS disabled) even though policies are defined — that is a regression we'll re-enable so the policies actually take effect.
 
-### 1. Audit findings (current pain points)
+## Fix plan
 
-**Duplication / drift:**
-- Two parallel rental hooks: `useRentals` (reads legacy `rentals` table) and `useOptimizedRentals` (also reads `rentals`). Neither reads the canonical `rental_access` table that edge functions write to.
-- Three rental UI surfaces: `RentalButton` (683 lines), `OptimizedRentalButton`, `RentalBottomSheet` + `OptimizedRentalCheckout` (862 lines). Behavior diverges (iOS gating, Paystack handling, referral codes).
-- Two verification edge functions: `verify-payment` and `verify-rental-payment`. Two table families: legacy `rentals`/`rental_payments` and new `rental_intents`/`rental_access`.
+### 1. Restore the landing page (frontend, 1 line)
+In `src/App.tsx`, change `<Route path="/" element={<Maintenance />} />` to `<Route path="/" element={<Index />} />` and add the lazy import for `Index`. Keep `Maintenance` available at `/maintenance` only (no other code touched).
 
-**State model gaps:**
-- Frontend uses booleans (`hasAccess`, `isPaid`) instead of an explicit state machine. No first-class `PAYMENT_PENDING`, `PAYMENT_VERIFICATION`, `FAILED`, `REVOKED` surfaced in UI.
-- Countdown is computed from whichever table the hook happens to query; `rentals.expires_at` and `rental_access.expires_at` can diverge.
+### 2. Add phone number to signup + 400 bonus signup flow (frontend)
+- `src/pages/Auth.tsx`: add a Phone Number input to the signup form state and JSX (optional field, simple validation).
+- `src/contexts/AuthContext.tsx`: extend `signUp(email, password, name?, phoneNumber?)` and pass `phone_number` inside `options.data` so the trigger picks it up from `raw_user_meta_data`.
+- No new components or routes.
 
-**Playback access:**
-- `Watch.tsx` / `EpisodePlayer` check access via the legacy hook; `get-video-url` validates against `rental_access`. Possible mismatch where UI says "Watch" but URL signing fails (or vice versa).
-- No graceful in-player expiry: timer is purely visual, no forced pause + overlay.
+### 3. Single migration to repair the backend
 
-**Payment trust:**
-- Paystack flow relies partly on frontend polling `verify-payment`; webhook is authoritative but client occasionally optimistically grants UI access before webhook lands.
+One migration file containing, in order:
 
----
-
-### 2. Target architecture (reuse existing pieces)
-
-**Single source of truth:** `rental_intents` (payment lifecycle) + `rental_access` (entitlement). Legacy `rentals` table becomes read-only / deprecated for new writes.
-
-**Entitlement state machine** (derived on backend, surfaced as a single enum to frontend):
-
-```text
-NOT_RENTED ─► PAYMENT_PENDING ─► PAYMENT_VERIFICATION ─► ACTIVE ─► EXPIRED
-                   │                      │                │
-                   ▼                      ▼                ▼
-                FAILED                 FAILED          REVOKED / REFUNDED
+**A. Re-enable RLS on the three tables where it got turned off**
+```sql
+ALTER TABLE public.profiles    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wallets     ENABLE ROW LEVEL SECURITY;
 ```
 
-Mapping (no schema change required, derived from existing columns):
-- `rental_intents.status = pending` + `payment_method = wallet` → `PAYMENT_PENDING` (transient, usually instant)
-- `rental_intents.status = pending` + `payment_method = paystack` → `PAYMENT_VERIFICATION`
-- `rental_intents.status = paid` + `rental_access.status = paid` + `expires_at > now()` → `ACTIVE`
-- `rental_access.expires_at <= now()` → `EXPIRED`
-- `rental_intents.status = failed` → `FAILED`
-- `rental_access.revoked_at IS NOT NULL` → `REVOKED`
-- `payments.status = refunded` linked via intent → `REFUNDED`
+**B. Recreate `handle_new_user` + trigger** so every signup gets a profile (with name + phone from `raw_user_meta_data`), a wallet, and a 400 NGN bonus credited via the existing `grant_signup_bonus` helper. Trigger is `AFTER INSERT ON auth.users FOR EACH ROW`.
 
-**Backend canonical access check:** keep `has_active_rental_access()` Postgres function (already exists). All hooks query it via a thin RPC wrapper instead of joining tables client-side.
+**C. Add the missing RLS policies.** Grouped by access pattern (all use the existing `public.has_role` / `public.is_staff` security-definer helpers — no recursion):
 
----
+- **Public read, staff write** (catalog + homepage data):
+  `movies`, `tv_shows`, `seasons`, `episodes`, `genres`, `sections`, `content_sections`, `slider_items`, `banners`, `cast_crew`, `movie_cast`, `tv_show_cast`, `episode_cast`.
+  → `SELECT` policy `USING (true)` for `anon` + `authenticated`; `INSERT/UPDATE/DELETE` policy `USING (public.is_staff(auth.uid()))`.
+  → Also add the matching `GRANT SELECT ON … TO anon` and `GRANT SELECT, INSERT, UPDATE, DELETE … TO authenticated` since they were never granted.
 
-### 3. Frontend consolidation
+- **Public read of active rows only**:
+  `job_listings` (`status = 'active'` for anon, full access for staff).
 
-**Hooks (collapse 2 → 1):**
-- Delete `useRentals.tsx`. Keep `useOptimizedRentals.tsx`, rewrite to:
-  - Query `rental_access` (not `rentals`) joined with latest `rental_intents` per content.
-  - Expose: `getEntitlement(contentId, contentType) → { state, expiresAt, intentId, secondsRemaining }` (state machine enum above).
-  - Subscribe to both `rental_access` and `rental_intents` realtime channels for the user.
-  - Server-time skew correction: fetch `now()` from Supabase once on mount, use `Date.now() - skew` for countdowns.
-- Keep `usePaystackRentalVerification` but simplify: it only polls `verify-payment` until intent reaches a terminal state, then resolves.
+- **User-owned data** (`USING (auth.uid() = user_id)` for select/insert/update/delete, plus staff override):
+  `rentals`, `rental_intents`, `rental_access`, `payments`, `wallet_transactions`, `favorites`, `watch_history`, `user_preferences`, `purchases`, `referral_code_uses`, `push_device_tokens`, `user_payments`.
 
-**Components (collapse 4 → 2):**
-- Delete `RentalButton.tsx` (legacy) and `RentalBottomSheet.tsx`.
-- Keep `OptimizedRentalButton.tsx` as the single CTA — extend it to render dynamic states from the entitlement enum (`Rent Now`, `Confirming Payment…`, `Watch Now` + countdown, `Rental Expired` + `Rent Again`).
-- Keep `OptimizedRentalCheckout.tsx` as the only modal/bottom-sheet. Trim it to a clean 2-step flow (Summary → Payment method) and reuse it for both web and mobile via responsive Sheet/Dialog.
-- Update `MoviePreview.tsx`, `TVShowPreview.tsx`, `EpisodePlayer.tsx`, `Profile.tsx` to import only `OptimizedRentalButton` + `OptimizedRentalCheckout`.
-- `ActiveRentalCard.tsx` stays (My Rentals dashboard) but reads from the new entitlement hook.
+- **Staff-only** (admin tooling):
+  `referral_codes` (this is the one currently throwing the RLS error), `payouts`, `finance_audit_logs`, `transactions_ledger`, `payment_anomalies`, `payment_attempts`, `producers`, `submissions`, `rental_payments`, `rental_audit_log`, `email_logs`, `push_notifications`, `ticket_templates`, `permissions`, `roles`, `role_permissions`, `webhook_events`, `job_applications`.
 
-**Countdown component (new, small):** `<RentalCountdown expiresAt={...} onExpire={...} />` — single shared formatter (`2d 4h`, `18h 14m`, `42m`, `Expires soon`). Used in detail page, player overlay, and My Rentals.
+- **Ticket access**: `tickets` / `ticket_comments` / `ticket_activity_log` — owner can read their own, staff can read/write all.
 
-**Player expiry handling:** in `VideoPlayer` / `NativeVideoPlayer`, accept an `expiresAt` prop. Internal interval (per-second near expiry, per-minute otherwise):
-- T-5min: toast warning.
-- T-0: pause player, dispatch `onRentalExpired` → parent shows full-screen overlay with "Rental Expired" + "Rent Again" CTA. No black screen, no reload.
+- **`user_roles`**: keep the existing `roles_select_own` policy, add staff `SELECT/INSERT/UPDATE/DELETE` via `has_role(auth.uid(),'super_admin')` so the admin Users page works.
 
----
+- **`profiles`**: keep existing own-row policies, add staff `SELECT` so admin user list works.
 
-### 4. Backend optimization (no new edge functions)
+- **`wallets`**: keep existing own-row select, add staff `SELECT` for admin wallet view.
 
-Reuse and tighten existing functions:
+**D. GRANTs** (re-issued for every public-schema table touched, matching the policies above) — required because PostgREST does not grant defaults on `public`. Service role gets `ALL`.
 
-- **`process-rental`** (entry point): keep as-is for both wallet and Paystack initialization. Add idempotency check — if an open `rental_intents` row exists for (user, content) within last 5 min, return it instead of creating a duplicate (prevents double-tap duplicates).
-- **`wallet-payment`**: already transactional via `process_wallet_rental_payment` RPC. Confirm it always returns the new `rental_access.id` so frontend transitions straight to ACTIVE without polling.
-- **`paystack-webhook`**: authoritative grant. Verify HMAC (already done), idempotency on `paystack_reference` (already enforced via unique reference on intent). Ensure it calls `grant_rental_access` only after intent flips to `paid`.
-- **`verify-payment`**: becomes the only client-facing verification endpoint. Returns `{ state, expiresAt, rentalAccessId }` shaped to the entitlement state machine. Mark `verify-rental-payment` as deprecated and route any remaining callers here, then delete only after no references remain.
-- **`rental-access`** + **`get-video-url`**: ensure both rely on `has_active_rental_access()` so playback authorization and UI authorization can never disagree.
+### 4. Verification
+After the migration runs, manually verify:
+- Homepage loads with hero slider + sections.
+- Admin → Hero Slider / Movies / TV Shows / Rentals / Finance / Job Listings all load and create works.
+- Admin → Referral Codes: create no longer throws RLS error.
+- Sign up a new account → profile + wallet created, wallet balance shows 400 NGN.
 
-**Audit + anomalies:** existing `payment_anomalies` and `finance_audit_logs` tables are sufficient; ensure webhook + wallet flows write to them on every state transition (most already do — verify and patch gaps).
+## Files touched
 
----
+- `src/App.tsx` — swap `/` route, lazy-import `Index`.
+- `src/pages/Auth.tsx` — add phone number field.
+- `src/contexts/AuthContext.tsx` — extend `signUp` signature, forward phone in metadata.
+- `supabase/migrations/<new timestamp>_restore_rls_and_signup_trigger.sql` — single consolidated migration described above.
 
-### 5. UX flow (final shape)
-
-1. **Detail page** loads → `useOptimizedRentals().getEntitlement()` returns one of the 8 states → `OptimizedRentalButton` renders the matching CTA + countdown.
-2. **Rent Now** opens `OptimizedRentalCheckout` (Summary → Payment method).
-3. **Wallet path:** confirm → `process-rental` (wallet) → atomic debit + entitlement → modal shows success animation (existing `PaymentSuccessAnimation`) → auto-route to `/watch/...`.
-4. **Paystack path:** confirm → redirect to Paystack → return URL hits a small handler that calls `verify-payment` polling → state transitions PAYMENT_VERIFICATION → ACTIVE → success animation → route to `/watch/...`.
-5. **Playback:** `Watch.tsx` calls `get-video-url`; on 403 expired, show overlay (no crash). Player receives `expiresAt` and handles T-5min toast + T-0 pause + overlay.
-6. **My Rentals (Profile):** lists ACTIVE + EXPIRED with countdown and one-click `Rent Again` (re-opens checkout pre-filled).
-
----
-
-### 6. Edge cases covered
-
-- Double-tap on Rent → idempotent intent reuse.
-- Paystack webhook arrives before user returns → `verify-payment` immediately resolves ACTIVE.
-- User returns but webhook delayed → polling shows PAYMENT_VERIFICATION until webhook lands or 5 min timeout → FAILED with "Try again" CTA.
-- Wallet debit succeeds but entitlement insert fails → RPC is transactional, both rollback.
-- Expired during playback → graceful pause + overlay.
-- Re-rent of expired content → existing `grant_rental_access` already releases expired row first.
-- Refund issued → `payments.status = refunded` cascades to REFUNDED state in UI.
-- Clock skew on device → server-time anchor correction.
-
----
-
-### 7. Deliverables (phased, credit-aware)
-
-**Phase 1 — Backend tighten (1 migration, no new functions):**
-- Add a thin Postgres view `v_user_entitlements` that returns `(user_id, content_id, content_type, state, expires_at, intent_id, access_id)` derived from `rental_intents` + `rental_access`. Hooks query this view.
-- Add idempotency guard inside `process-rental` (code edit, no new function).
-- Standardize `verify-payment` response shape.
-
-**Phase 2 — Hook + countdown:**
-- Rewrite `useOptimizedRentals` to use the view; delete `useRentals`.
-- Add `RentalCountdown` component + shared `formatRentalRemaining` util.
-
-**Phase 3 — UI consolidation:**
-- Extend `OptimizedRentalButton` with all 8 states.
-- Slim `OptimizedRentalCheckout` to 2-step flow.
-- Migrate `MoviePreview`, `TVShowPreview`, `EpisodePlayer`, `Profile` to the consolidated components.
-- Delete `RentalButton.tsx` and `RentalBottomSheet.tsx`.
-
-**Phase 4 — Player expiry:**
-- Add `expiresAt` prop + warning/expiry overlay to `VideoPlayer` and `NativeVideoPlayer`. Wire through `Watch.tsx` and `EpisodePlayer`.
-
-**Phase 5 — Cleanup:**
-- Delete `verify-rental-payment` once no callers remain.
-- Mark legacy `rentals` table read-only via comment + remove writers.
-
----
-
-### Technical details
-
-- **No new edge functions.** All changes are: 1 migration (view + optional idempotency index), edits to `process-rental` and `verify-payment` response shape, frontend refactor.
-- **State enum** lives in `src/lib/rentalStates.ts` (new ~30-line file) and is the only place the 8 states are defined.
-- **Realtime:** subscribe to `rental_access` and `rental_intents` filtered by `user_id`; debounced refetch of the view.
-- **Security:** view exposed via RLS (user sees own rows only); video URL signing keeps `has_active_rental_access` as the gate; webhook HMAC unchanged.
-
-This delivers the OTT-grade flow you described while reusing every existing edge function and removing ~1,500 lines of duplicated frontend code.
+No new pages, components, or edge functions. No edits to existing migrations.
