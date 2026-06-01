@@ -146,6 +146,7 @@ const Auth = () => {
         setSignupData({
           name: "",
           email: "",
+          phoneNumber: "",
           password: "",
           confirmPassword: "",
         });
