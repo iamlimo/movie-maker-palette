@@ -1140,13 +1140,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "rental_access_rental_intent_id_fkey"
-            columns: ["rental_intent_id"]
-            isOneToOne: false
-            referencedRelation: "v_user_entitlements"
-            referencedColumns: ["intent_id"]
-          },
-          {
             foreignKeyName: "rental_access_season_id_fkey"
             columns: ["season_id"]
             isOneToOne: false
@@ -1161,6 +1154,45 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      rental_audit_log: {
+        Row: {
+          content_id: string | null
+          content_type: string | null
+          created_at: string | null
+          message: string | null
+          metadata: Json | null
+          rental_access_id: string | null
+          rental_intent_id: string | null
+          status: string | null
+          step: string | null
+          user_id: string | null
+        }
+        Insert: {
+          content_id?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          message?: string | null
+          metadata?: Json | null
+          rental_access_id?: string | null
+          rental_intent_id?: string | null
+          status?: string | null
+          step?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          content_id?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          message?: string | null
+          metadata?: Json | null
+          rental_access_id?: string | null
+          rental_intent_id?: string | null
+          status?: string | null
+          step?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       rental_intents: {
         Row: {
@@ -2060,7 +2092,9 @@ export type Database = {
           id: string
           metadata: Json | null
           payment_id: string | null
+          reference: string
           transaction_type: string
+          user_id: string
           wallet_id: string
         }
         Insert: {
@@ -2072,7 +2106,9 @@ export type Database = {
           id?: string
           metadata?: Json | null
           payment_id?: string | null
+          reference: string
           transaction_type: string
+          user_id: string
           wallet_id: string
         }
         Update: {
@@ -2084,7 +2120,9 @@ export type Database = {
           id?: string
           metadata?: Json | null
           payment_id?: string | null
+          reference?: string
           transaction_type?: string
+          user_id?: string
           wallet_id?: string
         }
         Relationships: [
@@ -2107,18 +2145,24 @@ export type Database = {
       wallets: {
         Row: {
           balance: number
+          created_at: string
+          id: string
           updated_at: string | null
           user_id: string | null
           wallet_id: string
         }
         Insert: {
           balance?: number
+          created_at?: string
+          id?: string
           updated_at?: string | null
           user_id?: string | null
           wallet_id?: string
         }
         Update: {
           balance?: number
+          created_at?: string
+          id?: string
           updated_at?: string | null
           user_id?: string | null
           wallet_id?: string
@@ -2206,15 +2250,15 @@ export type Database = {
     Views: {
       v_user_entitlements: {
         Row: {
+          access_created_at: string | null
           access_id: string | null
-          access_status: string | null
           content_id: string | null
           content_type: string | null
           expires_at: string | null
+          intent_created_at: string | null
           intent_id: string | null
-          intent_status: string | null
+          last_updated_at: string | null
           payment_method: string | null
-          revoked_at: string | null
           state: string | null
           user_id: string | null
         }
@@ -2231,12 +2275,40 @@ export type Database = {
         Returns: boolean
       }
       cleanup_expired_payments: { Args: never; Returns: number }
+      credit_wallet: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_metadata?: Json
+          p_payment_id?: string
+          p_reference?: string
+          p_type: string
+          p_user_id?: string
+          p_wallet_id: string
+        }
+        Returns: string
+      }
+      debit_wallet: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_metadata?: Json
+          p_payment_id?: string
+          p_reference?: string
+          p_type: string
+          p_user_id?: string
+          p_wallet_id: string
+        }
+        Returns: string
+      }
+      ensure_wallet_for_user: { Args: { p_user_id: string }; Returns: string }
       expire_rentals: { Args: never; Returns: number }
       get_current_user_profile: { Args: never; Returns: string }
       get_season_episode_count: {
         Args: { season_id_param: string }
         Returns: number
       }
+      get_wallet_balance: { Args: { p_user_id: string }; Returns: number }
       grant_rental_access: {
         Args: {
           p_content_id: string
@@ -2250,6 +2322,7 @@ export type Database = {
         }
         Returns: string
       }
+      grant_signup_bonus: { Args: { p_user_id: string }; Returns: string }
       has_active_rental_access: {
         Args: {
           p_content_id: string
@@ -2303,17 +2376,32 @@ export type Database = {
           wallet_balance: number
         }[]
       }
-      process_wallet_transaction: {
-        Args: {
-          p_amount: number
-          p_description?: string
-          p_metadata?: Json
-          p_payment_id?: string
-          p_type: string
-          p_wallet_id: string
-        }
-        Returns: string
-      }
+      process_wallet_transaction:
+        | {
+            Args: {
+              p_amount: number
+              p_description?: string
+              p_is_credit?: boolean
+              p_metadata?: Json
+              p_payment_id?: string
+              p_reference?: string
+              p_type: string
+              p_user_id?: string
+              p_wallet_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_description?: string
+              p_metadata?: Json
+              p_payment_id?: string
+              p_type: string
+              p_wallet_id: string
+            }
+            Returns: string
+          }
       update_user_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2323,6 +2411,10 @@ export type Database = {
       }
       update_user_role_by_email: {
         Args: { _email: string; _role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
+      validate_wallet_funds: {
+        Args: { p_required_amount: number; p_wallet_id: string }
         Returns: boolean
       }
     }
