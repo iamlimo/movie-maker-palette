@@ -16,7 +16,6 @@ import RoleRoute from "@/components/RoleRoute";
 import { STAFF_ROLES } from "@/lib/rbac";
 import AdminLayout from "@/components/admin/AdminLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -31,6 +30,8 @@ const TVShows = lazy(() => import("./pages/TVShows"));
 const Genres = lazy(() => import("./pages/Genres"));
 const Watchlist = lazy(() => import("./pages/Watchlist"));
 const Wallet = lazy(() => import("./pages/Wallet"));
+const Maintenance = lazy(() => import("./pages/Maintenance"));
+const Index = lazy(() => import("./pages/Index"));
 const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
 const Help = lazy(() => import("./pages/Help"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -113,6 +114,7 @@ function AppContent() {
         >
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route

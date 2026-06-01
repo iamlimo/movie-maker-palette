@@ -31,7 +31,13 @@ export const OptimizedRentalButton = ({
   const [showCheckout, setShowCheckout] = useState(false);
 
   const entitlement = getEntitlement(contentId, contentType);
-  const watchPath = `/watch/${contentType}/${contentId}`;
+
+  // Ensure episode rentals always route to the episode Watch page.
+  // Other rental types (movie/season) keep their existing paths.
+  const resolvedWatchPath = (() => {
+    if (contentType === 'episode') return `/watch/episode/${contentId}`;
+    return `/watch/${contentType}/${contentId}`;
+  })();
 
   if (!user) {
     return (
@@ -50,7 +56,7 @@ export const OptimizedRentalButton = ({
           Unavailable on iOS App
         </Button>
         <p className="text-xs text-muted-foreground text-center">
-          To rent content on iOS, please visit our website on Safari
+          To rent content on iOS, please visit our website on Safari web browser
         </p>
       </div>
     );
@@ -59,7 +65,8 @@ export const OptimizedRentalButton = ({
   if (entitlement.state === 'ACTIVE') {
     return (
       <Button
-        onClick={() => navigate(watchPath)}
+        onClick={() => navigate(resolvedWatchPath)}
+
         variant="default"
         className="w-full bg-green-600 hover:bg-green-700"
       >

@@ -115,31 +115,39 @@ export const OptimizedRentalCheckout = ({
     navigate(watchPath);
   };
 
-  const waitForRentalAccess = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const accessToken = session?.access_token;
+  const verifyPaystackAccess = useCallback(
+    async (callbackData: Record<string, unknown>) => {
+      setPaymentStatus({
+        show: true,
+        status: 'verifying',
+        message: 'Confirming payment and activating your rental...',
+      });
 
-    if (!accessToken) return false;
-
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      const { data } = await supabase.functions.invoke('rental-access', {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: {
-          content_id: contentId,
-          content_type: contentType,
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+          rentalId: callbackData.rentalId,
+          rental_intent_id: callbackData.rentalId,
+          payment_id: callbackData.paymentId,
+          reference: callbackData.reference,
         },
       });
 
-      if (data?.has_access) return true;
-      await new Promise((resolve) => window.setTimeout(resolve, 1000));
-    }
+      if (error) throw error;
 
-    return false;
-  }, [contentId, contentType]);
+      const hasActiveRental =
+        (Array.isArray(data?.related_records?.rental_access) &&
+          data.related_records.rental_access.length > 0);
+
+      if (hasActiveRental) {
+        await refreshWallet();
+        await refreshEntitlements();
+        return true;
+      }
+
+      return false;
+    },
+    [refreshEntitlements, refreshWallet],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -201,39 +209,31 @@ export const OptimizedRentalCheckout = ({
 
   useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
       const data = event.data as any;
       if (!data || data.type !== 'paystack:callback') return;
 
-      if (data.status === 'completed') {
-        setPaymentStatus({
-          show: true,
-          status: 'verifying',
-          message: 'Payment confirmed. Activating your rental...',
-        });
+      if (data.status === 'completed' || data.status === 'pending') {
+        onOpenChange(false);
 
         try {
-          await refreshWallet();
-          await refreshEntitlements();
-        } catch (e) {
-          // ignore
-          console.warn('PaymentCallback refresh failed:', e);
-        }
+          const hasAccess = await verifyPaystackAccess(data);
 
-        const hasAccess = await waitForRentalAccess();
-        await refreshEntitlements();
-
-        if (hasAccess) {
-          setPaymentStatus({ show: false, status: 'processing', message: '' });
-          onOpenChange(false);
-          onSuccess?.();
-          navigate(watchPath);
-          return;
+          if (hasAccess) {
+            setPaymentStatus({ show: false, status: 'processing', message: '' });
+            onSuccess?.();
+            navigate(watchPath);
+            return;
+          }
+        } catch (error) {
+          console.warn('PaymentCallback verification failed:', error);
         }
 
         setPaymentStatus({
           show: true,
           status: 'pending',
-          message: 'Payment is confirmed, but access is still activating. Please wait a moment and try again.',
+          message: 'Payment received. Access is still being confirmed. Please try Watch Now again shortly.',
         });
       }
 
@@ -244,7 +244,7 @@ export const OptimizedRentalCheckout = ({
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [navigate, onOpenChange, onSuccess, refreshEntitlements, refreshWallet, waitForRentalAccess, watchPath]);
+  }, [navigate, onOpenChange, onSuccess, verifyPaystackAccess, watchPath]);
 
   const handlePayment = async () => {
     if (!user || !paymentMethod) return;

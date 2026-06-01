@@ -27,6 +27,106 @@ interface VideoContent {
   season_id?: string | null;
 }
 
+interface StreamTokenPayload {
+  userId: string;
+  contentId: string;
+  contentType: VideoContentType;
+  exp: number;
+}
+
+function base64UrlEncode(value: string) {
+  return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function base64UrlDecode(value: string) {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (value.length % 4)) % 4);
+  return atob(padded);
+}
+
+async function signStreamToken(payload: StreamTokenPayload, secret: string) {
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encodedPayload));
+  const encodedSignature = base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
+  return `${encodedPayload}.${encodedSignature}`;
+}
+
+async function verifyStreamToken(token: string | null, secret: string): Promise<StreamTokenPayload | null> {
+  try {
+    if (!token || !token.includes('.')) return null;
+
+    const [encodedPayload, encodedSignature] = token.split('.');
+    if (!encodedPayload || !encodedSignature) return null;
+
+    const payload = JSON.parse(base64UrlDecode(encodedPayload)) as StreamTokenPayload;
+    const expectedToken = await signStreamToken(payload, secret);
+    const expectedSignature = expectedToken.split('.')[1];
+    if (expectedSignature !== encodedSignature) return null;
+
+    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (!payload.contentId || (payload.contentType !== 'movie' && payload.contentType !== 'episode')) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function buildProxyStreamUrl(
+  supabaseUrl: string,
+  contentId: string,
+  contentType: VideoContentType,
+  streamToken: string,
+) {
+  const params = new URLSearchParams({
+    stream: 'true',
+    contentId,
+    contentType,
+    token: streamToken,
+  });
+
+  if (contentType === 'episode') {
+    params.set('episodeId', contentId);
+  } else {
+    params.set('movieId', contentId);
+  }
+
+  return `${supabaseUrl}/functions/v1/get-video-url?${params.toString()}`;
+}
+
+function getB2Credentials() {
+  return {
+    keyId:
+      Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY_ID') ||
+      Deno.env.get('BACKBLAZE_API_KEY_ID') ||
+      Deno.env.get('BACKBLAZE_API_KEY_ID_ID'),
+    appKey:
+      Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY') ||
+      Deno.env.get('BACKBLAZE_API_KEY'),
+    bucketName: Deno.env.get('BACKBLAZE_B2_BUCKET_NAME'),
+    bucketId: Deno.env.get('BACKBLAZE_B2_BUCKET_ID'),
+  };
+}
+
+function buildVideoProxyHeaders(req: Request, authorization?: string) {
+  const headers: Record<string, string> = {
+    'User-Agent': req.headers.get('User-Agent') || 'Supabase-Video-Proxy/1.0',
+    'Accept': req.headers.get('Accept') || '*/*',
+  };
+
+  const range = req.headers.get('Range');
+  if (range) headers.Range = range;
+  if (authorization) headers.Authorization = authorization;
+
+  return headers;
+}
+
 // Bandwidth tracking - stored in-memory for this function instance
 const bandwidthTracker = {
   dailyDownloads: 0,
@@ -71,35 +171,57 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication token' }),
-        { status: 401, headers: corsHeaders }
-      );
-    }
-
     const url = new URL(req.url);
     const movieIdFromUrl = url.searchParams.get('movieId');
+    const episodeIdFromUrl = url.searchParams.get('episodeId');
+    const contentIdFromUrl = url.searchParams.get('contentId');
     const isStreamingRequest = url.searchParams.get('stream') === 'true';
+    const streamToken = url.searchParams.get('token');
+    const requestedContentType = url.searchParams.get('contentType');
 
     // Get content identifier from either URL params (for streaming) or request body
-    let contentId = movieIdFromUrl;
-    let contentType: VideoContentType = 'movie';
+    let contentId = contentIdFromUrl || episodeIdFromUrl || movieIdFromUrl;
+    let contentType: VideoContentType =
+      requestedContentType === 'episode' || episodeIdFromUrl ? 'episode' : 'movie';
     let expiryHours = 24;
+    let user: { id: string } | null = null;
 
-    if (!contentId) {
+    if (isStreamingRequest) {
+      const verifiedToken = await verifyStreamToken(streamToken, supabaseKey);
+      if (!verifiedToken) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired stream token' }),
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
+      contentId = verifiedToken.contentId;
+      contentType = verifiedToken.contentType;
+      user = { id: verifiedToken.userId };
+    } else {
+      // Verify authentication for URL generation requests.
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: 'Missing Authorization header' }),
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+
+      if (authError || !authUser) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid authentication token' }),
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
+      user = authUser;
+    }
+
+    if (!contentId && !isStreamingRequest) {
       // Try to get from request body
       const body = await req.json().catch(() => ({}));
       contentId = body.movieId || body.contentId || body.episodeId;
@@ -111,6 +233,13 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Content ID is required' }),
         { status: 400, headers: corsHeaders }
+      );
+    }
+
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'Unable to resolve authenticated user' }),
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -316,77 +445,35 @@ Deno.serve(async (req) => {
 
     if (isBackblazeUrl) {
       // Generate Backblaze signed URL
-      const b2KeyId = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY_ID');
-      const b2AppKey = Deno.env.get('BACKBLAZE_B2_APPLICATION_KEY');
-      const b2BucketName = Deno.env.get('BACKBLAZE_B2_BUCKET_NAME');
-      const b2BucketId = Deno.env.get('BACKBLAZE_B2_BUCKET_ID');
+      const {
+        keyId: b2KeyId,
+        appKey: b2AppKey,
+        bucketName: b2BucketName,
+        bucketId: b2BucketId,
+      } = getB2Credentials();
 
       if (!b2KeyId || !b2AppKey || !b2BucketName || !b2BucketId) {
-        console.warn('Backblaze credentials not configured, falling back to Supabase storage', {
+        console.warn('Backblaze credentials not configured', {
           hasKeyId: !!b2KeyId,
           hasAppKey: !!b2AppKey,
           hasBucketName: !!b2BucketName,
           hasBucketId: !!b2BucketId,
+          contentId,
+          contentType,
           videoUrl
         });
 
-        // Fall back to Supabase storage
-        console.log('Attempting Supabase storage fallback for Backblaze URL:', videoUrl);
-
-        // Extract potential file path from Backblaze URL for Supabase storage
-        let supabaseFilePath = videoUrl;
-        try {
-          const urlObj = new URL(videoUrl);
-          // Remove the Backblaze domain and /file/ prefix to get the path
-          const pathParts = urlObj.pathname.split('/').filter(Boolean);
-          if (pathParts[0] === 'file' && pathParts.length > 1) {
-            // Remove 'file' and bucket name, keep the rest as path
-            supabaseFilePath = pathParts.slice(2).join('/');
-          }
-          console.log('Extracted Supabase file path:', supabaseFilePath);
-        } catch (parseError) {
-          console.error('Failed to parse Backblaze URL for Supabase fallback:', parseError);
-          supabaseFilePath = videoUrl; // Use as-is if parsing fails
-        }
-
-        const expiresIn = expiryHours * 3600;
-        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-          .from('videos')
-          .createSignedUrl(supabaseFilePath, expiresIn);
-
-        if (signedUrlError) {
-          console.error('Supabase fallback failed:', signedUrlError);
-          return new Response(
-            JSON.stringify({
-              error: 'Video temporarily unavailable',
-              details: 'Storage configuration issue - video cannot be accessed at this time. Please configure Backblaze credentials or ensure videos exist in Supabase storage.',
-              debug: {
-                backblazeConfigured: false,
-                supabaseFallbackFailed: true,
-                originalUrl: videoUrl,
-                extractedPath: supabaseFilePath,
-                setupGuide: 'See BACKBLAZE_SETUP.md for configuration instructions'
-              }
-            }),
-            { status: 503, headers: corsHeaders }
-          );
-        }
-
-        const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
         return new Response(
           JSON.stringify({
-            success: true,
-            signedUrl: signedUrlData.signedUrl,
-            expiresAt,
-            message: 'Video URL generated via Supabase (Backblaze credentials missing)',
-            source: 'supabase-fallback'
-          }),
-          {
-            headers: {
-              ...corsHeaders,
-              'Cache-Control': 'public, max-age=3600'
+            error: 'Video temporarily unavailable',
+            details: 'Backblaze credentials are missing or incomplete.',
+            debug: {
+              contentId,
+              contentType,
+              backblazeConfigured: false,
             }
-          }
+          }),
+          { status: 503, headers: corsHeaders }
         );
       }
 
@@ -394,6 +481,103 @@ Deno.serve(async (req) => {
         bucketName: b2BucketName,
         videoUrl: videoUrl.substring(0, 100) + '...' // Truncate for logging
       });
+
+      // Check if this is a Backblaze API endpoint URL (b2_download_file_by_id)
+      const isB2ApiDownloadUrl = videoUrl.includes('/b2api/') && videoUrl.includes('b2_download_file_by_id');
+      
+      if (isB2ApiDownloadUrl) {
+        console.log('Detected Backblaze API download endpoint:', { contentId, contentType });
+        
+        const authResponse = await fetch(`${BACKBLAZE_API_URL}/b2api/v2/b2_authorize_account`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${btoa(`${b2KeyId}:${b2AppKey}`)}`
+          }
+        });
+
+        if (!authResponse.ok) {
+          const authErrorBody = await authResponse.text();
+          console.error('Backblaze authorization failed for API endpoint:', {
+            status: authResponse.status,
+            body: authErrorBody
+          });
+          return new Response(
+            JSON.stringify({ error: 'Failed to authorize with Backblaze', details: authErrorBody }),
+            { status: 500, headers: corsHeaders }
+          );
+        }
+
+        const authData: B2AuthResponse = await authResponse.json();
+        const expiresAt = new Date(Date.now() + 7200 * 1000).toISOString(); // 2 hour expiry
+
+        if (isStreamingRequest) {
+          const videoResponse = await fetch(videoUrl, {
+            headers: buildVideoProxyHeaders(req, authData.authorizationToken),
+          });
+
+          if (!videoResponse.ok) {
+            console.error('Failed to proxy B2 API video request:', {
+              status: videoResponse.status,
+              statusText: videoResponse.statusText,
+              contentId,
+              contentType,
+            });
+            return new Response(
+              JSON.stringify({ error: 'Failed to stream video' }),
+              { status: 500, headers: corsHeaders }
+            );
+          }
+
+          const responseHeaders = new Headers({
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers': 'Range, User-Agent, Accept',
+            'Content-Type': videoResponse.headers.get('Content-Type') || 'video/mp4',
+            'Content-Length': videoResponse.headers.get('Content-Length') || '',
+            'Accept-Ranges': videoResponse.headers.get('Accept-Ranges') || 'bytes',
+            'Cache-Control': 'private, max-age=300',
+            'X-Signed-Url-Expires': expiresAt,
+            'Content-Range': videoResponse.headers.get('Content-Range') || '',
+            'ETag': videoResponse.headers.get('ETag') || '',
+            'Last-Modified': videoResponse.headers.get('Last-Modified') || '',
+          });
+
+          return new Response(videoResponse.body, {
+            status: videoResponse.status,
+            headers: responseHeaders
+          });
+        }
+
+        const proxyToken = await signStreamToken(
+          {
+            userId: user.id,
+            contentId,
+            contentType,
+            exp: Math.floor(Date.now() / 1000) + 7200,
+          },
+          supabaseKey,
+        );
+        const signedUrl = buildProxyStreamUrl(supabaseUrl, contentId, contentType, proxyToken);
+        
+        console.log('Successfully generated protected proxy URL for B2 API endpoint');
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            signedUrl,
+            expiresAt,
+            message: 'Video URL generated successfully (Backblaze API)',
+            source: 'backblaze-api'
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Cache-Control': 'public, max-age=7200',
+              'X-Signed-Url-Expires': expiresAt
+            }
+          }
+        );
+      }
 
       // Extract file path (remove domain and bucket from full URL)
       let filePath = videoUrl;
@@ -577,7 +761,7 @@ Deno.serve(async (req) => {
       }
 
       const downloadAuthData: B2SignedUrlResponse = await downloadAuthResponse.json();
-      const signedUrl = `${authData.downloadUrl}/file/${b2BucketName}/${filePath}?Authorization=${downloadAuthData.authorizationToken}`;
+      const backblazeSignedUrl = `${authData.downloadUrl}/file/${b2BucketName}/${filePath}?Authorization=${downloadAuthData.authorizationToken}`;
       const expiresAt = new Date(Date.now() + validDurationInSeconds * 1000).toISOString();
 
       // For video streaming, we need to proxy the request to avoid CORS issues
@@ -586,12 +770,8 @@ Deno.serve(async (req) => {
         console.log('Proxying video request to avoid CORS issues');
 
         try {
-          const videoResponse = await fetch(signedUrl, {
-            headers: {
-              'Range': req.headers.get('Range') || '',
-              'User-Agent': req.headers.get('User-Agent') || 'Supabase-Video-Proxy/1.0',
-              'Accept': req.headers.get('Accept') || '*/*',
-            }
+          const videoResponse = await fetch(backblazeSignedUrl, {
+            headers: buildVideoProxyHeaders(req),
           });
 
           if (!videoResponse.ok) {
@@ -633,12 +813,23 @@ Deno.serve(async (req) => {
         }
       }
 
+      const proxyToken = await signStreamToken(
+        {
+          userId: user.id,
+          contentId,
+          contentType,
+          exp: Math.floor(Date.now() / 1000) + validDurationInSeconds,
+        },
+        supabaseKey,
+      );
+      const signedUrl = buildProxyStreamUrl(supabaseUrl, contentId, contentType, proxyToken);
+
       return new Response(
         JSON.stringify({
           success: true,
           signedUrl,
           expiresAt,
-          message: 'Video URL generated successfully (Backblaze)',
+          message: 'Video proxy URL generated successfully (Backblaze)',
           source: 'backblaze'
         }),
         {

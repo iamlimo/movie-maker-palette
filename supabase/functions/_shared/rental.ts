@@ -82,8 +82,10 @@ async function findDirectRentalAccess(
     from: (table: string) => {
       select: (columns: string) => any;
       eq: (column: string, value: unknown) => any;
+      is: (column: string, value: unknown) => any;
       gt: (column: string, value: unknown) => any;
       order: (column: string, options: { ascending: boolean }) => any;
+      limit: (count: number) => any;
       maybeSingle: () => Promise<{ data: any; error: any }>;
     };
   },
@@ -100,9 +102,10 @@ async function findDirectRentalAccess(
       .eq('user_id', userId)
       .eq(column, value)
       .eq('status', 'paid')
-      .eq('revoked_at', null)
+      .is('revoked_at', null)
       .gt('expires_at', now)
       .order('expires_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error || !data) {
@@ -147,8 +150,10 @@ export async function hasActiveRentalAccess(
     from: (table: string) => {
       select: (columns: string) => any;
       eq: (column: string, value: unknown) => any;
+      is: (column: string, value: unknown) => any;
       gt: (column: string, value: unknown) => any;
       order: (column: string, options: { ascending: boolean }) => any;
+      limit: (count: number) => any;
       maybeSingle: () => Promise<{ data: any; error: any }>;
     };
   },

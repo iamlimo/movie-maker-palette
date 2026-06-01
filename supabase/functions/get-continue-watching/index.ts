@@ -48,8 +48,7 @@ serve(async (req: Request) => {
         completed,
         last_watched_at,
         playback_position,
-        video_duration,
-        season_id
+        video_duration
       `)
       .eq("user_id", user.id)
       .eq("completed", false)
@@ -99,28 +98,33 @@ serve(async (req: Request) => {
               title,
               duration,
               price,
-              season_id,
-              seasons!inner(
-                id,
-                tv_shows!inner(
-                  title,
-                  thumbnail_url,
-                  genre_id,
-                  genres(name)
-                )
-              )
+              season_id
             `)
             .eq("id", item.content_id)
             .single();
 
           if (episodeData) {
+            const { data: seasonData } = await supabase
+              .from("seasons")
+              .select("id, tv_show_id")
+              .eq("id", episodeData.season_id)
+              .maybeSingle();
+
+            const { data: showData } = seasonData?.tv_show_id
+              ? await supabase
+                  .from("tv_shows")
+                  .select("title, thumbnail_url, genre_id, genres(name)")
+                  .eq("id", seasonData.tv_show_id)
+                  .maybeSingle()
+              : { data: null };
+
             contentDetails = {
-              title: `${episodeData.seasons.tv_shows.title} - ${episodeData.title}`,
-              thumbnail_url: episodeData.seasons.tv_shows.thumbnail_url,
+              title: `${showData?.title || "Episode"} - ${episodeData.title}`,
+              thumbnail_url: showData?.thumbnail_url,
               duration: episodeData.duration,
               price: episodeData.price,
-              genre: episodeData.seasons.tv_shows.genres?.name,
-              season_id: episodeData.season_id || episodeData.seasons.id,
+              genre: showData?.genres?.name,
+              season_id: episodeData.season_id || seasonData?.id,
             };
           }
         }
@@ -132,11 +136,27 @@ serve(async (req: Request) => {
           p_content_type: item.content_type,
         });
 
-        if (!accessError && accessData && accessData.length > 0) {
-          const access = accessData[0];
-          if (access.has_access) {
-            rentalStatus = "active";
-            expiresAt = access.expires_at;
+        if (accessError) {
+          console.error(`Error checking rental access for item ${item.content_id}:`, {
+            errorCode: accessError.code,
+            errorMessage: accessError.message,
+            errorDetails: accessError.details,
+          });
+        }
+
+        // Handle RPC response - might be array or single object
+        let access = null;
+        if (accessData) {
+          if (Array.isArray(accessData) && accessData.length > 0) {
+            access = accessData[0];
+          } else if (!Array.isArray(accessData)) {
+            access = accessData;
+          }
+        }
+
+        if (!accessError && access && access.has_access) {
+          rentalStatus = "active";
+          expiresAt = access.expires_at;
 
             // Calculate time remaining
             if (expiresAt) {
@@ -163,10 +183,11 @@ serve(async (req: Request) => {
                 rentalStatus = "expired";
               }
             }
-          } else {
-            rentalStatus = "expired";
-          }
+        } else if (!accessError && access && !access.has_access) {
+          // User has no access or access has expired
+          rentalStatus = "expired";
         } else {
+          // No error but no access data, or error occurred
           rentalStatus = "none";
         }
 
