@@ -1,77 +1,149 @@
-## Root cause
 
-Three things broke the app at the database/routing layer; the frontend itself is mostly intact.
+# RBAC + ABAC + Audit Overlay — Signature TV
 
-1. **`/` route points to `Maintenance`** in `src/App.tsx` — the real landing (`Index`) is no longer mounted, which is why the homepage is empty (no hero slider, no movie/TV sections).
-2. **The `on_auth_user_created` trigger on `auth.users` was dropped** (see `supabase/migrations/20260630_remove_handle_new_user_and_trigger.sql`). No trigger means new signups never get a `profiles` row, never get a `wallets` row, and never receive the 400 NGN signup bonus — that is why signup "behaves abnormally".
-3. **RLS is enabled on almost every table but the policies are missing.** A query of `pg_policies` returns policies for only `profiles`, `user_roles`, and `wallets`. Every other table (`movies`, `tv_shows`, `seasons`, `episodes`, `sections`, `content_sections`, `slider_items`, `banners`, `genres`, `rentals`, `rental_intents`, `rental_access`, `payments`, `referral_codes`, `job_listings`, `wallet_transactions`, `favorites`, `watch_history`, …) has RLS on with zero policies, so PostgREST returns empty arrays for reads and rejects every insert. That single fact explains:
-   - Empty landing page (movies/tv/sections/slider_items unreadable),
-   - Admin can't create or view hero slider / movies / TV shows,
-   - Admin can't see rentals, finance, or job listings,
-   - `new row violates row-level security policy for table "referral_codes"` when admin tries to create a referral code.
-4. Additionally `profiles`, `user_roles`, and `wallets` currently have `rowsecurity = false` (RLS disabled) even though policies are defined — that is a regression we'll re-enable so the policies actually take effect.
+Goal: evolve from "role → page" to "permission → action + owner-scoped data + audit trail" while keeping the existing `app_role` enum, every current admin route, and all live RLS policies intact. Ship before June 14.
 
-## Fix plan
+## Guiding rules
+- Keep the `app_role` enum and `user_roles` table as-is. New `role_permissions` maps enum values → permissions. `is_staff()` / `has_role()` keep working.
+- All new RLS uses `has_permission()` **in addition to** existing policies (additive overlay). No existing policy is dropped in this pass.
+- ABAC scope = content ownership only (`uploaded_by` on movies, producer link on tv_shows/seasons/episodes). Region/assignment scopes deferred.
+- Audit logs: schema + automatic write-side triggers only. The viewer UI ships in a follow-up.
+- Sidebar/buttons read from a single `can(permission)` helper. `useRole` is kept as a thin compatibility shim.
 
-### 1. Restore the landing page (frontend, 1 line)
-In `src/App.tsx`, change `<Route path="/" element={<Maintenance />} />` to `<Route path="/" element={<Index />} />` and add the lazy import for `Index`. Keep `Maintenance` available at `/maintenance` only (no other code touched).
+---
 
-### 2. Add phone number to signup + 400 bonus signup flow (frontend)
-- `src/pages/Auth.tsx`: add a Phone Number input to the signup form state and JSX (optional field, simple validation).
-- `src/contexts/AuthContext.tsx`: extend `signUp(email, password, name?, phoneNumber?)` and pass `phone_number` inside `options.data` so the trigger picks it up from `raw_user_meta_data`.
-- No new components or routes.
+## 1. Permission catalog (seed data)
 
-### 3. Single migration to repair the backend
+Resource.action format, grouped:
 
-One migration file containing, in order:
+- users: `user.view`, `user.create`, `user.edit`, `user.delete`, `user.suspend`
+- content: `content.movie.create|edit|delete`, `content.tv.create|edit|delete`, `content.publish`, `content.unpublish`
+- homepage: `homepage.section.manage`, `homepage.hero.manage`, `homepage.banner.manage`
+- finance: `wallet.view`, `wallet.adjust`, `wallet.audit`, `rental.manage`, `referral.manage`
+- support: `support.ticket.view`, `support.ticket.respond`
+- careers: `careers.job.manage`, `careers.application.view`
+- notifications: `notification.send`
+- settings/admin: `settings.manage`, `role.manage`, `permission.manage`, `audit.view`
 
-**A. Re-enable RLS on the three tables where it got turned off**
-```sql
-ALTER TABLE public.profiles    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_roles  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.wallets     ENABLE ROW LEVEL SECURITY;
+Default role → permission mapping (seeded, editable later):
+- `super_admin` → all
+- `admin` → all except `role.manage`, `permission.manage`, `audit.view`
+- `accounting` → `wallet.*`, `rental.manage`, `referral.manage`, `user.view`
+- `sales` → `homepage.*`, `referral.manage`, `user.view`, `rental.manage`
+- `support` → `support.*`, `user.view`, `careers.*`
+- `user` → none
+
+---
+
+## 2. Database additions (additive, zero destructive change)
+
+New migration (no edits to existing tables):
+
+```text
+permissions(id, key UNIQUE, description, module)
+role_permissions(role app_role, permission_id) PK(role, permission_id)
+audit_logs(
+  id, actor_id, action, resource_type, resource_id,
+  metadata jsonb, ip, user_agent, created_at DEFAULT now()
+)  -- append-only
 ```
 
-**B. Recreate `handle_new_user` + trigger** so every signup gets a profile (with name + phone from `raw_user_meta_data`), a wallet, and a 400 NGN bonus credited via the existing `grant_signup_bonus` helper. Trigger is `AFTER INSERT ON auth.users FOR EACH ROW`.
+Append-only enforcement on `audit_logs`:
+- `REVOKE UPDATE, DELETE` from authenticated/anon/service_role
+- BEFORE UPDATE/DELETE trigger that RAISEs
+- RLS: `audit.view` permission required for SELECT; INSERT allowed via SECURITY DEFINER function only
 
-**C. Add the missing RLS policies.** Grouped by access pattern (all use the existing `public.has_role` / `public.is_staff` security-definer helpers — no recursion):
+ABAC support column (already present): `movies.uploaded_by`. We add `tv_shows.uploaded_by` and `seasons.uploaded_by` nullable columns (NULL = legacy, treated as staff-owned). No backfill required.
 
-- **Public read, staff write** (catalog + homepage data):
-  `movies`, `tv_shows`, `seasons`, `episodes`, `genres`, `sections`, `content_sections`, `slider_items`, `banners`, `cast_crew`, `movie_cast`, `tv_show_cast`, `episode_cast`.
-  → `SELECT` policy `USING (true)` for `anon` + `authenticated`; `INSERT/UPDATE/DELETE` policy `USING (public.is_staff(auth.uid()))`.
-  → Also add the matching `GRANT SELECT ON … TO anon` and `GRANT SELECT, INSERT, UPDATE, DELETE … TO authenticated` since they were never granted.
+GRANTs included for every new public table per project rules.
 
-- **Public read of active rows only**:
-  `job_listings` (`status = 'active'` for anon, full access for staff).
+### New SQL helpers (SECURITY DEFINER, STABLE)
+- `has_permission(_user uuid, _perm text) returns boolean` — joins `user_roles` → `role_permissions` → `permissions`
+- `owns_content(_user uuid, _table text, _id uuid) returns boolean` — owner check used by ABAC RLS
+- `log_audit(_action, _resource_type, _resource_id, _metadata)` — append to `audit_logs` with `auth.uid()`
 
-- **User-owned data** (`USING (auth.uid() = user_id)` for select/insert/update/delete, plus staff override):
-  `rentals`, `rental_intents`, `rental_access`, `payments`, `wallet_transactions`, `favorites`, `watch_history`, `user_preferences`, `purchases`, `referral_code_uses`, `push_device_tokens`, `user_payments`.
+---
 
-- **Staff-only** (admin tooling):
-  `referral_codes` (this is the one currently throwing the RLS error), `payouts`, `finance_audit_logs`, `transactions_ledger`, `payment_anomalies`, `payment_attempts`, `producers`, `submissions`, `rental_payments`, `rental_audit_log`, `email_logs`, `push_notifications`, `ticket_templates`, `permissions`, `roles`, `role_permissions`, `webhook_events`, `job_applications`.
+## 3. RLS — additive overlay only
 
-- **Ticket access**: `tickets` / `ticket_comments` / `ticket_activity_log` — owner can read their own, staff can read/write all.
+For each existing staff-write policy we keep it. We add a second policy that grants the same action when `has_permission(...)` is true AND (for content) `owns_content(...)` is true. This means:
 
-- **`user_roles`**: keep the existing `roles_select_own` policy, add staff `SELECT/INSERT/UPDATE/DELETE` via `has_role(auth.uid(),'super_admin')` so the admin Users page works.
+- Existing super_admin/admin flows continue to work via `is_staff()`.
+- New permission grants (e.g. a producer with `content.movie.edit` on their own row) become possible.
+- Anyone the old policy already allowed remains allowed → zero regression.
 
-- **`profiles`**: keep existing own-row policies, add staff `SELECT` so admin user list works.
+Example (movies.update):
+```sql
+create policy movies_owner_edit on public.movies
+for update to authenticated
+using (has_permission(auth.uid(), 'content.movie.edit') and uploaded_by = auth.uid())
+with check (has_permission(auth.uid(), 'content.movie.edit') and uploaded_by = auth.uid());
+```
 
-- **`wallets`**: keep existing own-row select, add staff `SELECT` for admin wallet view.
+No DROP POLICY in this migration.
 
-**D. GRANTs** (re-issued for every public-schema table touched, matching the policies above) — required because PostgREST does not grant defaults on `public`. Service role gets `ALL`.
+---
 
-### 4. Verification
-After the migration runs, manually verify:
-- Homepage loads with hero slider + sections.
-- Admin → Hero Slider / Movies / TV Shows / Rentals / Finance / Job Listings all load and create works.
-- Admin → Referral Codes: create no longer throws RLS error.
-- Sign up a new account → profile + wallet created, wallet balance shows 400 NGN.
+## 4. Automatic audit triggers (write-side only)
 
-## Files touched
+AFTER INSERT/UPDATE/DELETE triggers on:
+- `user_roles` → role changes
+- `role_permissions` → permission changes
+- `wallets` (UPDATE of balance) + manual `wallet.adjust` calls → wallet adjustments
+- `movies`, `tv_shows`, `episodes` status change → moderation actions
+- Auth events: already captured by Supabase Auth logs; we mirror sign-in success into `audit_logs` via an edge-function hook only if it's a one-liner — otherwise we defer (Supabase already keeps these).
 
-- `src/App.tsx` — swap `/` route, lazy-import `Index`.
-- `src/pages/Auth.tsx` — add phone number field.
-- `src/contexts/AuthContext.tsx` — extend `signUp` signature, forward phone in metadata.
-- `supabase/migrations/<new timestamp>_restore_rls_and_signup_trigger.sql` — single consolidated migration described above.
+Each trigger calls `log_audit(...)` with a typed `action` string ('role.changed', 'permission.granted', 'wallet.adjusted', 'content.published'…).
 
-No new pages, components, or edge functions. No edits to existing migrations.
+---
+
+## 5. Frontend integration (no UI rewrite)
+
+New files:
+- `src/lib/permissions.ts` — `PermissionKey` union, derived from the seed list.
+- `src/hooks/usePermissions.tsx` — fetches `role_permissions` for current role once, memoizes a `Set<PermissionKey>`, exposes `can(perm)` and `canAny(perms)`.
+- `src/components/Can.tsx` — `<Can perm="wallet.adjust">…</Can>` render-prop guard.
+
+Edits:
+- `src/lib/rbac.ts` — keep `PAGE_ACCESS` but mark deprecated; `canAccessPage` now delegates to `can()` for the matching permission(s). Backward compatible.
+- `src/hooks/useRole.tsx` — `canDo()` becomes a thin wrapper over `usePermissions().can()`. Existing call sites keep working.
+- `src/components/RoleRoute.tsx` / `RequireRole.tsx` — accept optional `perm` prop; if provided, use permission check; otherwise fall back to current role check.
+- `src/components/admin/AdminLayout.tsx` — sidebar filter swaps `canAccess(page)` for a permission map (each sidebar item gets a permission key). Visible-when logic unchanged.
+
+Nothing about existing pages is rewritten. Sensitive buttons (Delete user, Adjust wallet, Publish content, Manage roles) are wrapped in `<Can>` so they hide when the permission is missing.
+
+---
+
+## 6. Phased rollout (zero downtime)
+
+1. **Phase 1 — schema + seed (1 migration, behind the scenes).** Add tables, seed permissions + role_permissions from current enum mapping, add `has_permission()`. No RLS changes. No UI changes. Verify nothing regresses.
+2. **Phase 2 — overlay RLS + frontend `can()`.** Add additive policies, ship `usePermissions` + `<Can>`, wire sidebar and sensitive buttons. Existing staff still pass via old `is_staff()` policies → safe.
+3. **Phase 3 — audit triggers.** Enable triggers on role/permission/wallet/content. Append-only enforcement on. (Viewer UI deferred per your choice.)
+4. **Phase 4 (post-launch).** Reports & Compliance page reading from `audit_logs`. Dynamic dashboard widgets. Then optionally retire `is_staff()` from policies module-by-module once permission coverage is verified.
+
+Each phase is independently revertable.
+
+---
+
+## 7. Risk & rollback
+
+| Risk | Mitigation | Rollback |
+|---|---|---|
+| New RLS breaks an admin action | All new policies are additive; old `is_staff()` policies remain | `DROP POLICY` for the new overlay; behavior reverts |
+| Permission seed wrong → admin loses access to a button | Super admin has all perms by definition; we test with a real admin account before enabling `<Can>` | Toggle the button back to a role check (one-line) |
+| Audit trigger slows writes | Triggers do a single INSERT into an unindexed-for-write table | Disable trigger; data already written stays |
+| Append-only blocks legitimate cleanup | Service-role SECURITY DEFINER procedure for retention pruning, gated by `permission.manage` | n/a |
+
+---
+
+## 8. Out of scope (this plan)
+- Region/country and ticket-assignment ABAC scopes
+- Reports & Compliance viewer UI + CSV export
+- Replacing the enum with fully dynamic roles
+- Dashboard widget refactor
+
+## 9. Deliverables this round
+1. One migration: `permissions`, `role_permissions`, `audit_logs`, helper functions, additive RLS overlay for movies/tv_shows/seasons/episodes/wallets/tickets, audit triggers, GRANTs.
+2. `src/lib/permissions.ts`, `src/hooks/usePermissions.tsx`, `src/components/Can.tsx`.
+3. Light edits to `src/lib/rbac.ts`, `src/hooks/useRole.tsx`, `src/components/RoleRoute.tsx`, `src/components/RequireRole.tsx`, `src/components/admin/AdminLayout.tsx` to plug `can()` in without changing layouts.
+4. No edits to existing migrations, no removal of existing policies, no new pages.
