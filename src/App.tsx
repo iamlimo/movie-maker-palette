@@ -68,6 +68,7 @@ const HeroSlider = lazy(() => import("@/pages/admin/HeroSlider"));
 const Banners = lazy(() => import("@/pages/admin/Banners"));
 const Wallets = lazy(() => import("@/pages/admin/Wallets"));
 const Settings = lazy(() => import("@/pages/admin/Settings"));
+const PermissionsMatrix = lazy(() => import("@/pages/admin/PermissionsMatrix"));
 const JobListingsAdmin = lazy(() => import("@/pages/admin/JobListings"));
 const JobApplicationsAdmin = lazy(
   () => import("@/pages/admin/JobApplications"),
@@ -189,6 +190,7 @@ function AppContent() {
               <Route path="banners" element={<RoleRoute page="banners"><Banners /></RoleRoute>} />
               <Route path="wallets" element={<RoleRoute page="wallets"><Wallets /></RoleRoute>} />
               <Route path="settings" element={<SuperAdminRoute><Settings /></SuperAdminRoute>} />
+              <Route path="permissions" element={<SuperAdminRoute><PermissionsMatrix /></SuperAdminRoute>} />
               <Route path="job-listings" element={<RoleRoute page="job-listings"><JobListingsAdmin /></RoleRoute>} />
               <Route path="applications" element={<RoleRoute page="job-applications"><JobApplicationsAdmin /></RoleRoute>} />
               <Route path="referral-codes" element={<RoleRoute page="referral-codes"><ReferralCodes /></RoleRoute>} />
