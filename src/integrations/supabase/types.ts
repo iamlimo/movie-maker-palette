@@ -86,6 +86,36 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          resource_id: string | null
+          resource_type: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_type: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       content_sections: {
         Row: {
           content_id: string
@@ -2308,6 +2338,7 @@ export type Database = {
         Args: { season_id_param: string }
         Returns: number
       }
+      get_user_role: { Args: { p_user_id: string }; Returns: string }
       get_wallet_balance: { Args: { p_user_id: string }; Returns: number }
       grant_rental_access: {
         Args: {
@@ -2351,6 +2382,7 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { user_uuid: string }; Returns: boolean }
       log_finance_action: {
         Args: { p_action: string; p_details?: Json }
         Returns: string
