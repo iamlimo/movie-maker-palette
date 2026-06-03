@@ -194,7 +194,7 @@ const fetchUserProfile = async (userId: string, currentSession?: Session | null)
           .from('user_roles')
           .select('role')
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
 
         if (roleData) {
           setUserRole({ role: roleData.role as AppRole });
