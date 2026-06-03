@@ -2449,6 +2449,14 @@ export type Database = {
         Args: { p_required_amount: number; p_wallet_id: string }
         Returns: boolean
       }
+      verify_playback_authorization: {
+        Args: {
+          p_episode_id?: string
+          p_movie_id?: string
+          p_season_id?: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:
