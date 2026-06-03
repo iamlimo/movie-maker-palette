@@ -4,12 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
-import SystemVideoPlayer from "@/components/SystemVideoPlayer";
-import { toast } from "@/hooks/use-toast";
 import { usePlatform } from "@/hooks/usePlatform";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useFullscreenLandscape } from "@/hooks/useFullscreenLandscape";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react"; // Unified line here
 
 const Watch = () => {
   const { contentType, contentId } = useParams();
@@ -21,12 +19,9 @@ const Watch = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState("Access Denied");
-  const [content, setContent] = useState<unknown>(null);
+  const [content, setContent] = useState<any>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-launch fullscreen + landscape lock once a playable video is loaded.
-  // Native (iOS/Android): orientation lock via @capacitor/screen-orientation.
-  // Mobile web: requestFullscreen on the container + best-effort orientation lock.
   useFullscreenLandscape({
     containerRef: fullscreenContainerRef,
     enabled: !!videoUrl && (isNative || isMobile),
@@ -50,14 +45,12 @@ const Watch = () => {
 
   const checkAccessAndLoad = async () => {
     try {
-      let accessData = null;
-      let accessError = null;
+      let hasAccess = false;
       let retryCount = 0;
       const maxRetries = 3;
-      const retryDelay = 500; // ms
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const retryDelay = 500; 
+
+      const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
 
       if (!accessToken) {
@@ -67,44 +60,39 @@ const Watch = () => {
         return;
       }
 
-      // Retry logic for access check (database sync delay)
+      // 1. High-Performance Database Guard (Replaces slower edge function invocation)
+      const rpcParams = {
+        p_movie_id: contentType === "movie" ? contentId : null,
+        p_season_id: contentType === "season" ? contentId : null,
+        p_episode_id: contentType === "episode" ? contentId : null,
+      };
+
       while (retryCount < maxRetries) {
-        const result = await supabase.functions.invoke("rental-access", {
-          body: { content_id: contentId, content_type: contentType },
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
+        const { data, error: rpcError } = await supabase.rpc(
+          "verify_playback_authorization",
+          rpcParams
+        );
 
-        accessError = result.error;
-        accessData = result.data;
-
-        if (accessData?.has_access) {
-          break; // Access verified, proceed
+        if (!rpcError && data === true) {
+          hasAccess = true;
+          break; 
         }
 
         retryCount++;
         if (retryCount < maxRetries) {
-          // Wait before retrying to allow database to sync
           await new Promise((resolve) => setTimeout(resolve, retryDelay));
         }
       }
 
-      if (accessError || !accessData?.has_access) {
-        console.error("Watch access check failed:", {
-          contentId,
-          contentType,
-          accessError,
-          accessData,
-        });
+      if (!hasAccess) {
         setErrorTitle("Access Denied");
-        setError("You don't have access to this content");
+        setError("You don't have an active rental for this content");
         setLoading(false);
         return;
       }
 
-      // Fetch content details
-      let contentData;
+      // 2. Fetch content details with relational joins to prevent metadata gaps
+      let contentData: any = null;
       if (contentType === "movie") {
         const { data } = await supabase
           .from("movies")
@@ -113,14 +101,23 @@ const Watch = () => {
           .single();
         contentData = data;
       } else if (contentType === "episode") {
+        // FIXED: Relational nested fetch to grab parent TV Show details natively
         const { data } = await supabase
           .from("episodes")
-          .select("*")
+          .select(`
+            *,
+            seasons!inner (
+              season_number,
+              tv_shows!inner (
+                title,
+                thumbnail_url
+              )
+            )
+          `)
           .eq("id", contentId)
           .single();
         contentData = data;
       } else if (contentType === "season") {
-        // Seasons are rented as a package but are not directly playable.
         const { data: seasonData, error: seasonError } = await supabase
           .from("seasons")
           .select("id, season_number, tv_show_id")
@@ -128,7 +125,6 @@ const Watch = () => {
           .single();
 
         if (seasonError || !seasonData) {
-          console.error("Season fetch error:", seasonError);
           setErrorTitle("Video Unavailable");
           setError("Season not found");
           setLoading(false);
@@ -142,7 +138,6 @@ const Watch = () => {
           .order("episode_number", { ascending: true });
 
         if (episodesError || !episodesData || episodesData.length === 0) {
-          console.error("Season episodes fetch error:", episodesError);
           const { data: showData } = await supabase
             .from("tv_shows")
             .select("slug")
@@ -154,38 +149,27 @@ const Watch = () => {
             return;
           }
           setErrorTitle("Video Unavailable");
-          setError("Season not found");
+          setError("Season content structural mismatch");
           setLoading(false);
           return;
         }
 
-        const episodeIds = (episodesData as Array<{ id: string }>).map(
-          (episode) => episode.id,
-        );
+        const episodeIds = episodesData.map((ep) => ep.id);
         const { data: historyData } = await supabase
           .from("watch_history")
           .select("content_id, completed, progress")
           .eq("user_id", user.id)
           .in("content_id", episodeIds);
 
-        const watchMap = (historyData || []).reduce<
-          Record<string, { completed: boolean; progress: number }>
-        >(
-          (map, entry: { content_id: string; completed: boolean; progress?: number }) => {
-            map[entry.content_id] = {
-              completed: entry.completed,
-              progress: entry.progress || 0,
-            };
-            return map;
-          },
-          {},
-        );
+        const watchMap = (historyData || []).reduce<Record<string, any>>((map, entry) => {
+          map[entry.content_id] = { completed: entry.completed, progress: entry.progress || 0 };
+          return map;
+        }, {});
 
-        const nextEpisode =
-          (episodesData as Array<{ id: string }>).find((episode) => {
-            const history = watchMap[episode.id];
-            return !history || (!history.completed && history.progress < 90);
-          }) || episodesData[0];
+        const nextEpisode = episodesData.find((ep) => {
+          const history = watchMap[ep.id];
+          return !history || (!history.completed && history.progress < 90);
+        }) || episodesData[0];
 
         navigate(`/watch/episode/${nextEpisode.id}`);
         return;
@@ -193,122 +177,55 @@ const Watch = () => {
 
       if (!contentData) {
         setErrorTitle("Video Unavailable");
-        setError("Content not found");
+        setError("Content metadata record could not be resolved");
         setLoading(false);
         return;
       }
 
       setContent(contentData);
 
-      // Get video URL based on content type
+      // 3. Resolve Media Asset Streams
       let videoUrlData: { url: string } | null = null;
 
       if (contentType === "movie") {
-        // Use get-video-url function for movies (generates signed URL)
-        const { data: urlData, error: urlError } =
-          await supabase.functions.invoke("get-video-url", {
-            body: { movieId: contentId },
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
+        const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
+          body: { movieId: contentId },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
-        if (urlError || !urlData?.signedUrl) {
-          // Fallback to direct URL from database
-          videoUrlData = { url: contentData.video_url };
-        } else {
-          videoUrlData = { url: urlData.signedUrl };
-        }
+        videoUrlData = (urlError || !urlData?.signedUrl) 
+          ? { url: contentData.video_url } 
+          : { url: urlData.signedUrl };
+
       } else if (contentType === "episode") {
-        const { data: urlData, error: urlError } =
-          await supabase.functions.invoke("get-video-url", {
-            body: {
-              contentId,
-              episodeId: contentId,
-              contentType: "episode",
-              expiryHours: 24,
-            },
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
+        const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
+          body: { contentId, episodeId: contentId, contentType: "episode", expiryHours: 24 },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
-        const resolveSignedUrl = (input: unknown): string | null => {
-          // Observed in logs: urlData can be a JSON string:
-          // "{\"success\":true,\"signedUrl\":\"https://...\",\"expiresAt\":\"...\"}"
+        const resolveSignedUrl = (input: any): string | null => {
           if (input == null) return null;
-
           if (typeof input === "string") {
             try {
-              const parsed: unknown = JSON.parse(input);
-
-              if (
-                typeof parsed === "object" &&
-                parsed !== null &&
-                "signedUrl" in parsed &&
-                typeof (parsed as { signedUrl?: unknown }).signedUrl === "string"
-              ) {
-                return (parsed as { signedUrl: string }).signedUrl;
-              }
-
-              if (typeof parsed === "object" && parsed !== null && "data" in parsed) {
-                const dataVal = (parsed as { data?: unknown }).data;
-                if (
-                  typeof dataVal === "object" &&
-                  dataVal !== null &&
-                  "signedUrl" in dataVal &&
-                  typeof (dataVal as { signedUrl?: unknown }).signedUrl === "string"
-                ) {
-                  return (dataVal as { signedUrl: string }).signedUrl;
-                }
-              }
-
-              return null;
+              const parsed = JSON.parse(input);
+              if (parsed?.signedUrl) return parsed.signedUrl;
+              if (parsed?.data?.signedUrl) return parsed.data.signedUrl;
             } catch {
               return null;
             }
           }
-
-          if (typeof input === "object" && input !== null) {
-            const obj = input as Record<string, unknown>;
-            const directSigned = obj["signedUrl"];
-            if (typeof directSigned === "string") return directSigned;
-
-            const dataVal = obj["data"];
-            if (typeof dataVal === "object" && dataVal !== null) {
-              const dataObj = dataVal as Record<string, unknown>;
-              const nestedSigned = dataObj["signedUrl"];
-              if (typeof nestedSigned === "string") return nestedSigned;
-            }
+          if (typeof input === "object") {
+            if (input.signedUrl) return input.signedUrl;
+            if (input.data?.signedUrl) return input.data.signedUrl;
           }
-
           return null;
         };
 
         const signedUrl = resolveSignedUrl(urlData);
 
         if (urlError || !signedUrl) {
-          console.error("Episode video URL generation failed:", {
-            contentId,
-            contentType,
-            urlError,
-            urlData,
-          });
           setErrorTitle("Video Unavailable");
-
-          const errorFromUrlData =
-            typeof urlData === "object" && urlData !== null
-              ? (urlData as Record<string, unknown>)["error"]
-              : undefined;
-
-          const errorMsg =
-            (typeof errorFromUrlData === "string" && errorFromUrlData) ||
-            urlError?.message ||
-            (typeof urlData === "string"
-              ? "Failed to parse video URL response"
-              : "Failed to load video");
-
-          setError(errorMsg);
+          setError(urlError?.message || "Secure token generation failed for media stream");
           setLoading(false);
           return;
         }
@@ -317,23 +234,18 @@ const Watch = () => {
       }
 
       if (!videoUrlData?.url) {
-        console.error("Watch video URL missing:", {
-          contentId,
-          contentType,
-          videoUrlData,
-        });
         setErrorTitle("Video Unavailable");
-        setError("Failed to load video");
+        setError("Stream URI resolution failed");
         setLoading(false);
         return;
       }
 
       setVideoUrl(videoUrlData.url);
       setLoading(false);
-    } catch (err: unknown) {
-      console.error("Error loading content:", err);
+    } catch (err) {
+      console.error("Critical crash inside playback thread:", err);
       setErrorTitle("Video Unavailable");
-      setError("Failed to load content");
+      setError("An unexpected error occurred while setting up the player");
       setLoading(false);
     }
   };
@@ -349,12 +261,12 @@ const Watch = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center text-white">
+        <div className="text-center text-white p-6">
           <h1 className="text-2xl font-bold mb-4">{errorTitle}</h1>
-          <p className="mb-4">{error}</p>
+          <p className="mb-4 text-gray-400">{error}</p>
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90 transition"
           >
             Go Back
           </button>
@@ -363,8 +275,30 @@ const Watch = () => {
     );
   }
 
-  return (
-    <div ref={fullscreenContainerRef} className="min-h-screen bg-black">
+  // Formatting strings safely out of unified object types
+  const contentTitle = contentType === "movie" 
+    ? (content?.title ?? "Untitled Movie")
+    : `${content?.seasons?.tv_shows?.title ?? "Show"} - Season ${content?.seasons?.season_number ?? ""} Ep ${content?.episode_number ?? ""}`;
+
+  const contentPoster = contentType === "movie"
+    ? (content?.thumbnail_url ?? "")
+    : (content?.seasons?.tv_shows?.thumbnail_url ?? content?.thumbnail_url ?? "");
+
+return (
+    <div 
+      ref={fullscreenContainerRef} 
+      className="min-h-screen bg-black relative group select-none"
+    >
+      {/* Premium Floating Back Button Layer */}
+      <button
+        onClick={() => navigate(-1)}
+        className="absolute top-6 left-6 z-50 flex items-center justify-center bg-black/40 hover:bg-black/70 text-white p-3 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out transform -translate-x-2 group-hover:translate-x-0 cursor-pointer shadow-2xl border border-white/10 hover:scale-105 active:scale-95"
+        title="Go Back"
+        aria-label="Return to previous page"
+      >
+        <ArrowLeft className="h-6 w-6 transition-transform group-hover/btn:-translate-x-0.5" />
+      </button>
+
       {videoUrl && content && (
         <>
           {/* Use Native Player on iOS/Android if available */}
@@ -373,61 +307,19 @@ const Watch = () => {
               contentId={contentId!}
               contentType={contentType as "movie" | "episode"}
               videoUrl={videoUrl}
-              title={
-                contentType === "movie"
-                  ? ((content as Record<string, unknown>)?.title as string | undefined) ?? ""
-                  : `${((content as Record<string, unknown>)?.show_title as
-                      | string
-                      | undefined) ?? "Show"} - Episode ${
-                      ((content as Record<string, unknown>)?.episode_number as
-                        | number
-                        | undefined) ?? ""
-                    }`
-              }
-              poster={
-                contentType === "movie"
-                  ? (((content as Record<string, unknown>)?.thumbnail_url as
-                      | string
-                      | undefined) ?? "")
-                  : (((content as Record<string, unknown>)?.seasons as
-                      | { tv_shows?: { thumbnail_url?: string } }
-                      | undefined)?.tv_shows?.thumbnail_url as string | undefined) ??
-                    ""
-              }
-              subtitleUrl={
-                ((content as Record<string, unknown>)?.subtitle_url as
-                  | string
-                  | undefined) ?? ""
-              }
+              title={contentTitle}
+              poster={contentPoster}
+              subtitleUrl={content?.subtitle_url ?? ""}
               autoPlay={true}
             />
           ) : (
-            // Fallback to Web Player on desktop or web platforms
+            /* Fallback to Web Player on desktop or web platforms */
             <VideoPlayer
               src={videoUrl}
               contentId={contentId!}
               contentType={contentType!}
-              title={
-                contentType === "movie"
-                  ? (((content as Record<string, unknown>)?.title as
-                      | string
-                      | undefined) ?? "")
-                  : `${(((content as Record<string, unknown>)?.seasons as
-                      | { tv_shows?: { title?: string } }
-                      | undefined)?.tv_shows?.title ?? "Show")} - Episode ${
-                      ((content as Record<string, unknown>)?.episode_number as
-                        | number
-                        | undefined) ?? ""
-                    }`
-              }
-              poster={
-                (((content as Record<string, unknown>)?.thumbnail_url as
-                  | string
-                  | undefined) ?? "") ||
-                (((content as Record<string, unknown>)?.poster_url as
-                  | string
-                  | undefined) ?? "")
-              }
+              title={contentTitle}
+              poster={contentPoster}
               autoPlay={true}
               immersive={true}
             />
