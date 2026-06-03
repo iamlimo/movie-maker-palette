@@ -59,7 +59,8 @@ export type PageKey =
   | 'job-listings'
   | 'job-applications'
   | 'push-notifications'
-  | 'settings';
+  | 'settings'
+  | 'permissions';
 
 export const PAGE_ACCESS: Record<PageKey, AppRole[]> = {
   dashboard: ['super_admin', 'admin', 'support', 'sales', 'accounting'],
@@ -80,6 +81,7 @@ export const PAGE_ACCESS: Record<PageKey, AppRole[]> = {
   'job-applications': ['super_admin', 'admin', 'support'],
   'push-notifications': ['super_admin', 'admin'],
   settings: ['super_admin'],
+  permissions: ['super_admin'],
 };
 
 /** Per-action permission matrix for sensitive in-page operations. */
