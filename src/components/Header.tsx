@@ -21,7 +21,8 @@ import { cn } from "@/lib/utils";
 
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
-  const { isSuperAdmin } = useRole();
+  // const { isSuperAdmin } = useRole();
+  const { isSuperAdmin, isStaff, isSales, isAccounting, isSupport } = useRole();
   const { formatBalance, isLoading: walletLoading, error: walletError } = useWallet();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -144,7 +145,77 @@ const Header = () => {
                 </Button>
               </Link>
 
-              <DropdownMenu>
+
+<DropdownMenu>
+  {/* The Trigger must be inside the DropdownMenu */}
+  <DropdownMenuTrigger asChild>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:bg-secondary h-8 lg:h-9 px-2 lg:px-3"
+    >
+      <User className="h-4 w-4 lg:h-5 lg:w-5" />
+      <span className="hidden lg:inline text-sm truncate max-w-[120px]">
+        {profile?.name || user?.email || "Account"}
+      </span>
+    </Button>
+  </DropdownMenuTrigger>
+
+  {/* The Content must also be inside the DropdownMenu */}
+  <DropdownMenuContent align="end" className="w-48 bg-card border-border">
+    <DropdownMenuItem asChild>
+      <Link to="/profile" className="flex items-center text-foreground">
+        <User className="mr-2 h-4 w-4" /> Profile
+      </Link>
+    </DropdownMenuItem>
+    
+    <DropdownMenuItem asChild>
+      <Link to="/wallet" className="flex items-center text-foreground">
+        <Wallet className="mr-2 h-4 w-4" /> My Wallet
+      </Link>
+    </DropdownMenuItem>
+
+    {isStaff() && <DropdownMenuSeparator className="bg-border" />}
+
+    {isSuperAdmin() && (
+      <DropdownMenuItem asChild>
+        <Link to="/admin" className="flex items-center text-foreground">
+          <Settings className="mr-2 h-4 w-4" /> Admin Panel
+        </Link>
+      </DropdownMenuItem>
+    )}
+
+    {isSales() && (
+      <DropdownMenuItem asChild>
+        <Link to="/dashboard/sales" className="flex items-center text-foreground">
+          <Settings className="mr-2 h-4 w-4" /> Sales Dashboard
+        </Link>
+      </DropdownMenuItem>
+    )}
+
+    {isAccounting() && (
+      <DropdownMenuItem asChild>
+        <Link to="/dashboard/accounting" className="flex items-center text-foreground">
+          <Settings className="mr-2 h-4 w-4" /> Accounting Dashboard
+        </Link>
+      </DropdownMenuItem>
+    )}
+
+    {isSupport() && (
+      <DropdownMenuItem asChild>
+        <Link to="/dashboard/support" className="flex items-center text-foreground">
+          <Settings className="mr-2 h-4 w-4" /> Support Dashboard
+        </Link>
+      </DropdownMenuItem>
+    )}
+
+    <DropdownMenuSeparator className="bg-border" />
+    <DropdownMenuItem onClick={handleSignOut} className="text-foreground hover:bg-destructive/10">
+      <LogOut className="mr-2 h-4 w-4" /> Sign Out
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+              {/* <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
@@ -203,7 +274,9 @@ const Header = () => {
                     {isSigningOut ? "Signing Out..." : "Sign Out"}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu> */}
+
+
 
               {/* Quick Sign Out Button - Only on large screens */}
               <Button
