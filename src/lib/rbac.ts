@@ -83,6 +83,17 @@ export const PAGE_ACCESS: Record<PageKey, AppRole[]> = {
 };
 
 /** Per-action permission matrix for sensitive in-page operations. */
+// export type ActionKey =
+//   | 'manage-roles'
+//   | 'delete-user'
+//   | 'wallet-adjustment'
+//   | 'manage-payouts'
+//   | 'issue-refund'
+//   | 'edit-content'
+//   | 'edit-marketing'
+//   | 'manage-tickets'
+//   | 'view-pii';
+
 export type ActionKey =
   | 'manage-roles'
   | 'delete-user'
@@ -92,7 +103,28 @@ export type ActionKey =
   | 'edit-content'
   | 'edit-marketing'
   | 'manage-tickets'
-  | 'view-pii';
+  | 'view-pii'
+  // 🌟 NEW CONSTRAINTS ADDED MANUALLY:
+  | 'user.view'
+  | 'user.edit'
+  | 'user.suspend'
+  | 'content.movie.create'
+  | 'content.movie.edit'
+  | 'content.movie.delete'
+  | 'finance.audit';
+
+// export const ACTION_ACCESS: Record<ActionKey, AppRole[]> = {
+//   'manage-roles': ['super_admin'],
+//   'delete-user': ['super_admin'],
+//   'wallet-adjustment': ['super_admin', 'accounting'],
+//   'manage-payouts': ['super_admin', 'accounting'],
+//   'issue-refund': ['super_admin', 'accounting'],
+//   'edit-content': ['super_admin', 'admin'],
+//   'edit-marketing': ['super_admin', 'admin', 'sales'],
+//   'manage-tickets': ['super_admin', 'admin', 'support'],
+//   // Per user request, sales sees customer PII for outreach.
+//   'view-pii': ['super_admin', 'admin', 'support', 'accounting', 'sales'],
+// };
 
 export const ACTION_ACCESS: Record<ActionKey, AppRole[]> = {
   'manage-roles': ['super_admin'],
@@ -103,8 +135,16 @@ export const ACTION_ACCESS: Record<ActionKey, AppRole[]> = {
   'edit-content': ['super_admin', 'admin'],
   'edit-marketing': ['super_admin', 'admin', 'sales'],
   'manage-tickets': ['super_admin', 'admin', 'support'],
-  // Per user request, sales sees customer PII for outreach.
   'view-pii': ['super_admin', 'admin', 'support', 'accounting', 'sales'],
+  
+  // 🌟 NEW GRANULAR MAPPING RULES:
+  'user.view': ['super_admin', 'admin', 'support'],
+  'user.edit': ['super_admin', 'admin'],
+  'user.suspend': ['super_admin'],
+  'content.movie.create': ['super_admin', 'admin'],
+  'content.movie.edit': ['super_admin', 'admin'],
+  'content.movie.delete': ['super_admin'],
+  'finance.audit': ['super_admin', 'accounting'],
 };
 
 export const isStaffRole = (role: AppRole | null | undefined): boolean =>

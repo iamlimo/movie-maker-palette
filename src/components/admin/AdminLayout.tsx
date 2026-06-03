@@ -22,7 +22,8 @@ import {
   Briefcase,
   ClipboardList,
   CreditCard,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck // Added for Reports & Compliance icon
 } from 'lucide-react';
 import {
   Sidebar,
@@ -47,7 +48,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole } from '@/hooks/useRole';
+// 🌟 NEW HYBRID RBAC SYSTEM: Swapped useRole for our high-speed capability hook
+import { useAuthCheck } from '@/hooks/useAuthCheck';
 import { ROLE_LABELS, type PageKey } from '@/lib/rbac';
 import { Badge } from '@/components/ui/badge';
 
@@ -111,25 +113,30 @@ const sidebarItems: Item[] = [
     ],
   },
   { title: 'Settings', url: '/admin/settings', icon: Settings, page: 'settings' },
+  // 🌟 NEW REQUIREMENT ADDED MANUALLY: Added structural anchor for compliance logs
+  // { title: 'Reports & Compliance', url: '/admin/ReportsCompliance', icon: ShieldCheck, page: 'ReportsCompliance' },
 ];
 
 function AppSidebar() {
   const location = useLocation();
   const { profile, signOut } = useAuth();
-  const { canAccess, userRole } = useRole();
+  // 🌟 NEW HYBRID RBAC SYSTEM: Exposing clean validation primitives
+  const { can, appRole } = useAuthCheck();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
   const isSubmenuActive = (submenu: any[]) => {
     return submenu.some(item => location.pathname.startsWith(item.url));
   };
 
+  // 🌟 NEW HYBRID RBAC SYSTEM: Filtering views directly via structural matrix mappings
   const visibleItems = sidebarItems
     .map((item) => {
       if (item.submenu) {
-        const subs = item.submenu.filter((s) => canAccess(s.page));
+        // Evaluate if any children of this menu are accessible via the fallback roles map
+        const subs = item.submenu.filter((s) => s.page && can(s.page as any));
         return subs.length ? { ...item, submenu: subs } : null;
       }
-      return item.page && canAccess(item.page) ? item : null;
+      return item.page && can(item.page as any) ? item : null;
     })
     .filter(Boolean) as Item[];
 
@@ -142,7 +149,7 @@ function AppSidebar() {
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
             <span className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Admin Panel
+              Signature TV
             </span>
           </div>
         </div>
@@ -222,9 +229,9 @@ function AppSidebar() {
                       {profile?.name || 'Admin'}
                     </span>
                     <span className="truncate text-xs flex items-center gap-1">
-                      {userRole && (
+                      {appRole && (
                         <Badge variant="secondary" className="px-1.5 py-0 text-[10px] h-4">
-                          {ROLE_LABELS[userRole]}
+                          {ROLE_LABELS[appRole] || appRole}
                         </Badge>
                       )}
                       <span className="truncate">{profile?.email || ''}</span>
@@ -260,7 +267,7 @@ export default function AdminLayout() {
           <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
             <div className="flex items-center gap-2 px-4">
               <SidebarTrigger className="-ml-1" />
-              <span className="text-xl font-semibold">Super Admin Dashboard</span>
+              <span className="text-xl font-semibold">Signature TV Control Center</span>
             </div>
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
