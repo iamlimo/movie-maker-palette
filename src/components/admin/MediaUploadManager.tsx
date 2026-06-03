@@ -112,7 +112,7 @@ export const MediaUploadManager = ({
         .from('user_roles')
         .select('role')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
       if (roleError || !roleData || roleData.role !== 'super_admin') {
         throw new Error('You need super admin privileges to upload files');
