@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 /**
  * Safe, fire-and-forget audit log writer.
@@ -14,13 +15,14 @@ export async function writeAuditLog(params: {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return; // RLS requires auth.uid()
-    const { error } = await supabase.from('compliance_audit_logs').insert({
+    const row = {
       action: params.action,
       resource_type: params.resource_type,
       resource_id: params.resource_id ?? null,
       user_id: user.id,
-      metadata: params.metadata ?? {},
-    });
+      metadata: (params.metadata ?? {}) as Json,
+    };
+    const { error } = await supabase.from('compliance_audit_logs').insert(row);
     if (error) {
       // eslint-disable-next-line no-console
       console.warn('[audit] insert failed:', error.message);
