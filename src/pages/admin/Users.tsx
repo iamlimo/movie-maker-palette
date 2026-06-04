@@ -252,6 +252,18 @@ export default function Users() {
           title: "Success",
           description: `User role updated to ${newRole} successfully.`
         });
+
+        void writeAuditLog({
+          action: 'user_role.updated',
+          resource_type: 'user_roles',
+          resource_id: selectedUser.user_id,
+          metadata: {
+            target_user_id: selectedUser.user_id,
+            target_email: selectedUser.email,
+            previous_role: selectedUser.role,
+            new_role: newRole,
+          },
+        });
         
         // Optimistic local update for snappy UI
         setUsers(prev => prev.map(user =>
