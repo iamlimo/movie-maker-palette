@@ -18,6 +18,7 @@ import { UserDetailModal } from '@/components/admin/UserDetailModal';
 import { Link } from 'react-router-dom';
 import { useRole } from '@/hooks/useRole';
 import { ROLE_LABELS, type AppRole } from '@/lib/rbac';
+import { writeAuditLog } from '@/lib/auditLog';
 
 // Helper function to convert kobo to naira
 const koboToNaira = (kobo: number): number => {
