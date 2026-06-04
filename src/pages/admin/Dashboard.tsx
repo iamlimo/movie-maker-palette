@@ -24,6 +24,10 @@ import {
 import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAuthCheck } from "@/hooks/useAuthCheck";
+import SalesPanel from "./dashboards/SalesPanel";
+import AccountingPanel from "./dashboards/AccountingPanel";
+import SupportPanel from "./dashboards/SupportPanel";
 
 interface DashboardStats {
   totalUsers: number;
@@ -75,7 +79,20 @@ const timeAgo = (date: string): string => {
   return then.toLocaleDateString();
 };
 
+/**
+ * Role-based dashboard switcher.
+ * Super Admin & Admin see the full SuperAdminDashboard below.
+ * Other staff roles see their dedicated panel.
+ */
 export default function Dashboard() {
+  const { appRole } = useAuthCheck();
+  if (appRole === 'sales') return <SalesPanel />;
+  if (appRole === 'accounting') return <AccountingPanel />;
+  if (appRole === 'support') return <SupportPanel />;
+  return <SuperAdminDashboard />;
+}
+
+function SuperAdminDashboard() {
   const { profile } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,

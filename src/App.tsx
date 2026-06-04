@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
@@ -191,7 +191,7 @@ function AppContent() {
               <Route path="banners" element={<RoleRoute page="banners"><Banners /></RoleRoute>} />
               <Route path="wallets" element={<RoleRoute page="wallets"><Wallets /></RoleRoute>} />
               <Route path="settings" element={<SuperAdminRoute><Settings /></SuperAdminRoute>} />
-              <Route path="permissions" element={<SuperAdminRoute><PermissionsMatrix /></SuperAdminRoute>} />
+              <Route path="permissions" element={<Navigate to="/admin/settings?tab=permissions" replace />} />
               <Route path="job-listings" element={<RoleRoute page="job-listings"><JobListingsAdmin /></RoleRoute>} />
               <Route path="applications" element={<RoleRoute page="job-applications"><JobApplicationsAdmin /></RoleRoute>} />
               <Route path="referral-codes" element={<RoleRoute page="referral-codes"><ReferralCodes /></RoleRoute>} />

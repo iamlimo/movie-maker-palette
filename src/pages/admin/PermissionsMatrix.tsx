@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Loader2, Shield, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { writeAuditLog } from '@/lib/auditLog';
 
 interface Role {
   id: string;
@@ -122,6 +123,19 @@ export default function PermissionsMatrix() {
       toast.error(isRls ? 'Permission denied by security policy' : `Update failed: ${error.message}`);
     } else {
       toast.success(next ? `Granted ${perm.name}` : `Revoked ${perm.name}`);
+      const roleName = roles.find((r) => r.id === selectedRoleId)?.name ?? selectedRoleId;
+      void writeAuditLog({
+        action: next ? 'role_permission.granted' : 'role_permission.revoked',
+        resource_type: 'role_permissions',
+        resource_id: perm.id,
+        metadata: {
+          role_id: selectedRoleId,
+          role_name: roleName,
+          permission_id: perm.id,
+          permission_name: perm.name,
+          permission_module: perm.module,
+        },
+      });
     }
   };
 

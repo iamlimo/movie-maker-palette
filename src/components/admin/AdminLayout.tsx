@@ -88,7 +88,6 @@ const sidebarItems: Item[] = [
     icon: Users,
     submenu: [
       { title: 'Users', url: '/admin/users', icon: Users, page: 'users' },
-      { title: 'Permissions', url: '/admin/permissions', icon: KeyRound, page: 'permissions' },
       { title: 'Producers', url: '/admin/producers', icon: UserCheck, page: 'producers' },
       { title: 'Submissions', url: '/admin/submissions', icon: FileText, page: 'submissions' },
     ],

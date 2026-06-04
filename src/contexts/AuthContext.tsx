@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { writeAuditLog } from '@/lib/auditLog';
 
 interface UserProfile {
   id: string;
@@ -319,6 +320,13 @@ useEffect(() => {
         },
       },
     });
+    if (!error) {
+      void writeAuditLog({
+        action: 'auth.signup',
+        resource_type: 'auth',
+        metadata: { email },
+      });
+    }
     return { error };
   };
 
@@ -327,12 +335,30 @@ useEffect(() => {
       email,
       password,
     });
+    if (!error) {
+      void writeAuditLog({
+        action: 'auth.signin',
+        resource_type: 'auth',
+        metadata: { email },
+      });
+    } else {
+      void writeAuditLog({
+        action: 'auth.signin_failed',
+        resource_type: 'auth',
+        metadata: { email, error_message: error.message },
+      });
+    }
     return { error };
   };
 
   const signOut = async () => {
     try {
       setLoading(true);
+      void writeAuditLog({
+        action: 'auth.signout',
+        resource_type: 'auth',
+        metadata: { email: user?.email },
+      });
       await supabase.auth.signOut();
 
       // iOS/Android reliability: redirect immediately after signOut resolves.
