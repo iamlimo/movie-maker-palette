@@ -191,7 +191,7 @@ function AppContent() {
               <Route path="banners" element={<RoleRoute page="banners"><Banners /></RoleRoute>} />
               <Route path="wallets" element={<RoleRoute page="wallets"><Wallets /></RoleRoute>} />
               <Route path="settings" element={<SuperAdminRoute><Settings /></SuperAdminRoute>} />
-              <Route path="permissions" element={<SuperAdminRoute><PermissionsMatrix /></SuperAdminRoute>} />
+              <Route path="permissions" element={<Navigate to="/admin/settings?tab=permissions" replace />} />
               <Route path="job-listings" element={<RoleRoute page="job-listings"><JobListingsAdmin /></RoleRoute>} />
               <Route path="applications" element={<RoleRoute page="job-applications"><JobApplicationsAdmin /></RoleRoute>} />
               <Route path="referral-codes" element={<RoleRoute page="referral-codes"><ReferralCodes /></RoleRoute>} />
