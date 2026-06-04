@@ -79,15 +79,21 @@ const timeAgo = (date: string): string => {
   return then.toLocaleDateString();
 };
 
+/**
+ * Role-based dashboard switcher.
+ * Super Admin & Admin see the full SuperAdminDashboard below.
+ * Other staff roles see their dedicated panel.
+ */
 export default function Dashboard() {
-  const { profile } = useAuth();
   const { appRole } = useAuthCheck();
-
-  // Role-based dashboard switcher. Super Admin & Admin see the full panel below.
   if (appRole === 'sales') return <SalesPanel />;
   if (appRole === 'accounting') return <AccountingPanel />;
   if (appRole === 'support') return <SupportPanel />;
+  return <SuperAdminDashboard />;
+}
 
+function SuperAdminDashboard() {
+  const { profile } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeUsers: 0,
