@@ -151,6 +151,20 @@ serve(async (req: Request) => {
       return errorResponse('Failed to create payment record', 500);
     }
 
+    // Resolve a safe browser-facing callback URL. The previous value pointed at
+    // /functions/v1/paystack-webhook which is a server-to-server endpoint and
+    // rejects browser redirects (no signature) → users saw a broken page.
+    const originHeader = req.headers.get('origin') || '';
+    const safeOrigin = /^https?:\/\//.test(originHeader)
+      ? originHeader
+      : 'https://signaturetv.co';
+    const callbackUrl =
+      `${safeOrigin}/payment/callback` +
+      `?kind=rental&paymentId=${encodeURIComponent(payment.id)}` +
+      `&contentType=${encodeURIComponent(normalizedContentType)}` +
+      `&contentId=${encodeURIComponent(contentId)}` +
+      `&returnTo=${encodeURIComponent(`/watch/${normalizedContentType}/${contentId}`)}`;
+
     // Initialize Paystack payment
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -162,7 +176,7 @@ serve(async (req: Request) => {
         email: profile.email,
         amount: amountInKobo,
         reference: intentId,
-        callback_url: `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/paystack-webhook`,
+        callback_url: callbackUrl,
         metadata: {
           payment_id: payment.id,
           user_id: user.id,

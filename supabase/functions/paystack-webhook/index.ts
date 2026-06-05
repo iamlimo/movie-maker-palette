@@ -51,6 +51,123 @@ function buildContentFields(contentId: string, contentType: RentalContentType) {
   };
 }
 
+/**
+ * Sync the canonical `payments` row for a Paystack reference so the admin
+ * dashboard reflects every Paystack event (rental + wallet_topup), and credit
+ * the wallet exactly once when a wallet top-up succeeds. Safe to call multiple
+ * times — idempotent on `enhanced_status`.
+ */
+async function syncPaymentRecord(
+  supabase: ReturnType<typeof createClient>,
+  params: {
+    reference: string;
+    success: boolean;
+    paidAmount: number;
+    channel: string;
+    paystackStatus: string;
+    failureReason?: string | null;
+    rawEvent: Record<string, unknown>;
+  },
+): Promise<void> {
+  try {
+    const { data: payment, error: lookupErr } = await supabase
+      .from("payments")
+      .select("id, user_id, purpose, amount, enhanced_status, status, metadata")
+      .or(`intent_id.eq.${params.reference},provider_reference.eq.${params.reference}`)
+      .maybeSingle();
+
+    if (lookupErr) {
+      console.warn("[webhook] payment lookup failed:", lookupErr.message);
+      return;
+    }
+    if (!payment) {
+      console.log("[webhook] no payment row for reference:", params.reference);
+      return;
+    }
+
+    const alreadyCompleted =
+      payment.enhanced_status === "completed" || payment.status === "completed";
+
+    const nextStatus = params.success ? "completed" : "failed";
+    const nextEnhanced = params.success ? "completed" : "failed";
+
+    const mergedMeta = {
+      ...(payment.metadata as Record<string, unknown> | null ?? {}),
+      paystack_channel: params.channel,
+      paystack_status: params.paystackStatus,
+      paystack_paid_amount: params.paidAmount,
+      paystack_event_at: new Date().toISOString(),
+      ...(params.failureReason ? { paystack_failure_reason: params.failureReason } : {}),
+    };
+
+    const { error: updErr } = await supabase
+      .from("payments")
+      .update({
+        status: nextStatus,
+        enhanced_status: nextEnhanced,
+        provider_reference: params.reference,
+        method: params.channel,
+        error_message: params.success ? null : (params.failureReason ?? "Charge failed"),
+        metadata: mergedMeta,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", payment.id);
+
+    if (updErr) {
+      console.warn("[webhook] payment update failed:", updErr.message);
+    }
+
+    // Credit wallet for top-ups — only if not already completed.
+    if (params.success && payment.purpose === "wallet_topup" && !alreadyCompleted) {
+      const { data: wallet, error: walletErr } = await supabase
+        .from("wallets")
+        .select("id")
+        .eq("user_id", payment.user_id)
+        .maybeSingle();
+
+      let walletId = wallet?.id as string | undefined;
+      if (!walletId) {
+        const { data: newWalletId } = await supabase.rpc("ensure_wallet_for_user", {
+          p_user_id: payment.user_id,
+        });
+        walletId = newWalletId as string | undefined;
+      }
+
+      if (!walletId) {
+        console.error("[webhook] wallet not found and could not be created for", payment.user_id);
+        return;
+      }
+
+      const { error: creditErr } = await supabase.rpc("credit_wallet", {
+        p_wallet_id: walletId,
+        p_amount: params.paidAmount,
+        p_type: "wallet_topup",
+        p_reference: params.reference,
+        p_description: "Paystack wallet top-up",
+        p_metadata: { channel: params.channel, source: "paystack-webhook" },
+        p_user_id: payment.user_id,
+        p_payment_id: payment.id,
+      });
+
+      if (creditErr) {
+        // Wallet ledger uses unique constraint on reference for idempotency — duplicate is OK.
+        const msg = String(creditErr.message || "");
+        if (creditErr.code === "23505" || /duplicate|already/i.test(msg)) {
+          console.log("[webhook] wallet credit already applied for", params.reference);
+        } else {
+          console.error("[webhook] wallet credit failed:", msg);
+        }
+      } else {
+        console.log(
+          `[webhook] wallet credited: user=${payment.user_id} amount=${params.paidAmount} ref=${params.reference}`,
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[webhook] syncPaymentRecord exception:", err);
+  }
+}
+
 async function verifyPaystackSignature(payload: string, signature: string): Promise<boolean> {
   const secret = Deno.env.get("PAYSTACK_SECRET_KEY");
   if (!secret) {
@@ -241,10 +358,24 @@ Deno.serve(async (req) => {
         });
       }
 
+      // 1) ALWAYS sync the canonical `payments` row first so the admin dashboard
+      //    reflects every Paystack event (rental + wallet_topup). This also
+      //    credits the wallet on successful top-ups.
+      await syncPaymentRecord(supabase, {
+        reference: paymentReference,
+        success: true,
+        paidAmount,
+        channel: paymentChannel,
+        paystackStatus: paymentStatus,
+        rawEvent: event.data ?? {},
+      });
+
+      // 2) Then handle rental access (only relevant for rental purchases).
       const rentalIntent = await loadRentalIntentByReference(supabase, paymentReference);
       if (!rentalIntent) {
-        console.error("Rental intent not found for reference:", paymentReference);
-        return new Response(JSON.stringify({ received: true, message: "Intent not found" }), {
+        // Not a rental — likely a wallet top-up already handled by syncPaymentRecord.
+        console.log("[webhook] no rental intent for reference (wallet/other):", paymentReference);
+        return new Response(JSON.stringify({ received: true, message: "Payment synced" }), {
           headers: corsHeaders,
         });
       }
@@ -417,6 +548,17 @@ Deno.serve(async (req) => {
       if (!paymentReference) {
         return new Response(JSON.stringify({ received: true }), { headers: corsHeaders });
       }
+
+      // Mirror failure into payments table for admin visibility.
+      await syncPaymentRecord(supabase, {
+        reference: paymentReference,
+        success: false,
+        paidAmount: Number(event.data?.amount || 0),
+        channel: event.data?.channel || "unknown",
+        paystackStatus: event.data?.status || "failed",
+        failureReason: event.data?.failure_reason || event.data?.failure_message || "Charge failed",
+        rawEvent: event.data ?? {},
+      });
 
       const rentalIntent = await loadRentalIntentByReference(supabase, paymentReference);
       if (rentalIntent && rentalIntent.status === "pending") {
