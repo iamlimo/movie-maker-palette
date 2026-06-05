@@ -85,7 +85,19 @@ const timeAgo = (date: string): string => {
  * Other staff roles see their dedicated panel.
  */
 export default function Dashboard() {
-  const { appRole } = useAuthCheck();
+  const { appRole, isReady } = useAuthCheck();
+  if (!isReady) {
+    return (
+      <div className="flex flex-1 flex-col space-y-8 p-4 sm:p-6 lg:p-8 min-h-screen gradient-hero">
+        <div className="h-12 bg-muted/20 rounded-xl w-1/3 animate-pulse" />
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 bg-muted/20 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (appRole === 'sales') return <SalesPanel />;
   if (appRole === 'accounting') return <AccountingPanel />;
   if (appRole === 'support') return <SupportPanel />;
