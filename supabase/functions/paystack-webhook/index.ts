@@ -358,10 +358,24 @@ Deno.serve(async (req) => {
         });
       }
 
+      // 1) ALWAYS sync the canonical `payments` row first so the admin dashboard
+      //    reflects every Paystack event (rental + wallet_topup). This also
+      //    credits the wallet on successful top-ups.
+      await syncPaymentRecord(supabase, {
+        reference: paymentReference,
+        success: true,
+        paidAmount,
+        channel: paymentChannel,
+        paystackStatus: paymentStatus,
+        rawEvent: event.data ?? {},
+      });
+
+      // 2) Then handle rental access (only relevant for rental purchases).
       const rentalIntent = await loadRentalIntentByReference(supabase, paymentReference);
       if (!rentalIntent) {
-        console.error("Rental intent not found for reference:", paymentReference);
-        return new Response(JSON.stringify({ received: true, message: "Intent not found" }), {
+        // Not a rental — likely a wallet top-up already handled by syncPaymentRecord.
+        console.log("[webhook] no rental intent for reference (wallet/other):", paymentReference);
+        return new Response(JSON.stringify({ received: true, message: "Payment synced" }), {
           headers: corsHeaders,
         });
       }
