@@ -51,7 +51,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useAuth } from '@/contexts/AuthContext';
 // 🌟 NEW HYBRID RBAC SYSTEM: Swapped useRole for our high-speed capability hook
 import { useAuthCheck } from '@/hooks/useAuthCheck';
-import { ROLE_LABELS, type PageKey } from '@/lib/rbac';
+import { ROLE_LABELS, canAccessPage, type PageKey, type AppRole } from '@/lib/rbac';
 import { Badge } from '@/components/ui/badge';
 
 type SubItem = { title: string; url: string; icon: any; page: PageKey };
@@ -122,7 +122,8 @@ function AppSidebar() {
   const location = useLocation();
   const { profile, signOut } = useAuth();
   // 🌟 NEW HYBRID RBAC SYSTEM: Exposing clean validation primitives
-  const { can, appRole } = useAuthCheck();
+  const { appRole } = useAuthCheck();
+  const canPage = (page: PageKey) => canAccessPage(appRole as AppRole, page);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
   const isSubmenuActive = (submenu: any[]) => {
@@ -133,11 +134,10 @@ function AppSidebar() {
   const visibleItems = sidebarItems
     .map((item) => {
       if (item.submenu) {
-        // Evaluate if any children of this menu are accessible via the fallback roles map
-        const subs = item.submenu.filter((s) => s.page && can(s.page as any));
+        const subs = item.submenu.filter((s) => s.page && canPage(s.page));
         return subs.length ? { ...item, submenu: subs } : null;
       }
-      return item.page && can(item.page as any) ? item : null;
+      return item.page && canPage(item.page) ? item : null;
     })
     .filter(Boolean) as Item[];
 
