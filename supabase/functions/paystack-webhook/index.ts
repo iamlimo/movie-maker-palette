@@ -549,6 +549,17 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ received: true }), { headers: corsHeaders });
       }
 
+      // Mirror failure into payments table for admin visibility.
+      await syncPaymentRecord(supabase, {
+        reference: paymentReference,
+        success: false,
+        paidAmount: Number(event.data?.amount || 0),
+        channel: event.data?.channel || "unknown",
+        paystackStatus: event.data?.status || "failed",
+        failureReason: event.data?.failure_reason || event.data?.failure_message || "Charge failed",
+        rawEvent: event.data ?? {},
+      });
+
       const rentalIntent = await loadRentalIntentByReference(supabase, paymentReference);
       if (rentalIntent && rentalIntent.status === "pending") {
         await supabase
