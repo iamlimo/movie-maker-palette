@@ -187,7 +187,7 @@ const Header = () => {
 
     {isSales() && (
       <DropdownMenuItem asChild>
-        <Link to="/dashboard/sales" className="flex items-center text-foreground">
+        <Link to="/admin" className="flex items-center text-foreground">
           <Settings className="mr-2 h-4 w-4" /> Sales Dashboard
         </Link>
       </DropdownMenuItem>
@@ -195,7 +195,7 @@ const Header = () => {
 
     {isAccounting() && (
       <DropdownMenuItem asChild>
-        <Link to="/dashboard/accounting" className="flex items-center text-foreground">
+        <Link to="/admin" className="flex items-center text-foreground">
           <Settings className="mr-2 h-4 w-4" /> Accounting Dashboard
         </Link>
       </DropdownMenuItem>
@@ -203,7 +203,7 @@ const Header = () => {
 
     {isSupport() && (
       <DropdownMenuItem asChild>
-        <Link to="/dashboard/support" className="flex items-center text-foreground">
+        <Link to="/admin" className="flex items-center text-foreground">
           <Settings className="mr-2 h-4 w-4" /> Support Dashboard
         </Link>
       </DropdownMenuItem>
