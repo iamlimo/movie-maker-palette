@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-const { ExoPlayer } = Capacitor.Plugins;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { ExoPlayer } = (Capacitor as any).Plugins ?? {};
 import type { Player, PlayerState } from '../types/Player';
 
 export const usePlayer = (): Player => {

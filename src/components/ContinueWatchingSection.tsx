@@ -14,7 +14,7 @@ interface ContinueWatchingCardProps {
   onAction: () => void;
   onRemove: () => void;
   canRemove: boolean;
-  isExpired: boolean;
+  isExpired?: boolean;
 }
 
 const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
@@ -22,7 +22,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
   onAction,
   onRemove,
   canRemove,
-  isExpired,
+  isExpired: _isExpired,
 }) => {
   const formatTimeRemaining = (item: WatchHistoryItem) => {
     if (
@@ -66,7 +66,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      onPlay();
+      onAction();
     }
   };
 
@@ -164,7 +164,7 @@ const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
             size="sm"
             onClick={(event) => {
               event.stopPropagation();
-              onPlay();
+              onAction();
             }}
             className="w-full rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
@@ -185,7 +185,6 @@ const ContinueWatchingSection: React.FC = () => {
     loading,
     removeFromHistory,
     canRemoveFromHistory,
-    hasActiveAccess,
   } = useWatchHistory();
 
   // Show both active and expired rentals in Continue Watching.
@@ -237,7 +236,7 @@ const ContinueWatchingSection: React.FC = () => {
 
               key={item.id}
               item={item}
-              onPlay={() => handlePlay(item)}
+              onAction={() => handlePlay(item)}
               onRemove={() => handleRemove(item)}
               canRemove={canRemoveFromHistory(item)}
             />

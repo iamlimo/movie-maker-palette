@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, Wifi, WifiOff } from 'lucide-react';
-import { Button } from '@/components/ui/card';
 
 const NativePlayerSetup = () => {
   const { toast } = useToast();
@@ -23,12 +21,13 @@ const NativePlayerSetup = () => {
 
       // Check network status
       try {
+        // @ts-expect-error optional native plugin
         const { Network } = await import('@capacitor/network');
         const status = await Network.getStatus();
         setIsOnline(status.connected);
 
         // Listen to network changes
-        Network.addListener('networkStatusChange', (status) => {
+        Network.addListener('networkStatusChange', (status: { connected: boolean }) => {
           setIsOnline(status.connected);
           if (!status.connected) {
             toast({
@@ -49,6 +48,7 @@ const NativePlayerSetup = () => {
 
       // Check if Video Player plugin is available
       try {
+        // @ts-expect-error optional native plugin
         const module = await import('@capacitor-community/video-player');
         if (module.VideoPlayer) {
           setPluginAvailable(true);

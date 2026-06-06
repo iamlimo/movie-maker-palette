@@ -257,12 +257,12 @@ export const VideoPlayer = ({
     }
   };
 
-  const handleLoadedMetadata = () => {
+  const handleLoadedMetadata = async () => {
     if (!videoRef.current) return;
     setDuration(videoRef.current.duration);
 
     // Restore last position
-    const lastPos = getLastPosition();
+    const lastPos = await getLastPosition();
     if (lastPos > 0 && lastPos < videoRef.current.duration - 10) {
       videoRef.current.currentTime = lastPos;
       setCurrentTime(lastPos);
