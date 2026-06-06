@@ -270,12 +270,12 @@ function SuperAdminDashboard() {
         // Fetch recent payments
         const { data: recentPayments } = await supabase
           .from("payments")
-          .select("id, amount, payment_method, created_at, user_id")
+          .select("id, amount, method, created_at, user_id")
           .eq("status", "completed")
           .order("created_at", { ascending: false })
           .limit(3);
 
-        recentPayments?.forEach((payment) => {
+        (recentPayments as any[] | null)?.forEach((payment: any) => {
           const nairaAmount = koboToNaira(
             typeof payment.amount === "string"
               ? parseFloat(payment.amount)
@@ -286,31 +286,31 @@ function SuperAdminDashboard() {
             type: "payment",
             message: "Payment processed",
             detail: `${formatCurrency(nairaAmount)} payment via ${
-              payment.payment_method || "unknown method"
+              payment.method || "unknown method"
             }`,
             timestamp: payment.created_at,
             color: "bg-purple-500",
-            metadata: { amount: nairaAmount, method: payment.payment_method },
+            metadata: { amount: nairaAmount, method: payment.method },
           });
         });
 
         // Fetch pending producer applications
         const { data: pendingProducers } = await supabase
           .from("producers")
-          .select("id, full_name, created_at")
+          .select("id, company_name, created_at")
           .eq("status", "pending")
           .order("created_at", { ascending: false })
           .limit(2);
 
-        pendingProducers?.forEach((producer) => {
+        (pendingProducers as any[] | null)?.forEach((producer: any) => {
           activitiesList.push({
             id: `producer-${producer.id}`,
             type: "producer",
             message: "Producer application",
-            detail: `${producer.full_name} submitted a producer application`,
+            detail: `${producer.company_name} submitted a producer application`,
             timestamp: producer.created_at,
             color: "bg-amber-500",
-            metadata: { producerId: producer.id, name: producer.full_name },
+            metadata: { producerId: producer.id, name: producer.company_name },
           });
         });
 

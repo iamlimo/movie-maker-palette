@@ -62,22 +62,17 @@ const Producers = () => {
     try {
       setLoading(true);
 
-      // First, get producers data
-      let producerQuery = supabase
-        .from("profiles")
-        .select("*, producer:producers(*)")
-        .eq("role", "producer")
+      // Fetch producers directly from producers table
+      let producerQuery: any = supabase
+        .from("producers")
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "all") {
-        producerQuery = producerQuery.eq(
-          "producer.status",
-          statusFilter as "pending" | "approved" | "rejected",
-        );
+        producerQuery = producerQuery.eq("status", statusFilter);
       }
 
-      const { data: producersData, error: producersError } =
-        await producerQuery;
+      const { data: producersData, error: producersError } = await producerQuery;
 
       if (producersError) {
         console.error("Error fetching producers:", producersError);
@@ -89,8 +84,7 @@ const Producers = () => {
         return;
       }
 
-      // Get all user IDs from producers
-      const userIds = producersData?.map((p) => p.user_id) || [];
+      const userIds = (producersData as any[] | null)?.map((p: any) => p.user_id) || [];
 
       // Fetch profiles separately
       const { data: profilesData, error: profilesError } = await supabase
@@ -104,7 +98,7 @@ const Producers = () => {
 
       // Merge the data
       const enrichedProducers =
-        producersData?.map((producer) => {
+        (producersData as any[] | null)?.map((producer: any) => {
           const profile = profilesData?.find(
             (p) => p.user_id === producer.user_id,
           );
@@ -112,15 +106,15 @@ const Producers = () => {
             ...producer,
             producer_name: profile?.name || "Unknown",
             producer_email: profile?.email || "Unknown",
-          };
+          } as Producer;
         }) || [];
 
       // Filter by search term if provided
-      let filteredData = enrichedProducers;
+      let filteredData: Producer[] = enrichedProducers;
       if (searchTerm) {
         filteredData = filteredData.filter(
           (producer) =>
-            producer.company_name
+            (producer.company_name || "")
               .toLowerCase()
               .includes(searchTerm.toLowerCase()) ||
             producer.producer_name

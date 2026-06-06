@@ -1224,6 +1224,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rental_credits: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          episode_id: string
+          id: string
+          rental_date: string
+          rental_intent_id: string
+          season_id: string
+          user_id: string
+        }
+        Insert: {
+          amount_paid?: number
+          created_at?: string
+          episode_id: string
+          id?: string
+          rental_date?: string
+          rental_intent_id: string
+          season_id: string
+          user_id: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          episode_id?: string
+          id?: string
+          rental_date?: string
+          rental_intent_id?: string
+          season_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rental_intents: {
         Row: {
           created_at: string
@@ -2296,6 +2329,15 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_season_upgrade_price: {
+        Args: { p_season_id: string; p_user_id: string }
+        Returns: {
+          eligible_spend: number
+          full_price: number
+          qualifies: boolean
+          upgrade_price: number
+        }[]
+      }
       check_existing_rental: {
         Args: {
           p_content_id: string

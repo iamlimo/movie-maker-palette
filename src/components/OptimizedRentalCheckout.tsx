@@ -32,6 +32,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
 import { usePlatform } from '@/hooks/usePlatform';
 import { useEntitlements } from '@/hooks/useEntitlements';
+import { useSeasonUpgradeQuote } from '@/hooks/useSeasonUpgradeQuote';
 import { toast } from '@/hooks/use-toast';
 import { formatNaira } from '@/lib/priceUtils';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +68,10 @@ export const OptimizedRentalCheckout = ({
   const { processRental } = useOptimizedRentals();
   const { isIOS } = usePlatform();
   const { refresh: refreshEntitlements } = useEntitlements();
+  const { quote: upgradeQuote } = useSeasonUpgradeQuote(
+    contentType === 'season' ? contentId : null,
+    open && contentType === 'season',
+  );
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -87,9 +92,17 @@ export const OptimizedRentalCheckout = ({
   const isNative = Capacitor.isNativePlatform();
   const isMobileBrowser = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
 
+  // When the user qualifies for the smart season upgrade, charge the upgrade price instead.
+  const effectivePrice = useMemo(() => {
+    if (contentType === 'season' && upgradeQuote?.qualifies) {
+      return Math.max(0, upgradeQuote.upgradePrice);
+    }
+    return price;
+  }, [contentType, upgradeQuote, price]);
+
   const subTotal = useMemo(() => {
-    return discount ? Math.max(0, price - discount.amount) : price;
-  }, [discount, price]);
+    return discount ? Math.max(0, effectivePrice - discount.amount) : effectivePrice;
+  }, [discount, effectivePrice]);
 
   const VAT_RATE = 0.075;
   const vatAmount = Math.round(subTotal * VAT_RATE);
@@ -425,6 +438,29 @@ export const OptimizedRentalCheckout = ({
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            {contentType === 'season' && upgradeQuote?.qualifies && (
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-primary/10 p-2 mt-0.5">
+                    <Gift className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      Smart Upgrade
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      You've spent {formatNaira(upgradeQuote.eligibleSpend)} on episodes in the last 7 days.
+                      Upgrade to the full season for{' '}
+                      <span className="font-semibold text-foreground">
+                        {formatNaira(upgradeQuote.upgradePrice)}
+                      </span>
+                      {' '}instead of {formatNaira(upgradeQuote.fullPrice)}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Subtotal</span>

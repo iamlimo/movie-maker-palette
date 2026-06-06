@@ -653,10 +653,34 @@ serve(async (req: Request) => {
 
     let finalPrice = price;
     let discountApplied = 0;
+    let upgradeApplied = 0;
+    let upgradeEligibleSpend = 0;
+
+    // Smart upgrade: when buying a season, credit any episode spend from the last 7 days.
+    if (normalizedType === "season") {
+      try {
+        const { data: quote, error: quoteError } = await supabase.rpc(
+          "calculate_season_upgrade_price",
+          { p_user_id: userId, p_season_id: contentId },
+        );
+        if (!quoteError && Array.isArray(quote) && quote.length > 0) {
+          const row = quote[0] as { eligible_spend: number; upgrade_price: number; qualifies: boolean };
+          if (row.qualifies) {
+            upgradeEligibleSpend = Number(row.eligible_spend ?? 0);
+            const newPrice = Math.max(0, Number(row.upgrade_price ?? price));
+            upgradeApplied = Math.max(0, price - newPrice);
+            finalPrice = newPrice;
+            console.log(`[${requestId}] 🎟️ Season upgrade applied. Spend=${upgradeEligibleSpend}, upgradePrice=${newPrice}`);
+          }
+        }
+      } catch (e) {
+        console.warn(`[${requestId}] ⚠️ Season upgrade quote failed:`, e);
+      }
+    }
 
     if (referralCode) {
       console.log(`[${requestId}] 🎁 Validating referral code: ${referralCode}`);
-      const referralResult = await validateReferralCode(supabase, referralCode, userId, price);
+      const referralResult = await validateReferralCode(supabase, referralCode, userId, finalPrice);
 
       if (!referralResult.valid) {
         console.error(`[${requestId}] ❌ Invalid referral code: ${referralResult.error}`);
@@ -664,7 +688,7 @@ serve(async (req: Request) => {
       }
 
       discountApplied = referralResult.discountAmount || 0;
-      finalPrice = Math.max(0, price - discountApplied);
+      finalPrice = Math.max(0, finalPrice - discountApplied);
       console.log(`[${requestId}] ✅ Referral code valid. Discount: ${discountApplied}, Final price: ${finalPrice}`);
     }
 
@@ -680,6 +704,12 @@ serve(async (req: Request) => {
       content_type: normalizedType,
       original_price: price,
       payment_method: paymentMethod,
+      ...(upgradeApplied > 0
+        ? {
+            season_upgrade_applied: upgradeApplied,
+            season_upgrade_eligible_spend: upgradeEligibleSpend,
+          }
+        : {}),
       ...(referralCode
         ? {
             referral_code: referralCode.toUpperCase(),
@@ -687,6 +717,55 @@ serve(async (req: Request) => {
           }
         : {}),
     };
+
+    // Fully covered upgrade: skip payment processor and mint season access immediately.
+    if (normalizedType === "season" && finalPrice === 0 && upgradeApplied > 0) {
+      console.log(`[${requestId}] 🎁 Free season upgrade — granting access without charging`);
+      const { data: intentRow, error: intentErr } = await supabase
+        .from("rental_intents")
+        .insert({
+          user_id: userId,
+          season_id: contentId,
+          rental_type: "season",
+          price: 0,
+          currency: "NGN",
+          payment_method: "wallet",
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          discount_amount: discountApplied,
+          referral_code: referralCode ?? null,
+          metadata: paymentMetadata,
+          expires_at: expiresAt,
+        })
+        .select("id")
+        .single();
+      if (intentErr || !intentRow) {
+        console.error(`[${requestId}] ❌ Free upgrade intent insert failed`, intentErr);
+        return createResponse({ error: "Failed to grant upgrade" }, 500, origin);
+      }
+      // Trigger handle_season_paid_revoke_episodes runs automatically.
+      // The rental_access row is created by the existing process_successful_rental flow if attached,
+      // but the season trigger only revokes — explicitly grant access here:
+      await supabase.rpc("grant_rental_access", {
+        p_user_id: userId,
+        p_content_id: contentId,
+        p_content_type: "season",
+        p_rental_type: "season",
+        p_expires_at: expiresAt,
+        p_rental_intent_id: intentRow.id,
+        p_source: "upgrade",
+        p_metadata: paymentMetadata,
+      });
+      return createResponse({
+        success: true,
+        paymentMethod: "upgrade",
+        rentalId: intentRow.id,
+        paymentId: null,
+        rentalExpiresAt: expiresAt,
+        discountApplied,
+        upgradeApplied,
+      }, 200, origin);
+    }
 
     if (paymentMethod === "wallet") {
       console.log(`[${requestId}] 💳 Processing wallet payment for user ${userId}...`);

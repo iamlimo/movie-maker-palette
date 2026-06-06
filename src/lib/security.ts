@@ -224,7 +224,7 @@ export const clearSensitiveData = (value: string | null): null => {
  * Detect if running in development mode
  */
 export const isDevelopment = (): boolean => {
-  return process.env.NODE_ENV === 'development';
+  return import.meta.env.DEV === true;
 };
 
 /**
