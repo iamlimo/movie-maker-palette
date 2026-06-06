@@ -24,7 +24,7 @@ export default function SupportPanel() {
         const iso = sevenDaysAgo.toISOString();
 
         const [tickets, users7d, producers, jobApps, allUsers] = await Promise.all([
-          supabase.from('tickets' as any).select('*', { count: 'exact', head: true }).neq('status', 'closed').then((r: any) => r).catch(() => ({ count: 0 })),
+          (supabase.from('tickets' as any).select('*', { count: 'exact', head: true }).neq('status', 'closed').then((r: any) => r) as Promise<any>).catch(() => ({ count: 0 })),
           supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', iso),
           supabase.from('producers').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
           supabase.from('job_applications').select('*', { count: 'exact', head: true }).eq('status', 'new'),

@@ -100,7 +100,7 @@ export const FinanceOverview = () => {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        const activeUsers = (users || []).filter(user => {
+        const activeUsers = ((users as any[]) || []).filter((user: any) => {
           if (!user.last_sign_in_at) return false;
           return new Date(user.last_sign_in_at) > thirtyDaysAgo;
         }).length;

@@ -14,7 +14,6 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import {
-  ProgressCircle,
   BarChart,
   Bar,
   XAxis,
@@ -83,8 +82,8 @@ export const ReconciliationTools = () => {
         throw new Error('Failed to fetch data');
       }
 
-      const paymentsList = payments || [];
-      const rentalsList = rentals || [];
+      const paymentsList = (payments as any[]) || [];
+      const rentalsList = ((rentals as any[]) || []).map((r: any) => ({ ...r, amount: r.amount ?? r.price ?? 0 }));
 
       // Try to match payments with rentals
       const matched = new Set<string>();
@@ -155,22 +154,10 @@ export const ReconciliationTools = () => {
 
       setDiscrepancies(foundDiscrepancies);
 
-      // Save reconciliation report
-      const { error: reportError } = await supabase.from('reconciliation_reports').insert({
-        status: reconciliationRate > 95 ? 'passed' : 'failed',
-        matched_records: matched.size,
-        unmatched_count: foundDiscrepancies.length,
-        discrepancy_amount: totalDiscrepancyAmount,
-        reconciliation_rate: reconciliationRate,
-        created_at: new Date().toISOString(),
+      toast({
+        title: 'Reconciliation Complete',
+        description: `${matched.size} payments matched with rentals`,
       });
-
-      if (!reportError) {
-        toast({
-          title: 'Reconciliation Complete',
-          description: `${matched.size} payments matched with rentals`,
-        });
-      }
     } catch (error) {
       console.error('Reconciliation error:', error);
       toast({

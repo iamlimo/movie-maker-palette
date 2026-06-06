@@ -59,8 +59,7 @@ interface RentalRecord {
   paystack_reference?: string;
 }
 
-type IconComponent = (props: { className?: string }) => JSX.Element;
-const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: IconComponent }> =
+const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: any }> =
   {
     active: {
       label: "Active",
@@ -220,9 +219,9 @@ export default function Rentals() {
           status: (r.status as RentalStatus) || "expired",
           created_at: String(r.created_at),
           expires_at: String(r.expires_at),
-          payment_status: paymentMap.get(r.id)?.payment_status,
-          payment_channel: paymentMap.get(r.id)?.payment_channel,
-          paystack_reference: paymentMap.get(r.id)?.paystack_reference,
+          payment_status: paymentMap.get(String(r.id))?.payment_status,
+          payment_channel: paymentMap.get(String(r.id))?.payment_channel,
+          paystack_reference: paymentMap.get(String(r.id))?.paystack_reference,
         };
         },
       );

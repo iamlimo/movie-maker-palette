@@ -70,7 +70,7 @@ export const useOptimizedRentals = () => {
         states: data?.map(e => e.state) || [],
       });
       
-      setEntitlements((data || []) as RentalEntitlement[]);
+      setEntitlements((data || []) as unknown as RentalEntitlement[]);
     } catch (error) {
       console.error('[useOptimizedRentals] Error fetching entitlements:', error);
     } finally {

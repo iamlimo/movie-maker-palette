@@ -48,7 +48,15 @@ export default function ReportsCompliance() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setLogs(data || []);
+      setLogs(((data as any[]) || []).map((row: any) => ({
+        id: row.id,
+        created_at: row.created_at,
+        action: row.action,
+        resource_type: row.resource_type,
+        resource_id: row.resource_id,
+        actor_id: row.user_id ?? row.actor_id ?? '',
+        metadata: row.metadata,
+      })));
     } catch (err) {
       console.error('Error loading compliance audit logs:', err);
     } finally {

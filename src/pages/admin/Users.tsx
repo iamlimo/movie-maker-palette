@@ -720,7 +720,7 @@ export default function Users() {
       <UserDetailModal 
         open={showDetailModal}
         onOpenChange={setShowDetailModal}
-        user={selectedUser}
+        user={selectedUser as any}
       />
     </div>
   );

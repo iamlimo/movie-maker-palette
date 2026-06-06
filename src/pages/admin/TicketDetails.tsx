@@ -62,7 +62,7 @@ const fetchTicket = async () => {
 
     if (error) throw error;
 
-    setTicket(data);
+    setTicket(data as any);
 
     // 👇 fetch user after
     if (data?.user_id) {
