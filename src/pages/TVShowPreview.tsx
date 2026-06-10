@@ -38,6 +38,7 @@ import { OptimizedRentalButton } from "@/components/OptimizedRentalButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatNaira } from "@/lib/priceUtils";
 import { usePlatform } from "@/hooks/usePlatform";
+import { useSeasonUpgradeQuote } from "@/hooks/useSeasonUpgradeQuote";
 
 interface TVShow {
   id: string;
@@ -191,9 +192,23 @@ const TVShowPreview = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [tvShow]);
 
+  const currentSeason =
+    seasons.find((s) => s.season_number === selectedSeason) ?? seasons[0] ?? null;
+  const currentEpisodes = currentSeason ? episodes[currentSeason.id] || [] : [];
+
+  const {
+    quote: upgradeQuote,
+    refetch: refetchUpgradeQuote,
+    loading: upgradeQuoteLoading,
+  } = useSeasonUpgradeQuote(
+    !isIOS && currentSeason ? currentSeason.id : null,
+    !isIOS && !!user,
+  );
+
   const handleRentalSuccess = async () => {
     try {
       await refreshEntitlements();
+      if (refetchUpgradeQuote) refetchUpgradeQuote();
       await new Promise((resolve) => setTimeout(resolve, 150));
       computeAccess(seasons, episodes);
     } catch (e) {
@@ -274,9 +289,13 @@ const TVShowPreview = () => {
       setEpisodes(episodesMap);
 
       if (user) computeAccess(seasonsData || [], episodesMap);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error fetching TV show:", err);
-      setError(err.message || "Failed to load TV show");
+      setError(
+        err && typeof err === "object" && "message" in err && typeof (err as { message?: unknown }).message === "string"
+          ? ((err as { message?: unknown }).message as string)
+          : "Failed to load TV show",
+      );
     } finally {
       setLoading(false);
     }
@@ -339,10 +358,6 @@ const TVShowPreview = () => {
       </div>
     );
   }
-
-  const currentSeason =
-    seasons.find((s) => s.season_number === selectedSeason) ?? seasons[0] ?? null;
-  const currentEpisodes = currentSeason ? episodes[currentSeason.id] || [] : [];
 
   return (
     <div className="min-h-screen">
@@ -497,16 +512,37 @@ const TVShowPreview = () => {
                         Best Value
                       </Badge>
                       <p className="text-sm font-semibold mb-1">Full Season</p>
+
                       <p className="text-2xl font-bold text-primary mb-2">
-                        {formatNaira(currentSeason.price)}
+                        {formatNaira(
+                          upgradeQuote?.qualifies === true
+                            ? Math.max(0, upgradeQuote.upgradePrice)
+                            : currentSeason.price,
+                        )}
                       </p>
+
+                      {upgradeQuote?.qualifies === true && (
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Smart Upgrade: instead of {formatNaira(upgradeQuote.fullPrice)}
+                        </p>
+                      )}
+
+                      {upgradeQuoteLoading && (
+                        <p className="text-xs text-muted-foreground mb-2">Checking Smart Upgrade…</p>
+                      )}
+
                       <p className="text-xs text-muted-foreground mb-3">
                         {currentEpisodes.length} episodes • {currentSeason.rental_expiry_duration}h access
                       </p>
+
                       <OptimizedRentalButton
                         contentId={currentSeason.id}
                         contentType="season"
-                        price={currentSeason.price}
+                        price={
+                          upgradeQuote?.qualifies === true
+                            ? upgradeQuote.upgradePrice
+                            : currentSeason.price
+                        }
                         title={`${tvShow.title} - Season ${selectedSeason}`}
                         onRentalSuccess={handleRentalSuccess}
                       />
@@ -546,12 +582,31 @@ const TVShowPreview = () => {
                 </Badge>
                 <p className="text-sm font-semibold mb-1">Full Season</p>
                 <p className="text-xl font-bold text-primary mb-2">
-                  {formatNaira(currentSeason.price)}
+                  {formatNaira(
+                    upgradeQuote?.qualifies === true
+                      ? Math.max(0, upgradeQuote.upgradePrice)
+                      : currentSeason.price,
+                  )}
                 </p>
+
+                {upgradeQuote?.qualifies === true && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Smart Upgrade: instead of {formatNaira(upgradeQuote.fullPrice)}
+                  </p>
+                )}
+
+                {upgradeQuoteLoading && (
+                  <p className="text-xs text-muted-foreground mb-2">Checking Smart Upgrade…</p>
+                )}
+
                 <OptimizedRentalButton
                   contentId={currentSeason.id}
                   contentType="season"
-                  price={currentSeason.price}
+                  price={
+                    upgradeQuote?.qualifies === true
+                      ? upgradeQuote.upgradePrice
+                      : currentSeason.price
+                  }
                   title={`${tvShow.title} - Season ${selectedSeason}`}
                   onRentalSuccess={handleRentalSuccess}
                 />
@@ -586,7 +641,10 @@ const TVShowPreview = () => {
           className="container mx-auto px-4 py-12 border-t border-border"
         >
           <h2 className="text-2xl font-bold mb-6">Episodes</h2>
-          <Tabs value={selectedSeason.toString()} onValueChange={(value) => setSelectedSeason(parseInt(value))}>
+          <Tabs
+            value={selectedSeason.toString()}
+            onValueChange={(value) => setSelectedSeason(parseInt(String(value), 10))}
+          >
             <TabsList className="w-full justify-start">
               {seasons.map((season) => (
                 <TabsTrigger key={season.id} value={season.season_number.toString()}>

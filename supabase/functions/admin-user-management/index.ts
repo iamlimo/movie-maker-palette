@@ -199,12 +199,41 @@ serve(async (req) => {
 
     throw new Error('Invalid action');
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in admin-user-management:', error);
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'An error occurred processing your request';
+
+    const lower = message.toLowerCase();
+
+    // Map common failure reasons to proper status codes.
+    const status =
+      lower.includes('unauthorized') ? 401
+      : lower.includes('insufficient permissions') ? 403
+      : lower.includes('too many requests') ? 429
+      : 400;
+
+    const raw =
+      typeof error === 'string'
+        ? error
+        : error instanceof Error
+          ? { name: error.name, message: error.message }
+          : String(error);
+
     return new Response(
-      JSON.stringify({ success: false, error: 'An error occurred processing your request' }),
+      JSON.stringify({
+        success: false,
+        error: message,
+        debug: {
+          raw,
+          computed_status: status
+        }
+      }),
       {
-        status: 400,
+        status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );

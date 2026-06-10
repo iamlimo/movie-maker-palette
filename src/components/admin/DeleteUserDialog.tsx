@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { AlertTriangle, Loader2, Wallet, Trash2 } from 'lucide-react';
 import { formatNaira } from '@/lib/priceUtils';
 
@@ -26,6 +27,7 @@ export const DeleteUserDialog = ({ open, onOpenChange, user, onUserDeleted }: De
   const [acknowledged, setAcknowledged] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+  const { session } = useAuth();
 
   const handleDelete = async () => {
     if (!user || confirmEmail !== user.email || !acknowledged) {
@@ -37,17 +39,51 @@ export const DeleteUserDialog = ({ open, onOpenChange, user, onUserDeleted }: De
       return;
     }
 
+    if (!session?.access_token) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "Your session has expired. Please sign in again."
+      });
+      return;
+    }
+
     try {
       setIsDeleting(true);
 
-      const { data, error } = await supabase.functions.invoke('admin-user-management', {
-        body: {
+      const supabaseUrl = (supabase as { supabaseUrl?: string }).supabaseUrl;
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL is not available in the client');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/admin-user-management`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
           action: 'delete',
           user_id: user.user_id
-        }
+        })
       });
 
-      if (error) throw error;
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        // ignore json parse errors
+      }
+
+      if (!response.ok) {
+        const errMsg =
+          typeof payload === 'object' && payload !== null && 'error' in payload
+            ? String((payload as { error?: unknown }).error ?? `Edge function failed with status ${response.status}`)
+            : `Edge function failed with status ${response.status}`;
+        throw new Error(errMsg);
+      }
+
+      const data = payload as { success?: boolean; error?: unknown } | null;
 
       if (data?.success) {
         toast({
@@ -60,12 +96,13 @@ export const DeleteUserDialog = ({ open, onOpenChange, user, onUserDeleted }: De
       } else {
         throw new Error(data?.error || 'Failed to delete user');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting user:', error);
+      const message = error instanceof Error ? error.message : "Failed to delete user";
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to delete user"
+        description: message
       });
     } finally {
       setIsDeleting(false);
