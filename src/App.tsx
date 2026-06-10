@@ -115,10 +115,7 @@ function AppContent() {
           }
         >
           <Routes>
-            <Route
-              path="/"
-              element={isMaintenanceOn() ? <Maintenance /> : <Index />}
-            />
+            <Route path="/" element={isMaintenanceOn() ? <Maintenance /> : <Index />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
