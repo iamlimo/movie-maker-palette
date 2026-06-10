@@ -14,6 +14,7 @@ import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import RoleRoute from "@/components/RoleRoute";
 import { STAFF_ROLES } from "@/lib/rbac";
+import { isMaintenanceOn } from "@/lib/maintenance";
 import AdminLayout from "@/components/admin/AdminLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
@@ -114,7 +115,7 @@ function AppContent() {
           }
         >
           <Routes>
-            <Route path="/" element={<Maintenance />} />
+            <Route path="/" element={isMaintenanceOn() ? <Maintenance /> : <Index />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />

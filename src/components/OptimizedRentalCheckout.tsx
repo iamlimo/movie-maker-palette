@@ -53,6 +53,12 @@ interface OptimizedRentalCheckoutProps {
 type PaymentMethod = 'wallet' | 'paystack';
 type PaymentState = 'processing' | 'verifying' | 'success' | 'failed' | 'pending';
 
+type PaystackCallbackPayload = {
+  type?: unknown;
+  status?: unknown;
+  [key: string]: unknown;
+};
+
 export const OptimizedRentalCheckout = ({
   open,
   onOpenChange,
@@ -68,21 +74,33 @@ export const OptimizedRentalCheckout = ({
   const { processRental } = useOptimizedRentals();
   const { isIOS } = usePlatform();
   const { refresh: refreshEntitlements } = useEntitlements();
-  const { quote: upgradeQuote } = useSeasonUpgradeQuote(
-    contentType === 'season' ? contentId : null,
-    open && contentType === 'season',
+
+  const watchPath = `/watch/${contentType}/${contentId}`;
+
+  const [upgradeQuoteRefreshNonce, setUpgradeQuoteRefreshNonce] = useState(0);
+
+  const isSeason = contentType === 'season';
+  const upgradeQuoteEnabled = open && isSeason;
+
+  const { quote: upgradeQuote, loading: upgradeQuoteLoading } = useSeasonUpgradeQuote(
+    isSeason ? contentId : null,
+    upgradeQuoteEnabled,
+    upgradeQuoteRefreshNonce,
   );
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
   const [referralCode, setReferralCode] = useState('');
   const [discount, setDiscount] = useState<{
     code: string;
     percentage: number;
     amount: number;
   } | null>(null);
+
   const [validatingCode, setValidatingCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+
   const [paymentStatus, setPaymentStatus] = useState<{
     show: boolean;
     status: PaymentState;
@@ -92,13 +110,12 @@ export const OptimizedRentalCheckout = ({
   const isNative = Capacitor.isNativePlatform();
   const isMobileBrowser = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
 
-  // When the user qualifies for the smart season upgrade, charge the upgrade price instead.
   const effectivePrice = useMemo(() => {
-    if (contentType === 'season' && upgradeQuote?.qualifies) {
+    if (isSeason && upgradeQuote?.qualifies === true) {
       return Math.max(0, upgradeQuote.upgradePrice);
     }
     return price;
-  }, [contentType, upgradeQuote, price]);
+  }, [isSeason, upgradeQuote, price]);
 
   const subTotal = useMemo(() => {
     return discount ? Math.max(0, effectivePrice - discount.amount) : effectivePrice;
@@ -111,9 +128,7 @@ export const OptimizedRentalCheckout = ({
   const canPayWithWallet = canAfford(totalToPay);
   const canProceed = paymentMethod === 'wallet' ? canPayWithWallet : paymentMethod === 'paystack';
 
-  const watchPath = `/watch/${contentType}/${contentId}`;
-
-  const triggerHaptic = async () => {
+  const triggerHaptic = useCallback(async () => {
     if (!isNative) return;
 
     try {
@@ -121,7 +136,7 @@ export const OptimizedRentalCheckout = ({
     } catch {
       console.log('Haptic feedback not available');
     }
-  };
+  }, [isNative]);
 
   const redirectToWatch = () => {
     onOpenChange(false);
@@ -147,9 +162,17 @@ export const OptimizedRentalCheckout = ({
 
       if (error) throw error;
 
-      const hasActiveRental =
-        (Array.isArray(data?.related_records?.rental_access) &&
-          data.related_records.rental_access.length > 0);
+      const relatedRecords =
+        data && typeof data === 'object' && 'related_records' in data
+          ? (data as { related_records?: unknown }).related_records
+          : undefined;
+
+      const rentalAccess =
+        relatedRecords && typeof relatedRecords === 'object' && 'rental_access' in relatedRecords
+          ? (relatedRecords as { rental_access?: unknown }).rental_access
+          : undefined;
+
+      const hasActiveRental = Array.isArray(rentalAccess) && rentalAccess.length > 0;
 
       if (hasActiveRental) {
         await refreshWallet();
@@ -212,8 +235,8 @@ export const OptimizedRentalCheckout = ({
         title: '✨ Discount applied',
         description: `You saved ${formatNaira(discountAmount)}`,
       });
-    } catch (error) {
-      console.error('Error validating code:', error);
+    } catch (err) {
+      console.error('Error validating code:', err);
       setCodeError('Error validating code');
     } finally {
       setValidatingCode(false);
@@ -224,16 +247,21 @@ export const OptimizedRentalCheckout = ({
     const onMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
 
-      const data = event.data as any;
-      if (!data || data.type !== 'paystack:callback') return;
+      const payload = event.data as PaystackCallbackPayload;
+      if (!payload || typeof payload !== 'object' || !('type' in payload)) return;
 
-      if (data.status === 'completed' || data.status === 'pending') {
+      if (payload.type !== 'paystack:callback') return;
+
+      if (payload.status === 'completed' || payload.status === 'pending') {
         onOpenChange(false);
 
         try {
-          const hasAccess = await verifyPaystackAccess(data);
+          const hasAccess = await verifyPaystackAccess(payload as Record<string, unknown>);
 
           if (hasAccess) {
+            // Banner should re-check eligibility immediately for the open modal state.
+            setUpgradeQuoteRefreshNonce((n) => n + 1);
+
             setPaymentStatus({ show: false, status: 'processing', message: '' });
             onSuccess?.();
             navigate(watchPath);
@@ -246,11 +274,12 @@ export const OptimizedRentalCheckout = ({
         setPaymentStatus({
           show: true,
           status: 'pending',
-          message: 'Payment received. Access is still being confirmed. Please try Watch Now again shortly.',
+          message:
+            'Payment received. Access is still being confirmed. Please try Watch Now again shortly.',
         });
       }
 
-      if (data.status === 'failed') {
+      if (payload.status === 'failed') {
         setPaymentStatus({ show: true, status: 'failed', message: 'Payment failed. Please try again.' });
       }
     };
@@ -315,6 +344,9 @@ export const OptimizedRentalCheckout = ({
           console.warn('Could not refresh wallet/entitlements:', error);
         }
 
+        // Force upgrade banner quote to update immediately for the still-open modal.
+        setUpgradeQuoteRefreshNonce((n) => n + 1);
+
         toast({
           title: '🎉 Payment successful!',
           description: `You can now watch ${title}. Enjoy!`,
@@ -363,9 +395,7 @@ export const OptimizedRentalCheckout = ({
 
       const paymentError = error as {
         message?: string;
-        response?: {
-          status?: number;
-        };
+        response?: { status?: number };
       };
 
       let errorTitle = '❌ Payment error';
@@ -438,27 +468,45 @@ export const OptimizedRentalCheckout = ({
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-            {contentType === 'season' && upgradeQuote?.qualifies && (
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-full bg-primary/10 p-2 mt-0.5">
-                    <Gift className="h-4 w-4 text-primary" />
+            {isSeason && (
+              <>
+                {upgradeQuoteLoading && (
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-full bg-primary/10 p-2 mt-0.5">
+                        <Gift className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-foreground">Smart Upgrade</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Checking your upgrade eligibility…
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-foreground">
-                      Smart Upgrade
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      You've spent {formatNaira(upgradeQuote.eligibleSpend)} on episodes in the last 7 days.
-                      Upgrade to the full season for{' '}
-                      <span className="font-semibold text-foreground">
-                        {formatNaira(upgradeQuote.upgradePrice)}
-                      </span>
-                      {' '}instead of {formatNaira(upgradeQuote.fullPrice)}.
-                    </p>
+                )}
+
+                {!upgradeQuoteLoading && upgradeQuote?.qualifies === true && (
+                  <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-full bg-primary/10 p-2 mt-0.5">
+                        <Gift className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-foreground">Smart Upgrade</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          You've spent {formatNaira(upgradeQuote.eligibleSpend)} on episodes in the last 7 days.
+                          Upgrade to the full season for{' '}
+                          <span className="font-semibold text-foreground">
+                            {formatNaira(upgradeQuote.upgradePrice)}
+                          </span>{' '}
+                          instead of {formatNaira(upgradeQuote.fullPrice)}.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                )}
+              </>
             )}
 
             <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -754,6 +802,7 @@ export const OptimizedRentalCheckout = ({
                 </div>
               )}
             </div>
+
             <DialogTitle
               className={
                 paymentStatus.status === 'success'
@@ -765,8 +814,7 @@ export const OptimizedRentalCheckout = ({
             >
               {paymentStatus.status === 'success' && 'Payment successful'}
               {paymentStatus.status === 'failed' && 'Payment failed'}
-              {(paymentStatus.status === 'verifying' || paymentStatus.status === 'processing') &&
-                'Processing payment'}
+              {(paymentStatus.status === 'verifying' || paymentStatus.status === 'processing') && 'Processing payment'}
               {paymentStatus.status === 'pending' && 'Payment pending'}
             </DialogTitle>
           </DialogHeader>

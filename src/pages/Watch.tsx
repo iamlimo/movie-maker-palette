@@ -19,8 +19,26 @@ const Watch = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState("Access Denied");
-  const [content, setContent] = useState<any>(null);
+  const [content, setContent] = useState<unknown>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Prevent in-flight async calls from older route params overwriting newer UI state
+  const requestIdRef = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const guardSetState = (requestId: unknown) => {
+    return (
+      isMountedRef.current &&
+      typeof requestId === "number" &&
+      requestId === requestIdRef.current
+    );
+  };
 
   useFullscreenLandscape({
     containerRef: fullscreenContainerRef,
@@ -28,54 +46,84 @@ const Watch = () => {
   });
 
   useEffect(() => {
+    // New params => invalidate previous async work
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+
+    // Reset UI to avoid showing stale Access Denied while new check starts
+    setLoading(true);
+    setError(null);
+    setErrorTitle("Access Denied");
+    setContent(null);
+    setVideoUrl(null);
+
     if (!user) {
       navigate("/auth");
       return;
     }
 
     if (!contentType || !contentId) {
-      setErrorTitle("Access Denied");
-      setError("Invalid content");
-      setLoading(false);
+      if (guardSetState(requestId)) {
+        setErrorTitle("Access Denied");
+        setError("Invalid content");
+        setLoading(false);
+      }
       return;
     }
 
-    checkAccessAndLoad();
+    checkAccessAndLoad(requestId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, contentType, contentId, navigate]);
 
-  const checkAccessAndLoad = async () => {
+  const checkAccessAndLoad = async (requestId: number) => {
     try {
+      if (!guardSetState(requestId)) return;
+
       let hasAccess = false;
       let retryCount = 0;
-      const maxRetries = 3;
-      const retryDelay = 500; 
+
+      // Entitlements may be written slightly after checkout/webhook completes.
+      // Season rentals are more prone to this race condition, so we give them
+      // a longer retry window before showing Access Denied.
+      const isSeasonWatch = contentType === "season";
+      const maxRetries = isSeasonWatch ? 12 : 3; // ~6s for season (~12*500ms) vs ~1.5s default
+      const retryDelay = isSeasonWatch ? 500 : 500;
 
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
 
       if (!accessToken) {
-        setErrorTitle("Access Denied");
-        setError("Please sign in again to continue");
-        setLoading(false);
+        if (guardSetState(requestId)) {
+          setErrorTitle("Access Denied");
+          setError("Please sign in again to continue");
+          setLoading(false);
+        }
         return;
       }
 
-      // 1. High-Performance Database Guard (Replaces slower edge function invocation)
-      const rpcParams = {
-        p_movie_id: contentType === "movie" ? contentId : null,
-        p_season_id: contentType === "season" ? contentId : null,
-        p_episode_id: contentType === "episode" ? contentId : null,
-      };
-
+      // 1. Access Guard (edge function is the canonical entitlement checker)
+      // This avoids false negatives caused by RPC timing/episode delegation.
       while (retryCount < maxRetries) {
-        const { data, error: rpcError } = await supabase.rpc(
-          "verify_playback_authorization",
-          rpcParams
+        const { data: accessData, error: accessError } = await supabase.functions.invoke(
+          "rental-access",
+          {
+            body: {
+              content_id: contentId,
+              content_type: contentType,
+            },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
         );
 
-        if (!rpcError && data === true) {
+        const hasAccessNow = (() => {
+          if (!accessData || typeof accessData !== "object") return false;
+          const row = accessData as Record<string, unknown>;
+          return row["has_access"] === true;
+        })();
+
+        if (!accessError && hasAccessNow) {
           hasAccess = true;
-          break; 
+          break;
         }
 
         retryCount++;
@@ -85,6 +133,7 @@ const Watch = () => {
       }
 
       if (!hasAccess) {
+        if (!guardSetState(requestId)) return;
         setErrorTitle("Access Denied");
         setError("You don't have an active rental for this content");
         setLoading(false);
@@ -92,7 +141,7 @@ const Watch = () => {
       }
 
       // 2. Fetch content details with relational joins to prevent metadata gaps
-      let contentData: any = null;
+      let contentData: unknown = null;
       if (contentType === "movie") {
         const { data } = await supabase
           .from("movies")
@@ -125,6 +174,7 @@ const Watch = () => {
           .single();
 
         if (seasonError || !seasonData) {
+          if (!guardSetState(requestId)) return;
           setErrorTitle("Video Unavailable");
           setError("Season not found");
           setLoading(false);
@@ -138,6 +188,7 @@ const Watch = () => {
           .order("episode_number", { ascending: true });
 
         if (episodesError || !episodesData || episodesData.length === 0) {
+          if (!guardSetState(requestId)) return;
           const { data: showData } = await supabase
             .from("tv_shows")
             .select("slug")
@@ -148,6 +199,7 @@ const Watch = () => {
             navigate(`/tvshow/${showData.slug}`);
             return;
           }
+          if (!guardSetState(requestId)) return;
           setErrorTitle("Video Unavailable");
           setError("Season content structural mismatch");
           setLoading(false);
@@ -161,10 +213,13 @@ const Watch = () => {
           .eq("user_id", user.id)
           .in("content_id", episodeIds);
 
-        const watchMap = (historyData || []).reduce<Record<string, any>>((map, entry) => {
-          map[entry.content_id] = { completed: entry.completed, progress: entry.progress || 0 };
-          return map;
-        }, {});
+        const watchMap = (historyData || []).reduce<Record<string, { completed: boolean; progress: number }>>(
+          (map, entry) => {
+            map[entry.content_id] = { completed: entry.completed, progress: entry.progress || 0 };
+            return map;
+          },
+          {},
+        );
 
         const nextEpisode = episodesData.find((ep) => {
           const history = watchMap[ep.id];
@@ -176,6 +231,7 @@ const Watch = () => {
       }
 
       if (!contentData) {
+        if (!guardSetState(requestId)) return;
         setErrorTitle("Video Unavailable");
         setError("Content metadata record could not be resolved");
         setLoading(false);
@@ -193,8 +249,9 @@ const Watch = () => {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
 
-        videoUrlData = (urlError || !urlData?.signedUrl) 
-          ? { url: contentData.video_url } 
+        const typedContentData = contentData as { video_url?: string } | null;
+        videoUrlData = (urlError || !urlData?.signedUrl)
+          ? { url: typedContentData?.video_url ?? "" }
           : { url: urlData.signedUrl };
 
       } else if (contentType === "episode") {
@@ -203,27 +260,44 @@ const Watch = () => {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
 
-        const resolveSignedUrl = (input: any): string | null => {
+        const resolveSignedUrl = (input: unknown): string | null => {
           if (input == null) return null;
+
           if (typeof input === "string") {
             try {
-              const parsed = JSON.parse(input);
-              if (parsed?.signedUrl) return parsed.signedUrl;
-              if (parsed?.data?.signedUrl) return parsed.data.signedUrl;
+              const parsed = JSON.parse(input) as
+                | { signedUrl?: unknown; data?: { signedUrl?: unknown } }
+                | null;
+              const signedUrl = parsed?.signedUrl;
+              if (typeof signedUrl === "string") return signedUrl;
+
+              const dataSignedUrl = parsed?.data?.signedUrl;
+              if (typeof dataSignedUrl === "string") return dataSignedUrl;
             } catch {
               return null;
             }
           }
+
           if (typeof input === "object") {
-            if (input.signedUrl) return input.signedUrl;
-            if (input.data?.signedUrl) return input.data.signedUrl;
+            const obj = input as Record<string, unknown>;
+            const signedUrl = obj["signedUrl"];
+            if (typeof signedUrl === "string") return signedUrl;
+
+            const data = obj["data"];
+            if (typeof data === "object" && data !== null) {
+              const dataObj = data as Record<string, unknown>;
+              const dataSignedUrl = dataObj["signedUrl"];
+              if (typeof dataSignedUrl === "string") return dataSignedUrl;
+            }
           }
+
           return null;
         };
 
         const signedUrl = resolveSignedUrl(urlData);
 
         if (urlError || !signedUrl) {
+          if (!guardSetState(requestId)) return;
           setErrorTitle("Video Unavailable");
           setError(urlError?.message || "Secure token generation failed for media stream");
           setLoading(false);
@@ -234,15 +308,18 @@ const Watch = () => {
       }
 
       if (!videoUrlData?.url) {
+        if (!guardSetState(requestId)) return;
         setErrorTitle("Video Unavailable");
         setError("Stream URI resolution failed");
         setLoading(false);
         return;
       }
 
+      if (!guardSetState(requestId)) return;
       setVideoUrl(videoUrlData.url);
       setLoading(false);
     } catch (err) {
+      if (!guardSetState(requestId)) return;
       console.error("Critical crash inside playback thread:", err);
       setErrorTitle("Video Unavailable");
       setError("An unexpected error occurred while setting up the player");
@@ -276,13 +353,28 @@ const Watch = () => {
   }
 
   // Formatting strings safely out of unified object types
-  const contentTitle = contentType === "movie" 
-    ? (content?.title ?? "Untitled Movie")
-    : `${content?.seasons?.tv_shows?.title ?? "Show"} - Season ${content?.seasons?.season_number ?? ""} Ep ${content?.episode_number ?? ""}`;
+  const typedContent = content as
+    | null
+    | {
+        title?: string;
+        thumbnail_url?: string;
+        subtitle_url?: string;
+        video_url?: string;
+        episode_number?: number;
+        seasons?: {
+          season_number?: number;
+          tv_shows?: { title?: string; thumbnail_url?: string };
+        };
+        [key: string]: unknown;
+      };
+
+  const contentTitle = contentType === "movie"
+    ? (typedContent?.title ?? "Untitled Movie")
+    : `${typedContent?.seasons?.tv_shows?.title ?? "Show"} - Season ${typedContent?.seasons?.season_number ?? ""} Ep ${typedContent?.episode_number ?? ""}`;
 
   const contentPoster = contentType === "movie"
-    ? (content?.thumbnail_url ?? "")
-    : (content?.seasons?.tv_shows?.thumbnail_url ?? content?.thumbnail_url ?? "");
+    ? (typedContent?.thumbnail_url ?? "")
+    : (typedContent?.seasons?.tv_shows?.thumbnail_url ?? typedContent?.thumbnail_url ?? "");
 
 return (
     <div 
@@ -309,7 +401,7 @@ return (
               videoUrl={videoUrl}
               title={contentTitle}
               poster={contentPoster}
-              subtitleUrl={content?.subtitle_url ?? ""}
+              subtitleUrl={typedContent?.subtitle_url ?? ""}
               autoPlay={true}
             />
           ) : (
