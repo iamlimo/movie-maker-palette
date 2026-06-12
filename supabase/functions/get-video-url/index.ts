@@ -505,6 +505,43 @@ Deno.serve(async (req) => {
         videoUrl: videoUrl.substring(0, 100) + '...' // Truncate for logging
       });
 
+      // Detect public Backblaze direct URLs (standard /file/<bucket>/<path> links)
+      // These don't require our file-path extraction / b2_download_authorization logic.
+      const isPublicB2FileUrl = videoUrl.includes('/file/');
+
+      if (isPublicB2FileUrl) {
+        // For streaming requests, avoid returning JSON; redirect the browser/app directly.
+        if (isStreamingRequest) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              ...corsHeaders,
+              Location: videoUrl,
+              'Cache-Control': `public, max-age=${expiryHours * 3600}`,
+            },
+          });
+        }
+
+        const expiresAt = new Date(Date.now() + expiryHours * 3600 * 1000).toISOString();
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            signedUrl: videoUrl,
+            expiresAt,
+            message: 'Video URL generated successfully (Backblaze public /file/ URL)',
+            source: 'backblaze-public',
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Cache-Control': `public, max-age=${expiryHours * 3600}`,
+              'X-Signed-Url-Expires': expiresAt,
+            },
+          },
+        );
+      }
+
       // Check if this is a Backblaze API endpoint URL (b2_download_file_by_id)
       const isB2ApiDownloadUrl = videoUrl.includes('/b2api/') && videoUrl.includes('b2_download_file_by_id');
       
