@@ -56,7 +56,7 @@ export const OptimizedRentalButton = ({
           Unavailable on iOS App
         </Button>
         <p className="text-xs text-muted-foreground text-center">
-          To rent content on iOS, please visit our website on Safari web browser
+          To rent content on iOS, please visit our website on Safari web browser.
         </p>
       </div>
     );

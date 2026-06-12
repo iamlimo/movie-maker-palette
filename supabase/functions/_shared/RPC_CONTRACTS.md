@@ -15,6 +15,8 @@
 - `p_discount_amount` (bigint): Discount in kobo
 - `p_provider_reference` (text, nullable): Optional provider reference for traceability
 
+Referral validation is owned by the caller (`process-rental`) before this RPC is invoked. The RPC must not query legacy/nonexistent referral fields such as `referral_codes.is_valid`; it receives `p_final_price` and `p_discount_amount` after validation.
+
 #### Return Type (as consumed by `supabase/functions/process-rental/index.ts`)
 `RETURNS TABLE (...)` returning a row containing:
 - `rental_intent_id` (uuid): ID of created `rental_intents` row

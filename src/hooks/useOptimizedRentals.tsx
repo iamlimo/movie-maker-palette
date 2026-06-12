@@ -140,7 +140,9 @@ export const useOptimizedRentals = () => {
     ): Promise<{
       success: boolean;
       rentalId?: string;
+      paymentId?: string;
       authorizationUrl?: string;
+      paystackReference?: string;
       error?: string;
     }> => {
       if (!user) {
@@ -214,6 +216,7 @@ export const useOptimizedRentals = () => {
           return {
             success: true,
             rentalId: data.rentalId,
+            paymentId: data.paymentId,
           };
         } else if (paymentMethod === 'paystack') {
           // Return authorization URL for Paystack
@@ -227,7 +230,9 @@ export const useOptimizedRentals = () => {
           return {
             success: true,
             rentalId: data.rentalId,
+            paymentId: data.paymentId,
             authorizationUrl: data.authorizationUrl,
+            paystackReference: data.paystackReference,
           };
         }
 
