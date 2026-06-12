@@ -100,6 +100,29 @@ function buildProxyStreamUrl(
   return `${supabaseUrl}/functions/v1/get-video-url?${params.toString()}`;
 }
 
+function safeDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function encodeB2Path(filePath: string) {
+  return filePath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
+function buildB2DownloadUrl(downloadUrl: string, bucketName: string, filePath: string, authorizationToken: string) {
+  const encodedBucket = encodeURIComponent(bucketName);
+  const encodedPath = encodeB2Path(filePath);
+  const url = new URL(`/file/${encodedBucket}/${encodedPath}`, downloadUrl);
+  url.searchParams.set('Authorization', authorizationToken);
+  return url.toString();
+}
+
 function getB2Credentials() {
   return {
     keyId:
@@ -584,7 +607,7 @@ Deno.serve(async (req) => {
       if (videoUrl.includes('://')) {
         try {
           const urlObj = new URL(videoUrl);
-          const segments = urlObj.pathname.split('/').filter(Boolean);
+          const segments = urlObj.pathname.split('/').filter(Boolean).map(safeDecodeURIComponent);
 
           if (segments[0] === 'file' && segments.length >= 3) {
             // backblaze direct/download URL format: /file/<bucket>/<path>
@@ -761,7 +784,12 @@ Deno.serve(async (req) => {
       }
 
       const downloadAuthData: B2SignedUrlResponse = await downloadAuthResponse.json();
-      const backblazeSignedUrl = `${authData.downloadUrl}/file/${b2BucketName}/${filePath}?Authorization=${downloadAuthData.authorizationToken}`;
+      const backblazeSignedUrl = buildB2DownloadUrl(
+        authData.downloadUrl,
+        b2BucketName,
+        filePath,
+        downloadAuthData.authorizationToken,
+      );
       const expiresAt = new Date(Date.now() + validDurationInSeconds * 1000).toISOString();
 
       // For video streaming, we need to proxy the request to avoid CORS issues
@@ -777,7 +805,11 @@ Deno.serve(async (req) => {
           if (!videoResponse.ok) {
             console.error('Failed to proxy video request:', {
               status: videoResponse.status,
-              statusText: videoResponse.statusText
+              statusText: videoResponse.statusText,
+              contentId,
+              contentType,
+              filePath,
+              responseBody: await videoResponse.text().catch(() => null),
             });
             return new Response(
               JSON.stringify({ error: 'Failed to stream video' }),
