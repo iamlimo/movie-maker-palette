@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveWatchPath } from '@/lib/watchPaths';
 
 type CallbackStatus = 'verifying' | 'completed' | 'pending' | 'failed';
 
@@ -14,6 +15,7 @@ export default function PaymentCallback() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<CallbackStatus>('verifying');
   const [message, setMessage] = useState('Confirming your payment...');
+  const [resolvedReturnTo, setResolvedReturnTo] = useState<string | null>(null);
 
   const callbackData = useMemo(() => {
     const contentType = searchParams.get('contentType');
@@ -47,8 +49,19 @@ export default function PaymentCallback() {
     let closeTimer: number | undefined;
     let cancelled = false;
 
-    const finish = (nextStatus: CallbackStatus, nextMessage: string) => {
+    const finish = async (nextStatus: CallbackStatus, nextMessage: string) => {
       if (cancelled) return;
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const nextReturnTo =
+        nextStatus === 'completed' && callbackData.kind === 'rental'
+          ? await resolveWatchPath(callbackData.contentType, callbackData.contentId, user?.id)
+          : callbackData.returnTo;
+
+      if (cancelled) return;
+      setResolvedReturnTo(nextReturnTo);
 
       setStatus(nextStatus);
       setMessage(nextMessage);
@@ -58,12 +71,15 @@ export default function PaymentCallback() {
           type: 'paystack:callback',
           status: nextStatus,
           ...callbackData,
+          returnTo: nextReturnTo,
         },
         window.location.origin,
       );
 
       if (window.opener && !window.opener.closed) {
         closeTimer = window.setTimeout(() => window.close(), CLOSE_DELAY_MS);
+      } else if (nextStatus === 'completed') {
+        closeTimer = window.setTimeout(() => navigate(nextReturnTo, { replace: true }), CLOSE_DELAY_MS);
       }
     };
 
@@ -109,7 +125,7 @@ export default function PaymentCallback() {
         }
 
         if (error) {
-          finish('pending', 'Payment received. Final confirmation may take a moment.');
+          await finish('pending', 'Payment received. Final confirmation may take a moment.');
           return;
         }
 
@@ -126,19 +142,19 @@ export default function PaymentCallback() {
           data.related_records.rental_access.length > 0;
 
         if (hasActiveRental) {
-          finish('completed', 'Payment confirmed. Closing this window...');
+          await finish('completed', 'Payment confirmed. Closing this window...');
           return;
         }
 
         if (['failed', 'cancelled', 'canceled', 'rejected'].includes(paymentStatus)) {
-          finish('failed', 'Payment was not completed.');
+          await finish('failed', 'Payment was not completed.');
           return;
         }
 
-        finish('pending', 'Payment is still being confirmed. You can close this window.');
+        await finish('pending', 'Payment is still being confirmed. You can close this window.');
       } catch (error) {
         console.error('Payment callback verification failed:', error);
-        finish('pending', 'Payment received. Final confirmation may take a moment.');
+        await finish('pending', 'Payment received. Final confirmation may take a moment.');
       }
     };
 
@@ -148,7 +164,7 @@ export default function PaymentCallback() {
       cancelled = true;
       if (closeTimer) window.clearTimeout(closeTimer);
     };
-  }, [callbackData]);
+  }, [callbackData, navigate]);
 
   const icon =
     status === 'completed' ? (
@@ -176,7 +192,7 @@ export default function PaymentCallback() {
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">{message}</p>
           </div>
-          <Button className="w-full" onClick={() => navigate(callbackData.returnTo, { replace: true })}>
+          <Button className="w-full" onClick={() => navigate(resolvedReturnTo || callbackData.returnTo, { replace: true })}>
             Continue
           </Button>
         </CardContent>

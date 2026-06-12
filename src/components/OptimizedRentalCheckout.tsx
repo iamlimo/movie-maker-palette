@@ -35,6 +35,7 @@ import { useEntitlements } from '@/hooks/useEntitlements';
 import { useSeasonUpgradeQuote } from '@/hooks/useSeasonUpgradeQuote';
 import { toast } from '@/hooks/use-toast';
 import { formatNaira } from '@/lib/priceUtils';
+import { resolveWatchPath } from '@/lib/watchPaths';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
@@ -74,8 +75,6 @@ export const OptimizedRentalCheckout = ({
   const { processRental } = useOptimizedRentals();
   const { isIOS } = usePlatform();
   const { refresh: refreshEntitlements } = useEntitlements();
-
-  const watchPath = `/watch/${contentType}/${contentId}`;
 
   const [upgradeQuoteRefreshNonce, setUpgradeQuoteRefreshNonce] = useState(0);
 
@@ -138,9 +137,13 @@ export const OptimizedRentalCheckout = ({
     }
   }, [isNative]);
 
-  const redirectToWatch = () => {
+  const redirectToWatch = async () => {
+    const resolvedPath = await resolveWatchPath(contentType, contentId, user?.id);
     onOpenChange(false);
-    navigate(watchPath);
+    navigate(resolvedPath, {
+      replace: contentType === 'season',
+      state: contentType === 'season' ? { fromSeasonId: contentId } : undefined,
+    });
   };
 
   const verifyPaystackAccess = useCallback(
@@ -264,7 +267,18 @@ export const OptimizedRentalCheckout = ({
 
             setPaymentStatus({ show: false, status: 'processing', message: '' });
             onSuccess?.();
-            navigate(watchPath);
+            const resolvedPath = await resolveWatchPath(
+              typeof payload.contentType === 'string' ? payload.contentType : contentType,
+              typeof payload.contentId === 'string' ? payload.contentId : contentId,
+              user?.id,
+            );
+            navigate(resolvedPath, {
+              replace: payload.contentType === 'season' || contentType === 'season',
+              state:
+                payload.contentType === 'season' || contentType === 'season'
+                  ? { fromSeasonId: typeof payload.contentId === 'string' ? payload.contentId : contentId }
+                  : undefined,
+            });
             return;
           }
         } catch (error) {
@@ -286,7 +300,7 @@ export const OptimizedRentalCheckout = ({
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [navigate, onOpenChange, onSuccess, verifyPaystackAccess, watchPath]);
+  }, [contentId, contentType, navigate, onOpenChange, onSuccess, user?.id, verifyPaystackAccess]);
 
   const handlePayment = async () => {
     if (!user || !paymentMethod) return;
@@ -355,7 +369,7 @@ export const OptimizedRentalCheckout = ({
         await triggerHaptic();
         onSuccess?.();
         setIsProcessing(false);
-        redirectToWatch();
+        await redirectToWatch();
         return;
       }
 
@@ -376,7 +390,7 @@ export const OptimizedRentalCheckout = ({
             ? null
             : window.open(result.authorizationUrl, 'paystack_checkout', 'width=520,height=720');
 
-        if (isNative || isMobileBrowser) {
+        if (isNative || isMobileBrowser || !paystackWindow) {
           window.location.href = result.authorizationUrl;
         }
 

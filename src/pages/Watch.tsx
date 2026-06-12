@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
@@ -8,9 +8,11 @@ import { usePlatform } from "@/hooks/usePlatform";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useFullscreenLandscape } from "@/hooks/useFullscreenLandscape";
 import { Loader2, ArrowLeft } from "lucide-react"; // Unified line here
+import { resolveWatchPath } from "@/lib/watchPaths";
 
 const Watch = () => {
   const { contentType, contentId } = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isNative, isIOS, isAndroid } = usePlatform();
@@ -81,12 +83,15 @@ const Watch = () => {
 
       let hasAccess = false;
       let retryCount = 0;
+      const routeState = location.state as { fromSeasonId?: string } | null;
+      const fromSeasonId = routeState?.fromSeasonId;
 
       // Entitlements may be written slightly after checkout/webhook completes.
       // Season rentals are more prone to this race condition, so we give them
       // a longer retry window before showing Access Denied.
       const isSeasonWatch = contentType === "season";
-      const maxRetries = isSeasonWatch ? 12 : 3; // ~6s for season (~12*500ms) vs ~1.5s default
+      const isEpisodeAfterSeasonRedirect = contentType === "episode" && !!fromSeasonId;
+      const maxRetries = isSeasonWatch || isEpisodeAfterSeasonRedirect ? 12 : 3; // ~6s after checkout vs ~1.5s default
       const retryDelay = isSeasonWatch ? 500 : 500;
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -124,6 +129,43 @@ const Watch = () => {
         if (!accessError && hasAccessNow) {
           hasAccess = true;
           break;
+        }
+
+        if (contentType === "episode") {
+          const seasonId =
+            fromSeasonId ||
+            (await (async () => {
+              const { data: episodeData } = await supabase
+                .from("episodes")
+                .select("season_id")
+                .eq("id", contentId)
+                .maybeSingle();
+              return episodeData?.season_id || null;
+            })());
+
+          if (seasonId) {
+            const { data: seasonAccessData, error: seasonAccessError } = await supabase.functions.invoke(
+              "rental-access",
+              {
+                body: {
+                  content_id: seasonId,
+                  content_type: "season",
+                },
+                headers: { Authorization: `Bearer ${accessToken}` },
+              }
+            );
+
+            const hasSeasonAccess =
+              !seasonAccessError &&
+              !!seasonAccessData &&
+              typeof seasonAccessData === "object" &&
+              (seasonAccessData as Record<string, unknown>)["has_access"] === true;
+
+            if (hasSeasonAccess) {
+              hasAccess = true;
+              break;
+            }
+          }
         }
 
         retryCount++;
@@ -206,27 +248,8 @@ const Watch = () => {
           return;
         }
 
-        const episodeIds = episodesData.map((ep) => ep.id);
-        const { data: historyData } = await supabase
-          .from("watch_history")
-          .select("content_id, completed, progress")
-          .eq("user_id", user.id)
-          .in("content_id", episodeIds);
-
-        const watchMap = (historyData || []).reduce<Record<string, { completed: boolean; progress: number }>>(
-          (map, entry) => {
-            map[entry.content_id] = { completed: entry.completed, progress: entry.progress || 0 };
-            return map;
-          },
-          {},
-        );
-
-        const nextEpisode = episodesData.find((ep) => {
-          const history = watchMap[ep.id];
-          return !history || (!history.completed && history.progress < 90);
-        }) || episodesData[0];
-
-        navigate(`/watch/episode/${nextEpisode.id}`);
+        const resolvedPath = await resolveWatchPath("season", contentId, user.id);
+        navigate(resolvedPath, { replace: true, state: { fromSeasonId: contentId } });
         return;
       }
 
