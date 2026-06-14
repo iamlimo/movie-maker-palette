@@ -48,6 +48,9 @@ interface VideoPlayerControlsProps {
   availableSubtitles?: { code: string; label: string }[];
   currentQuality?: string;
   currentSubtitle?: string | null;
+
+  /** Optional hooks for mobile/TV tap behavior. */
+  onTogglePlayPause?: () => void;
 }
 
 const formatTime = (seconds: number) => {

@@ -84,6 +84,36 @@ export const VideoPlayer = ({
     contentType === 'episode' || contentType === 'movie' ? contentType : 'movie'
   );
 
+  const isTypingTarget = (el: EventTarget | null) => {
+    const node = el as HTMLElement | null;
+    if (!node) return false;
+    const tag = node.tagName?.toLowerCase();
+    const isContentEditable = !!(node as HTMLElement).isContentEditable;
+    return tag === 'input' || tag === 'textarea' || isContentEditable;
+  };
+
+  // Keyboard shortcuts (web only):
+  // - Space: play/pause (when not typing)
+  // - F: toggle fullscreen (when not typing)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (isTypingTarget(e.target)) return;
+
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key?.toLowerCase?.() === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, { passive: false });
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen, isPlaying]);
+
   // Auto-hide controls in fullscreen
   useEffect(() => {
     const handleMouseMove = () => {
@@ -316,8 +346,11 @@ export const VideoPlayer = ({
   };
 
   const handleCastToTV = () => {
-    // Implementation for Google Cast API
-    if ((window as any).chrome && (window as any).chrome.cast) {
+    // Implementation for Google Cast API (stub)
+    const w = window as Window & { chrome?: { cast?: unknown } };
+    const hasCast = !!w.chrome?.cast;
+
+    if (hasCast) {
       toast({
         title: "Cast",
         description: "Casting to TV...",
@@ -399,9 +432,19 @@ export const VideoPlayer = ({
     );
   }
 
+  const showControlsAndMaybePlay = () => {
+    setControlsVisible(true);
+
+    // If paused, start playing (primary tap-to-toggle behavior)
+    if (videoRef.current && !isPlaying) {
+      togglePlay();
+    }
+  };
+
   return (
     <div
       ref={containerRef}
+      onClick={() => showControlsAndMaybePlay()}
       className={`relative bg-black ${
         immersive ? 'w-screen h-screen' : 'rounded-lg overflow-hidden'
       } ${className} group cursor-default`}
