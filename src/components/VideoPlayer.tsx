@@ -69,7 +69,7 @@ export const VideoPlayer = ({
   const [isBandwidthLimited, setIsBandwidthLimited] = useState(false);
   const [showMovieInfo, setShowMovieInfo] = useState(false);
   const [currentQuality, setCurrentQuality] = useState('Auto');
-  const [currentSubtitle, setCurrentSubtitle] = useState<string | null>(null);
+  const [currentSubtitle, setCurrentSubtitle] = useState<string | null>(subtitleUrl ? 'en' : null);
   const [hideControlsTimeout, setHideControlsTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [skipIntroClicked, setSkipIntroClicked] = useState(false);
@@ -237,6 +237,11 @@ export const VideoPlayer = ({
     fetchVideoUrl();
   }, [fetchVideoUrl]);
 
+  // If the subtitle URL changes (switching content), reset subtitle state.
+  useEffect(() => {
+    setCurrentSubtitle(subtitleUrl ? 'en' : null);
+  }, [subtitleUrl]);
+
   // Cleanup auto-save on unmount
   useEffect(() => {
     return () => {
@@ -265,16 +270,19 @@ export const VideoPlayer = ({
 
   const handleVolumeChange = (newVolume: number) => {
     if (!videoRef.current) return;
-    videoRef.current.volume = newVolume / 100;
-    setVolume(newVolume);
 
-    if (newVolume === 0) {
-      setIsMuted(true);
+    const nextVolume = Math.max(0, Math.min(100, newVolume));
+    videoRef.current.volume = nextVolume / 100;
+    setVolume(nextVolume);
+
+    if (nextVolume === 0) {
       videoRef.current.muted = true;
-    } else if (isMuted) {
-      setIsMuted(false);
-      videoRef.current.muted = false;
+      setIsMuted(true);
+      return;
     }
+
+    videoRef.current.muted = false;
+    setIsMuted(false);
   };
 
   const handleTimeUpdate = () => {
@@ -374,11 +382,23 @@ export const VideoPlayer = ({
   };
 
   const handleSubtitlesChange = (subtitle: string | null) => {
-    setCurrentSubtitle(subtitle);
-    // In a production app, you'd load the appropriate subtitle track
+    // DB only provides a single English subtitle_url for now.
+    if (!subtitleUrl) {
+      setCurrentSubtitle(null);
+      toast({
+        title: "Subtitles",
+        description: "Subtitles are not available for this content",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const next = subtitle === null ? null : 'en';
+    setCurrentSubtitle(next);
+
     toast({
       title: "Subtitles",
-      description: subtitle ? `Switched to ${subtitle}` : "Subtitles off",
+      description: next ? "English captions on" : "Subtitles off",
     });
   };
 
@@ -475,8 +495,15 @@ export const VideoPlayer = ({
         crossOrigin="anonymous"
         autoPlay={autoPlay}
       >
-        {subtitleUrl && (
-          <track kind="subtitles" src={subtitleUrl} srcLang="en" label="English" default />
+        {subtitleUrl && currentSubtitle !== null && (
+          <track
+            key={`track-${currentSubtitle}`}
+            kind="subtitles"
+            src={subtitleUrl}
+            srcLang="en"
+            label="English"
+            default
+          />
         )}
       </video>
       
