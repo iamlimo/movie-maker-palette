@@ -5,6 +5,7 @@
 
 export type AppRole =
   | 'user'
+  | 'creator'
   | 'support'
   | 'sales'
   | 'accounting'
@@ -25,6 +26,7 @@ export const ROLE_HIERARCHY: Record<AppRole, number> = {
   accounting: 60,
   sales: 60,
   support: 60,
+  creator: 30,
   user: 1,
 };
 
@@ -34,6 +36,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   accounting: 'Accounting',
   sales: 'Sales',
   support: 'Support',
+  creator: 'Creator',
   user: 'User',
 };
 
