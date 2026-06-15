@@ -30,3 +30,24 @@
 
 ### Milestone 2 (separate) — Chromecast/AirPlay/DLNA
 - [ ] Real Chromecast/AirPlay/DLNA integration (current cast is stub-only)
+
+## Supabase Edge Functions — Creator Provisioning
+
+### admin-create-creator
+- [x] Implement edge function: `supabase/functions/admin-create-creator/index.ts`
+- [ ] Verify DB column names / insert fields match schema:
+  - `creator_profiles` fields for: `user_id`, `full_name`, `phone_number`, `company_name`, `creator_type`, and active flag column(s)
+  - `creator_activation_tokens` fields for: `user_id`, `token_hash`, `used`, `expires_at`
+- [ ] Run Curl tests:
+  - happy path (admin JWT) returns raw token and writes DB rows
+  - missing/invalid JWT → 401
+  - non-admin role → 403
+
+### creator-activation
+- [x] Implement edge function: `supabase/functions/creator-activation/index.ts`
+- [ ] Verify DB column names / update fields match schema:
+  - `creator_activation_tokens` fields for: `token_hash`, `used`, `expires_at`, `user_id`
+  - `creator_profiles` active flag column(s): `active` / `is_active`
+- [ ] Run Curl tests:
+  - happy path (raw token + password) updates password + activates creator + marks token used
+  - token not found / already used / expired → error
