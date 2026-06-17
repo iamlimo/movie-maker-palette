@@ -8,6 +8,7 @@ import { formatNaira } from '@/lib/priceUtils';
 import { usePlatform } from '@/hooks/usePlatform';
 import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
 import { canRent } from '@/lib/rentalStates';
+import { buildWebUnlockUrl } from '@/lib/webUnlockPaths';
 
 interface OptimizedRentalButtonProps {
   contentId: string;
@@ -51,12 +52,16 @@ export const OptimizedRentalButton = ({
   if (isIOS && entitlement.state !== 'ACTIVE') {
     return (
       <div className="space-y-2">
-        <Button disabled variant="secondary" className="w-full opacity-50 cursor-not-allowed">
+        <Button
+          onClick={() => navigate(buildWebUnlockUrl(contentType, contentId))}
+          variant="default"
+          className="w-full bg-green-600 hover:bg-green-700"
+        >
           <AlertCircle className="h-4 w-4 mr-2" />
-          Unavailable on iOS App
+          Unlock on Web
         </Button>
         <p className="text-xs text-muted-foreground text-center">
-          To rent content on iOS, please visit our website on Safari web browser.
+          To rent content on iOS, please unlock it on the website in Safari browser.
         </p>
       </div>
     );

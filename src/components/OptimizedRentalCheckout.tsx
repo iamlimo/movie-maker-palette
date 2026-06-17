@@ -36,6 +36,7 @@ import { useSeasonUpgradeQuote } from '@/hooks/useSeasonUpgradeQuote';
 import { toast } from '@/hooks/use-toast';
 import { formatNaira } from '@/lib/priceUtils';
 import { resolveWatchPath } from '@/lib/watchPaths';
+import { buildWebUnlockUrl } from '@/lib/webUnlockPaths';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
@@ -77,6 +78,14 @@ export const OptimizedRentalCheckout = ({
   const { refresh: refreshEntitlements } = useEntitlements();
 
   const [upgradeQuoteRefreshNonce, setUpgradeQuoteRefreshNonce] = useState(0);
+
+  // iOS is a reader app: never complete rentals inside the iOS app.
+  // Redirect to web unlock flow for movies/episodes/seasons.
+  if (isIOS && open) {
+    onOpenChange(false);
+    navigate(buildWebUnlockUrl(contentType, contentId));
+    return null;
+  }
 
   const isSeason = contentType === 'season';
   const upgradeQuoteEnabled = open && isSeason;
