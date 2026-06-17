@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
 import { Separator } from "@/components/ui/separator";
 import { UnifiedContentUploader } from '@/components/admin/UnifiedContentUploader';
+import CreatorSelect from '@/components/admin/CreatorSelect';
 
 interface Genre {
   id: string;
@@ -89,13 +90,35 @@ const EditMovie = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { sections } = useSections();
+  const [creatorProfileId, setCreatorProfileId] = useState<string>('');
 
   useEffect(() => {
     if (id) {
       fetchMovie(id);
+      fetchCreatorMapping(id);
     }
     fetchGenres();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const fetchCreatorMapping = async (movieId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('content_creators')
+        .select('creator_profile_id')
+        .eq('content_id', movieId)
+        .eq('content_type', 'movie')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const creatorId = data?.creator_profile_id ?? '';
+      setCreatorProfileId(creatorId);
+    } catch (error) {
+      console.error('Error fetching creator mapping:', error);
+      setCreatorProfileId('');
+    }
+  };
 
   const fetchMovie = async (movieId: string) => {
     try {
@@ -130,7 +153,9 @@ const EditMovie = () => {
         thumbnail_url: data.thumbnail_url || "",
         landscape_poster_url: data.landscape_poster_url || "",
         slider_cover_url: data.slider_cover_url || "",
-        subtitle_url: (data as any).subtitle_url || "",
+        subtitle_url: (data as Record<string, unknown>).subtitle_url as
+          | string
+          | undefined || "",
       });
 
       // Fetch current section assignments
@@ -142,12 +167,18 @@ const EditMovie = () => {
       );
 
       if (contentSections) {
-        const movieSections = contentSections
+        const typedSections = contentSections as Array<{
+          content_id: string;
+          content_type: string;
+          section_id: string;
+        }>;
+
+        const movieSections = typedSections
           .filter(
-            (cs: any) =>
+            (cs) =>
               cs.content_id === movieId && cs.content_type === "movie"
           )
-          .map((cs: any) => cs.section_id);
+          .map((cs) => cs.section_id);
 
         setFormData((prev) => ({
           ...prev,
@@ -208,6 +239,15 @@ const EditMovie = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!creatorProfileId) {
+      toast({
+        title: 'Error',
+        description: 'Please select a creator',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!formData.title) {
       toast({
         title: "Error",
@@ -253,6 +293,18 @@ const EditMovie = () => {
         .single();
 
       if (error) throw error;
+
+      // Map content to creator (RPC)
+      const { error: mapError } = await supabase.rpc(
+        'map_content_to_creator',
+        {
+          p_content_id: id,
+          p_content_type: 'movie',
+          p_creator_id: creatorProfileId,
+        }
+      );
+
+      if (mapError) throw mapError;
 
       // Update section assignments
       if (formData.selectedSections.length > 0) {
@@ -325,6 +377,25 @@ const EditMovie = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Creator */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Creator</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Select the creator/owner for this movie *
+            </p>
+          </CardHeader>
+          <CardContent>
+            <CreatorSelect
+              contentType="movie"
+              contentId={id || null}
+              required={true}
+              value={creatorProfileId || null}
+              onChange={(nextCreatorId) => setCreatorProfileId(nextCreatorId)}
+            />
+          </CardContent>
+        </Card>
+
         {/* Basic Information */}
         <Card>
           <CardHeader>

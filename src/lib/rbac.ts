@@ -52,6 +52,7 @@ export type PageKey =
   | 'hero-slider'
   | 'banners'
   | 'users'
+  | 'creators'
   | 'producers'
   | 'submissions'
   | 'finance'
@@ -73,6 +74,7 @@ export const PAGE_ACCESS: Record<PageKey, AppRole[]> = {
   'hero-slider': ['super_admin', 'admin', 'sales'],
   banners: ['super_admin', 'admin', 'sales'],
   users: ['super_admin', 'admin', 'support', 'sales', 'accounting'],
+  creators: ['super_admin', 'admin', 'support', 'sales', 'accounting'],
   producers: ['super_admin', 'admin'],
   submissions: ['super_admin', 'admin'],
   finance: ['super_admin', 'admin', 'accounting', 'sales'],

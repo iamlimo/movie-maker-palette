@@ -64,7 +64,7 @@ const Submissions = lazy(() => import("@/pages/admin/Submissions"));
 const Users = lazy(() => import("@/pages/admin/Users"));
 const Finance = lazy(() => import("@/pages/admin/Finance"));
 const AdminRentals = lazy(() => import("@/pages/admin/Rentals"));
-const Producers = lazy(() => import("@/pages/admin/Producers"));
+const Creators = lazy(() => import("@/pages/admin/Creators"));
 const Sections = lazy(() => import("@/pages/admin/Sections"));
 const HeroSlider = lazy(() => import("@/pages/admin/HeroSlider"));
 const Banners = lazy(() => import("@/pages/admin/Banners"));
@@ -186,7 +186,7 @@ function AppContent() {
               <Route path="users" element={<RoleRoute page="users"><Users /></RoleRoute>} />
               <Route path="finance" element={<RoleRoute page="finance"><Finance /></RoleRoute>} />
               <Route path="rentals" element={<RoleRoute page="rentals"><AdminRentals /></RoleRoute>} />
-              <Route path="producers" element={<RoleRoute page="producers"><Producers /></RoleRoute>} />
+              <Route path="creators" element={<RoleRoute page="creators"><Creators /></RoleRoute>} />
               <Route path="sections" element={<RoleRoute page="sections"><Sections /></RoleRoute>} />
               <Route path="hero-slider" element={<RoleRoute page="hero-slider"><HeroSlider /></RoleRoute>} />
               <Route path="banners" element={<RoleRoute page="banners"><Banners /></RoleRoute>} />
