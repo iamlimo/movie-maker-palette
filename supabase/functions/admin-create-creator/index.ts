@@ -1,4 +1,3 @@
-/// <reference lib="deno.ns" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -84,16 +83,53 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Method not allowed" }, 405);
     }
 
+    const getEnv = (key: string): string => {
+      const g: unknown = globalThis;
+      const denoObj =
+        typeof g === "object" && g !== null && "Deno" in g
+          ? (g as { Deno?: unknown }).Deno
+          : undefined;
+
+      if (denoObj && typeof denoObj === "object" && "env" in denoObj) {
+        const envObj = (denoObj as { env?: unknown }).env;
+        if (envObj && typeof envObj === "object" && "get" in envObj) {
+          const getter = (envObj as { get?: unknown }).get;
+          if (typeof getter === "function") {
+            const val = (getter as (k: string) => unknown)(key);
+            return typeof val === "string" ? val : "";
+          }
+        }
+      }
+
+      return "";
+    };
+
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      getEnv("SUPABASE_URL"),
+      getEnv("SUPABASE_SERVICE_ROLE_KEY"),
     );
 
+    // ---- Auth / role check diagnostics ----
+    const authHeader = req.headers.get("Authorization") ?? "";
+    console.info("[admin-create-creator] start", {
+      hasAuthHeader: authHeader.startsWith("Bearer "),
+    });
+
     const adminCheck = await requireAdmin(req, supabase);
-    if (!adminCheck.ok) return jsonResponse({ success: false, error: adminCheck.error }, adminCheck.status);
+    if (!adminCheck.ok) {
+      console.warn("[admin-create-creator] adminCheck failed", {
+        status: adminCheck.status,
+        error: adminCheck.error,
+      });
+      return jsonResponse(
+        { success: false, error: adminCheck.error, debug: { stage: "requireAdmin" } },
+        adminCheck.status,
+      );
+    }
 
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object") {
+      console.warn("[admin-create-creator] invalid request body");
       return jsonResponse({ success: false, error: "Invalid request body" }, 400);
     }
 
@@ -111,78 +147,126 @@ serve(async (req: Request) => {
       creatorType?: string;
     };
 
-    if (!email || !fullName || !phone || !companyName || !creatorType) {
+    // ---- Payload diagnostics (no secrets) ----
+    const missing: string[] = [];
+    if (!email) missing.push("email");
+    if (!fullName) missing.push("fullName");
+    if (!phone) missing.push("phone");
+    if (!companyName) missing.push("companyName");
+    if (!creatorType) missing.push("creatorType");
+
+    if (missing.length) {
+      console.warn("[admin-create-creator] missing required fields", { missing });
       return jsonResponse(
-        { success: false, error: "Missing required fields: email, fullName, phone, companyName, creatorType" },
+        { success: false, error: `Missing required fields: ${missing.join(", ")}` },
         400,
       );
     }
+
+    console.info("[admin-create-creator] payload received", {
+      creatorType,
+      email,
+      hasPhone: Boolean(phone),
+      hasCompanyName: Boolean(companyName),
+      hasFullName: Boolean(fullName),
+    });
 
     const activationTokenRaw = randomUuid();
     const activationTokenHash = await sha256Hex(activationTokenRaw);
     const generatedPassword = randomPassword(22);
 
-    // 1) Create auth user
-    const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
-      email,
-      password: generatedPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName,
-        phone_number: phone,
-        company_name: companyName,
-        creator_type: creatorType,
-      },
-    });
+    // Requested behavior: DO NOT create auth.users yet (prevents "ghost" logins).
+    // We only create:
+    // 1) creator_profiles (inactive/pending)
+    // 2) creator_activation_tokens (one-time activation token)
 
-    if (createUserError || !createdUser?.user?.id) {
-      throw createUserError ?? new Error("Failed to create auth user");
+    // ---- Insert creator profile (diagnostics) ----
+    let creatorProfileId: string;
+
+    try {
+      const { data: profileRow, error: profileError } = await supabase
+        .from("creator_profiles")
+        .insert({
+          display_name: fullName, // schema uses display_name
+          email,
+          phone_number: phone,
+          company_name: companyName,
+          creator_type: creatorType,
+          status: "pending_activation",
+          is_active: false,
+          password_not_set: true,
+          created_by: null,
+        })
+        .select("id")
+        .single();
+
+      if (profileError || !profileRow?.id) {
+        throw profileError ?? new Error("Failed to create creator profile");
+      }
+
+      creatorProfileId = profileRow.id;
+    } catch (e) {
+      console.error("[admin-create-creator] creator_profiles insert failed", e);
+      throw new Error(
+        `creator_profiles insert failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
 
-    const userId = createdUser.user.id;
+    // ---- Insert activation token (diagnostics) ----
+    try {
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
+      const { error: tokenError } = await supabase
+        .from("creator_activation_tokens")
+        .insert({
+          token_hash: activationTokenHash,
+          creator_profile_id: creatorProfileId,
+          expires_at: expiresAt.toISOString(),
+          used_at: null,
+        });
 
-    // 2) Insert creator profile
-    // Column names can vary slightly; adjust if needed after aligning with schema.
-    const { error: profileError } = await supabase.from("creator_profiles").insert({
-      user_id: userId,
-      full_name: fullName,
-      phone_number: phone,
-      company_name: companyName,
-      creator_type: creatorType,
-      active: false,
-    });
+      if (tokenError) throw tokenError;
+    } catch (e) {
+      console.error("[admin-create-creator] creator_activation_tokens insert failed", e);
+      throw new Error(
+        `creator_activation_tokens insert failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
 
-    if (profileError) throw profileError;
-
-    // 3) Insert activation token record
-    // Store hash only; mark unused. expires_at set if column exists; otherwise omit.
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
-
-    const { error: tokenError } = await supabase.from("creator_activation_tokens").insert({
-      user_id: userId,
-      token_hash: activationTokenHash,
-      used: false,
-      expires_at: expiresAt.toISOString(),
-    });
-
-    if (tokenError) throw tokenError;
-
+    // Return temporary password as well so admin UI can perform activation immediately if desired.
     return jsonResponse({
       success: true,
       token: activationTokenRaw,
-      user_id: userId,
+      creator_profile_id: creatorProfileId,
+      password: generatedPassword,
     });
   } catch (err) {
+    // ---- Better status mapping (don’t collapse everything to 400) ----
     console.error("admin-create-creator error:", err);
-    const message = err instanceof Error ? err.message : "Internal error";
 
+    const message = err instanceof Error ? err.message : "Internal error";
     const lower = message.toLowerCase();
+
+    // Postgres / supabase-js common markers
     const status =
       lower.includes("forbidden") ? 403
         : lower.includes("unauthorized") ? 401
           : lower.includes("too many") ? 429
-            : 400;
+            : lower.includes("unique") ? 409
+              : lower.includes("violates") ? 400
+                : lower.includes("foreign key") ? 400
+                  : lower.includes("not null") ? 400
+                    : 500;
 
-    return jsonResponse({ success: false, error: message, debug: { computed_status: status } }, status);
+    return jsonResponse(
+      {
+        success: false,
+        error: message,
+        debug: {
+          computed_status: status,
+          // NOTE: no auth secrets returned
+        },
+      },
+      status,
+    );
   }
 });

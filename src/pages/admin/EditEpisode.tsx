@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import NairaInput from "@/components/admin/NairaInput";
 import ChunkedUpload from "@/components/admin/ChunkedUpload";
 import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
+import CreatorSelect from "@/components/admin/CreatorSelect";
 
 interface Season {
   id: string;
@@ -78,14 +79,34 @@ const EditEpisode = () => {
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [trailerUrl, setTrailerUrl] = useState<string>("");
   const [subtitleUrl, setSubtitleUrl] = useState<string>("");
+  const [creatorProfileId, setCreatorProfileId] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     if (seasonId && episodeId) {
       fetchData();
+      fetchCreatorMapping(episodeId);
     }
   }, [seasonId, episodeId]);
+
+  const fetchCreatorMapping = async (currentEpisodeId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('content_creators')
+        .select('creator_profile_id')
+        .eq('content_id', currentEpisodeId)
+        .eq('content_type', 'episode')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      setCreatorProfileId(data?.creator_profile_id ?? '');
+    } catch (err) {
+      console.error('Error fetching creator mapping:', err);
+      setCreatorProfileId('');
+    }
+  };
 
   const fetchData = async () => {
     if (!seasonId || !episodeId) return;
@@ -131,7 +152,10 @@ const EditEpisode = () => {
       setVideoUrl(episodeData.video_url || "");
       setThumbnailUrl(episodeData.thumbnail_url || "");
       setTrailerUrl(episodeData.trailer_url || "");
-      setSubtitleUrl((episodeData as any).subtitle_url || "");
+
+      const subtitleValue = (episodeData as Record<string, unknown>)
+        .subtitle_url;
+      setSubtitleUrl(typeof subtitleValue === "string" ? subtitleValue : "");
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -159,6 +183,15 @@ const EditEpisode = () => {
       toast({
         title: "Error",
         description: "Episode information is missing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!creatorProfileId) {
+      toast({
+        title: "Error",
+        description: "Please select a creator",
         variant: "destructive",
       });
       return;
@@ -216,6 +249,22 @@ const EditEpisode = () => {
         title: "Success",
         description: `Episode ${formData.episode_number} updated successfully!`,
       });
+
+      // Map content to creator (RPC) after update
+      const supabaseUntyped = supabase as unknown as {
+        rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: unknown }>;
+      };
+
+      const { error: mapError } = await supabaseUntyped.rpc(
+        "map_content_to_creator",
+        {
+          p_content_id: episodeId,
+          p_content_type: "episode",
+          p_creator_id: creatorProfileId,
+        }
+      );
+
+      if (mapError) throw mapError;
 
       // Navigate back to TV show view
       navigate(`/admin/tv-shows/view/${showId}`);
@@ -278,6 +327,25 @@ const EditEpisode = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Creator */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Creator</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Select the creator/owner for this episode *
+              </p>
+            </CardHeader>
+            <CardContent>
+              <CreatorSelect
+                contentType="episode"
+                contentId={episodeId || null}
+                required={true}
+                value={creatorProfileId || null}
+                onChange={(nextCreatorId) => setCreatorProfileId(nextCreatorId)}
+              />
+            </CardContent>
+          </Card>
+
           {/* Episode Information */}
           <Card>
             <CardHeader>

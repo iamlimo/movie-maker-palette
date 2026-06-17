@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import NairaInput from "@/components/admin/NairaInput";
 import ChunkedUpload from "@/components/admin/ChunkedUpload";
 import BackblazeUrlInput from "@/components/admin/BackblazeUrlInput";
+import CreatorSelect from "@/components/admin/CreatorSelect";
 
 interface Season {
   id: string;
@@ -62,6 +63,7 @@ const AddEpisode = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [creatorProfileId, setCreatorProfileId] = useState<string>('');
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
   const [trailerUrl, setTrailerUrl] = useState<string>("");
@@ -168,6 +170,15 @@ const AddEpisode = () => {
       return;
     }
 
+    if (!creatorProfileId) {
+      toast({
+        title: "Error",
+        description: "Please select a creator",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -199,6 +210,25 @@ const AddEpisode = () => {
         console.error('Database error:', error);
         throw error;
       }
+
+      // Map episode to creator (RPC)
+      const supabaseUntyped = supabase as unknown as {
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>
+        ) => Promise<{ error: unknown }>;
+      };
+
+      const { error: mapError } = await supabaseUntyped.rpc(
+        'map_content_to_creator',
+        {
+          p_content_id: data.id,
+          p_content_type: 'episode',
+          p_creator_id: creatorProfileId,
+        }
+      );
+
+      if (mapError) throw mapError;
 
       toast({
         title: "Success",
@@ -253,6 +283,20 @@ const AddEpisode = () => {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Episode Information */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Creator</CardTitle>
+              <p className="text-sm text-muted-foreground">Select the creator/owner for this episode *</p>
+            </CardHeader>
+            <CardContent>
+              <CreatorSelect
+                contentType="episode"
+                contentId={null}
+                required={true}
+                onChange={(nextCreatorId) => setCreatorProfileId(nextCreatorId)}
+              />
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Episode Information</CardTitle>

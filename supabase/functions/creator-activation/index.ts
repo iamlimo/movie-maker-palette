@@ -30,9 +30,34 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Method not allowed" }, 405);
     }
 
+    const getEnv = (key: string): string => {
+      const g: unknown = globalThis;
+      const denoObj =
+        typeof g === "object" && g !== null && "Deno" in g
+          ? (g as { Deno?: unknown }).Deno
+          : undefined;
+
+      if (
+        denoObj &&
+        typeof denoObj === "object" &&
+        "env" in denoObj
+      ) {
+        const envObj = (denoObj as { env?: unknown }).env;
+        if (envObj && typeof envObj === "object" && "get" in envObj) {
+          const getter = (envObj as { get?: unknown }).get;
+          if (typeof getter === "function") {
+            const val = (getter as (k: string) => unknown)(key);
+            return typeof val === "string" ? val : "";
+          }
+        }
+      }
+
+      return "";
+    };
+
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      getEnv("SUPABASE_URL"),
+      getEnv("SUPABASE_SERVICE_ROLE_KEY"),
     );
 
     const body = await req.json().catch(() => null);
@@ -48,11 +73,12 @@ serve(async (req: Request) => {
 
     const tokenHash = await sha256Hex(token);
 
+    const now = new Date();
+
     // Validate token (exists, unused, not expired)
-    const nowIso = new Date().toISOString();
     const { data: tokenRow, error: tokenQueryError } = await supabase
       .from("creator_activation_tokens")
-      .select("user_id, used, expires_at")
+      .select("creator_profile_id, used_at, expires_at")
       .eq("token_hash", tokenHash)
       .single();
 
@@ -60,45 +86,71 @@ serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Invalid token" }, 400);
     }
 
-    if (tokenRow.used) {
+    if (tokenRow.used_at) {
       return jsonResponse({ success: false, error: "Token already used" }, 400);
     }
 
-    if (tokenRow.expires_at && tokenRow.expires_at <= nowIso) {
+    if (tokenRow.expires_at && new Date(tokenRow.expires_at) <= now) {
       return jsonResponse({ success: false, error: "Token expired" }, 400);
     }
 
-    const userId = tokenRow.user_id;
-
-    // Update auth password
-    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
-      password,
-    });
-
-    if (updateError) throw updateError;
-
-    // Activate creator profile
-    const { error: profileError } = await supabase
-      .from("creator_profiles")
-      .update({
-        active: true,
-        is_active: true, // harmless if column doesn't exist; if it errors, we catch below
-      })
-      .eq("user_id", userId);
-
-    if (profileError) {
-      // Fallback: try only `active`
-      const { error: profileError2 } = await supabase
-        .from("creator_profiles")
-        .update({ active: true })
-        .eq("user_id", userId);
-      if (profileError2) throw profileError2;
+    const creatorProfileId = tokenRow.creator_profile_id;
+    if (!creatorProfileId) {
+      return jsonResponse({ success: false, error: "Invalid token linkage" }, 400);
     }
 
-    // Mark token as used (and optionally consume)
+    // Load creator profile details for auth creation
+    const { data: creatorProfile, error: creatorProfileError } = await supabase
+      .from("creator_profiles")
+      .select("id, email, display_name, phone_number, company_name, creator_type, user_id, is_active")
+      .eq("id", creatorProfileId)
+      .single();
+
+    if (creatorProfileError || !creatorProfile) {
+      return jsonResponse({ success: false, error: "Creator profile not found" }, 400);
+    }
+
+    if (creatorProfile.user_id) {
+      return jsonResponse({ success: false, error: "Creator already activated" }, 400);
+    }
+
+    // 1) Create auth user now
+    const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
+      email: creatorProfile.email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: creatorProfile.display_name,
+        phone_number: creatorProfile.phone_number,
+        company_name: creatorProfile.company_name,
+        creator_type: creatorProfile.creator_type,
+      },
+    });
+
+    if (createUserError || !createdUser?.user?.id) {
+      throw createUserError ?? new Error("Failed to create auth user");
+    }
+
+    const userId = createdUser.user.id;
+
+    // 2) Activate creator profile
+    const { error: profileUpdateError } = await supabase
+      .from("creator_profiles")
+      .update({
+        user_id: userId,
+        is_active: true,
+        password_not_set: false,
+        status: "active",
+        updated_at: now.toISOString(),
+      })
+      .eq("id", creatorProfileId);
+
+    if (profileUpdateError) throw profileUpdateError;
+
+    // 3) Mark token used
     const { error: useError } = await supabase
       .from("creator_activation_tokens")
-      .update({ used: true })
+      .update({ used_at: now.toISOString() })
       .eq("token_hash", tokenHash);
 
     if (useError) throw useError;

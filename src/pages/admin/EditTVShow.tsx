@@ -23,6 +23,7 @@ import TrailerPlayer from '@/components/TrailerPlayer';
 import NairaInput from '@/components/admin/NairaInput';
 import { DEFAULT_PRICES_NAIRA } from '@/lib/priceUtils';
 import { UnifiedContentUploader } from '@/components/admin/UnifiedContentUploader';
+import CreatorSelect from '@/components/admin/CreatorSelect';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
@@ -63,6 +64,7 @@ export default function EditTVShow() {
   const [saving, setSaving] = useState(false);
   const [assignedSections, setAssignedSections] = useState<string[]>([]);
   const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+  const [creatorProfileId, setCreatorProfileId] = useState<string>('');
   const [formData, setFormData] = useState<TVShowData>({
     title: '',
     description: '',
@@ -90,8 +92,27 @@ export default function EditTVShow() {
     if (id) {
       fetchTVShow();
       fetchAssignedSections();
+      fetchCreatorMapping(id);
     }
   }, [id]);
+
+  const fetchCreatorMapping = async (tvShowId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('content_creators')
+        .select('creator_profile_id')
+        .eq('content_id', tvShowId)
+        .eq('content_type', 'tv_show')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      setCreatorProfileId(data?.creator_profile_id ?? '');
+    } catch (err) {
+      console.error('Error fetching creator mapping:', err);
+      setCreatorProfileId('');
+    }
+  };
 
   const fetchGenres = async () => {
     try {
@@ -171,6 +192,15 @@ export default function EditTVShow() {
     e.preventDefault();
     if (!id) return;
 
+    if (!creatorProfileId) {
+      toast({
+        title: 'Error',
+        description: 'Please select a creator',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase
@@ -201,6 +231,14 @@ export default function EditTVShow() {
         .eq('id', id);
 
       if (error) throw error;
+
+      const { error: mapError } = await supabase.rpc('map_content_to_creator', {
+        p_content_id: id,
+        p_content_type: 'tv_show',
+        p_creator_id: creatorProfileId,
+      });
+
+      if (mapError) throw mapError;
 
       toast({
         title: "Success",
@@ -314,6 +352,18 @@ export default function EditTVShow() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Creator */}
+            <div className="space-y-2">
+              <Label>Creator *</Label>
+              <CreatorSelect
+                contentType="tv_show"
+                contentId={id || null}
+                required={true}
+                value={creatorProfileId || null}
+                onChange={(nextCreatorId) => setCreatorProfileId(nextCreatorId)}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="title">Title *</Label>
               <Input
@@ -395,11 +445,13 @@ export default function EditTVShow() {
               </div>
             </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value) => handleInputChange('status', value as any)}
+                onValueChange={(value) =>
+                  handleInputChange('status', value as TVShowData['status'])
+                }
               >
                 <SelectTrigger>
                   <SelectValue />

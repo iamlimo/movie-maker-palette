@@ -15,6 +15,7 @@ import ChunkedUpload from '@/components/admin/ChunkedUpload';
 import BackblazeUrlInput from '@/components/admin/BackblazeUrlInput';
 import CastCrewManager from '@/components/admin/CastCrewManager';
 import NairaInput from '@/components/admin/NairaInput';
+import CreatorSelect from '@/components/admin/CreatorSelect';
 
 interface MovieFormData {
   title: string;
@@ -67,6 +68,8 @@ const AddMovieNew = () => {
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [trailerUrl, setTrailerUrl] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [creatorProfileId, setCreatorProfileId] = useState<string>('');
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -157,6 +160,7 @@ const AddMovieNew = () => {
     if (!formData.genre_id) errors.push("Genre is required");
     if (!thumbnailUrl) errors.push("Thumbnail is required");
     if (!videoUrl) errors.push("Video URL is required");
+    if (!creatorProfileId) errors.push("Creator is required");
     
     return errors;
   };
@@ -208,6 +212,25 @@ const AddMovieNew = () => {
       if (castAssignments.length > 0) {
         await saveCastAssignments(movie.id);
       }
+
+      // Map content to creator (RPC)
+      const supabaseUntyped = supabase as unknown as {
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>
+        ) => Promise<{ error: unknown }>;
+      };
+
+      const { error: mapError } = await supabaseUntyped.rpc(
+        'map_content_to_creator',
+        {
+          p_content_id: movie.id,
+          p_content_type: 'movie',
+          p_creator_id: creatorProfileId,
+        }
+      );
+
+      if (mapError) throw mapError;
 
       toast({
         title: "Success",
@@ -399,8 +422,23 @@ const AddMovieNew = () => {
             </CardContent>
           </Card>
 
-          {/* Media Files */}
-          <Card className="gradient-card border-border shadow-card">
+              {/* Creator */}
+              <Card className="gradient-card border-border shadow-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">Creator</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CreatorSelect
+                    contentType="movie"
+                    contentId={null}
+                    required={true}
+                    onChange={(nextCreatorId) => setCreatorProfileId(nextCreatorId)}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Media Files */}
+              <Card className="gradient-card border-border shadow-card">
             <CardHeader>
               <CardTitle className="text-foreground">Media Files</CardTitle>
             </CardHeader>
@@ -461,7 +499,11 @@ const AddMovieNew = () => {
                             <Label className="text-foreground">Role in Movie</Label>
                             <Select
                               value={assignment.role_type}
-                              onValueChange={(value) => updateCastAssignment(member.id, { role_type: value as any })}
+                              onValueChange={(value) =>
+                                updateCastAssignment(member.id, {
+                                  role_type: value as MovieCastAssignment['role_type'],
+                                })
+                              }
                             >
                               <SelectTrigger className="bg-input border-border">
                                 <SelectValue />
