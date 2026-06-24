@@ -47,8 +47,21 @@ interface Activity {
   detail: string;
   timestamp: string;
   color: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
+
+type PaymentRow = {
+  id: string;
+  amount: string | number;
+  method?: string | null;
+  created_at: string;
+};
+
+type ProducerRow = {
+  id: string;
+  company_name: string;
+  created_at: string;
+};
 
 // Helper function to convert kobo to naira
 const koboToNaira = (kobo: number): number => {
@@ -275,7 +288,7 @@ function SuperAdminDashboard() {
           .order("created_at", { ascending: false })
           .limit(3);
 
-        (recentPayments as any[] | null)?.forEach((payment: any) => {
+        (recentPayments as PaymentRow[] | null)?.forEach((payment) => {
           const nairaAmount = koboToNaira(
             typeof payment.amount === "string"
               ? parseFloat(payment.amount)
@@ -302,7 +315,7 @@ function SuperAdminDashboard() {
           .order("created_at", { ascending: false })
           .limit(2);
 
-        (pendingProducers as any[] | null)?.forEach((producer: any) => {
+        (pendingProducers as ProducerRow[] | null)?.forEach((producer) => {
           activitiesList.push({
             id: `producer-${producer.id}`,
             type: "producer",
@@ -748,6 +761,29 @@ function SuperAdminDashboard() {
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Handle roles & permissions
+                  </div>
+                </div>
+              </NavLink>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start h-auto p-4 border-0 bg-gradient-to-r from-accent/10 to-primary/10 hover:from-accent/20 hover:to-primary/20 transition-all duration-300"
+              asChild
+            >
+              <NavLink
+                to="/admin/push-notifications"
+                className="flex items-center space-x-3"
+              >
+                <div className="p-2 rounded-lg bg-accent/20">
+                  <AlertCircle className="h-5 w-5 text-accent" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold text-foreground">
+                    Push Notifications
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Compose & send alerts
                   </div>
                 </div>
               </NavLink>

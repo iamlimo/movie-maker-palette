@@ -79,6 +79,7 @@ const ReferralCodes = lazy(() => import("@/pages/admin/ReferralCodes"));
 const CreateTicket = lazy(() => import("@/pages/admin/CreateTicket"));
 const TicketsList = lazy(() => import("@/pages/admin/TicketsList"));
 const TicketDetails = lazy(() => import("@/pages/admin/TicketDetails"));
+const PushNotifications = lazy(() => import("@/pages/admin/PushNotifications"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -199,6 +200,11 @@ function AppContent() {
               <Route path="tickets" element={<RoleRoute page="tickets"><TicketsList /></RoleRoute>} />
               <Route path="tickets/create" element={<RoleRoute page="tickets"><CreateTicket /></RoleRoute>} />
               <Route path="tickets/:ticketId" element={<RoleRoute page="tickets"><TicketDetails /></RoleRoute>} />
+
+              <Route
+                path="push-notifications"
+                element={<RoleRoute page="push-notifications"><PushNotifications /></RoleRoute>}
+              />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
