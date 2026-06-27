@@ -45,6 +45,11 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 interface OptimizedRentalCheckoutProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Fired before any transition to closed (onOpenChange(false)),
+   * used for deterministic UI smoothing (grace window) in parent.
+   */
+  onDismiss?: () => void;
   contentId: string;
   contentType: 'movie' | 'episode' | 'season';
   price: number;
@@ -64,6 +69,7 @@ type PaystackCallbackPayload = {
 export const OptimizedRentalCheckout = ({
   open,
   onOpenChange,
+  onDismiss,
   contentId,
   contentType,
   price,
@@ -79,13 +85,13 @@ export const OptimizedRentalCheckout = ({
 
   const [upgradeQuoteRefreshNonce, setUpgradeQuoteRefreshNonce] = useState(0);
 
-  // iOS is a reader app: never complete rentals inside the iOS app.
-  // Redirect to web unlock flow for movies/episodes/seasons.
-  if (isIOS && open) {
-    onOpenChange(false);
-    navigate(buildWebUnlockUrl(contentType, contentId));
-    return null;
-  }
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) onDismiss?.();
+      onOpenChange(nextOpen);
+    },
+    [onDismiss, onOpenChange],
+  );
 
   const isSeason = contentType === 'season';
   const upgradeQuoteEnabled = open && isSeason;
@@ -148,7 +154,7 @@ export const OptimizedRentalCheckout = ({
 
   const redirectToWatch = async () => {
     const resolvedPath = await resolveWatchPath(contentType, contentId, user?.id);
-    onOpenChange(false);
+    handleOpenChange(false);
     navigate(resolvedPath, {
       replace: contentType === 'season',
       state: contentType === 'season' ? { fromSeasonId: contentId } : undefined,
@@ -265,7 +271,7 @@ export const OptimizedRentalCheckout = ({
       if (payload.type !== 'paystack:callback') return;
 
       if (payload.status === 'completed' || payload.status === 'pending') {
-        onOpenChange(false);
+        handleOpenChange(false);
 
         try {
           const hasAccess = await verifyPaystackAccess(payload as Record<string, unknown>);
@@ -448,6 +454,8 @@ export const OptimizedRentalCheckout = ({
     }
   };
 
+  const shouldRedirectForIos = isIOS && open;
+
   if (!user) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -462,7 +470,11 @@ export const OptimizedRentalCheckout = ({
           </div>
 
           <DialogFooter className="flex flex-col-reverse gap-3 border-t px-6 py-4 sm:flex-row sm:justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+            <Button
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isProcessing}
+            >
               Cancel
             </Button>
             <Button onClick={() => (window.location.href = '/auth')}>Sign In</Button>
@@ -472,9 +484,15 @@ export const OptimizedRentalCheckout = ({
     );
   }
 
+  if (shouldRedirectForIos) {
+    handleOpenChange(false);
+    navigate(buildWebUnlockUrl(contentType, contentId));
+    return null;
+  }
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[calc(100vh-1.5rem)] overflow-hidden p-0 flex flex-col rounded-2xl">
           <DialogHeader className="border-b px-6 py-5 text-left">
             <DialogTitle className="text-xl">
@@ -764,7 +782,7 @@ export const OptimizedRentalCheckout = ({
           <DialogFooter className="flex flex-col-reverse gap-3 border-t px-6 py-4 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
               disabled={isProcessing}
               className="w-full sm:w-auto"
             >
@@ -871,7 +889,7 @@ export const OptimizedRentalCheckout = ({
               <Button
                 onClick={() => {
                   setPaymentStatus({ show: false, status: 'processing', message: '' });
-                  onOpenChange(false);
+                  handleOpenChange(false);
                   onSuccess?.();
                 }}
                 className="w-full"
@@ -889,8 +907,7 @@ export const OptimizedRentalCheckout = ({
             ) : paymentStatus.status === 'pending' ? (
               <Button
                 onClick={() => {
-                  setPaymentStatus({ show: false, status: 'processing', message: '' });
-                  onOpenChange(false);
+                  handleOpenChange(false);
                   toast({
                     title: 'Payment pending',
                     description: 'Your rental will activate once payment is confirmed',

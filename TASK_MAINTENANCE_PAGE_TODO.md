@@ -1,16 +1,13 @@
-# TODO - Maintenance landing page
-
-- [ ] Add `src/pages/Maintenance.tsx`
-  - Minimal smooth under-maintenance UI
-  - Animated visuals (CSS/Tailwind transitions) to feel engaging for an OTT/VOD streaming platform
-  - Live countdown to **June 14th** (next upcoming date) with days/hours/minutes/seconds
-  - Prominent “Contact us” mailto link to `support@signaturepicture.co`
-
-- [ ] Update `src/App.tsx`
-  - Route `/` should render `<Maintenance />` instead of `<Index />`
-  - Keep other routes unchanged
-
-- [ ] Quick local verification
-  - Visit `/` and confirm maintenance page renders
-  - Confirm counter counts down correctly
-  - Confirm contact email link works
+- [x] Create Supabase Edge Function: `supabase/functions/rental-hard-reset/index.ts`
+  - [x] Implement admin auth (Authorization header) + role check via `has_any_role` for `super_admin` and `accounting`
+  - [x] Validate request body schema: `userId`, `contentId`, `contentType`, optional `maxAgeHoursPending`
+  - [x] Hard-reset logic:
+    - [x] Revoke expired ACTIVE anomalies: revoke `rental_access` rows where `status='paid'`, `revoked_at is null`, `expires_at <= now`
+    - [x] Clear stuck pending anomalies: set `rental_intents.status='failed'` + `failed_at` where `status='pending'` and older than threshold
+    - [x] Safety: revoke any still-unrevoked `rental_access` for those intents (best-effort)
+  - [x] Idempotency guards (only update rows when `revoked_at is null` / status matches expected)
+  - [x] Rental audit logging using `log_rental_step` (best-effort)
+  - [x] Return JSON with counts
+- [ ] (Optional) Update any admin docs / verification notes if repo has conventions
+- [ ] Verify locally by calling endpoint twice with same payload (idempotency)
+- [ ] Run project lint/typecheck/build (as available)
