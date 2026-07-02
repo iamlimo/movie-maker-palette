@@ -116,6 +116,38 @@ export type Database = {
         }
         Relationships: []
       }
+      content_creators: {
+        Row: {
+          assigned_at: string | null
+          content_id: string
+          content_type: string
+          creator_profile_id: string
+          role_at_creation: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          content_id: string
+          content_type: string
+          creator_profile_id: string
+          role_at_creation?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          content_id?: string
+          content_type?: string
+          creator_profile_id?: string
+          role_at_creation?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_creators_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "creator_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_sections: {
         Row: {
           content_id: string
@@ -150,6 +182,86 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      creator_activation_tokens: {
+        Row: {
+          created_at: string | null
+          creator_profile_id: string | null
+          expires_at: string
+          token_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creator_profile_id?: string | null
+          expires_at: string
+          token_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creator_profile_id?: string | null
+          expires_at?: string
+          token_hash?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_activation_tokens_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "creator_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_profiles: {
+        Row: {
+          company_name: string | null
+          created_at: string | null
+          created_by: string | null
+          creator_type: string | null
+          display_name: string
+          email: string
+          id: string
+          is_active: boolean | null
+          password_not_set: boolean | null
+          phone_number: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          creator_type?: string | null
+          display_name: string
+          email: string
+          id?: string
+          is_active?: boolean | null
+          password_not_set?: boolean | null
+          phone_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          creator_type?: string | null
+          display_name?: string
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          password_not_set?: boolean | null
+          phone_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       email_logs: {
         Row: {
@@ -1230,6 +1342,7 @@ export type Database = {
           created_at: string
           episode_id: string
           id: string
+          is_valid: boolean | null
           rental_date: string
           rental_intent_id: string
           season_id: string
@@ -1240,6 +1353,7 @@ export type Database = {
           created_at?: string
           episode_id: string
           id?: string
+          is_valid?: boolean | null
           rental_date?: string
           rental_intent_id: string
           season_id: string
@@ -1250,6 +1364,7 @@ export type Database = {
           created_at?: string
           episode_id?: string
           id?: string
+          is_valid?: boolean | null
           rental_date?: string
           rental_intent_id?: string
           season_id?: string
@@ -2311,6 +2426,38 @@ export type Database = {
       }
     }
     Views: {
+      creator_analytics_summary: {
+        Row: {
+          content_id: string | null
+          content_type: string | null
+          creator_profile_id: string | null
+          rental_count: number | null
+          total_revenue: number | null
+        }
+        Insert: {
+          content_id?: string | null
+          content_type?: string | null
+          creator_profile_id?: string | null
+          rental_count?: never
+          total_revenue?: never
+        }
+        Update: {
+          content_id?: string | null
+          content_type?: string | null
+          creator_profile_id?: string | null
+          rental_count?: never
+          total_revenue?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_creators_creator_profile_id_fkey"
+            columns: ["creator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "creator_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_user_entitlements: {
         Row: {
           access_created_at: string | null
@@ -2428,6 +2575,14 @@ export type Database = {
       log_finance_action: {
         Args: { p_action: string; p_details?: Json }
         Returns: string
+      }
+      map_content_to_creator: {
+        Args: {
+          p_content_id: string
+          p_content_type: string
+          p_creator_id: string
+        }
+        Returns: undefined
       }
       process_wallet_rental_payment: {
         Args: {
