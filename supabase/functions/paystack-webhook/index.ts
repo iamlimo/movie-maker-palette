@@ -353,6 +353,26 @@ Deno.serve(async (req) => {
     const event = JSON.parse(body);
     console.log("Webhook event:", event.event, "Reference:", event.data?.reference);
 
+    // Observability: record every verified Paystack event in webhook_events.
+    // Idempotent on (provider, provider_event_id) — safe to re-insert on retries.
+    try {
+      const providerEventId =
+        String(event.id ?? "") ||
+        `${event.event}:${event.data?.reference ?? crypto.randomUUID()}`;
+      await supabase.from("webhook_events").upsert(
+        {
+          provider: "paystack",
+          provider_event_id: providerEventId,
+          event_type: String(event.event ?? "unknown"),
+          payload: event,
+          processed_at: new Date().toISOString(),
+        },
+        { onConflict: "provider,provider_event_id" },
+      );
+    } catch (obsErr) {
+      console.warn("[webhook] failed to persist webhook_event:", obsErr);
+    }
+
     if (event.event === "charge.success") {
       const paymentReference = event.data?.reference;
       const paymentChannel = event.data?.channel || "unknown";
