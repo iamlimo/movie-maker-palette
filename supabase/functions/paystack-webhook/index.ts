@@ -189,7 +189,14 @@ async function verifyPaystackSignature(payload: string, signature: string): Prom
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-  return computedSignature === signature;
+  const ok = computedSignature === signature;
+  if (!ok) {
+    // Help spot LIVE vs TEST key mismatches without leaking either value.
+    console.warn(
+      `[webhook] signature mismatch — expected(prefix=${computedSignature.slice(0, 6)}), received(prefix=${(signature || "").slice(0, 6)}), secretKind=${secret.startsWith("sk_live_") ? "live" : secret.startsWith("sk_test_") ? "test" : "unknown"}`,
+    );
+  }
+  return ok;
 }
 
 async function loadRentalIntentByReference(supabase: ReturnType<typeof createClient>, reference: string) {
