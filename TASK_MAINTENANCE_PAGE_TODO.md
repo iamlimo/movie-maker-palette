@@ -1,16 +1,17 @@
-# TODO - Maintenance landing page
-
-- [ ] Add `src/pages/Maintenance.tsx`
-  - Minimal smooth under-maintenance UI
-  - Animated visuals (CSS/Tailwind transitions) to feel engaging for an OTT/VOD streaming platform
-  - Live countdown to **June 14th** (next upcoming date) with days/hours/minutes/seconds
-  - Prominent “Contact us” mailto link to `support@signaturepicture.co`
-
-- [ ] Update `src/App.tsx`
-  - Route `/` should render `<Maintenance />` instead of `<Index />`
-  - Keep other routes unchanged
-
-- [ ] Quick local verification
-  - Visit `/` and confirm maintenance page renders
-  - Confirm counter counts down correctly
-  - Confirm contact email link works
+# TODO - Rental Management (Admin)
+- [ ] Update `src/pages/admin/Rentals.tsx`
+  - [ ] Add per-row **Hard reset** action that calls `supabase/functions/rental-hard-reset`
+  - [ ] Replace **Sync with Paystack** “archived” toast with a real call to new admin edge function
+  - [ ] Display JSON counts from edge-function responses (toast)
+- [ ] Add backend: `supabase/functions/admin-sync-paystack/index.ts`
+  - [ ] Admin-only auth/role gate (super_admin/accounting)
+  - [ ] Verify pending/failed Paystack-related rental payments via Paystack verify API
+  - [ ] Apply canonical “webhook processing” behavior for rental intents/access
+- [ ] Refactor backend shared logic
+  - [ ] Extract canonical logic from `supabase/functions/paystack-webhook/index.ts` into a shared module
+  - [ ] Reuse that shared module from both:
+    - [ ] `supabase/functions/paystack-webhook/index.ts`
+    - [ ] `supabase/functions/admin-sync-paystack/index.ts`
+- [ ] Validate
+  - [ ] Typecheck / build
+  - [ ] Sanity-check edge-function contract payload + response JSON shape

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Play, Lock, AlertCircle, RotateCcw } from 'lucide-react';
+import { Play, Lock, AlertCircle, RotateCcw, RotateCcw as RetryIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { formatNaira } from '@/lib/priceUtils';
@@ -33,12 +33,36 @@ export const OptimizedRentalButton = ({
 
   const entitlement = getEntitlement(contentId, contentType);
 
-  // Ensure episode rentals always route to the episode Watch page.
-  // Other rental types (movie/season) keep their existing paths.
-  const resolvedWatchPath = (() => {
+  // 2500ms grace period toggled by OptimizedRentalCheckout onDismiss
+  const graceTimerRef = useRef<number | null>(null);
+  const [isGraceActive, setIsGraceActive] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (graceTimerRef.current) window.clearTimeout(graceTimerRef.current);
+    };
+  }, []);
+
+  const triggerGrace = () => {
+    if (graceTimerRef.current) window.clearTimeout(graceTimerRef.current);
+    setIsGraceActive(true);
+    graceTimerRef.current = window.setTimeout(() => {
+      setIsGraceActive(false);
+      graceTimerRef.current = null;
+    }, 2500);
+  };
+
+  const resolvedWatchPath = useMemo(() => {
     if (contentType === 'episode') return `/watch/episode/${contentId}`;
     return `/watch/${contentType}/${contentId}`;
-  })();
+  }, [contentId, contentType]);
+
+  const isExpiredHardStop = useMemo(() => {
+    if (!entitlement?.expiresAt) return false;
+    const expiresMs = new Date(entitlement.expiresAt).getTime();
+    if (Number.isNaN(expiresMs)) return false;
+    return expiresMs <= Date.now();
+  }, [entitlement?.expiresAt]);
 
   if (!user) {
     return (
@@ -67,14 +91,48 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  if (entitlement.state === 'ACTIVE') {
+  // Precedence hierarchy
+  // 1) Expiry Hard-Stop
+  if (isExpiredHardStop) {
+    return (
+      <Button disabled variant="secondary" className="w-full">
+        <AlertCircle className="h-4 w-4 mr-2" />
+        Renew Rental
+      </Button>
+    );
+  }
+
+  // 2) Grace Period (for NOT_RENTED / PAYMENT_PENDING / PAYMENT_VERIFICATION)
+  const isGraceEligibleState =
+    entitlement.state === 'NOT_RENTED' ||
+    entitlement.state === 'PAYMENT_PENDING' ||
+    entitlement.state === 'PAYMENT_VERIFICATION';
+
+  if (isGraceActive && isGraceEligibleState) {
     return (
       <Button
-        onClick={() => navigate(resolvedWatchPath)}
-
+        onClick={async () => {
+          if (
+            entitlement.state === 'PAYMENT_PENDING' ||
+            entitlement.state === 'PAYMENT_VERIFICATION'
+          ) {
+            await refresh();
+          }
+          setShowCheckout(true);
+        }}
+        className="w-full"
         variant="default"
-        className="w-full bg-green-600 hover:bg-green-700"
       >
+        <RetryIcon className="h-4 w-4 mr-2" />
+        Retry Payment - {formatNaira(price)}
+      </Button>
+    );
+  }
+
+  // 3) Terminal/Default states (standard entitlement logic)
+  if (entitlement.state === 'ACTIVE') {
+    return (
+      <Button onClick={() => navigate(resolvedWatchPath)} variant="default" className="w-full bg-green-600 hover:bg-green-700">
         <Play className="h-4 w-4 mr-2" />
         Watch Now
       </Button>
@@ -97,7 +155,10 @@ export const OptimizedRentalButton = ({
     <>
       <Button
         onClick={async () => {
-          if (entitlement.state === 'PAYMENT_PENDING' || entitlement.state === 'PAYMENT_VERIFICATION') {
+          if (
+            entitlement.state === 'PAYMENT_PENDING' ||
+            entitlement.state === 'PAYMENT_VERIFICATION'
+          ) {
             await refresh();
           }
           setShowCheckout(true);
@@ -115,7 +176,7 @@ export const OptimizedRentalButton = ({
         {isReRent
           ? `Rent Again - ${formatNaira(price)}`
           : isRetry
-            ? `Retry Payment - ${formatNaira(price)}`
+            ? `Payment Failed — Try Again`
             : `Rent ${contentType === 'season' ? 'Season' : contentType === 'episode' ? 'Episode' : 'Movie'} - ${formatNaira(price)}`}
       </Button>
 
@@ -126,6 +187,7 @@ export const OptimizedRentalButton = ({
         contentType={contentType}
         price={price}
         title={title}
+        onDismiss={triggerGrace}
         onSuccess={() => {
           refresh();
           onRentalSuccess?.();
@@ -136,3 +198,4 @@ export const OptimizedRentalButton = ({
 };
 
 export default OptimizedRentalButton;
+
