@@ -242,7 +242,7 @@ export default function Users() {
       
       const { data, error } = await supabase.rpc('update_user_role', {
         _user_id: selectedUser.user_id,
-        _role: newRole
+        _role: newRole as 'accounting' | 'admin' | 'sales' | 'super_admin' | 'support' | 'user',
       });
 
       if (error) throw error;

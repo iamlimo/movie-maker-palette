@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Play, Lock, AlertCircle, RotateCcw, RotateCcw as RetryIcon } from 'lucide-react';
+import { Play, Lock, AlertCircle, RotateCcw, RotateCcw as RetryIcon, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { formatNaira } from '@/lib/priceUtils';
@@ -9,6 +9,8 @@ import { usePlatform } from '@/hooks/usePlatform';
 import { OptimizedRentalCheckout } from './OptimizedRentalCheckout';
 import { canRent } from '@/lib/rentalStates';
 import { buildWebUnlockUrl } from '@/lib/webUnlockPaths';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface OptimizedRentalButtonProps {
   contentId: string;
@@ -30,8 +32,43 @@ export const OptimizedRentalButton = ({
   const { getEntitlement, refresh } = useEntitlements();
   const { isIOS } = usePlatform();
   const [showCheckout, setShowCheckout] = useState(false);
+  const { toast } = useToast();
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const entitlement = getEntitlement(contentId, contentType);
+
+  const handleRetryVerification = async () => {
+    if (isVerifying) return;
+    setIsVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: {
+          rentalId: entitlement.intentId,
+          rental_intent_id: entitlement.intentId,
+        },
+      });
+      if (error) throw error;
+      await refresh();
+      const hasActive =
+        Array.isArray((data as any)?.related_records?.rental_access) &&
+        (data as any).related_records.rental_access.length > 0;
+      toast({
+        title: hasActive ? 'Payment confirmed' : 'Still verifying',
+        description: hasActive
+          ? 'Access has been granted.'
+          : 'Paystack has not confirmed the payment yet. Try again in a few seconds.',
+      });
+    } catch (err) {
+      console.error('[OptimizedRentalButton] verify-payment failed', err);
+      toast({
+        title: 'Verification failed',
+        description: (err as Error)?.message || 'Could not reach verification service.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   // 2500ms grace period toggled by OptimizedRentalCheckout onDismiss
   const graceTimerRef = useRef<number | null>(null);
@@ -126,6 +163,35 @@ export const OptimizedRentalButton = ({
         <RetryIcon className="h-4 w-4 mr-2" />
         Retry Payment - {formatNaira(price)}
       </Button>
+    );
+  }
+
+  // Pending payment verification: allow user to manually re-run verify-payment
+  if (
+    (entitlement.state === 'PAYMENT_PENDING' ||
+      entitlement.state === 'PAYMENT_VERIFICATION') &&
+    entitlement.intentId
+  ) {
+    return (
+      <div className="space-y-2">
+        <Button disabled variant="secondary" className="w-full">
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Verifying Payment...
+        </Button>
+        <Button
+          onClick={handleRetryVerification}
+          disabled={isVerifying}
+          variant="outline"
+          className="w-full"
+        >
+          {isVerifying ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RetryIcon className="h-4 w-4 mr-2" />
+          )}
+          {isVerifying ? 'Checking...' : 'Retry Verification'}
+        </Button>
+      </div>
     );
   }
 
