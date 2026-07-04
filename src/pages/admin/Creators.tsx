@@ -301,7 +301,7 @@ const fetchCreators = async () => {
     try {
       // Only activate when pending_activation (per requirement)
       if (safeStatus(creator.status) !== "pending_activation") {
-        toast({ title: "Not eligible for activation", description: "Creator is not pending activation.", variant: "secondary" });
+        toast({ title: "Not eligible for activation", description: "Creator is not pending activation." });
         return;
       }
 
