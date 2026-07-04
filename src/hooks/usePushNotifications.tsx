@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
-import { FCM } from "@capacitor-community/fcm";
+import { FCM as FCMBase } from "@capacitor-community/fcm";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const FCM = FCMBase as any;
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { mapPushDataToRoute } from "@/lib/pushNavigation";
@@ -25,7 +27,7 @@ async function upsertDeviceToken(params: {
 
   // RLS on push_device_tokens requires auth.uid() = user_id (or staff).
   // Supabase client auth session is what provides auth.uid().
-  const { error } = await supabase.from("push_device_tokens").upsert({
+  const { error } = await (supabase.from("push_device_tokens") as any).upsert({
     user_id: userId,
     token,
     device_type: deviceType,
