@@ -51,7 +51,7 @@ export const DeleteUserDialog = ({ open, onOpenChange, user, onUserDeleted }: De
     try {
       setIsDeleting(true);
 
-      const supabaseUrl = (supabase as { supabaseUrl?: string }).supabaseUrl;
+      const supabaseUrl = (supabase as unknown as { supabaseUrl?: string }).supabaseUrl;
       if (!supabaseUrl) {
         throw new Error('Supabase URL is not available in the client');
       }
@@ -94,7 +94,7 @@ export const DeleteUserDialog = ({ open, onOpenChange, user, onUserDeleted }: De
         onOpenChange(false);
         resetForm();
       } else {
-        throw new Error(data?.error || 'Failed to delete user');
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to delete user');
       }
     } catch (error: unknown) {
       console.error('Error deleting user:', error);
