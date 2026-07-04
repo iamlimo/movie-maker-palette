@@ -1,13 +1,17 @@
-- [x] Create Supabase Edge Function: `supabase/functions/rental-hard-reset/index.ts`
-  - [x] Implement admin auth (Authorization header) + role check via `has_any_role` for `super_admin` and `accounting`
-  - [x] Validate request body schema: `userId`, `contentId`, `contentType`, optional `maxAgeHoursPending`
-  - [x] Hard-reset logic:
-    - [x] Revoke expired ACTIVE anomalies: revoke `rental_access` rows where `status='paid'`, `revoked_at is null`, `expires_at <= now`
-    - [x] Clear stuck pending anomalies: set `rental_intents.status='failed'` + `failed_at` where `status='pending'` and older than threshold
-    - [x] Safety: revoke any still-unrevoked `rental_access` for those intents (best-effort)
-  - [x] Idempotency guards (only update rows when `revoked_at is null` / status matches expected)
-  - [x] Rental audit logging using `log_rental_step` (best-effort)
-  - [x] Return JSON with counts
-- [ ] (Optional) Update any admin docs / verification notes if repo has conventions
-- [ ] Verify locally by calling endpoint twice with same payload (idempotency)
-- [ ] Run project lint/typecheck/build (as available)
+# TODO - Rental Management (Admin)
+- [ ] Update `src/pages/admin/Rentals.tsx`
+  - [ ] Add per-row **Hard reset** action that calls `supabase/functions/rental-hard-reset`
+  - [ ] Replace **Sync with Paystack** “archived” toast with a real call to new admin edge function
+  - [ ] Display JSON counts from edge-function responses (toast)
+- [ ] Add backend: `supabase/functions/admin-sync-paystack/index.ts`
+  - [ ] Admin-only auth/role gate (super_admin/accounting)
+  - [ ] Verify pending/failed Paystack-related rental payments via Paystack verify API
+  - [ ] Apply canonical “webhook processing” behavior for rental intents/access
+- [ ] Refactor backend shared logic
+  - [ ] Extract canonical logic from `supabase/functions/paystack-webhook/index.ts` into a shared module
+  - [ ] Reuse that shared module from both:
+    - [ ] `supabase/functions/paystack-webhook/index.ts`
+    - [ ] `supabase/functions/admin-sync-paystack/index.ts`
+- [ ] Validate
+  - [ ] Typecheck / build
+  - [ ] Sanity-check edge-function contract payload + response JSON shape

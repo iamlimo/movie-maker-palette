@@ -37,6 +37,8 @@ import { Navigate } from "react-router-dom";
 type RentalContentType = "movie" | "tv" | "episode" | "season";
 type RentalStatus = "active" | "expired";
 
+type BadgeIcon = React.ComponentType<{ className?: string }> | ((props: { className?: string }) => JSX.Element);
+
 interface RentalRecord {
   id: string;
   user_id: string;
@@ -59,7 +61,7 @@ interface RentalRecord {
   paystack_reference?: string;
 }
 
-const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: any }> =
+const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: BadgeIcon }> =
   {
     active: {
       label: "Active",
@@ -77,7 +79,7 @@ const statusConfig: Record<RentalStatus, { label: string; color: string; textCol
 
 const paymentStatusConfig: Record<
   NonNullable<RentalRecord["payment_status"]> | "pending",
-  { label: string; color: string; textColor: string; icon: any }
+  { label: string; color: string; textColor: string; icon: BadgeIcon }
 > = {
   pending: {
     label: "Pending",
@@ -155,13 +157,18 @@ export default function Rentals() {
       const rentalIds = rentalsData.map((r: { id: string }) => r.id);
 
       // payment data is optional for admin display
-      type PaymentRow = { payment_status?: RentalRecord["payment_status"]; payment_channel?: string; paystack_reference?: string };
+      type PaymentRow = {
+        payment_status?: RentalRecord["payment_status"];
+        payment_channel?: string;
+        paystack_reference?: string;
+        amount?: number | null;
+      };
       let paymentMap = new Map<string, PaymentRow>();
       try {
         const { data: paymentData, error: paymentError } = await supabase
           .from("rental_payments")
           .select(
-            "rental_id, payment_status, payment_channel, paystack_reference",
+            "rental_id, payment_status, payment_channel, paystack_reference, amount",
           )
           .in("rental_id", rentalIds);
 
@@ -206,6 +213,7 @@ export default function Rentals() {
         expires_at: string;
       }>).map((r) => {
         const contentType = r.content_type as RentalContentType;
+        const paymentRow = paymentMap.get(String(r.id));
 
         return {
           id: String(r.id),
@@ -215,16 +223,21 @@ export default function Rentals() {
           content_id: String(r.content_id),
           content_title: String(r.content_title || "Unknown Content"),
           content_type: contentType,
-          amount: typeof r.amount === "number" ? r.amount : 0,
+          // Prefer the amount from rental_payments when available (admin accuracy)
+          amount:
+            typeof paymentRow?.amount === "number"
+              ? paymentRow.amount
+              : typeof r.amount === "number"
+                ? r.amount
+                : 0,
           status: (r.status as RentalStatus) || "expired",
           created_at: String(r.created_at),
           expires_at: String(r.expires_at),
-          payment_status: paymentMap.get(String(r.id))?.payment_status,
-          payment_channel: paymentMap.get(String(r.id))?.payment_channel,
-          paystack_reference: paymentMap.get(String(r.id))?.paystack_reference,
+          payment_status: paymentRow?.payment_status,
+          payment_channel: paymentRow?.payment_channel,
+          paystack_reference: paymentRow?.paystack_reference,
         };
-        },
-      );
+      });
 
       setRentals(formattedRentals);
       setFilteredRentals(formattedRentals);
@@ -241,13 +254,74 @@ export default function Rentals() {
   };
 
   const syncPaystackPayments = async () => {
-    // Archived: sync-paystack-payments Edge Function
-    toast({
-      title: "Sync Unavailable",
-      description:
-        "Payment sync has been archived and is not available in this admin panel.",
-      variant: "destructive",
-    });
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-sync-paystack", {
+        body: { limit: 50 },
+      });
+
+      if (error) throw error;
+
+      type AdminSyncResponse = {
+        success?: boolean;
+        counts?: Record<string, number>;
+      };
+
+      const payload = data as unknown as AdminSyncResponse;
+
+      toast({
+        title: "Paystack sync complete",
+        description: JSON.stringify(payload?.counts ?? payload, null, 2),
+        variant: "default",
+      });
+
+      await fetchRentals();
+    } catch (e) {
+      console.error("Sync error:", e);
+      toast({
+        title: "Sync failed",
+        description: e instanceof Error ? e.message : "Failed to sync payments",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const hardResetRental = async (rental: RentalRecord) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("rental-hard-reset", {
+        body: {
+          userId: rental.user_id,
+          contentId: rental.content_id,
+          contentType: rental.content_type,
+        },
+      });
+
+      if (error) throw error;
+
+      type HardResetResponse = {
+        success?: boolean;
+        counts?: Record<string, number>;
+      };
+
+      const payload = data as unknown as HardResetResponse;
+
+      toast({
+        title: "Hard reset executed",
+        description: JSON.stringify(payload?.counts ?? {}, null, 2),
+        variant: "default",
+      });
+
+      await fetchRentals();
+    } catch (e) {
+      console.error("Hard reset error:", e);
+      toast({
+        title: "Hard reset failed",
+        description: e instanceof Error ? e.message : "Failed to hard reset rental",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -574,7 +648,6 @@ export default function Rentals() {
               <TableHeader>
                 <TableRow>
                   <TableHead>User</TableHead>
-                  <TableHead>Content</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Payment Status</TableHead>
@@ -582,6 +655,7 @@ export default function Rentals() {
                   <TableHead>Rental Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Expires</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -590,10 +664,13 @@ export default function Rentals() {
                   filteredRentals
                     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                     .map((rental) => {
-                      const statusInfo = statusConfig[rental.status];
+                      const statusInfo =
+                        statusConfig[rental.status] ?? statusConfig.expired;
+
                       const paymentStatusInfo =
-                        paymentStatusConfig[(rental.payment_status ?? "pending") as keyof typeof paymentStatusConfig] ??
-                        paymentStatusConfig.pending;
+                        paymentStatusConfig[
+                          (rental.payment_status ?? "pending") as keyof typeof paymentStatusConfig
+                        ] ?? paymentStatusConfig.pending;
 
                       return (
                         <TableRow key={rental.id}>
@@ -601,11 +678,6 @@ export default function Rentals() {
                             <div className="flex flex-col">
                               <span className="font-medium">{rental.user_name}</span>
                               <span className="text-sm text-muted-foreground">{rental.user_email}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-xs">
-                            <div className="flex items-start gap-2">
-                              <span className="break-words">{rental.content_title}</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -643,12 +715,23 @@ export default function Rentals() {
                           <TableCell className="text-sm">
                             {new Date(rental.expires_at).toLocaleDateString()}
                           </TableCell>
+                          <TableCell className="text-sm">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => hardResetRental(rental)}
+                            >
+                              <AlertCircle className="h-4 w-4" />
+                              Hard reset
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No rental records found
                     </TableCell>
                   </TableRow>
