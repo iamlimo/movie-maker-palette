@@ -238,24 +238,48 @@ Deno.serve(async (req) => {
     const event = JSON.parse(body);
     console.log("Webhook event:", event.event, "Reference:", event.data?.reference);
 
-    // Observability: record every verified Paystack event in webhook_events.
-    // Idempotent on (provider, provider_event_id) — safe to re-insert on retries.
-    try {
-      const providerEventId =
-        String(event.id ?? "") ||
-        `${event.event}:${event.data?.reference ?? crypto.randomUUID()}`;
-      await supabase.from("webhook_events").upsert(
-        {
-          provider: "paystack",
-          provider_event_id: providerEventId,
-          event_type: String(event.event ?? "unknown"),
-          payload: event,
-          processed_at: new Date().toISOString(),
-        },
-        { onConflict: "provider,provider_event_id" },
+    // ─────────────────────────────────────────────────────────────────
+    // Strong idempotency guard: insert-first into webhook_events.
+    // Unique (provider, provider_event_id) means a duplicate delivery
+    // (Paystack retries the same event id, OR two callbacks share the
+    // same event+reference key) short-circuits with 200 BEFORE any
+    // side-effects run. This is the single entrypoint check for the
+    // whole handler.
+    // ─────────────────────────────────────────────────────────────────
+    const providerEventId =
+      (event.id != null && String(event.id)) ||
+      `${event.event ?? "unknown"}:${event.data?.reference ?? crypto.randomUUID()}`;
+
+    const { data: insertedEvent, error: insertEventError } = await supabase
+      .from("webhook_events")
+      .insert({
+        provider: "paystack",
+        provider_event_id: providerEventId,
+        event_type: String(event.event ?? "unknown"),
+        payload: event,
+        processed_at: new Date().toISOString(),
+      })
+      .select("event_id")
+      .maybeSingle();
+
+    if (insertEventError) {
+      // 23505 = unique_violation on (provider, provider_event_id) → duplicate delivery.
+      const code = (insertEventError as { code?: string }).code;
+      if (code === "23505") {
+        console.log(
+          `[webhook] duplicate delivery ignored: provider_event_id=${providerEventId}`,
+        );
+        return new Response(
+          JSON.stringify({ received: true, duplicate: true, provider_event_id: providerEventId }),
+          { headers: corsHeaders },
+        );
+      }
+      // Non-duplicate insert error — log and continue so we don't drop the event.
+      console.warn("[webhook] webhook_events insert failed (continuing):", insertEventError);
+    } else {
+      console.log(
+        `[webhook] recorded event ${insertedEvent?.event_id ?? "?"} (${providerEventId})`,
       );
-    } catch (obsErr) {
-      console.warn("[webhook] failed to persist webhook_event:", obsErr);
     }
 
     if (event.event === "charge.success") {
