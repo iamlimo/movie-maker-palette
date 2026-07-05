@@ -80,6 +80,7 @@ const CreateTicket = lazy(() => import("@/pages/admin/CreateTicket"));
 const TicketsList = lazy(() => import("@/pages/admin/TicketsList"));
 const TicketDetails = lazy(() => import("@/pages/admin/TicketDetails"));
 const PushNotifications = lazy(() => import("@/pages/admin/PushNotifications"));
+const WebhookEvents = lazy(() => import("@/pages/admin/WebhookEvents"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -192,6 +193,7 @@ function AppContent() {
               <Route path="hero-slider" element={<RoleRoute page="hero-slider"><HeroSlider /></RoleRoute>} />
               <Route path="banners" element={<RoleRoute page="banners"><Banners /></RoleRoute>} />
               <Route path="wallets" element={<RoleRoute page="wallets"><Wallets /></RoleRoute>} />
+              <Route path="webhook-events" element={<RoleRoute page="webhook-events"><WebhookEvents /></RoleRoute>} />
               <Route path="settings" element={<SuperAdminRoute><Settings /></SuperAdminRoute>} />
               <Route path="permissions" element={<Navigate to="/admin/settings?tab=permissions" replace />} />
               <Route path="job-listings" element={<RoleRoute page="job-listings"><JobListingsAdmin /></RoleRoute>} />
