@@ -24,7 +24,8 @@ import {
   CreditCard,
   AlertCircle,
   ShieldCheck,
-  KeyRound
+  KeyRound,
+  Webhook
 } from 'lucide-react';
 import {
   Sidebar,
@@ -94,6 +95,7 @@ const sidebarItems: Item[] = [
   { title: 'Finance', url: '/admin/finance', icon: DollarSign, page: 'finance' },
   { title: 'Rental Tracking', url: '/admin/rentals', icon: CreditCard, page: 'rentals' },
   { title: 'Wallets', url: '/admin/wallets', icon: Wallet, page: 'wallets' },
+  { title: 'Webhook Events', url: '/admin/webhook-events', icon: Webhook, page: 'webhook-events' },
   { title: 'Referral Codes', url: '/admin/referral-codes', icon: Tag, page: 'referral-codes' },
   { title: 'Push Notifications', url: '/admin/push-notifications', icon: Bell, page: 'push-notifications' },
   {
