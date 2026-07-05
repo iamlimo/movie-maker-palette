@@ -164,6 +164,22 @@ const normalizeType = (t: string): RentalContentType => {
     return () => clearTimeout(t);
   }, [entitlements, fetchEntitlements]);
 
+  // Refetch on tab focus / visibility so stale PAYMENT_VERIFICATION states
+  // clear as soon as the user returns to the app or refreshes the page.
+  useEffect(() => {
+    if (!user) return;
+    const onFocus = () => fetchEntitlements();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchEntitlements();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user, fetchEntitlements]);
+
   const getEntitlement = useCallback(
     (contentId: string, contentType: RentalContentType): Entitlement => {
       const statePriority: Record<RentalState, number> = {
@@ -181,7 +197,20 @@ const normalizeType = (t: string): RentalContentType => {
         .filter((e) => e.contentId === contentId && e.contentType === contentType)
         .sort((a, b) => statePriority[a.state] - statePriority[b.state])[0];
 
-      return found ?? NOT_RENTED_ENTITLEMENT(contentId, contentType);
+      if (!found) return NOT_RENTED_ENTITLEMENT(contentId, contentType);
+
+      // Auto-clear stuck verification states: if the intent's own
+      // expires_at is in the past, treat as NOT_RENTED so the user can
+      // rent again instead of being blocked by a "Verifying…" button.
+      if (
+        (found.state === 'PAYMENT_PENDING' || found.state === 'PAYMENT_VERIFICATION') &&
+        found.expiresAt &&
+        new Date(found.expiresAt).getTime() <= Date.now()
+      ) {
+        return NOT_RENTED_ENTITLEMENT(contentId, contentType);
+      }
+
+      return found;
     },
     [entitlements],
   );
