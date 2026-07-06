@@ -149,7 +149,10 @@ Deno.serve(async (req) => {
     if (expiredAccessIds.length > 0) {
       const { error: revokeErr } = await supabase
         .from("rental_access")
-        .update({ revoked_at: now, status: "revoked" })
+        .update({
+          revoked_at: now,
+          status: "failed",
+        })
         .in("id", expiredAccessIds);
 
       if (revokeErr) {
@@ -211,7 +214,10 @@ Deno.serve(async (req) => {
         if (safetyIds.length > 0) {
           const { error: safetyRevokeErr } = await supabase
             .from("rental_access")
-            .update({ revoked_at: now, status: "revoked" })
+            .update({
+              revoked_at: now,
+              status: "failed",
+            })
             .in("id", safetyIds);
 
           if (safetyRevokeErr) {

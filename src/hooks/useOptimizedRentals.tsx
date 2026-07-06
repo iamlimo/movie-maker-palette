@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -98,6 +97,20 @@ export const useOptimizedRentals = () => {
     const now = new Date().getTime();
     const expiresAt = new Date(entitlement.expires_at).getTime();
     const remaining = expiresAt - now;
+
+    if (remaining <= 0) {
+      console.log('[useOptimizedRentals] ACTIVE entitlement expired client-side', {
+        contentId,
+        contentType,
+        access_id: entitlement.access_id,
+        expires_at: entitlement.expires_at,
+      });
+      return {
+        hasAccess: false,
+        entitlement: null,
+        timeRemaining: null,
+      };
+    }
 
     const hours = Math.floor(remaining / (1000 * 60 * 60));
     const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
@@ -256,6 +269,15 @@ export const useOptimizedRentals = () => {
   // This listens to the canonical source of truth
   useEffect(() => {
     if (!user) return;
+    let refetchTimer: number | null = null;
+    const scheduleRefetch = (source: string, eventType: string) => {
+      console.log('[useOptimizedRentals] entitlement change observed:', { source, eventType });
+      if (refetchTimer) window.clearTimeout(refetchTimer);
+      refetchTimer = window.setTimeout(() => {
+        refetchTimer = null;
+        fetchEntitlements();
+      }, 150);
+    };
 
     const channel = supabase
       .channel(entitlementsChannelNameRef.current)
@@ -267,14 +289,12 @@ export const useOptimizedRentals = () => {
           table: 'rental_access',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log('[useOptimizedRentals] Rental access changed:', payload.eventType);
-          fetchEntitlements();
-        }
+        (payload) => scheduleRefetch('rental_access', payload.eventType)
       )
       .subscribe();
 
     return () => {
+      if (refetchTimer) window.clearTimeout(refetchTimer);
       supabase.removeChannel(channel);
     };
   }, [user, fetchEntitlements]);
@@ -282,6 +302,15 @@ export const useOptimizedRentals = () => {
   // Also listen to rental_intents for payment pending state changes
   useEffect(() => {
     if (!user) return;
+    let refetchTimer: number | null = null;
+    const scheduleRefetch = (eventType: string) => {
+      console.log('[useOptimizedRentals] rental_intents change observed:', { eventType });
+      if (refetchTimer) window.clearTimeout(refetchTimer);
+      refetchTimer = window.setTimeout(() => {
+        refetchTimer = null;
+        fetchEntitlements();
+      }, 150);
+    };
 
     const channel = supabase
       .channel(intentsChannelNameRef.current ?? `intents-${user.id}-${Math.random().toString(36).slice(2, 10)}`)
@@ -289,19 +318,17 @@ export const useOptimizedRentals = () => {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'rental_intents',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log('[useOptimizedRentals] Rental intent changed:', payload.eventType);
-          fetchEntitlements();
-        }
+        (payload) => scheduleRefetch(payload.eventType)
       )
       .subscribe();
 
     return () => {
+      if (refetchTimer) window.clearTimeout(refetchTimer);
       supabase.removeChannel(channel);
     };
   }, [user, fetchEntitlements]);
@@ -310,6 +337,16 @@ export const useOptimizedRentals = () => {
   useEffect(() => {
     fetchEntitlements();
   }, [fetchEntitlements]);
+
+  useEffect(() => {
+    if (!user) return;
+    const hasPending = entitlements.some(
+      (e) => e.state === 'PAYMENT_PENDING' || e.state === 'PAYMENT_VERIFICATION',
+    );
+    if (!hasPending) return;
+    const interval = window.setInterval(fetchEntitlements, 10_000);
+    return () => window.clearInterval(interval);
+  }, [user, entitlements, fetchEntitlements]);
 
   useEffect(() => {
     const handlePaystackCallback = (event: MessageEvent) => {

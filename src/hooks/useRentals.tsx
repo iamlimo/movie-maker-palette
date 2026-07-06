@@ -14,6 +14,18 @@ export interface Rental {
   created_at: string;
 }
 
+interface EntitlementRentalRow {
+  user_id: string | null;
+  content_id: string | null;
+  content_type: string | null;
+  state: string | null;
+  expires_at: string | null;
+  access_id: string | null;
+  intent_id: string | null;
+  access_created_at: string | null;
+  intent_created_at: string | null;
+}
+
 export interface RentalAccess {
   has_access: boolean;
   access_type: 'rental' | 'purchase' | null;
@@ -36,37 +48,48 @@ export const useRentals = () => {
     
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('rentals')
+      await (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: Error | null }> })
+        .rpc('expire_canonical_rental_access', { p_skew_minutes: 0 })
+        .catch((error) => console.warn('[useRentals] expire cleanup failed', error));
+
+      const { data, error } = await (supabase as unknown as {
+        from: (t: string) => {
+          select: (c: string) => {
+            eq: (k: string, v: string) => {
+              eq: (k: string, v: string) => {
+                gt: (k: string, v: string) => {
+                  order: (k: string, opts: { ascending: boolean }) => Promise<{ data: EntitlementRentalRow[] | null; error: Error | null }>;
+                };
+              };
+            };
+          };
+        };
+      })
+        .from('v_user_entitlements')
         .select('*')
         .eq('user_id', user.id)
-        .in('status', ['active', 'completed'])
-        .gte('expires_at', new Date().toISOString())
+        .eq('state', 'ACTIVE')
+        .gt('expires_at', new Date().toISOString())
         .order('expires_at', { ascending: true });
 
       if (error) throw error;
-      const normalizedRentals: Rental[] = (data || []).map(
-        (rental: {
-          id: string;
-          user_id: string;
-          content_id: string;
-          content_type: string;
-          price?: number;
-          amount?: number;
-          status: string;
-          expires_at: string;
-          created_at: string;
-        }) => ({
-          id: rental.id,
-          user_id: rental.user_id,
-          content_id: rental.content_id,
-          content_type: rental.content_type,
-          amount: rental.amount ?? rental.price ?? 0,
-          status: rental.status,
-          expires_at: rental.expires_at,
-          created_at: rental.created_at,
+      const normalizedRentals: Rental[] = (data || [])
+        .filter((rental) => rental.user_id && rental.content_id && rental.content_type && rental.expires_at)
+        .map((rental) => ({
+          id: rental.access_id || rental.intent_id || rental.content_id!,
+          user_id: rental.user_id!,
+          content_id: rental.content_id!,
+          content_type: rental.content_type!,
+          amount: 0,
+          status: 'active',
+          expires_at: rental.expires_at!,
+          created_at: rental.access_created_at || rental.intent_created_at || rental.expires_at!,
         })
       );
+      console.log('[useRentals] Loaded canonical active rentals', {
+        count: normalizedRentals.length,
+        user_id: user.id,
+      });
       setActiveRentals(normalizedRentals);
     } catch (error) {
       console.error('Error fetching rentals:', error);
@@ -115,6 +138,16 @@ export const useRentals = () => {
   useEffect(() => {
     if (!user) return;
 
+    let refetchTimer: number | null = null;
+    const scheduleRefetch = (source: string) => {
+      console.log('[useRentals] rental source changed', { source });
+      if (refetchTimer) window.clearTimeout(refetchTimer);
+      refetchTimer = window.setTimeout(() => {
+        refetchTimer = null;
+        fetchActiveRentals();
+      }, 150);
+    };
+
     const channel = supabase
       .channel(rentalsChannelNameRef.current)
       .on(
@@ -122,16 +155,25 @@ export const useRentals = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'rentals',
+          table: 'rental_access',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
-          fetchActiveRentals();
-        }
+        () => scheduleRefetch('rental_access')
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rental_intents',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => scheduleRefetch('rental_intents')
       )
       .subscribe();
 
     return () => {
+      if (refetchTimer) window.clearTimeout(refetchTimer);
       supabase.removeChannel(channel);
     };
   }, [user, fetchActiveRentals]);

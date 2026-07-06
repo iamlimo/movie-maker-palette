@@ -68,14 +68,32 @@ Deno.serve(async (req) => {
     // Admin sync strategy:
     // - Use the canonical `payments` table where we have a paystack provider reference.
     // - Verify anything not yet completed/enhanced completed.
-    const { data: candidates, error: candErr } = await supabase
+    const { data: candidateRows, error: candErr } = await supabase
       .from("payments")
       .select("id, user_id, purpose, amount, enhanced_status, status, provider_reference, metadata")
-      .or("enhanced_status.ne.completed,status.ne.completed")
       .not("provider_reference", "is", null)
-      .limit(limit);
+      .order("updated_at", { ascending: false })
+      .limit(Math.min(limit * 3, 150));
 
-    if (candErr) return errorResponse("Failed to query payments for sync", 500);
+    if (candErr) {
+      console.error("[admin-sync-paystack] payments candidate query failed:", {
+        code: candErr.code,
+        message: candErr.message,
+        details: candErr.details,
+        hint: candErr.hint,
+      });
+      return errorResponse("Failed to query payments for sync", 500);
+    }
+
+    const candidates = (candidateRows ?? [])
+      .filter((payment: any) => payment.enhanced_status !== "completed" || payment.status !== "completed")
+      .slice(0, limit);
+
+    console.log("[admin-sync-paystack] candidate payments loaded", {
+      fetched: candidateRows?.length ?? 0,
+      selected: candidates.length,
+      limit,
+    });
 
     let synced = 0;
     let failures = 0;
@@ -187,11 +205,18 @@ Deno.serve(async (req) => {
       return data;
     };
 
-    for (const payment of candidates ?? []) {
+    for (const payment of candidates) {
       const reference = payment.provider_reference as string | null;
       if (!reference) continue;
 
       try {
+        console.log("[admin-sync-paystack] verifying payment", {
+          payment_id: payment.id,
+          reference,
+          enhanced_status: payment.enhanced_status,
+          status: payment.status,
+        });
+
         const transaction = await fetchPaystackTransaction(reference, paystackKey);
 
         const paystackSuccess = transaction?.status === true;
@@ -229,6 +254,13 @@ Deno.serve(async (req) => {
                 },
               })
               .eq("id", rentalIntent.id);
+            console.warn("[admin-sync-paystack] amount mismatch", {
+              payment_id: payment.id,
+              rental_intent_id: rentalIntent.id,
+              reference,
+              paidAmount,
+              expectedAmount,
+            });
             anomalies.push(`amount_mismatch: payment=${payment.id} ref=${reference}`);
             perPayment.push({ payment_id: String(payment.id), reference, status: "amount_mismatch" });
             continue;
@@ -252,6 +284,11 @@ Deno.serve(async (req) => {
                 },
               })
               .eq("id", rentalIntent.id);
+            console.log("[admin-sync-paystack] rental intent marked paid", {
+              rental_intent_id: rentalIntent.id,
+              reference,
+              paidAmount,
+            });
           }
 
           const contentId = rentalIntent.movie_id || rentalIntent.season_id || rentalIntent.episode_id;

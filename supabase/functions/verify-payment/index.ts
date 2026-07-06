@@ -250,24 +250,24 @@ async function loadActiveRentalAccess(
       .order("expires_at", { ascending: false });
 
   if (intentId) {
-    const { data, error } = await baseQuery().eq("rental_intent_id", intentId).maybeSingle();
-    if (!error && data) return data as RentalAccessRow;
+    const { data, error } = await baseQuery().eq("rental_intent_id", intentId).limit(1);
+    if (!error && data?.[0]) return data[0] as RentalAccessRow;
   }
 
   if (contentId) {
     if (contentType === "movie") {
-      const { data, error } = await baseQuery().eq("movie_id", contentId).maybeSingle();
-      if (!error && data) return data as RentalAccessRow;
+      const { data, error } = await baseQuery().eq("movie_id", contentId).limit(1);
+      if (!error && data?.[0]) return data[0] as RentalAccessRow;
     }
 
     if (contentType === "season") {
-      const { data, error } = await baseQuery().eq("season_id", contentId).maybeSingle();
-      if (!error && data) return data as RentalAccessRow;
+      const { data, error } = await baseQuery().eq("season_id", contentId).limit(1);
+      if (!error && data?.[0]) return data[0] as RentalAccessRow;
     }
 
     if (contentType === "episode") {
-      const { data, error } = await baseQuery().eq("episode_id", contentId).maybeSingle();
-      if (!error && data) return data as RentalAccessRow;
+      const { data, error } = await baseQuery().eq("episode_id", contentId).limit(1);
+      if (!error && data?.[0]) return data[0] as RentalAccessRow;
     }
   }
 
@@ -407,6 +407,15 @@ serve(async (req: Request) => {
       return errorResponse("payment_id, reference, or rental_intent_id is required", 400);
     }
 
+    const { data: expiredCount, error: expireError } = await supabase.rpc("expire_canonical_rental_access", {
+      p_skew_minutes: 0,
+    });
+    if (expireError) {
+      console.warn("[verify-payment] expired access cleanup failed:", expireError);
+    } else if (Number(expiredCount || 0) > 0) {
+      console.log("[verify-payment] expired access rows cleaned", { count: expiredCount });
+    }
+
     const payment = await loadPayment(supabase, identifiers.paymentId, identifiers.reference);
     const rentalIntent = await loadRentalIntent(supabase, identifiers, payment);
 
@@ -527,6 +536,12 @@ serve(async (req: Request) => {
         const now = new Date().toISOString();
         const reference = referenceToVerify || String(paystackResult?.reference || "");
 
+        console.log("[verify-payment] marking rental intent paid", {
+          rental_intent_id: refreshedRentalIntent.id,
+          reference,
+          paidAmount,
+          expectedAmount,
+        });
         await supabase
           .from("rental_intents")
           .update({
@@ -563,6 +578,11 @@ serve(async (req: Request) => {
 
         const grantedAccess = await grantAccessIfNeeded(supabase, refreshedRentalIntent, payment);
         if (grantedAccess) {
+          console.log("[verify-payment] active access confirmed", {
+            rental_intent_id: refreshedRentalIntent.id,
+            rental_access_id: grantedAccess.id,
+            expires_at: grantedAccess.expires_at,
+          });
           return jsonResponse({
             success: true,
             payment: payment

@@ -10,8 +10,8 @@ import {
 
 interface EntitlementRow {
   user_id: string;
-  content_id: string;
-  content_type: string;
+  content_id: string | null;
+  content_type: string | null;
   state: string;
   expires_at: string | null;
   intent_id: string | null;
@@ -61,16 +61,17 @@ const normalizeType = (t: string): RentalContentType => {
         .eq('user_id', user.id);
 
       if (error) throw error;
-      const mapped: Entitlement[] = (data || []).map((row) => ({
-        state: (row.state as RentalState) || 'NOT_RENTED',
-        contentId: row.content_id,
-        // contentType: row.content_type as RentalContentType,
-        contentType: normalizeType(row.content_type),
-        expiresAt: row.expires_at,
-        intentId: row.intent_id,
-        accessId: row.access_id,
-        paymentMethod: row.payment_method,
-      }));
+      const mapped: Entitlement[] = (data || [])
+        .filter((row) => row.content_id && row.content_type)
+        .map((row) => ({
+          state: (row.state as RentalState) || 'NOT_RENTED',
+          contentId: row.content_id!,
+          contentType: normalizeType(row.content_type!),
+          expiresAt: row.expires_at,
+          intentId: row.intent_id,
+          accessId: row.access_id,
+          paymentMethod: row.payment_method,
+        }));
       
       // Debug logging for payment verification states
       const verifyingEntitlements = mapped.filter(e => e.state === 'PAYMENT_VERIFICATION' || e.state === 'PAYMENT_PENDING');
@@ -124,29 +125,30 @@ const normalizeType = (t: string): RentalContentType => {
   // Realtime: refetch on any change to user's intents or access rows.
   useEffect(() => {
     if (!user) return;
-    let pending = false;
-    const debouncedRefetch = () => {
-      if (pending) return;
-      pending = true;
-      setTimeout(() => {
-        pending = false;
+    let refetchTimer: number | null = null;
+    const scheduleRefetch = (source: string) => {
+      console.log('[useEntitlements] entitlement change observed', { source });
+      if (refetchTimer) window.clearTimeout(refetchTimer);
+      refetchTimer = window.setTimeout(() => {
+        refetchTimer = null;
         fetchEntitlements();
-      }, 250);
+      }, 150);
     };
     const channel = supabase
       .channel(channelName.current)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rental_access', filter: `user_id=eq.${user.id}` },
-        debouncedRefetch,
+        () => scheduleRefetch('rental_access'),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rental_intents', filter: `user_id=eq.${user.id}` },
-        debouncedRefetch,
+        () => scheduleRefetch('rental_intents'),
       )
       .subscribe();
     return () => {
+      if (refetchTimer) window.clearTimeout(refetchTimer);
       supabase.removeChannel(channel);
     };
   }, [user, fetchEntitlements]);
@@ -180,16 +182,28 @@ const normalizeType = (t: string): RentalContentType => {
     };
   }, [user, fetchEntitlements]);
 
+  // While any payment is still pending, poll lightly so webhook delays or
+  // missed Realtime messages cannot leave the UI stuck indefinitely.
+  useEffect(() => {
+    if (!user) return;
+    const hasPending = entitlements.some(
+      (e) => e.state === 'PAYMENT_PENDING' || e.state === 'PAYMENT_VERIFICATION',
+    );
+    if (!hasPending) return;
+    const interval = window.setInterval(fetchEntitlements, 10_000);
+    return () => window.clearInterval(interval);
+  }, [user, entitlements, fetchEntitlements]);
+
   const getEntitlement = useCallback(
     (contentId: string, contentType: RentalContentType): Entitlement => {
       const statePriority: Record<RentalState, number> = {
         ACTIVE: 0,
-        PAYMENT_VERIFICATION: 1,
-        PAYMENT_PENDING: 2,
-        FAILED: 3,
-        EXPIRED: 4,
-        REVOKED: 5,
-        REFUNDED: 6,
+        EXPIRED: 1,
+        FAILED: 2,
+        REFUNDED: 3,
+        REVOKED: 4,
+        PAYMENT_VERIFICATION: 5,
+        PAYMENT_PENDING: 6,
         NOT_RENTED: 7,
       };
 
@@ -202,10 +216,15 @@ const normalizeType = (t: string): RentalContentType => {
       // Auto-clear stuck verification states: if the intent's own
       // expires_at is in the past, treat as NOT_RENTED so the user can
       // rent again instead of being blocked by a "Verifying…" button.
+      if (found.state === 'ACTIVE' && found.expiresAt && new Date(found.expiresAt).getTime() <= Date.now()) {
+        return { ...found, state: 'EXPIRED' };
+      }
+
+      const intentAgeMs = found.expiresAt ? Date.now() - new Date(found.expiresAt).getTime() : 0;
       if (
         (found.state === 'PAYMENT_PENDING' || found.state === 'PAYMENT_VERIFICATION') &&
         found.expiresAt &&
-        new Date(found.expiresAt).getTime() <= Date.now()
+        (new Date(found.expiresAt).getTime() <= Date.now() || intentAgeMs > 0)
       ) {
         return NOT_RENTED_ENTITLEMENT(contentId, contentType);
       }
