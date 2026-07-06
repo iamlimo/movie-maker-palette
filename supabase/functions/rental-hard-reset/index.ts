@@ -152,10 +152,6 @@ Deno.serve(async (req) => {
         .update({
           revoked_at: now,
           status: "failed",
-          metadata: {
-            expired_by: "rental-hard-reset",
-            expired_at: now,
-          },
         })
         .in("id", expiredAccessIds);
 
@@ -221,10 +217,6 @@ Deno.serve(async (req) => {
             .update({
               revoked_at: now,
               status: "failed",
-              metadata: {
-                expired_by: "rental-hard-reset:safety",
-                expired_at: now,
-              },
             })
             .in("id", safetyIds);
 
