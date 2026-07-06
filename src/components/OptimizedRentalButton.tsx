@@ -128,30 +128,24 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  // Precedence hierarchy
-  // 1) Expiry Hard-Stop
-  if (isExpiredHardStop) {
-    return (
-      <Button disabled variant="secondary" className="w-full">
-        <AlertCircle className="h-4 w-4 mr-2" />
-        Renew Rental
-      </Button>
-    );
-  }
+  const effectiveEntitlement =
+    entitlement.state === 'ACTIVE' && isExpiredHardStop
+      ? { ...entitlement, state: 'EXPIRED' as const }
+      : entitlement;
 
   // 2) Grace Period (for NOT_RENTED / PAYMENT_PENDING / PAYMENT_VERIFICATION)
   const isGraceEligibleState =
-    entitlement.state === 'NOT_RENTED' ||
-    entitlement.state === 'PAYMENT_PENDING' ||
-    entitlement.state === 'PAYMENT_VERIFICATION';
+    effectiveEntitlement.state === 'NOT_RENTED' ||
+    effectiveEntitlement.state === 'PAYMENT_PENDING' ||
+    effectiveEntitlement.state === 'PAYMENT_VERIFICATION';
 
   if (isGraceActive && isGraceEligibleState) {
     return (
       <Button
         onClick={async () => {
           if (
-            entitlement.state === 'PAYMENT_PENDING' ||
-            entitlement.state === 'PAYMENT_VERIFICATION'
+            effectiveEntitlement.state === 'PAYMENT_PENDING' ||
+            effectiveEntitlement.state === 'PAYMENT_VERIFICATION'
           ) {
             await refresh();
           }
@@ -168,8 +162,8 @@ export const OptimizedRentalButton = ({
 
   // Pending payment verification: allow user to manually re-run verify-payment
   if (
-    (entitlement.state === 'PAYMENT_PENDING' ||
-      entitlement.state === 'PAYMENT_VERIFICATION') &&
+    (effectiveEntitlement.state === 'PAYMENT_PENDING' ||
+      effectiveEntitlement.state === 'PAYMENT_VERIFICATION') &&
     entitlement.intentId
   ) {
     return (
@@ -196,7 +190,7 @@ export const OptimizedRentalButton = ({
   }
 
   // 3) Terminal/Default states (standard entitlement logic)
-  if (entitlement.state === 'ACTIVE') {
+  if (effectiveEntitlement.state === 'ACTIVE') {
     return (
       <Button onClick={() => navigate(resolvedWatchPath)} variant="default" className="w-full bg-green-600 hover:bg-green-700">
         <Play className="h-4 w-4 mr-2" />
@@ -205,25 +199,25 @@ export const OptimizedRentalButton = ({
     );
   }
 
-  if (!canRent(entitlement)) {
+  if (!canRent(effectiveEntitlement)) {
     return (
       <Button disabled variant="secondary" className="w-full">
         <AlertCircle className="h-4 w-4 mr-2" />
-        {entitlement.state === 'REVOKED' ? 'Access Revoked' : 'Rental Unavailable'}
+        {effectiveEntitlement.state === 'REVOKED' ? 'Access Revoked' : 'Rental Unavailable'}
       </Button>
     );
   }
 
-  const isReRent = entitlement.state === 'EXPIRED' || entitlement.state === 'REFUNDED' || entitlement.state === 'REVOKED';
-  const isRetry = entitlement.state === 'FAILED';
+  const isReRent = effectiveEntitlement.state === 'EXPIRED' || effectiveEntitlement.state === 'REFUNDED' || effectiveEntitlement.state === 'REVOKED';
+  const isRetry = effectiveEntitlement.state === 'FAILED';
 
   return (
     <>
       <Button
         onClick={async () => {
           if (
-            entitlement.state === 'PAYMENT_PENDING' ||
-            entitlement.state === 'PAYMENT_VERIFICATION'
+            effectiveEntitlement.state === 'PAYMENT_PENDING' ||
+            effectiveEntitlement.state === 'PAYMENT_VERIFICATION'
           ) {
             await refresh();
           }

@@ -118,16 +118,16 @@ async function loadActiveRentalAccess(
       .gt("expires_at", now)
       .order("expires_at", { ascending: false });
 
-  const { data: byIntent, error: intentError } = await baseQuery()
+  const { data: byIntentRows, error: intentError } = await baseQuery()
     .eq("rental_intent_id", rentalIntentId)
-    .maybeSingle();
-  if (!intentError && byIntent) {
-    return byIntent as RentalAccessRow;
+    .limit(1);
+  if (!intentError && byIntentRows?.[0]) {
+    return byIntentRows[0] as RentalAccessRow;
   }
 
   const fields = buildContentFields(contentId, contentType);
 
-  const { data: byContent, error: contentError } = await baseQuery()
+  const { data: byContentRows, error: contentError } = await baseQuery()
     .or(
       [
         fields.movie_id ? `movie_id.eq.${fields.movie_id}` : null,
@@ -137,10 +137,10 @@ async function loadActiveRentalAccess(
         .filter(Boolean)
         .join(","),
     )
-    .maybeSingle();
+    .limit(1);
 
-  if (!contentError && byContent) {
-    return byContent as RentalAccessRow;
+  if (!contentError && byContentRows?.[0]) {
+    return byContentRows[0] as RentalAccessRow;
   }
 
   return null;
@@ -462,11 +462,14 @@ Deno.serve(async (req) => {
           })
           .eq("id", rentalIntent.id);
 
+        console.warn(
+          `[webhook] dispute revoking rental access: intent_id=${rentalIntent.id}, reference=${paymentReference}`,
+        );
         await supabase
           .from("rental_access")
           .update({
             revoked_at: new Date().toISOString(),
-            status: "revoked",
+            status: "failed",
           })
           .eq("rental_intent_id", rentalIntent.id)
           .is("revoked_at", null);
