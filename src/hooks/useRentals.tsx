@@ -56,8 +56,10 @@ export const useRentals = () => {
         from: (t: string) => {
           select: (c: string) => {
             eq: (k: string, v: string) => {
-              gt: (k: string, v: string) => {
-                order: (k: string, opts: { ascending: boolean }) => Promise<{ data: EntitlementRentalRow[] | null; error: Error | null }>;
+              eq: (k: string, v: string) => {
+                gt: (k: string, v: string) => {
+                  order: (k: string, opts: { ascending: boolean }) => Promise<{ data: EntitlementRentalRow[] | null; error: Error | null }>;
+                };
               };
             };
           };
