@@ -2462,13 +2462,20 @@ export type Database = {
         Row: {
           access_created_at: string | null
           access_id: string | null
+          access_status:
+            | Database["public"]["Enums"]["rental_intent_status"]
+            | null
           content_id: string | null
           content_type: string | null
           expires_at: string | null
           intent_created_at: string | null
           intent_id: string | null
+          intent_status:
+            | Database["public"]["Enums"]["rental_intent_status"]
+            | null
           last_updated_at: string | null
           payment_method: string | null
+          revoked_at: string | null
           state: string | null
           user_id: string | null
         }
@@ -2521,6 +2528,10 @@ export type Database = {
         Returns: string
       }
       ensure_wallet_for_user: { Args: { p_user_id: string }; Returns: string }
+      expire_canonical_rental_access: {
+        Args: { p_skew_minutes?: number }
+        Returns: number
+      }
       expire_rentals: { Args: never; Returns: number }
       get_current_user_profile: { Args: never; Returns: string }
       get_season_episode_count: {
