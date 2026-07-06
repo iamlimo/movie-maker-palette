@@ -349,7 +349,7 @@ export const useWatchHistory = () => {
         const hasEpisodeAccess = checkEpisodeAccess(
           historyItem.content_id,
           "episode",
-        );
+        ).hasAccess;
         const hasSeasonAccess = historyItem.season_id
           ? checkSeasonAccess(historyItem.season_id)
           : false;
