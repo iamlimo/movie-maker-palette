@@ -424,6 +424,16 @@ serve(async (req: Request) => {
       console.log("[verify-payment] expired access rows cleaned", { count: expiredCount });
     }
 
+    const { data: stalePaystackCount, error: stalePaystackError } = await supabase.rpc(
+      "fail_stale_paystack_rental_intents",
+      { p_age_minutes: 15 },
+    );
+    if (stalePaystackError) {
+      console.warn("[verify-payment] stale Paystack cleanup failed:", stalePaystackError);
+    } else if (Number(stalePaystackCount || 0) > 0) {
+      console.log("[verify-payment] stale Paystack intents failed", { count: stalePaystackCount });
+    }
+
     const payment = await loadPayment(supabase, identifiers.paymentId, identifiers.reference);
     const rentalIntent = await loadRentalIntent(supabase, identifiers, payment);
 

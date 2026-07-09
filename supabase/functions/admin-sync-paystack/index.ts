@@ -65,6 +65,16 @@ Deno.serve(async (req) => {
 
     const limit = typeof body.limit === "number" && body.limit > 0 ? Math.floor(body.limit) : 50;
 
+    const { data: stalePaystackCount, error: stalePaystackError } = await supabase.rpc(
+      "fail_stale_paystack_rental_intents",
+      { p_age_minutes: 15 },
+    );
+    if (stalePaystackError) {
+      console.warn("[admin-sync-paystack] stale Paystack cleanup failed:", stalePaystackError.message);
+    } else if (Number(stalePaystackCount || 0) > 0) {
+      console.log("[admin-sync-paystack] stale Paystack intents failed", { count: stalePaystackCount });
+    }
+
     // Admin sync strategy:
     // - Use the canonical `payments` table where we have a paystack provider reference.
     // - Verify anything not yet completed/enhanced completed.
