@@ -87,7 +87,7 @@ export async function syncPaymentRecord(
     if (params.success && payment.purpose === "wallet_topup" && !alreadyCompleted) {
       const { data: wallet, error: walletErr } = await supabase
         .from("wallets")
-        .select("id")
+        .select("wallet_id")
         .eq("user_id", payment.user_id)
         .maybeSingle();
 
@@ -95,7 +95,7 @@ export async function syncPaymentRecord(
         console.error("[paystack-sync] wallet lookup failed:", walletErr.message);
       }
 
-      let walletId = wallet?.id as string | undefined;
+      let walletId = wallet?.wallet_id as string | undefined;
       if (!walletId) {
         const { data: newWalletId } = await supabase.rpc("ensure_wallet_for_user", {
           p_user_id: payment.user_id,

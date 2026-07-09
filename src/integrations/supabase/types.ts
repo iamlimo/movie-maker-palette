@@ -2533,6 +2533,10 @@ export type Database = {
         Returns: number
       }
       expire_rentals: { Args: never; Returns: number }
+      fail_stale_paystack_rental_intents: {
+        Args: { p_age_minutes?: number }
+        Returns: number
+      }
       get_current_user_profile: { Args: never; Returns: string }
       get_season_episode_count: {
         Args: { season_id_param: string }

@@ -85,6 +85,16 @@ async function verifyPaystackSignature(payload: string, signature: string): Prom
 }
 
 async function loadRentalIntentByReference(supabase: ReturnType<typeof createClient>, reference: string) {
+  const { data: byId, error: byIdError } = await supabase
+    .from("rental_intents")
+    .select("*")
+    .eq("id", reference)
+    .maybeSingle();
+
+  if (!byIdError && byId) {
+    return byId as RentalIntentRow;
+  }
+
   const { data, error } = await supabase
     .from("rental_intents")
     .select("*")
@@ -216,6 +226,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    console.log("[webhook] incoming request", {
+      method: req.method,
+      hasSignature: !!req.headers.get("x-paystack-signature"),
+      userAgent: req.headers.get("user-agent") || "unknown",
+    });
+
     const signature = req.headers.get("x-paystack-signature");
     if (!signature) {
       return new Response(JSON.stringify({ error: "Missing Paystack signature" }), {
@@ -274,8 +290,13 @@ Deno.serve(async (req) => {
           { headers: corsHeaders },
         );
       }
-      // Non-duplicate insert error — log and continue so we don't drop the event.
-      console.warn("[webhook] webhook_events insert failed (continuing):", insertEventError);
+      // Non-duplicate insert error means the idempotency guard is unavailable.
+      // Do not run side effects without the guard; let Paystack retry the event.
+      console.error("[webhook] webhook_events idempotency insert failed:", insertEventError);
+      return new Response(JSON.stringify({ error: "Webhook idempotency guard failed" }), {
+        status: 500,
+        headers: corsHeaders,
+      });
     } else {
       console.log(
         `[webhook] recorded event ${insertedEvent?.event_id ?? "?"} (${providerEventId})`,

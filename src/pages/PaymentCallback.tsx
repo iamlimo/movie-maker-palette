@@ -36,6 +36,7 @@ export default function PaymentCallback() {
 
     return {
       kind: searchParams.get('kind') || 'payment',
+      providerStatus: searchParams.get('status'),
       contentType,
       contentId,
       paymentId,
@@ -85,6 +86,8 @@ export default function PaymentCallback() {
 
     const verifyPayment = async () => {
       try {
+        const redirectedStatus = String(callbackData.providerStatus || '').toLowerCase();
+        const redirectLooksFailed = ['failed', 'cancelled', 'canceled', 'abandoned'].includes(redirectedStatus);
         let data: any = null;
         let error: any = null;
 
@@ -146,7 +149,7 @@ export default function PaymentCallback() {
           return;
         }
 
-        if (['failed', 'cancelled', 'canceled', 'rejected'].includes(paymentStatus)) {
+        if (redirectLooksFailed || ['failed', 'cancelled', 'canceled', 'rejected'].includes(paymentStatus)) {
           await finish('failed', 'Payment was not completed.');
           return;
         }

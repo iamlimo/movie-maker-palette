@@ -30,7 +30,7 @@ export interface RentalAccess {
   has_access: boolean;
   access_type: 'rental' | 'purchase' | null;
   rental: Rental | null;
-  purchase: any | null;
+  purchase: unknown | null;
   expires_at: string | null;
 }
 
@@ -48,9 +48,13 @@ export const useRentals = () => {
     
     setIsLoading(true);
     try {
-      await (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: Error | null }> })
-        .rpc('expire_canonical_rental_access', { p_skew_minutes: 0 })
-        .catch((error) => console.warn('[useRentals] expire cleanup failed', error));
+      try {
+        await (supabase as unknown as {
+          rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: Error | null }>;
+        }).rpc('expire_canonical_rental_access', { p_skew_minutes: 0 });
+      } catch (error) {
+        console.warn('[useRentals] expire cleanup failed', error instanceof Error ? error.message : error);
+      }
 
       const { data, error } = await (supabase as unknown as {
         from: (t: string) => {
