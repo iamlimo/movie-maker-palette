@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -117,14 +117,13 @@ export default function Rentals() {
   const { isSuperAdmin } = useRole();
 
   const [rentals, setRentals] = useState<RentalRecord[]>([]);
-  const [filteredRentals, setFilteredRentals] = useState<RentalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [contentTypeFilter, setContentTypeFilter] = useState("all");
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -143,13 +142,14 @@ export default function Rentals() {
     try {
       const { data: rentalsData, error: rentalsError } = await supabase
         .from("rentals")
-        .select("*")
+        .select(
+          "id, user_id, content_id, content_type, status, created_at, expires_at",
+        )
         .order("created_at", { ascending: false });
 
       if (rentalsError) throw rentalsError;
       if (!rentalsData || rentalsData.length === 0) {
         setRentals([]);
-        setFilteredRentals([]);
         return;
       }
 
@@ -205,9 +205,7 @@ export default function Rentals() {
         id: string | number;
         user_id: string;
         content_id: string;
-        content_title?: string | null;
         content_type: RentalContentType | string;
-        amount?: number | null;
         status?: RentalStatus | string;
         created_at: string;
         expires_at: string;
@@ -221,15 +219,12 @@ export default function Rentals() {
           user_email: profileMap.get(r.user_id)?.email || "Unknown User",
           user_name: profileMap.get(r.user_id)?.name || "Unknown User",
           content_id: String(r.content_id),
-          content_title: String(r.content_title || "Unknown Content"),
+          // `content_title` is not guaranteed to exist on `rentals`.
+          // Prefer it if present in schema; otherwise fall back.
+          content_title: "Unknown Content",
           content_type: contentType,
           // Prefer the amount from rental_payments when available (admin accuracy)
-          amount:
-            typeof paymentRow?.amount === "number"
-              ? paymentRow.amount
-              : typeof r.amount === "number"
-                ? r.amount
-                : 0,
+          amount: typeof paymentRow?.amount === "number" ? paymentRow.amount : 0,
           status: (r.status as RentalStatus) || "expired",
           created_at: String(r.created_at),
           expires_at: String(r.expires_at),
@@ -240,7 +235,6 @@ export default function Rentals() {
       });
 
       setRentals(formattedRentals);
-      setFilteredRentals(formattedRentals);
     } catch (e) {
       console.error("Error fetching rentals:", e);
       toast({
@@ -324,7 +318,7 @@ export default function Rentals() {
     }
   };
 
-  useEffect(() => {
+  const filteredRentals = useMemo(() => {
     let filtered = rentals;
 
     if (searchQuery) {
@@ -362,17 +356,12 @@ export default function Rentals() {
       filtered = filtered.filter((r) => new Date(r.created_at) <= end);
     }
 
-    setFilteredRentals(filtered);
+    return filtered;
+  }, [rentals, searchQuery, statusFilter, contentTypeFilter, paymentStatusFilter, startDate, endDate]);
+
+  useEffect(() => {
     setCurrentPage(1);
-  }, [
-    searchQuery,
-    statusFilter,
-    contentTypeFilter,
-    paymentStatusFilter,
-    startDate,
-    endDate,
-    rentals,
-  ]);
+  }, [searchQuery, statusFilter, contentTypeFilter, paymentStatusFilter, startDate, endDate]);
 
   const stats = (() => {
     const total = rentals.length;
@@ -532,7 +521,7 @@ export default function Rentals() {
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -543,7 +532,10 @@ export default function Rentals() {
               </SelectContent>
             </Select>
 
-            <Select value={contentTypeFilter} onValueChange={setContentTypeFilter}>
+            <Select
+              value={contentTypeFilter}
+              onValueChange={(v) => setContentTypeFilter(v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Content type" />
               </SelectTrigger>
@@ -556,7 +548,10 @@ export default function Rentals() {
               </SelectContent>
             </Select>
 
-            <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+            <Select
+              value={paymentStatusFilter}
+              onValueChange={(v) => setPaymentStatusFilter(v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Payment status" />
               </SelectTrigger>
