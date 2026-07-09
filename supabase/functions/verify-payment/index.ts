@@ -283,7 +283,15 @@ async function verifyWithPaystack(reference: string) {
       headers: { Authorization: `Bearer ${paystackSecretKey}` },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      console.warn("[verify-payment] Paystack verification non-OK", {
+        reference,
+        status: response.status,
+        body: body.slice(0, 300),
+      });
+      return null;
+    }
 
     const payload = await response.json();
     return payload?.data ?? null;
@@ -526,6 +534,41 @@ serve(async (req: Request) => {
     // Log cancelled/failed payments for debugging
     if (paystackFailed) {
       console.warn(`❌ Payment cancelled/failed: reference=${referenceToVerify}, status=${paystackStatus}`);
+
+      const now = new Date().toISOString();
+      if (refreshedRentalIntent && refreshedRentalIntent.status !== "failed") {
+        await supabase
+          .from("rental_intents")
+          .update({
+            status: "failed",
+            failed_at: refreshedRentalIntent.failed_at || now,
+            metadata: {
+              ...(refreshedRentalIntent.metadata || {}),
+              paystack_status: paystackStatus,
+              failure_reason: paystackResult?.gateway_response || paystackResult?.message || "Payment not completed",
+              fallback_verified_by: "verify-payment",
+            },
+          })
+          .eq("id", refreshedRentalIntent.id);
+        refreshedRentalIntent = { ...refreshedRentalIntent, status: "failed", failed_at: refreshedRentalIntent.failed_at || now };
+        intentStatus = "failed";
+      }
+
+      if (payment && (payment.enhanced_status !== "failed" || payment.status !== "failed")) {
+        await supabase
+          .from("payments")
+          .update({
+            enhanced_status: "failed",
+            status: "failed",
+            error_message: String(paystackResult?.gateway_response || paystackResult?.message || "Payment not completed"),
+            metadata: {
+              ...(payment.metadata || {}),
+              paystack_status: paystackStatus,
+              fallback_verified_by: "verify-payment",
+            },
+          })
+          .eq("id", payment.id);
+      }
     }
 
     if (paystackSuccessful && refreshedRentalIntent) {
@@ -690,9 +733,9 @@ serve(async (req: Request) => {
           ? {
               id: refreshedRentalIntent.id,
               channel: refreshedRentalIntent.payment_method,
-              status: intentStatus || "unknown",
+              status,
               message: "Rental intent lookup completed",
-              enhanced_status: refreshedRentalIntent.status,
+              enhanced_status: paystackFailed ? "failed" : refreshedRentalIntent.status,
               provider_reference:
                 refreshedRentalIntent.provider_reference || refreshedRentalIntent.paystack_reference,
             }

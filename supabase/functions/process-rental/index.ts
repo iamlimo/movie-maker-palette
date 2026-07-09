@@ -18,6 +18,8 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
 const ALLOWED_ORIGINS = [
   "https://signaturetv.co",
   "https://www.signaturetv.co",
+  "https://movie-maker-palette.lovable.app",
+  "https://id-preview--35c19387-a3ec-428d-a8fc-4ab933986941.lovable.app",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
@@ -39,6 +41,15 @@ function isAllowedOrigin(origin: string) {
     origin.includes(".vercel.app") &&
     origin.startsWith("https://")
   ) {
+    return true;
+  }
+
+  // Lovable preview/published domains are valid app origins for this project.
+  if (origin.includes(".lovable.app") && origin.startsWith("https://")) {
+    return true;
+  }
+
+  if (origin.includes(".netlify.app") && origin.startsWith("https://")) {
     return true;
   }
 
@@ -444,6 +455,9 @@ async function createPaystackRental(
   }
 
   // Create the rental_intent FIRST so the webhook can find it by reference.
+  // Generate the id up front and use it as the Paystack reference so a live-mode
+  // webhook can resolve the intent even if it arrives before post-initialize updates.
+  const intentId = crypto.randomUUID();
   const fields = buildContentFields(input.contentId, input.contentType);
   const intentMetadata = {
     ...input.metadata,
@@ -468,6 +482,7 @@ async function createPaystackRental(
   const { data: intent, error: intentError } = await supabase
     .from("rental_intents")
     .insert({
+      id: intentId,
       user_id: input.userId,
       ...fields,
       rental_type: input.contentType,
@@ -475,6 +490,8 @@ async function createPaystackRental(
       currency: "NGN",
       payment_method: "paystack",
       status: "pending",
+      provider_reference: intentId,
+      paystack_reference: intentId,
       referral_code: input.referralCode ?? null,
       discount_amount: Math.round(input.discountApplied),
       expires_at: input.expiresAt,
@@ -488,7 +505,6 @@ async function createPaystackRental(
     return { error: "Failed to create rental intent", status: 500 };
   }
 
-  const intentId = intent.id;
   const paymentMetadata = {
     ...input.metadata,
     payment_method: "paystack",
@@ -504,6 +520,7 @@ async function createPaystackRental(
       currency: "NGN",
       purpose: "rental",
       provider: "paystack",
+      provider_reference: intentId,
       method: "paystack",
       enhanced_status: "initiated",
       status: "pending",
