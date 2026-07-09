@@ -1,0 +1,22 @@
+# Rentals Super Admin Dashboard Refactor - TODO
+
+- [ ] Refactor `src/pages/admin/Rentals.tsx`
+  - [ ] Extract helper functions for:
+    - [ ] fetching rentals base rows (explicit column selects; no `select("*")`)
+    - [ ] fetching `rental_payments` and building `paymentMap`
+    - [ ] fetching `profiles` and building `profileMap`
+    - [ ] formatting/joining into `RentalRecord[]`
+  - [ ] Replace client-side `filteredRentals` state + filtering `useEffect` with derived `useMemo`
+  - [ ] Ensure pagination uses the derived filtered list
+  - [ ] Reduce per-render work (memoize stats, avoid repeated `new Date` inside tight loops if possible)
+  - [ ] Clean up typing + robustness (guard unexpected `content_type/status/payment_status` values)
+  - [ ] Remove unused imports/types or fix missing React type imports
+- [ ] Run project lint/typecheck after edits
+  - [ ] `npm run lint` (or nearest available script)
+  - [ ] `npm run typecheck` (or nearest available script)
+- [ ] Manual validation in UI
+  - [ ] Load rentals page (empty + non-empty)
+  - [ ] Apply filters + date range
+  - [ ] Paginate filtered results (Next/Previous)
+  - [ ] Export CSV matches displayed rows
+  - [ ] Sync with Paystack + Hard reset refreshes list correctly
