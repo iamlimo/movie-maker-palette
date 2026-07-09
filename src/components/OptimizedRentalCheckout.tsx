@@ -309,6 +309,13 @@ export const OptimizedRentalCheckout = ({
       }
 
       if (payload.status === 'failed') {
+        handleOpenChange(false);
+        await refreshEntitlements();
+        toast({
+          title: 'Payment not completed',
+          description: 'Your rental was not charged. You can try again when ready.',
+          variant: 'destructive',
+        });
         setPaymentStatus({ show: true, status: 'failed', message: 'Payment failed. Please try again.' });
       }
     };
@@ -411,6 +418,30 @@ export const OptimizedRentalCheckout = ({
 
         if (!isNative && !isMobileBrowser && paystackWindow) {
           paystackWindow.focus();
+          const closeWatcher = window.setInterval(async () => {
+            if (!paystackWindow.closed) return;
+            window.clearInterval(closeWatcher);
+            try {
+              const hasAccess = await verifyPaystackAccess({
+                rentalId: result.rentalId,
+                paymentId: result.paymentId,
+                reference: result.paystackReference,
+                contentId,
+                contentType,
+              });
+              await refreshEntitlements();
+              if (!hasAccess) {
+                toast({
+                  title: 'Payment not completed',
+                  description: 'Paystack did not confirm this rental. You can try again.',
+                  variant: 'destructive',
+                });
+              }
+            } catch (error) {
+              console.warn('Paystack close verification failed:', error);
+              await refreshEntitlements();
+            }
+          }, 1000);
         }
 
         onOpenChange(false);
