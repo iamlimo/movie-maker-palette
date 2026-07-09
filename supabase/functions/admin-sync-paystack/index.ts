@@ -71,6 +71,7 @@ Deno.serve(async (req) => {
     const { data: candidateRows, error: candErr } = await supabase
       .from("payments")
       .select("id, user_id, purpose, amount, enhanced_status, status, provider_reference, metadata")
+      .eq("provider", "paystack")
       .not("provider_reference", "is", null)
       .order("updated_at", { ascending: false })
       .limit(Math.min(limit * 3, 150));
@@ -85,12 +86,42 @@ Deno.serve(async (req) => {
       return errorResponse("Failed to query payments for sync", 500);
     }
 
-    const candidates = (candidateRows ?? [])
-      .filter((payment: any) => payment.enhanced_status !== "completed" || payment.status !== "completed")
-      .slice(0, limit);
+    const paymentCandidates = (candidateRows ?? [])
+      .filter((payment: any) => payment.enhanced_status !== "completed" || payment.status !== "completed");
+
+    // Some historical/live-mode rental attempts have a rental_intent reference
+    // but no usable payments.provider_reference row. Include those so the admin
+    // Sync button can still repair/close stuck Paystack rentals.
+    const { data: intentCandidates, error: intentCandErr } = await supabase
+      .from("rental_intents")
+      .select("id, user_id, status, price, provider_reference, paystack_reference, metadata, updated_at")
+      .eq("payment_method", "paystack")
+      .neq("status", "paid")
+      .order("updated_at", { ascending: false })
+      .limit(Math.min(limit * 3, 150));
+
+    if (intentCandErr) {
+      console.warn("[admin-sync-paystack] rental intent candidate query failed:", intentCandErr.message);
+    }
+
+    const byReference = new Map<string, any>();
+    for (const payment of paymentCandidates) {
+      if (payment.provider_reference) byReference.set(String(payment.provider_reference), { kind: "payment", payment });
+    }
+    for (const intent of intentCandidates ?? []) {
+      const reference = String(intent.paystack_reference || intent.provider_reference || intent.id || "");
+      if (reference && !byReference.has(reference)) byReference.set(reference, { kind: "intent", intent });
+    }
+
+    const candidates = Array.from(byReference.entries()).slice(0, limit).map(([reference, row]) => ({
+      reference,
+      payment: row.payment ?? null,
+      seedIntent: row.intent ?? null,
+    }));
 
     console.log("[admin-sync-paystack] candidate payments loaded", {
       fetched: candidateRows?.length ?? 0,
+      fetched_intents: intentCandidates?.length ?? 0,
       selected: candidates.length,
       limit,
     });
@@ -129,11 +160,11 @@ Deno.serve(async (req) => {
           .gt("expires_at", now)
           .order("expires_at", { ascending: false });
 
-      const { data: byIntent, error: intentError } = await baseQuery()
+      const { data: byIntentRows, error: intentError } = await baseQuery()
         .eq("rental_intent_id", rentalIntentId)
-        .maybeSingle();
+        .limit(1);
 
-      if (!intentError && byIntent) return byIntent;
+      if (!intentError && byIntentRows?.[0]) return byIntentRows[0];
 
       const contentFields = {
         movie_id: contentType === "movie" ? contentId : null,
@@ -141,7 +172,7 @@ Deno.serve(async (req) => {
         episode_id: contentType === "episode" ? contentId : null,
       };
 
-      const { data: byContent, error: contentError } = await baseQuery()
+      const { data: byContentRows, error: contentError } = await baseQuery()
         .or(
           [
             contentFields.movie_id ? `movie_id.eq.${contentFields.movie_id}` : null,
@@ -151,9 +182,9 @@ Deno.serve(async (req) => {
             .filter(Boolean)
             .join(","),
         )
-        .maybeSingle();
+        .limit(1);
 
-      if (!contentError && byContent) return byContent;
+      if (!contentError && byContentRows?.[0]) return byContentRows[0];
 
       return null;
     };
@@ -205,16 +236,17 @@ Deno.serve(async (req) => {
       return data;
     };
 
-    for (const payment of candidates) {
-      const reference = payment.provider_reference as string | null;
+    for (const candidate of candidates) {
+      const reference = candidate.reference as string | null;
       if (!reference) continue;
+      const payment = candidate.payment;
 
       try {
         console.log("[admin-sync-paystack] verifying payment", {
-          payment_id: payment.id,
+          payment_id: payment?.id ?? null,
           reference,
-          enhanced_status: payment.enhanced_status,
-          status: payment.status,
+          enhanced_status: payment?.enhanced_status ?? null,
+          status: payment?.status ?? candidate.seedIntent?.status ?? null,
         });
 
         const transaction = await fetchPaystackTransaction(reference, paystackKey);
@@ -237,8 +269,8 @@ Deno.serve(async (req) => {
         });
 
         // If this is a rental payment, ensure rental intent/access are activated like webhook.
-        const rentalIntent = await loadRentalIntentByReference(reference);
-        if (rentalIntent && (paystackStatus === "success" || paystackSuccess)) {
+        const rentalIntent = (await loadRentalIntentByReference(reference)) || candidate.seedIntent;
+        if (rentalIntent && paystackStatus === "success") {
           const expectedAmount = Math.round(Number(rentalIntent.price || 0));
           if (paidAmount < expectedAmount) {
             await supabase
@@ -255,14 +287,14 @@ Deno.serve(async (req) => {
               })
               .eq("id", rentalIntent.id);
             console.warn("[admin-sync-paystack] amount mismatch", {
-              payment_id: payment.id,
+                payment_id: payment?.id ?? "intent-only",
               rental_intent_id: rentalIntent.id,
               reference,
               paidAmount,
               expectedAmount,
             });
-            anomalies.push(`amount_mismatch: payment=${payment.id} ref=${reference}`);
-            perPayment.push({ payment_id: String(payment.id), reference, status: "amount_mismatch" });
+            anomalies.push(`amount_mismatch: payment=${payment?.id ?? "intent-only"} ref=${reference}`);
+            perPayment.push({ payment_id: String(payment?.id ?? rentalIntent.id), reference, status: "amount_mismatch" });
             continue;
           }
 
@@ -295,14 +327,28 @@ Deno.serve(async (req) => {
           if (contentId) {
             await grantRentalAccessLikeWebhook(rentalIntent, channel, paidAmount);
           }
+        } else if (rentalIntent && ["failed", "abandoned", "cancelled", "canceled", "reversed"].includes(String(paystackStatus).toLowerCase())) {
+          await supabase
+            .from("rental_intents")
+            .update({
+              status: "failed",
+              failed_at: new Date().toISOString(),
+              metadata: {
+                ...(rentalIntent.metadata || {}),
+                paystack_status: paystackStatus,
+                failure_reason: transaction?.data?.gateway_response || transaction?.data?.message || "Payment not completed",
+                synced_by: "admin-sync-paystack",
+              },
+            })
+            .eq("id", rentalIntent.id);
         }
 
         synced += 1;
-        perPayment.push({ payment_id: String(payment.id), reference, status: "synced" });
+        perPayment.push({ payment_id: String(payment?.id ?? rentalIntent?.id ?? "intent-only"), reference, status: "synced" });
       } catch (e: any) {
         failures += 1;
-        anomalies.push(`payment_failed: payment=${payment.id} ref=${reference} err=${String(e?.message || e)}`);
-        perPayment.push({ payment_id: String(payment.id), reference: String(reference), status: "error" });
+        anomalies.push(`payment_failed: payment=${payment?.id ?? "intent-only"} ref=${reference} err=${String(e?.message || e)}`);
+        perPayment.push({ payment_id: String(payment?.id ?? candidate.seedIntent?.id ?? "intent-only"), reference: String(reference), status: "error" });
       }
     }
 
