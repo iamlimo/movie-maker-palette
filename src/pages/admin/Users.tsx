@@ -81,7 +81,8 @@ export default function Users() {
       u.status || 'active',
       u.country || '',
       u.phone_number || '',
-      formatNaira(u.wallet_balance),
+      koboToNaira(u.wallet_balance),
+    
       new Date(u.created_at).toLocaleDateString(),
     ]);
 
@@ -146,7 +147,7 @@ export default function Users() {
       const walletMap = new Map<string, number>();
       wallets?.forEach(wallet => {
         // Convert kobo to naira
-        walletMap.set(wallet.user_id, wallet.balance / 100);
+        walletMap.set(wallet.user_id, wallet.balance );
       });
 
       // Combine profiles with roles and wallet data
