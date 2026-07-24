@@ -1,12 +1,15 @@
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { HelpCircle, MessageCircle, Book, Video, CreditCard, Shield, Clock, Users } from 'lucide-react';
+import { ArrowLeft, HelpCircle, MessageCircle, Book, Video, CreditCard, Shield, Clock, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Help = () => {
+  const navigate = useNavigate();
+
   const helpTopics = [
     {
       icon: Video,
@@ -75,6 +78,25 @@ const Help = () => {
       
       <main className="pt-24 pb-12">
         <div className="container mx-auto px-4">
+          <div className="mb-6 md:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate('/');
+                }
+              }}
+              className="-ml-2 gap-2 text-muted-foreground hover:text-foreground"
+              aria-label="Go back to the previous page"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              Back
+            </Button>
+          </div>
+
           {/* Hero Section */}
           <section className="text-center mb-12">
             <div className="flex items-center justify-center gap-3 mb-4">

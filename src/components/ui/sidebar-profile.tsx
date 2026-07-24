@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,8 @@ import {
   Menu,
   X,
   Shield,
-  Play
+  Play,
+  CircleHelp,
 } from 'lucide-react';
 
 interface ProfileSidebarProps {
@@ -100,6 +102,24 @@ export function ProfileSidebar({
             </Button>
           );
         })}
+
+        <div className="my-3 border-t border-border" />
+        <Link
+          to="/help"
+          className={cn(
+            "flex min-h-10 w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+            isCollapsed && "justify-center px-2",
+          )}
+          aria-label="Help Center: Get help and support"
+        >
+          <CircleHelp size={18} className={cn("flex-shrink-0", !isCollapsed && "mr-3")} />
+          {!isCollapsed && (
+            <div className="flex-1 text-left">
+              <div className="font-medium">Help Center</div>
+              <div className="text-xs text-muted-foreground">Get help and support</div>
+            </div>
+          )}
+        </Link>
       </nav>
     </div>
   );
