@@ -43,6 +43,7 @@ const TermsAndConditions = lazy(() => import("./pages/GeneralTerms"));
 const Careers = lazy(() => import("./pages/Careers"));
 const JobApplication = lazy(() => import("./pages/JobApplication"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
+const FAQ = lazy(() => import("./pages/FAQ"));
 const Watch = lazy(() => import("./pages/Watch"));
 
 
@@ -143,6 +144,7 @@ function AppContent() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/docs" element={<Docs />} />
             <Route path="/about" element={<AboutUs />} />
+            <Route path="/faq" element={<FAQ />} />
 
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/general-terms" element={<TermsAndConditions />} />

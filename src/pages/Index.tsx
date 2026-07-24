@@ -328,7 +328,7 @@ const Index = () => {
                 <ul className="space-y-2 text-muted-foreground">
                   <li>
                     <a
-                      href="#"
+                      href="/help"
                       className="hover:text-primary transition-smooth"
                     >
                       Help Center
@@ -365,6 +365,14 @@ const Index = () => {
                       className="hover:text-primary transition-smooth"
                     >
                       Privacy Policy
+                    </a>
+                  </li>
+                   <li>
+                    <a
+                      href="/faq"
+                      className="hover:text-primary transition-smooth"
+                    >
+                      FAQs
                     </a>
                   </li>
                 </ul>
