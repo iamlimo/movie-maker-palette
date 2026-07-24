@@ -205,10 +205,10 @@ export default function TermsAndConditions() {
             15. Contact Us
           </h2>
           <ul className="list-none pl-0">
-            <li>📧 Email: signaturepicturesnetwork@gmail.com</li>
-            <li>📞 Phone: +2348162059633</li>
-            <li>🌐 Website: www.signaturetv.co</li>
-            <li>📬 Mail: Signature Pictures Network, Lagos, Nigeria</li>
+            <li>Email: signaturepicturesnetwork@gmail.com</li>
+            <li>Phone: +2348162059633</li>
+            <li>Website: www.signaturetv.co</li>
+            <li> Address: Signature Pictures Network, Lagos, Nigeria</li>
           </ul>
 
           <h2 className="text-xl font-semibold text-[#FF8001]">
