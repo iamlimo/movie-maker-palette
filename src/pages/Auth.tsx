@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,16 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Phone } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  ArrowLeft,
+  Phone,
+  MailCheck,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { usePlatform } from "@/hooks/usePlatform";
 import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
@@ -21,7 +30,17 @@ import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
 const Auth = () => {
   const navigate = useNavigate();
   const { user, signIn, signUp } = useAuth();
-  const { isIOS } = usePlatform();
+  const { isIOS, isNative } = usePlatform();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Native apps use a single-view, mode-driven flow (no tabs) for a
+  // more app-like experience.
+  const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const goToMode = (next: "login" | "signup") => {
+    setSearchParams(next === "signup" ? { mode: "signup" } : {}, {
+      replace: true,
+    });
+  };
 
   // Redirect authenticated users to home
   useEffect(() => {
@@ -34,6 +53,9 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [signupSuccessEmail, setSignupSuccessEmail] = useState<string | null>(
+    null,
+  );
 
   // Login form state
   const [loginData, setLoginData] = useState({
