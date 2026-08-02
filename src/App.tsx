@@ -18,6 +18,7 @@ import { isMaintenanceOn } from "@/lib/maintenance";
 import AdminLayout from "@/components/admin/AdminLayout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
+import ConfirmEmail from "./pages/ConfirmEmail";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { Analytics } from "@vercel/analytics/react";
@@ -121,6 +122,7 @@ function AppContent() {
             <Route path="/" element={isMaintenanceOn() ? <Maintenance /> : <Index />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/confirm" element={<ConfirmEmail />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route
               path="/profile"

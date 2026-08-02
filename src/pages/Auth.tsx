@@ -36,6 +36,7 @@ const Auth = () => {
   // Native apps use a single-view, mode-driven flow (no tabs) for a
   // more app-like experience.
   const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const justConfirmed = searchParams.get("confirmed") === "1";
   const goToMode = (next: "login" | "signup") => {
     setSearchParams(next === "signup" ? { mode: "signup" } : {}, {
       replace: true,
@@ -514,6 +515,15 @@ const Auth = () => {
             Premium blockbusters and TV shows!
           </p>
         </div>
+
+        {justConfirmed && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3 animate-in fade-in slide-in-from-top-1 duration-300">
+            <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <p className="text-sm text-foreground">
+              Your email is confirmed. Log in to start watching.
+            </p>
+          </div>
+        )}
 
         <Card className="gradient-card border-border/50 shadow-premium">
           <CardHeader className="text-center">
