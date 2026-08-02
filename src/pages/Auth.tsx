@@ -36,6 +36,7 @@ const Auth = () => {
   // Native apps use a single-view, mode-driven flow (no tabs) for a
   // more app-like experience.
   const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const justConfirmed = searchParams.get("confirmed") === "1";
   const goToMode = (next: "login" | "signup") => {
     setSearchParams(next === "signup" ? { mode: "signup" } : {}, {
       replace: true,
