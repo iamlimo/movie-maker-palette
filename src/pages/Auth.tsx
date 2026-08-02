@@ -259,7 +259,212 @@ const Auth = () => {
       >
         {loading ? "Logging In..." : "Log In"}
       </Button>
+
+      <div className="relative py-2">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border/60" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-card px-3 text-xs uppercase tracking-wider text-muted-foreground">
+            New here?
+          </span>
+        </div>
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => goToMode("signup")}
+        className="w-full border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+      >
+        Create account
+      </Button>
     </form>
+  );
+
+  // Native signup form (single view, with back + log in affordances)
+  const renderNativeSignupForm = () => (
+    <form onSubmit={handleSignup} className="space-y-5">
+      <div className="space-y-2">
+        <Label htmlFor="native-signup-name" className="text-foreground">
+          Full Name
+        </Label>
+        <div className="relative">
+          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="native-signup-name"
+            type="text"
+            autoComplete="name"
+            placeholder="Enter your full name"
+            value={signupData.name}
+            onChange={(e) =>
+              setSignupData({ ...signupData, name: e.target.value })
+            }
+            className="pl-10 bg-background/50 border-border focus:border-primary"
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="native-signup-email" className="text-foreground">
+          Email
+        </Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="native-signup-email"
+            type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoComplete="email"
+            placeholder="Enter your email"
+            value={signupData.email}
+            onChange={(e) =>
+              setSignupData({ ...signupData, email: e.target.value })
+            }
+            className="pl-10 bg-background/50 border-border focus:border-primary"
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="native-signup-phone" className="text-foreground">
+          Phone Number{" "}
+          <span className="text-muted-foreground text-xs">(optional)</span>
+        </Label>
+        <div className="relative">
+          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="native-signup-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="e.g. +234 800 000 0000"
+            value={signupData.phoneNumber}
+            onChange={(e) =>
+              setSignupData({ ...signupData, phoneNumber: e.target.value })
+            }
+            className="pl-10 bg-background/50 border-border focus:border-primary"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="native-signup-password" className="text-foreground">
+          Password
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="native-signup-password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            placeholder="Create a password"
+            value={signupData.password}
+            onChange={(e) =>
+              setSignupData({ ...signupData, password: e.target.value })
+            }
+            className="pl-10 pr-10 bg-background/50 border-border focus:border-primary"
+            required
+            minLength={6}
+          />
+          <button
+            type="button"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-smooth"
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Use at least 6 characters.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label
+          htmlFor="native-signup-confirm-password"
+          className="text-foreground"
+        >
+          Confirm Password
+        </Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="native-signup-confirm-password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            placeholder="Confirm your password"
+            value={signupData.confirmPassword}
+            onChange={(e) =>
+              setSignupData({
+                ...signupData,
+                confirmPassword: e.target.value,
+              })
+            }
+            className="pl-10 bg-background/50 border-border focus:border-primary"
+            required
+          />
+        </div>
+      </div>
+
+      <Button
+        type="submit"
+        className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
+        disabled={loading}
+      >
+        {loading ? "Creating Account..." : "Create Account"}
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => goToMode("login")}
+        className="w-full text-muted-foreground hover:text-foreground"
+      >
+        Already have an account?{" "}
+        <span className="ml-1 font-semibold text-primary">Log In</span>
+      </Button>
+
+      <p className="text-center text-xs text-muted-foreground">
+        By creating an account you agree to our Terms of Service and Privacy
+        Policy.
+      </p>
+    </form>
+  );
+
+  const renderSignupSuccess = () => (
+    <div className="space-y-6 text-center animate-in fade-in duration-300">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/15">
+        <MailCheck className="h-8 w-8 text-primary" />
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-xl font-bold text-foreground">Check your email</h2>
+        <p className="text-sm text-muted-foreground">
+          We sent a confirmation link to{" "}
+          <span className="font-medium text-foreground">
+            {signupSuccessEmail}
+          </span>
+          . Confirm your email, then log in to start watching.
+        </p>
+      </div>
+      <Button
+        className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow"
+        onClick={() => {
+          setSignupSuccessEmail(null);
+          goToMode("login");
+        }}
+      >
+        Go to Log In
+      </Button>
+    </div>
   );
 
   return (
