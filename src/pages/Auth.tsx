@@ -795,7 +795,7 @@ const Auth = () => {
         </Card>
 
         {/* Footer text - only for Web/Android */}
-        {!isIOS && (
+        {!isNative && (
           <p className="text-center text-sm text-muted-foreground mt-6">
             By signing up, you agree to our Terms of Service and Privacy Policy
           </p>
