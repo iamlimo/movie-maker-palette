@@ -148,7 +148,7 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
 
       const { data: insertedContent, error } = await supabase
         .from(tableName)
-        .insert([contentData])
+        .insert([contentData] as any)
         .select(`
           *,
           genre:genres(id, name)
@@ -203,7 +203,7 @@ export const useContentManager = (contentType: ContentType, includeApprovedOnly 
 
       const { error } = await supabase
         .from(tableName)
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id);
 
       if (error) throw error;
