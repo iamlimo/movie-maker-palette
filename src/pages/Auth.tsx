@@ -164,6 +164,7 @@ const Auth = () => {
           description:
             "Please check your email to verify your account before logging in.",
         });
+        setSignupSuccessEmail(signupData.email);
         // Reset form and switch to login tab
         setSignupData({
           name: "",
