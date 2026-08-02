@@ -72,18 +72,14 @@ const Index = () => {
   // iOS Onboarding: Show login-gate for unauthenticated users
   if (isNative && !user && !authLoading) {
     const handleGetStarted = async () => {
-      try {
-        await Browser.open({ url: 'https://signaturetv.co/auth?mode=signup' });
-      } catch (error) {
-        console.error('Failed to open URL:', error);
-      }
+      navigate('/auth?mode=signup');
     };
 
     return (
       <div
         className="fixed inset-0 flex flex-col overflow-hidden"
         style={{
-          paddingTop: 'env(safe-area-inset-top)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 28px)',
           paddingBottom: 'env(safe-area-inset-bottom)',
           paddingLeft: 'env(safe-area-inset-left)',
           paddingRight: 'env(safe-area-inset-right)',
@@ -110,7 +106,7 @@ const Index = () => {
         </div>
 
         {/* Top bar: Logo + Log In */}
-        <div className="relative z-10 flex items-center justify-between px-6 pt-3">
+        <div className="relative z-10 flex items-center justify-between px-6 pt-6">
           <img src="/signature-tv-logo.png" alt="Signature TV" className="h-10 w-auto" />
           <Button
             onClick={() => navigate('/auth')}
