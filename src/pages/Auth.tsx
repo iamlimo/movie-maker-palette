@@ -468,17 +468,39 @@ const Auth = () => {
   );
 
   return (
-    <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
+    <div
+      className="min-h-screen gradient-hero flex items-center justify-center p-4"
+      style={
+        isNative
+          ? {
+              paddingTop: "calc(env(safe-area-inset-top) + 24px)",
+              paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)",
+            }
+          : undefined
+      }
+    >
       <div className="w-full max-w-md">
         {/* Header with back button */}
-        <div className="flex items-center mb-8">
-          {/* <Link
-            to="/"
-            className="flex items-center text-muted-foreground hover:text-primary transition-smooth"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Link> */}
+        <div className="flex items-center mb-4 min-h-10">
+          {isNative && (
+            <button
+              type="button"
+              aria-label="Go back"
+              onClick={() => {
+                if (signupSuccessEmail) {
+                  setSignupSuccessEmail(null);
+                  goToMode("login");
+                } else if (mode === "signup") {
+                  goToMode("login");
+                } else {
+                  navigate("/");
+                }
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-background/40 text-muted-foreground backdrop-blur-sm transition-smooth hover:text-primary active:scale-95"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
         {/* Logo */}
@@ -496,18 +518,34 @@ const Auth = () => {
         <Card className="gradient-card border-border/50 shadow-premium">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-foreground">
-              {isIOS ? "Welcome to Signature TV" : "Welcome"}
+              {isNative
+                ? signupSuccessEmail
+                  ? "Almost there"
+                  : mode === "signup"
+                    ? "Create your account"
+                    : "Welcome to Signature TV"
+                : "Welcome"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              {isIOS
-                ? "Log in to access your content."
+              {isNative
+                ? signupSuccessEmail
+                  ? "One quick step to finish setting up."
+                  : mode === "signup"
+                    ? "It takes less than a minute to get started."
+                    : "Log in to access your content."
                 : "Sign in to your account or create a new one"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isIOS ? (
-              // iOS: Login-only form (no tabs, no signup)
-              renderIOSLoginForm()
+            {isNative ? (
+              // Native (iOS/Android): single-view, mode-driven flow
+              <div key={signupSuccessEmail ? "success" : mode} className="animate-in fade-in slide-in-from-bottom-1 duration-300">
+                {signupSuccessEmail
+                  ? renderSignupSuccess()
+                  : mode === "signup"
+                    ? renderNativeSignupForm()
+                    : renderIOSLoginForm()}
+              </div>
             ) : (
               // Web/Android: Full tabs with login and signup
               <Tabs defaultValue="login" className="w-full">
