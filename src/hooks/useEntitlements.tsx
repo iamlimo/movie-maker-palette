@@ -40,6 +40,11 @@ const normalizeType = (t: string): RentalContentType => {
   const channelName = useRef(
     `entitlements-${Math.random().toString(36).slice(2, 8)}`,
   );
+  // Fallback reconciliation bookkeeping: how many times we've asked
+  // `verify-payment` to reconcile a given pending intent, and whether a
+  // reconcile call is currently in flight (avoids duplicate invocations).
+  const reconcileAttempts = useRef<Record<string, number>>({});
+  const reconcileInFlight = useRef<Set<string>>(new Set());
 
   const fetchEntitlements = useCallback(async () => {
     if (!user) {
