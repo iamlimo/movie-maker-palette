@@ -40,6 +40,11 @@ const normalizeType = (t: string): RentalContentType => {
   const channelName = useRef(
     `entitlements-${Math.random().toString(36).slice(2, 8)}`,
   );
+  // Fallback reconciliation bookkeeping: how many times we've asked
+  // `verify-payment` to reconcile a given pending intent, and whether a
+  // reconcile call is currently in flight (avoids duplicate invocations).
+  const reconcileAttempts = useRef<Record<string, number>>({});
+  const reconcileInFlight = useRef<Set<string>>(new Set());
 
   const fetchEntitlements = useCallback(async () => {
     if (!user) {
@@ -182,17 +187,79 @@ const normalizeType = (t: string): RentalContentType => {
     };
   }, [user, fetchEntitlements]);
 
-  // While any payment is still pending, poll lightly so webhook delays or
-  // missed Realtime messages cannot leave the UI stuck indefinitely.
+  /**
+   * Fallback for missed/delayed Paystack webhooks.
+   *
+   * `verify-payment` re-verifies the reference straight against the Paystack API
+   * and grants entitlement itself, so it is a complete substitute for the
+   * webhook. Ask it to reconcile every pending intent (bounded attempts) so a
+   * webhook that never arrives can't leave a paid user without access.
+   */
+  const reconcilePendingIntents = useCallback(
+    async (pending: Entitlement[]) => {
+      const targets = pending.filter((e) => e.intentId);
+      if (!targets.length) return;
+
+      await Promise.all(
+        targets.map(async (e) => {
+          const intentId = e.intentId!;
+          if (reconcileInFlight.current.has(intentId)) return;
+          const attempts = reconcileAttempts.current[intentId] ?? 0;
+          if (attempts >= 8) return;
+
+          reconcileInFlight.current.add(intentId);
+          reconcileAttempts.current[intentId] = attempts + 1;
+          try {
+            const { error } = await supabase.functions.invoke('verify-payment', {
+              body: { rentalId: intentId, rental_intent_id: intentId },
+            });
+            if (error) {
+              console.warn('[useEntitlements] reconcile failed', intentId, error.message);
+            }
+          } catch (err) {
+            console.warn('[useEntitlements] reconcile threw', intentId, err);
+          } finally {
+            reconcileInFlight.current.delete(intentId);
+          }
+        }),
+      );
+
+      await fetchEntitlements();
+    },
+    [fetchEntitlements],
+  );
+
+  // While any payment is still pending, poll lightly and reconcile through
+  // `verify-payment` so webhook delays or missed Realtime messages cannot leave
+  // the UI stuck indefinitely.
   useEffect(() => {
     if (!user) return;
-    const hasPending = entitlements.some(
+    const pending = entitlements.filter(
       (e) => e.state === 'PAYMENT_PENDING' || e.state === 'PAYMENT_VERIFICATION',
     );
-    if (!hasPending) return;
-    const interval = window.setInterval(fetchEntitlements, 10_000);
+    if (!pending.length) return;
+
+    // Immediate reconcile pass, then backoff polling while still pending.
+    reconcilePendingIntents(pending);
+    const interval = window.setInterval(() => {
+      reconcilePendingIntents(pending);
+    }, 8_000);
     return () => window.clearInterval(interval);
-  }, [user, entitlements, fetchEntitlements]);
+  }, [user, entitlements, reconcilePendingIntents]);
+
+  // Reset attempt counters once nothing is pending, so a later rental for the
+  // same content starts with a fresh budget.
+  useEffect(() => {
+    const stillPending = new Set(
+      entitlements
+        .filter((e) => e.state === 'PAYMENT_PENDING' || e.state === 'PAYMENT_VERIFICATION')
+        .map((e) => e.intentId)
+        .filter(Boolean) as string[],
+    );
+    Object.keys(reconcileAttempts.current).forEach((id) => {
+      if (!stillPending.has(id)) delete reconcileAttempts.current[id];
+    });
+  }, [entitlements]);
 
   const getEntitlement = useCallback(
     (contentId: string, contentType: RentalContentType): Entitlement => {
