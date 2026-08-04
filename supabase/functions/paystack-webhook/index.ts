@@ -220,11 +220,55 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Best-effort alerting: every webhook failure lands in public.payment_alerts
+  // so staff can debug from the admin dashboard with full reference details.
+  let alertClient: ReturnType<typeof createClient> | null = null;
+  const logAlert = async (alert: {
+    reason: string;
+    message?: string;
+    severity?: "warning" | "error" | "critical";
+    userId?: string | null;
+    rentalIntentId?: string | null;
+    reference?: string | null;
+    providerEventId?: string | null;
+    detail?: Record<string, unknown>;
+  }) => {
+    try {
+      const client =
+        alertClient ??
+        createClient(
+          Deno.env.get("SUPABASE_URL") ?? "",
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        );
+      alertClient = client;
+      console.error(`[webhook][alert] ${alert.reason}`, {
+        reference: alert.reference,
+        rental_intent_id: alert.rentalIntentId,
+        provider_event_id: alert.providerEventId,
+        message: alert.message,
+      });
+      await client.from("payment_alerts").insert({
+        source: "paystack_webhook",
+        severity: alert.severity ?? "error",
+        reason: alert.reason,
+        message: alert.message ?? null,
+        user_id: alert.userId ?? null,
+        rental_intent_id: alert.rentalIntentId ?? null,
+        reference: alert.reference ?? null,
+        provider_event_id: alert.providerEventId ?? null,
+        detail: alert.detail ?? {},
+      });
+    } catch (err) {
+      console.error("[webhook][alert] failed to record alert", err);
+    }
+  };
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+    alertClient = supabase;
 
     console.log("[webhook] incoming request", {
       method: req.method,
@@ -234,6 +278,12 @@ Deno.serve(async (req) => {
 
     const signature = req.headers.get("x-paystack-signature");
     if (!signature) {
+      await logAlert({
+        reason: "missing_signature",
+        message: "Webhook request arrived without an x-paystack-signature header",
+        severity: "warning",
+        detail: { user_agent: req.headers.get("user-agent") || "unknown" },
+      });
       return new Response(JSON.stringify({ error: "Missing Paystack signature" }), {
         status: 400,
         headers: corsHeaders,
@@ -245,6 +295,16 @@ Deno.serve(async (req) => {
     const isValid = await verifyPaystackSignature(body, signature);
     if (!isValid) {
       console.error("Invalid Paystack signature");
+      let refFromBody: string | null = null;
+      try {
+        refFromBody = JSON.parse(body)?.data?.reference ?? null;
+      } catch { /* ignore */ }
+      await logAlert({
+        reason: "invalid_signature",
+        message: "HMAC signature mismatch — check that the live Paystack secret key is set",
+        severity: "critical",
+        reference: refFromBody,
+      });
       return new Response(JSON.stringify({ error: "Invalid signature" }), {
         status: 400,
         headers: corsHeaders,
@@ -293,6 +353,14 @@ Deno.serve(async (req) => {
       // Non-duplicate insert error means the idempotency guard is unavailable.
       // Do not run side effects without the guard; let Paystack retry the event.
       console.error("[webhook] webhook_events idempotency insert failed:", insertEventError);
+      await logAlert({
+        reason: "idempotency_guard_failed",
+        message: insertEventError.message,
+        severity: "critical",
+        reference: event.data?.reference ?? null,
+        providerEventId: providerEventId,
+        detail: { code: (insertEventError as { code?: string }).code ?? null },
+      });
       return new Response(JSON.stringify({ error: "Webhook idempotency guard failed" }), {
         status: 500,
         headers: corsHeaders,
@@ -310,6 +378,12 @@ Deno.serve(async (req) => {
       const paidAmount = Number(event.data?.amount || 0);
 
       if (!paymentReference) {
+        await logAlert({
+          reason: "missing_reference",
+          message: "charge.success event had no payment reference",
+          severity: "warning",
+          providerEventId: providerEventId,
+        });
         return new Response(JSON.stringify({ received: true, message: "Missing payment reference" }), {
           headers: corsHeaders,
         });
@@ -361,6 +435,17 @@ Deno.serve(async (req) => {
           })
           .eq("id", rentalIntent.id);
 
+        await logAlert({
+          reason: "amount_mismatch",
+          message: `Paid ${paidAmount} kobo but intent expected ${expectedAmount} kobo`,
+          severity: "critical",
+          userId: rentalIntent.user_id,
+          rentalIntentId: rentalIntent.id,
+          reference: paymentReference,
+          providerEventId: providerEventId,
+          detail: { paid_amount: paidAmount, expected_amount: expectedAmount },
+        });
+
         return new Response(JSON.stringify({ received: true, message: "Amount mismatch" }), {
           headers: corsHeaders,
         });
@@ -387,6 +472,15 @@ Deno.serve(async (req) => {
 
         if (intentUpdateError) {
           console.error("Intent update error:", intentUpdateError);
+          await logAlert({
+            reason: "intent_update_failed",
+            message: intentUpdateError.message,
+            severity: "critical",
+            userId: rentalIntent.user_id,
+            rentalIntentId: rentalIntent.id,
+            reference: paymentReference,
+            providerEventId: providerEventId,
+          });
           return new Response(
             JSON.stringify({
               received: true,
@@ -399,6 +493,15 @@ Deno.serve(async (req) => {
 
       const contentId = rentalIntent.movie_id || rentalIntent.season_id || rentalIntent.episode_id;
       if (!contentId) {
+        await logAlert({
+          reason: "missing_content_id",
+          message: "Rental intent has no movie/season/episode id",
+          severity: "critical",
+          userId: rentalIntent.user_id,
+          rentalIntentId: rentalIntent.id,
+          reference: paymentReference,
+          providerEventId: providerEventId,
+        });
         return new Response(JSON.stringify({ received: true, message: "Missing content id" }), {
           headers: corsHeaders,
         });
@@ -432,6 +535,16 @@ Deno.serve(async (req) => {
       const accessRow = await grantRentalAccess(supabase, rentalIntent, paymentChannel, paidAmount);
       if (!accessRow) {
         console.error("Access grant failed for intent:", rentalIntent.id);
+        await logAlert({
+          reason: "access_grant_failed",
+          message: "Payment confirmed but rental access could not be granted",
+          severity: "critical",
+          userId: rentalIntent.user_id,
+          rentalIntentId: rentalIntent.id,
+          reference: paymentReference,
+          providerEventId: providerEventId,
+          detail: { rental_type: rentalIntent.rental_type, content_id: contentId },
+        });
         return new Response(
           JSON.stringify({
             received: true,
