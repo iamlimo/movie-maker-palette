@@ -45,6 +45,55 @@ const normalizeType = (t: string): RentalContentType => {
   // reconcile call is currently in flight (avoids duplicate invocations).
   const reconcileAttempts = useRef<Record<string, number>>({});
   const reconcileInFlight = useRef<Set<string>>(new Set());
+  // Intents we've already alerted staff about (budget exhausted), so a single
+  // stuck intent doesn't emit an alert on every poll tick.
+  const budgetAlerted = useRef<Set<string>>(new Set());
+
+  const RECONCILE_BUDGET = 8;
+
+  /**
+   * Alerting: when the fallback reconciliation loop burns its whole attempt
+   * budget, record a payment alert (with the intent reference) so staff see it
+   * on the admin dashboard instead of the failure being invisible.
+   */
+  const logReconciliationAlert = useCallback(
+    async (
+      e: Entitlement,
+      reason: 'reconciliation_budget_exhausted' | 'reconciliation_error',
+      message: string,
+    ) => {
+      if (!user || !e.intentId) return;
+      const key = `${reason}:${e.intentId}`;
+      if (budgetAlerted.current.has(key)) return;
+      budgetAlerted.current.add(key);
+      console.error('[useEntitlements] payment alert', { reason, intentId: e.intentId, message });
+      try {
+        await (supabase as unknown as {
+          from: (t: string) => { insert: (v: Record<string, unknown>) => Promise<{ error: unknown }> };
+        })
+          .from('payment_alerts')
+          .insert({
+            source: 'reconciliation',
+            severity: reason === 'reconciliation_budget_exhausted' ? 'critical' : 'error',
+            reason,
+            message,
+            user_id: user.id,
+            rental_intent_id: e.intentId,
+            attempts: reconcileAttempts.current[e.intentId] ?? null,
+            detail: {
+              content_id: e.contentId,
+              content_type: e.contentType,
+              state: e.state,
+              payment_method: e.paymentMethod,
+              expires_at: e.expiresAt,
+            },
+          });
+      } catch (err) {
+        console.warn('[useEntitlements] failed to record payment alert', err);
+      }
+    },
+    [user],
+  );
 
   const fetchEntitlements = useCallback(async () => {
     if (!user) {
@@ -205,7 +254,14 @@ const normalizeType = (t: string): RentalContentType => {
           const intentId = e.intentId!;
           if (reconcileInFlight.current.has(intentId)) return;
           const attempts = reconcileAttempts.current[intentId] ?? 0;
-          if (attempts >= 8) return;
+          if (attempts >= RECONCILE_BUDGET) {
+            await logReconciliationAlert(
+              e,
+              'reconciliation_budget_exhausted',
+              `Payment reconciliation gave up after ${attempts} attempts — intent ${intentId} is still ${e.state}. Webhook likely never arrived.`,
+            );
+            return;
+          }
 
           reconcileInFlight.current.add(intentId);
           reconcileAttempts.current[intentId] = attempts + 1;
@@ -215,9 +271,23 @@ const normalizeType = (t: string): RentalContentType => {
             });
             if (error) {
               console.warn('[useEntitlements] reconcile failed', intentId, error.message);
+              if (reconcileAttempts.current[intentId] >= RECONCILE_BUDGET) {
+                await logReconciliationAlert(
+                  e,
+                  'reconciliation_error',
+                  `verify-payment kept failing for intent ${intentId}: ${error.message}`,
+                );
+              }
             }
           } catch (err) {
             console.warn('[useEntitlements] reconcile threw', intentId, err);
+            if ((reconcileAttempts.current[intentId] ?? 0) >= RECONCILE_BUDGET) {
+              await logReconciliationAlert(
+                e,
+                'reconciliation_error',
+                `verify-payment threw for intent ${intentId}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
           } finally {
             reconcileInFlight.current.delete(intentId);
           }
@@ -226,7 +296,7 @@ const normalizeType = (t: string): RentalContentType => {
 
       await fetchEntitlements();
     },
-    [fetchEntitlements],
+    [fetchEntitlements, logReconciliationAlert],
   );
 
   // While any payment is still pending, poll lightly and reconcile through
@@ -258,6 +328,10 @@ const normalizeType = (t: string): RentalContentType => {
     );
     Object.keys(reconcileAttempts.current).forEach((id) => {
       if (!stillPending.has(id)) delete reconcileAttempts.current[id];
+    });
+    budgetAlerted.current.forEach((key) => {
+      const id = key.split(':').slice(1).join(':');
+      if (!stillPending.has(id)) budgetAlerted.current.delete(key);
     });
   }, [entitlements]);
 
