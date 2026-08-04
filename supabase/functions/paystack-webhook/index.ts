@@ -659,6 +659,12 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("Webhook error:", error);
+    await logAlert({
+      reason: "unhandled_exception",
+      message: error instanceof Error ? error.message : String(error),
+      severity: "critical",
+      detail: { stack: error instanceof Error ? error.stack ?? null : null },
+    });
     return new Response(JSON.stringify({ error: "Webhook processing failed" }), {
       status: 500,
       headers: corsHeaders,
