@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { RefreshCw, Search, Webhook } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw, Search, Webhook } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatNaira } from "@/lib/priceUtils";
@@ -38,6 +38,30 @@ interface DetailData {
   accessRows: any[];
 }
 
+interface PaymentAlertRow {
+  id: string;
+  created_at: string;
+  source: string;
+  severity: string;
+  reason: string;
+  message: string | null;
+  user_id: string | null;
+  rental_intent_id: string | null;
+  reference: string | null;
+  provider_event_id: string | null;
+  attempts: number | null;
+  detail: any;
+  acknowledged_at: string | null;
+}
+
+const alertsTable = () => (supabase as any).from("payment_alerts");
+
+function severityVariant(severity: string) {
+  if (severity === "critical") return "destructive" as const;
+  if (severity === "warning") return "secondary" as const;
+  return "outline" as const;
+}
+
 function extractReference(payload: any): string | null {
   return payload?.data?.reference ?? payload?.reference ?? null;
 }
@@ -54,6 +78,36 @@ export default function WebhookEvents() {
   const [search, setSearch] = useState("");
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [alerts, setAlerts] = useState<PaymentAlertRow[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [showAcknowledged, setShowAcknowledged] = useState(false);
+
+  const loadAlerts = async () => {
+    setAlertsLoading(true);
+    const { data, error } = await alertsTable()
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) {
+      toast({ title: "Failed to load payment alerts", description: error.message, variant: "destructive" });
+    } else {
+      setAlerts((data ?? []) as PaymentAlertRow[]);
+    }
+    setAlertsLoading(false);
+  };
+
+  const acknowledgeAlert = async (id: string) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await alertsTable()
+      .update({ acknowledged_at: new Date().toISOString(), acknowledged_by: auth?.user?.id ?? null })
+      .eq("id", id);
+    if (error) {
+      toast({ title: "Could not acknowledge", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Alert acknowledged" });
+    loadAlerts();
+  };
 
   const loadEvents = async () => {
     setLoading(true);
@@ -73,7 +127,14 @@ export default function WebhookEvents() {
 
   useEffect(() => {
     loadEvents();
+    loadAlerts();
   }, []);
+
+  const visibleAlerts = useMemo(
+    () => (showAcknowledged ? alerts : alerts.filter((a) => !a.acknowledged_at)),
+    [alerts, showAcknowledged],
+  );
+  const openAlertCount = useMemo(() => alerts.filter((a) => !a.acknowledged_at).length, [alerts]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -125,11 +186,103 @@ export default function WebhookEvents() {
             Every Paystack callback: payload, verification, and entitlement changes.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadEvents} disabled={loading}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            loadEvents();
+            loadAlerts();
+          }}
+          disabled={loading}
+        >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
+
+      <Card className={openAlertCount > 0 ? "border-destructive/60" : undefined}>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle
+              className={`h-5 w-5 ${openAlertCount > 0 ? "text-destructive" : "text-muted-foreground"}`}
+            />
+            Payment alerts
+            {openAlertCount > 0 && <Badge variant="destructive">{openAlertCount} open</Badge>}
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={() => setShowAcknowledged((v) => !v)}>
+            {showAcknowledged ? "Hide acknowledged" : "Show acknowledged"}
+          </Button>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>When</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Reference / Intent</TableHead>
+                <TableHead>Attempts</TableHead>
+                <TableHead>Details</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {alertsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    Loading…
+                  </TableCell>
+                </TableRow>
+              ) : visibleAlerts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <span className="inline-flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      No payment alerts — webhooks and reconciliation are healthy.
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                visibleAlerts.map((a) => (
+                  <TableRow key={a.id} className={a.acknowledged_at ? "opacity-60" : undefined}>
+                    <TableCell className="whitespace-nowrap text-xs">
+                      {new Date(a.created_at).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-xs">{a.source}</TableCell>
+                    <TableCell>
+                      <Badge variant={severityVariant(a.severity)}>{a.reason}</Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <div>{a.reference ?? "—"}</div>
+                      <div className="text-muted-foreground">{a.rental_intent_id ?? "—"}</div>
+                    </TableCell>
+                    <TableCell className="text-xs">{a.attempts ?? "—"}</TableCell>
+                    <TableCell className="text-xs max-w-[320px]">
+                      <div className="truncate" title={a.message ?? ""}>
+                        {a.message ?? "—"}
+                      </div>
+                      {a.detail && Object.keys(a.detail).length > 0 && (
+                        <div className="text-muted-foreground truncate" title={JSON.stringify(a.detail)}>
+                          {JSON.stringify(a.detail)}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {a.acknowledged_at ? (
+                        <span className="text-xs text-muted-foreground">Acknowledged</span>
+                      ) : (
+                        <Button size="sm" variant="ghost" onClick={() => acknowledgeAlert(a.id)}>
+                          Acknowledge
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
