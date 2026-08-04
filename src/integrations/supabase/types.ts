@@ -709,6 +709,57 @@ export type Database = {
           },
         ]
       }
+      payment_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          attempts: number | null
+          created_at: string
+          detail: Json
+          id: string
+          message: string | null
+          provider_event_id: string | null
+          reason: string
+          reference: string | null
+          rental_intent_id: string | null
+          severity: string
+          source: string
+          user_id: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          attempts?: number | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          message?: string | null
+          provider_event_id?: string | null
+          reason: string
+          reference?: string | null
+          rental_intent_id?: string | null
+          severity?: string
+          source: string
+          user_id?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          attempts?: number | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          message?: string | null
+          provider_event_id?: string | null
+          reason?: string
+          reference?: string | null
+          rental_intent_id?: string | null
+          severity?: string
+          source?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       payment_anomalies: {
         Row: {
           anomaly_type: string
