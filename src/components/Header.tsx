@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
   // const { isSuperAdmin } = useRole();
-  const { isSuperAdmin, isStaff, isSales, isAccounting, isSupport } = useRole();
+  const { isSuperAdmin, isStaff, isSales, isAccounting, isSupport, userRole } = useRole();
   const { formatBalance, isLoading: walletLoading, error: walletError } = useWallet();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
