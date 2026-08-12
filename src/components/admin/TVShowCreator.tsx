@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedTVShowUploader } from './UnifiedTVShowUploader';
 import BackblazeUrlInput from './BackblazeUrlInput';
+import CreatorSelect from './CreatorSelect';
 import TrailerPlayer from '../TrailerPlayer';
 import { 
   Tv, 
@@ -50,6 +51,7 @@ export const TVShowCreator = () => {
     banner?: string;
   }>({});
   
+  const [creatorProfileId, setCreatorProfileId] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -101,10 +103,10 @@ export const TVShowCreator = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.title || !formData.description || (!formData.poster_file && !uploadedUrls.poster)) {
+    if (!formData.title || !formData.description || (!formData.poster_file && !uploadedUrls.poster) || !creatorProfileId) {
       toast({
         title: "Validation Error",
-        description: "Title, description, and poster are required",
+        description: "Title, description, poster and creator are required",
         variant: "destructive",
       });
       return;
@@ -163,6 +165,18 @@ export const TVShowCreator = () => {
         throw new Error(result.error || `HTTP ${response.status}`);
       }
 
+      const newShowId = result.tvShow?.id;
+      if (newShowId) {
+        const { error: mapError } = await (supabase as unknown as {
+          rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: unknown }>;
+        }).rpc('map_content_to_creator', {
+          p_content_id: newShowId,
+          p_content_type: 'tv_show',
+          p_creator_id: creatorProfileId,
+        });
+        if (mapError) throw mapError;
+      }
+
       toast({
         title: "Success",
         description: "TV Show created successfully!",
@@ -181,6 +195,7 @@ export const TVShowCreator = () => {
         trailer_url: ''
       });
       setUploadedUrls({});
+      setCreatorProfileId('');
 
     } catch (error) {
       console.error('TV Show creation error:', error);
@@ -204,6 +219,12 @@ export const TVShowCreator = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          <CreatorSelect
+            contentType="tv_show"
+            value={creatorProfileId}
+            onChange={setCreatorProfileId}
+          />
+
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

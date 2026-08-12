@@ -28,6 +28,7 @@ import { useAuthCheck } from "@/hooks/useAuthCheck";
 import SalesPanel from "./dashboards/SalesPanel";
 import AccountingPanel from "./dashboards/AccountingPanel";
 import SupportPanel from "./dashboards/SupportPanel";
+import CreatorPanel from "./dashboards/CreatorPanel";
 
 interface DashboardStats {
   totalUsers: number;
@@ -114,6 +115,7 @@ export default function Dashboard() {
   if (appRole === 'sales') return <SalesPanel />;
   if (appRole === 'accounting') return <AccountingPanel />;
   if (appRole === 'support') return <SupportPanel />;
+  if (appRole === 'creator') return <CreatorPanel />;
   return <SuperAdminDashboard />;
 }
 

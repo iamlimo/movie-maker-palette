@@ -157,7 +157,7 @@ function AppContent() {
             <Route
               path="/admin"
               element={
-                <RoleRoute roles={STAFF_ROLES} redirectTo="/">
+                <RoleRoute roles={[...STAFF_ROLES, 'creator']} redirectTo="/">
                   <AdminLayout />
                 </RoleRoute>
               }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -12,6 +13,8 @@ import {
 type CreatorProfile = {
   id: string;
   display_name: string;
+  company_name?: string | null;
+  creator_type?: string | null;
 };
 
 type ContentType = 'movie' | 'tv_show' | 'episode';
@@ -37,6 +40,7 @@ export default function CreatorSelect(props: {
 
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
   const [selectedCreatorId, setSelectedCreatorId] = useState<string>(value || '');
+  const [search, setSearch] = useState('');
   const [loadingMapping, setLoadingMapping] = useState<boolean>(!!contentId);
   const [loadingCreators, setLoadingCreators] = useState<boolean>(true);
 
@@ -56,7 +60,7 @@ export default function CreatorSelect(props: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabase as any)
           .from('creator_profiles')
-          .select('id, display_name')
+          .select('id, display_name, company_name, creator_type')
           .eq('status', 'active')
           .order('display_name', { ascending: true });
 
@@ -123,6 +127,17 @@ export default function CreatorSelect(props: {
     onChange?.(next);
   };
 
+  const filteredCreators = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return creators;
+    return creators.filter((c) =>
+      [c.display_name, c.company_name ?? '', c.creator_type ?? '']
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [creators, search]);
+
   return (
     <div className={className}>
       <div className="space-y-2">
@@ -142,11 +157,26 @@ export default function CreatorSelect(props: {
             />
           </SelectTrigger>
           <SelectContent>
-            {creators.map((creator) => (
+            <div className="p-2">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                placeholder="Search creators or studios"
+                className="h-8"
+              />
+            </div>
+            {filteredCreators.map((creator) => (
               <SelectItem key={creator.id} value={creator.id}>
                 {creator.display_name}
+                {creator.company_name ? ` — ${creator.company_name}` : ''}
               </SelectItem>
             ))}
+            {filteredCreators.length === 0 && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                No matching creators
+              </div>
+            )}
           </SelectContent>
         </Select>
 

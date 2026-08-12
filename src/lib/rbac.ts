@@ -68,7 +68,7 @@ export type PageKey =
   | 'webhook-events';
 
 export const PAGE_ACCESS: Record<PageKey, AppRole[]> = {
-  dashboard: ['super_admin', 'admin', 'support', 'sales', 'accounting'],
+  dashboard: ['super_admin', 'admin', 'support', 'sales', 'accounting', 'creator'],
   movies: ['super_admin', 'admin'],
   tvshows: ['super_admin', 'admin'],
   sections: ['super_admin', 'admin', 'sales'],

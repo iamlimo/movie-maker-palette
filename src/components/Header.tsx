@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
   // const { isSuperAdmin } = useRole();
-  const { isSuperAdmin, isStaff, isSales, isAccounting, isSupport } = useRole();
+  const { isSuperAdmin, isStaff, isSales, isAccounting, isSupport, userRole } = useRole();
   const { formatBalance, isLoading: walletLoading, error: walletError } = useWallet();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -205,6 +205,14 @@ const Header = () => {
       <DropdownMenuItem asChild>
         <Link to="/admin" className="flex items-center text-foreground">
           <Settings className="mr-2 h-4 w-4" /> Support Dashboard
+        </Link>
+      </DropdownMenuItem>
+    )}
+
+    {userRole === 'creator' && (
+      <DropdownMenuItem asChild>
+        <Link to="/admin" className="flex items-center text-foreground">
+          <Settings className="mr-2 h-4 w-4" /> Creator Dashboard
         </Link>
       </DropdownMenuItem>
     )}

@@ -217,6 +217,7 @@ export type Database = {
       }
       creator_profiles: {
         Row: {
+          address: string | null
           company_name: string | null
           created_at: string | null
           created_by: string | null
@@ -232,6 +233,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          address?: string | null
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -247,6 +249,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          address?: string | null
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -2729,6 +2732,7 @@ export type Database = {
         | "support"
         | "sales"
         | "accounting"
+        | "creator"
       content_status: "pending" | "approved" | "rejected"
       content_type: "movie" | "episode" | "season"
       enhanced_payment_status:
@@ -2880,6 +2884,7 @@ export const Constants = {
         "support",
         "sales",
         "accounting",
+        "creator",
       ],
       content_status: ["pending", "approved", "rejected"],
       content_type: ["movie", "episode", "season"],
