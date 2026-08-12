@@ -209,6 +209,14 @@ const Header = () => {
       </DropdownMenuItem>
     )}
 
+    {userRole === 'creator' && (
+      <DropdownMenuItem asChild>
+        <Link to="/admin" className="flex items-center text-foreground">
+          <Settings className="mr-2 h-4 w-4" /> Creator Dashboard
+        </Link>
+      </DropdownMenuItem>
+    )}
+
     <DropdownMenuSeparator className="bg-border" />
     <DropdownMenuItem onClick={handleSignOut} className="text-foreground hover:bg-destructive/10">
       <LogOut className="mr-2 h-4 w-4" /> Sign Out
