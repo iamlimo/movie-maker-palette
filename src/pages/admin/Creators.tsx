@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -19,14 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Copy,
-  Pencil,
-  Power,
-  PowerOff,
-  Trash2,
-  UserPlus,
-} from "lucide-react";
+import { MailCheck, Pencil, Power, PowerOff, Trash2, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +37,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogOverlay,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuthCheck } from "@/hooks/useAuthCheck";
 
@@ -54,6 +48,7 @@ type CreatorProfile = {
   email: string;
   phone_number: string | null;
   company_name: string | null;
+  address: string | null;
   creator_type: string | null;
   status: string | null;
   is_active: boolean | null;
@@ -62,110 +57,86 @@ type CreatorProfile = {
   updated_at: string | null;
 };
 
-type CreatorTokenState = {
-  token: string;
-  password: string;
+export const CREATOR_TYPES = [
+  { value: "producer", label: "Producer" },
+  { value: "director", label: "Director" },
+  { value: "studio", label: "Studio" },
+  { value: "content_owner", label: "Content Owner" },
+  { value: "distributor", label: "Distributor" },
+];
+
+const creatorTypeLabel = (value: string | null) =>
+  CREATOR_TYPES.find((t) => t.value === value)?.label ?? value ?? "—";
+
+const emptyCreateForm = {
+  fullName: "",
+  email: "",
+  password: "",
+  phone: "",
+  companyName: "",
+  address: "",
+  creatorType: "",
 };
-
-type CreateCreatorPayload = {
-  email: string;
-  fullName: string;
-  phone: string;
-  companyName: string;
-  creatorType: string;
-};
-
-type CreatorEditPayload = {
-  display_name: string;
-  email: string;
-  phone_number: string;
-  company_name: string;
-  creator_type: string;
-  status: string | null;
-};
-
-const ACTIVATE_BASE_URL = "https://signaturetv.co/activate";
-
-function formatActivationLink(token: string) {
-  const t = encodeURIComponent(token);
-  return `${ACTIVATE_BASE_URL}?token=${t}`;
-}
 
 function safeStatus(status: CreatorProfile["status"]) {
   return status || "pending_activation";
 }
 
-function statusBadgeVariant(status: string | null) {
+function statusLabel(status: string | null) {
   const s = safeStatus(status);
-  if (s === "active") return "default";
-  if (s === "disabled") return "default";
-  if (s === "pending_activation") return "outline";
-  return "default";
+  if (s === "active") return "Active";
+  if (s === "disabled") return "Disabled";
+  if (s === "pending_activation") return "Pending activation";
+  return s;
 }
 
+function statusBadgeVariant(status: string | null): "default" | "outline" | "secondary" {
+  const s = safeStatus(status);
+  if (s === "active") return "default";
+  if (s === "pending_activation") return "outline";
+  return "secondary";
+}
 
 export default function Creators() {
   const { toast } = useToast();
   const { isSuperAdmin } = useAuthCheck();
+  const canManage = isSuperAdmin;
 
   const [creators, setCreators] = useState<CreatorProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    companyName: "",
-    creatorType: "",
-  });
-
+  const [createForm, setCreateForm] = useState({ ...emptyCreateForm });
   const [createSubmitting, setCreateSubmitting] = useState(false);
-
-  const [activationByCreatorId, setActivationByCreatorId] = useState<
-    Record<string, CreatorTokenState>
-  >({});
 
   const [editOpen, setEditOpen] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editTarget, setEditTarget] = useState<CreatorProfile | null>(null);
-  const [editForm, setEditForm] = useState<CreatorEditPayload>({
+  const [editForm, setEditForm] = useState({
     display_name: "",
     email: "",
     phone_number: "",
     company_name: "",
+    address: "",
     creator_type: "",
-    status: null,
   });
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CreatorProfile | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
-const fetchCreators = async () => {
+  const fetchCreators = async () => {
     setLoading(true);
     try {
-      const q = (supabase as unknown as { from: any }).from("creator_profiles").select("*");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const q = (supabase as any).from("creator_profiles").select("*");
 
-      // statusFilter/activeFilter behavior
-      // - all: no filter
-      // - active: is_active=true OR status=active
-      // - disabled: is_active=false OR status=disabled
-      // - pending_activation: status=pending_activation
       if (statusFilter !== "all") {
-        const sf = statusFilter;
-        if (sf === "active") {
-          q.or("is_active.eq.true,status.eq.active");
-        } else if (sf === "disabled") {
-          q.or("is_active.eq.false,status.eq.disabled");
-        } else if (sf === "pending_activation") {
-          q.eq("status", "pending_activation");
-        } else {
-          q.eq("status", sf);
-        }
+        q.eq("status", statusFilter);
       }
 
       if (searchTerm.trim()) {
@@ -182,12 +153,11 @@ const fetchCreators = async () => {
 
       const { data, error } = await q.order("created_at", { ascending: false });
       if (error) throw error;
-
       setCreators((data as CreatorProfile[]) ?? []);
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Failed to load creators",
-        description: err?.message ?? "Unknown error",
+        description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
     } finally {
@@ -196,96 +166,81 @@ const fetchCreators = async () => {
   };
 
   useEffect(() => {
-    fetchCreators();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      fetchCreators();
-    }, 250);
+    const t = setTimeout(fetchCreators, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [searchTerm, statusFilter]);
 
   useEffect(() => {
-    // keep edit form in sync when target changes
     if (!editTarget) return;
     setEditForm({
       display_name: editTarget.display_name ?? "",
       email: editTarget.email ?? "",
       phone_number: editTarget.phone_number ?? "",
       company_name: editTarget.company_name ?? "",
+      address: editTarget.address ?? "",
       creator_type: editTarget.creator_type ?? "",
-      status: editTarget.status ?? null,
     });
   }, [editTarget]);
 
-  const storedActivation = useMemo(() => {
-    return (creatorId: string) => activationByCreatorId[creatorId];
-  }, [activationByCreatorId]);
-
-  const canSuperAdmin = isSuperAdmin;
-
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSuperAdmin) return;
+    if (!canManage) return;
 
-    const payload: CreateCreatorPayload = {
-      email: createForm.email.trim(),
+    const payload = {
       fullName: createForm.fullName.trim(),
+      email: createForm.email.trim(),
+      password: createForm.password.trim() || undefined,
       phone: createForm.phone.trim(),
       companyName: createForm.companyName.trim(),
+      address: createForm.address.trim() || undefined,
       creatorType: createForm.creatorType,
+      redirectTo: `${window.location.origin}/reset-password`,
     };
 
-    if (!payload.email || !payload.fullName || !payload.phone || !payload.companyName || !payload.creatorType) {
-      toast({ title: "Missing required fields", variant: "destructive" });
+    if (
+      !payload.fullName ||
+      !payload.email ||
+      !payload.phone ||
+      !payload.companyName ||
+      !payload.creatorType
+    ) {
+      toast({
+        title: "Missing required fields",
+        description: "Full name, email, phone, company/studio name and creator type are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (payload.password && payload.password.length < 8) {
+      toast({ title: "Password must be at least 8 characters", variant: "destructive" });
       return;
     }
 
     setCreateSubmitting(true);
     try {
-      const res = await (supabase as any).functions.invoke(
-        "admin-create-creator",
-        {
-          body: {
-            email: payload.email,
-            fullName: payload.fullName,
-            phone: payload.phone,
-            companyName: payload.companyName,
-            creatorType: payload.creatorType,
-          },
-        },
-      );
+      const { data, error } = await supabase.functions.invoke("admin-create-creator", {
+        body: { action: "create", ...payload },
+      });
 
-      const data = res?.data ?? res;
-      if (!data?.success) {
-        throw new Error(data?.error ?? "Failed to create creator");
-      }
-
-      const token = data.token as string;
-      const creatorProfileId = data.creator_profile_id as string;
-      const password = data.password as string;
-
-      setActivationByCreatorId((prev) => ({
-        ...prev,
-        [creatorProfileId]: { token, password },
-      }));
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error ?? "Failed to create creator");
 
       toast({
         title: "Creator created",
-        description: "Activation token generated. You can now activate.",
+        description: data.emailSent
+          ? "A password-reset email was sent. Activate the account when you're ready."
+          : `Status: pending activation. Temporary password: ${data.password}`,
       });
 
       setCreateOpen(false);
-      setCreateForm({ fullName: "", email: "", phone: "", companyName: "", creatorType: "" });
-
+      setCreateForm({ ...emptyCreateForm });
       await fetchCreators();
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Failed to create creator",
-        description: err?.message ?? "Unknown error",
+        description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
     } finally {
@@ -293,58 +248,50 @@ const fetchCreators = async () => {
     }
   };
 
-  const handleActivate = async (creator: CreatorProfile) => {
-    const store = storedActivation(creator.id);
-    if (!store) return;
-
-    setLoading(true);
+  const runCreatorAction = async (
+    creator: CreatorProfile,
+    action: "activate" | "deactivate" | "send_reset",
+  ) => {
+    if (!canManage) return;
+    setBusyId(creator.id);
     try {
-      // Only activate when pending_activation (per requirement)
-      if (safeStatus(creator.status) !== "pending_activation") {
-        toast({ title: "Not eligible for activation", description: "Creator is not pending activation." });
-        return;
-      }
-
-      const res = await (supabase as any).functions.invoke(
-        "creator-activation",
-        {
-          body: {
-            token: store.token,
-            password: store.password,
-          },
+      const { data, error } = await supabase.functions.invoke("admin-create-creator", {
+        body: {
+          action,
+          creatorProfileId: creator.id,
+          email: creator.email,
+          redirectTo: `${window.location.origin}/reset-password`,
         },
-      );
+      });
 
-      const data = res?.data ?? res;
-      if (!data?.success) {
-        throw new Error(data?.error ?? "Activation failed");
-      }
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error ?? "Action failed");
 
-      toast({ title: "Creator activated" });
-
-      // clear stored token
-      setActivationByCreatorId((prev) => {
-        const next = { ...prev };
-        delete next[creator.id];
-        return next;
+      toast({
+        title:
+          action === "activate"
+            ? "Creator activated"
+            : action === "deactivate"
+              ? "Creator disabled"
+              : "Password reset email sent",
+        description:
+          action === "activate"
+            ? data.emailSent
+              ? "They were emailed a link to set their password."
+              : "Creator can now sign in to the creator dashboard."
+            : undefined,
       });
 
       await fetchCreators();
-    } catch (err: any) {
+    } catch (err) {
       toast({
-        title: "Activation failed",
-        description: err?.message ?? "Unknown error",
+        title: "Action failed",
+        description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setBusyId(null);
     }
-  };
-
-  const openEdit = (creator: CreatorProfile) => {
-    if (!canSuperAdmin) return;
-    setEditTarget(creator);
-    setEditOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -353,24 +300,17 @@ const fetchCreators = async () => {
 
     setEditSubmitting(true);
     try {
-      const payload: CreatorEditPayload = {
-        display_name: editForm.display_name.trim(),
-        email: editForm.email.trim(),
-        phone_number: editForm.phone_number.trim(),
-        company_name: editForm.company_name.trim(),
-        creator_type: editForm.creator_type.trim(),
-        status: editForm.status,
-      };
-
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any)
         .from("creator_profiles")
         .update({
-          display_name: payload.display_name,
-          email: payload.email,
-          phone_number: payload.phone_number,
-          company_name: payload.company_name,
-          creator_type: payload.creator_type,
-          status: payload.status,
+          display_name: editForm.display_name.trim(),
+          email: editForm.email.trim(),
+          phone_number: editForm.phone_number.trim(),
+          company_name: editForm.company_name.trim(),
+          address: editForm.address.trim() || null,
+          creator_type: editForm.creator_type || null,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", editTarget.id);
 
@@ -380,10 +320,10 @@ const fetchCreators = async () => {
       setEditOpen(false);
       setEditTarget(null);
       await fetchCreators();
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Failed to update creator",
-        description: err?.message ?? "Unknown error",
+        description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
     } finally {
@@ -391,46 +331,11 @@ const fetchCreators = async () => {
     }
   };
 
-  const handleToggleActive = async (creator: CreatorProfile, nextEnabled: boolean) => {
-    if (!canSuperAdmin) return;
-
-    setLoading(true);
-    try {
-      const nextStatus = nextEnabled ? "active" : "disabled";
-      const { error } = await (supabase as any)
-        .from("creator_profiles")
-        .update({
-          is_active: nextEnabled,
-          status: nextStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", creator.id);
-
-      if (error) throw error;
-
-      toast({ title: nextEnabled ? "Creator enabled" : "Creator disabled" });
-      await fetchCreators();
-    } catch (err: any) {
-      toast({
-        title: "Failed to update status",
-        description: err?.message ?? "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const requestDelete = (creator: CreatorProfile) => {
-    if (!canSuperAdmin) return;
-    setDeleteTarget(creator);
-    setDeleteOpen(true);
-  };
-
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleteSubmitting(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any)
         .from("creator_profiles")
         .delete()
@@ -438,21 +343,14 @@ const fetchCreators = async () => {
 
       if (error) throw error;
 
-      // clear activation token state
-      setActivationByCreatorId((prev) => {
-        const next = { ...prev };
-        delete next[deleteTarget.id];
-        return next;
-      });
-
       toast({ title: "Creator deleted" });
       setDeleteOpen(false);
       setDeleteTarget(null);
       await fetchCreators();
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Failed to delete creator",
-        description: err?.message ?? "Unknown error",
+        description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
     } finally {
@@ -460,23 +358,17 @@ const fetchCreators = async () => {
     }
   };
 
-  const statusLabel = (creator: CreatorProfile) => {
-    const s = safeStatus(creator.status);
-    if (s === "active") return "Active";
-    if (s === "disabled") return "Disabled";
-    if (s === "pending_activation") return "Pending activation";
-    return s;
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Creators</h1>
-          <p className="text-sm text-muted-foreground">Manage creator profiles and activation.</p>
+          <p className="text-sm text-muted-foreground">
+            Create creator accounts, activate them, and map them to content.
+          </p>
         </div>
 
-        {canSuperAdmin && (
+        {canManage && (
           <Button onClick={() => setCreateOpen(true)} className="gap-2">
             <UserPlus className="h-4 w-4" />
             Add a creator
@@ -513,89 +405,91 @@ const fetchCreators = async () => {
           <TableHeader>
             <TableRow>
               <TableHead>Creator</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Company</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Company / Studio</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {creators.map((creator) => {
-              const activationStore = activationByCreatorId[creator.id];
-              const eligibleForActivation =
-                safeStatus(creator.status) === "pending_activation" &&
-                !!activationStore;
+              const isPending = safeStatus(creator.status) === "pending_activation";
+              const busy = busyId === creator.id;
 
               return (
                 <TableRow key={creator.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <div className="font-medium">{creator.display_name}</div>
-                      {creator.creator_type && (
-                        <Badge variant="secondary">{creator.creator_type}</Badge>
-                      )}
+                      <span className="font-medium">{creator.display_name}</span>
+                      <Badge variant="secondary">{creatorTypeLabel(creator.creator_type)}</Badge>
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">{creator.phone_number ?? "—"}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {creator.address || "No address"}
+                    </div>
                   </TableCell>
 
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>{creator.email}</span>
-                    </div>
+                    <div>{creator.email}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {creator.user_id ? `Auth linked` : "Not linked"}
+                      {creator.phone_number ?? "—"} · {creator.user_id ? "Login ready" : "No login"}
                     </div>
                   </TableCell>
 
                   <TableCell>{creator.company_name ?? "—"}</TableCell>
 
                   <TableCell>
-                    <Badge variant={statusBadgeVariant(creator.status)}>{statusLabel(creator)}</Badge>
+                    <Badge variant={statusBadgeVariant(creator.status)}>
+                      {statusLabel(creator.status)}
+                    </Badge>
                   </TableCell>
 
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {eligibleForActivation && (
+                      {(isPending || !creator.is_active) && (
                         <Button
                           size="sm"
-                          variant="secondary"
                           className="gap-2"
-                          onClick={() => handleActivate(creator)}
-                          disabled={loading}
+                          onClick={() => runCreatorAction(creator, "activate")}
+                          disabled={!canManage || busy}
                         >
                           <Power className="h-4 w-4" />
                           Activate
                         </Button>
                       )}
 
-                      <Button
-                        size="sm"
-                        variant={creator.is_active ? "secondary" : "outline"}
-                        className="gap-2"
-                        onClick={() => handleToggleActive(creator, true)}
-                        disabled={!canSuperAdmin || !!creator.is_active || loading}
-                        title="Enable"
-                      >
-                        <Power className="h-4 w-4" />
-                      </Button>
+                      {creator.is_active && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => runCreatorAction(creator, "deactivate")}
+                          disabled={!canManage || busy}
+                          title="Disable"
+                        >
+                          <PowerOff className="h-4 w-4" />
+                        </Button>
+                      )}
 
                       <Button
                         size="sm"
-                        variant={!creator.is_active ? "secondary" : "outline"}
+                        variant="outline"
                         className="gap-2"
-                        onClick={() => handleToggleActive(creator, false)}
-                        disabled={!canSuperAdmin || !creator.is_active || loading}
-                        title="Disable"
+                        onClick={() => runCreatorAction(creator, "send_reset")}
+                        disabled={!canManage || busy}
+                        title="Send password reset email"
                       >
-                        <PowerOff className="h-4 w-4" />
+                        <MailCheck className="h-4 w-4" />
                       </Button>
 
                       <Button
                         size="sm"
                         variant="outline"
                         className="gap-2"
-                        onClick={() => openEdit(creator)}
-                        disabled={!canSuperAdmin || loading}
+                        onClick={() => {
+                          setEditTarget(creator);
+                          setEditOpen(true);
+                        }}
+                        disabled={!canManage || busy}
                         title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
@@ -605,54 +499,21 @@ const fetchCreators = async () => {
                         size="sm"
                         variant="destructive"
                         className="gap-2"
-                        onClick={() => requestDelete(creator)}
-                        disabled={!canSuperAdmin || loading}
+                        onClick={() => {
+                          setDeleteTarget(creator);
+                          setDeleteOpen(true);
+                        }}
+                        disabled={!canManage || busy}
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-
-                    {activationStore && safeStatus(creator.status) === "pending_activation" && (
-                      <div className="mt-2 flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={formatActivationLink(activationStore.token)}
-                            readOnly
-                            className="h-7 w-64 text-xs"
-                            onClick={(ev) => {
-                              (ev.target as HTMLInputElement).select();
-                            }}
-                          />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(
-                                  formatActivationLink(activationStore.token),
-                                );
-                                toast({ title: "Activation link copied" });
-                              } catch {
-                                toast({
-                                  title: "Copy failed",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Temp password: <span className="font-mono">{activationStore.password}</span>
-                        </div>
-                      </div>
-                    )}
                   </TableCell>
                 </TableRow>
               );
             })}
+
             {creators.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
@@ -666,66 +527,92 @@ const fetchCreators = async () => {
 
       {/* Create modal */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add a creator</DialogTitle>
             <DialogDescription>
-              Creates a pending creator profile and generates an activation token + password.
+              Creates the login account in “pending activation”. The creator is emailed a link to set
+              their own password, and can sign in to the creator dashboard once you activate them.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Full name</label>
+                <label className="text-sm font-medium">Full name *</label>
                 <Input
                   value={createForm.fullName}
-                  onChange={(e) =>
-                    setCreateForm((p) => ({ ...p, fullName: e.target.value }))
-                  }
+                  onChange={(e) => setCreateForm((p) => ({ ...p, fullName: e.target.value }))}
                   required
                 />
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
+                <label className="text-sm font-medium">Email *</label>
                 <Input
-                  value={createForm.email}
-                  onChange={(e) =>
-                    setCreateForm((p) => ({ ...p, email: e.target.value }))
-                  }
                   type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))}
                   required
                 />
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">Phone</label>
+                <label className="text-sm font-medium">Default password</label>
+                <Input
+                  type="text"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
+                  placeholder="Leave empty to auto-generate"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Minimum 8 characters. The creator is prompted to reset it.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phone number *</label>
                 <Input
                   value={createForm.phone}
-                  onChange={(e) =>
-                    setCreateForm((p) => ({ ...p, phone: e.target.value }))
-                  }
+                  onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))}
                   required
                 />
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">Company name</label>
+                <label className="text-sm font-medium">Company / Studio name *</label>
                 <Input
                   value={createForm.companyName}
-                  onChange={(e) =>
-                    setCreateForm((p) => ({ ...p, companyName: e.target.value }))
-                  }
+                  onChange={(e) => setCreateForm((p) => ({ ...p, companyName: e.target.value }))}
                   required
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium">Creator type</label>
-                <Input
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Creator type *</label>
+                <Select
                   value={createForm.creatorType}
-                  onChange={(e) =>
-                    setCreateForm((p) => ({ ...p, creatorType: e.target.value }))
-                  }
-                  placeholder="e.g. Individual / Studio / …"
-                  required
+                  onValueChange={(v) => setCreateForm((p) => ({ ...p, creatorType: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select creator type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CREATOR_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium">Address</label>
+                <Textarea
+                  value={createForm.address}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))}
+                  rows={2}
                 />
               </div>
             </div>
@@ -734,8 +621,8 @@ const fetchCreators = async () => {
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!canSuperAdmin || createSubmitting}>
-                {createSubmitting ? "Creating…" : "Create"}
+              <Button type="submit" disabled={!canManage || createSubmitting}>
+                {createSubmitting ? "Creating…" : "Create creator"}
               </Button>
             </DialogFooter>
           </form>
@@ -743,82 +630,79 @@ const fetchCreators = async () => {
       </Dialog>
 
       {/* Edit modal */}
-      <Dialog open={editOpen} onOpenChange={(v) => {
-        setEditOpen(v);
-        if (!v) {
-          setEditTarget(null);
-        }
-      }}>
-        <DialogContent>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(v) => {
+          setEditOpen(v);
+          if (!v) setEditTarget(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit creator</DialogTitle>
-            <DialogDescription>Update creator profile fields.</DialogDescription>
+            <DialogDescription>Update creator profile details.</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Display name</label>
+                <label className="text-sm font-medium">Full name</label>
                 <Input
                   value={editForm.display_name}
-                  onChange={(e) =>
-                    setEditForm((p) => ({ ...p, display_name: e.target.value }))
-                  }
-                  required
+                  onChange={(e) => setEditForm((p) => ({ ...p, display_name: e.target.value }))}
                 />
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email</label>
                 <Input
-                  value={editForm.email}
-                  onChange={(e) =>
-                    setEditForm((p) => ({ ...p, email: e.target.value }))
-                  }
                   type="email"
-                  required
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
                 />
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">Phone</label>
+                <label className="text-sm font-medium">Phone number</label>
                 <Input
                   value={editForm.phone_number}
-                  onChange={(e) =>
-                    setEditForm((p) => ({ ...p, phone_number: e.target.value }))
-                  }
-                  required
+                  onChange={(e) => setEditForm((p) => ({ ...p, phone_number: e.target.value }))}
                 />
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">Company</label>
+                <label className="text-sm font-medium">Company / Studio name</label>
                 <Input
                   value={editForm.company_name}
-                  onChange={(e) =>
-                    setEditForm((p) => ({ ...p, company_name: e.target.value }))
-                  }
-                  required
+                  onChange={(e) => setEditForm((p) => ({ ...p, company_name: e.target.value }))}
                 />
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Creator type</label>
-                <Input
+                <Select
                   value={editForm.creator_type}
-                  onChange={(e) =>
-                    setEditForm((p) => ({ ...p, creator_type: e.target.value }))
-                  }
-                  required
-                />
+                  onValueChange={(v) => setEditForm((p) => ({ ...p, creator_type: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select creator type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CREATOR_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
-                <Input
-                  value={editForm.status ?? ""}
-                  onChange={(e) =>
-                    setEditForm((p) => ({
-                      ...p,
-                      status: e.target.value ? e.target.value : null,
-                    }))
-                  }
-                  placeholder="active | disabled | pending_activation"
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium">Address</label>
+                <Textarea
+                  value={editForm.address}
+                  onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
+                  rows={2}
                 />
               </div>
             </div>
@@ -827,33 +711,26 @@ const fetchCreators = async () => {
               <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!canSuperAdmin || editSubmitting}>
-                {editSubmitting ? "Saving…" : "Save"}
+              <Button type="submit" disabled={editSubmitting}>
+                {editSubmitting ? "Saving…" : "Save changes"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <DialogTitle>Delete creator?</DialogTitle>
+            <AlertDialogTitle>Delete creator?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the creator profile.
+              This removes {deleteTarget?.display_name}'s creator profile and any content mappings.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                variant="destructive"
-                disabled={deleteSubmitting}
-                onClick={handleDelete}
-              >
-                {deleteSubmitting ? "Deleting…" : "Delete"}
-              </Button>
+            <AlertDialogCancel disabled={deleteSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleteSubmitting}>
+              {deleteSubmitting ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -861,4 +738,3 @@ const fetchCreators = async () => {
     </div>
   );
 }
-
