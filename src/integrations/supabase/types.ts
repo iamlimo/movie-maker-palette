@@ -2591,6 +2591,7 @@ export type Database = {
         Args: { p_age_minutes?: number }
         Returns: number
       }
+      get_creator_dashboard: { Args: never; Returns: Json }
       get_current_user_profile: { Args: never; Returns: string }
       get_season_episode_count: {
         Args: { season_id_param: string }
