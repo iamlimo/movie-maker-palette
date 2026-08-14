@@ -434,7 +434,9 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">All time</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.paidCount} paid · {stats.pending} pending · {stats.failed} failed
+            </p>
           </CardContent>
         </Card>
 
@@ -446,7 +448,7 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNaira(stats.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">From all rentals</p>
+            <p className="text-xs text-muted-foreground mt-1">Paid rentals only</p>
           </CardContent>
         </Card>
 
@@ -458,7 +460,7 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.active}</div>
-            <p className="text-xs text-muted-foreground mt-1">Currently active</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats.expired} expired</p>
           </CardContent>
         </Card>
 
@@ -470,7 +472,7 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNaira(stats.averagePrice)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Per rental</p>
+            <p className="text-xs text-muted-foreground mt-1">Per paid rental</p>
           </CardContent>
         </Card>
       </div>
@@ -499,6 +501,8 @@ export default function Rentals() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="revoked">Revoked</SelectItem>
+                <SelectItem value="none">No Access</SelectItem>
               </SelectContent>
             </Select>
 
@@ -512,9 +516,8 @@ export default function Rentals() {
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="movie">Movie</SelectItem>
-                <SelectItem value="tv">TV Show</SelectItem>
-                <SelectItem value="episode">Episode</SelectItem>
                 <SelectItem value="season">Season</SelectItem>
+                <SelectItem value="episode">Episode</SelectItem>
               </SelectContent>
             </Select>
 
@@ -528,10 +531,8 @@ export default function Rentals() {
               <SelectContent>
                 <SelectItem value="all">All Payment Status</SelectItem>
                 <SelectItem value="pending">Payment Pending</SelectItem>
-                <SelectItem value="completed">Payment Completed</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="failed">Payment Failed</SelectItem>
-                <SelectItem value="disputed">Payment Disputed</SelectItem>
-                <SelectItem value="amount_mismatch">Amount Mismatch</SelectItem>
               </SelectContent>
             </Select>
 
