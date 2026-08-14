@@ -378,7 +378,16 @@ export default function Rentals() {
       ]),
     ];
 
-    const csvContent = csv.map((row) => row.join(",")).join("\n");
+    const csvContent = csv
+      .map((row) =>
+        row
+          .map((cell) => {
+            const value = cell === null || cell === undefined ? "" : String(cell);
+            return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+          })
+          .join(","),
+      )
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
