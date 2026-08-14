@@ -34,8 +34,9 @@ import { formatNaira } from "@/lib/priceUtils";
 import { useRole } from "@/hooks/useRole";
 import { Navigate } from "react-router-dom";
 
-type RentalContentType = "movie" | "tv" | "episode" | "season";
-type RentalStatus = "active" | "expired";
+type RentalContentType = "movie" | "episode" | "season";
+type RentalStatus = "active" | "expired" | "revoked" | "none";
+type RentalPaymentStatus = "pending" | "paid" | "failed";
 
 type BadgeIcon = React.ComponentType<{ className?: string }> | ((props: { className?: string }) => JSX.Element);
 
@@ -50,35 +51,41 @@ interface RentalRecord {
   amount: number;
   status: RentalStatus;
   created_at: string;
-  expires_at: string;
-  payment_status?:
-    | "pending"
-    | "completed"
-    | "failed"
-    | "disputed"
-    | "amount_mismatch";
-  payment_channel?: string;
-  paystack_reference?: string;
+  expires_at: string | null;
+  payment_status: RentalPaymentStatus;
+  payment_channel?: string | null;
+  paystack_reference?: string | null;
 }
 
-const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: BadgeIcon }> =
-  {
-    active: {
-      label: "Active",
-      color: "bg-green-100",
-      textColor: "text-green-800",
-      icon: CheckCircle,
-    },
-    expired: {
-      label: "Expired",
-      color: "bg-gray-100",
-      textColor: "text-gray-800",
-      icon: AlertCircle,
-    },
-  };
+const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: BadgeIcon }> = {
+  active: {
+    label: "Active",
+    color: "bg-green-100",
+    textColor: "text-green-800",
+    icon: CheckCircle,
+  },
+  expired: {
+    label: "Expired",
+    color: "bg-gray-100",
+    textColor: "text-gray-800",
+    icon: AlertCircle,
+  },
+  revoked: {
+    label: "Revoked",
+    color: "bg-orange-100",
+    textColor: "text-orange-800",
+    icon: XCircle,
+  },
+  none: {
+    label: "No Access",
+    color: "bg-slate-100",
+    textColor: "text-slate-700",
+    icon: Clock,
+  },
+};
 
 const paymentStatusConfig: Record<
-  NonNullable<RentalRecord["payment_status"]> | "pending",
+  RentalPaymentStatus,
   { label: string; color: string; textColor: string; icon: BadgeIcon }
 > = {
   pending: {
@@ -87,8 +94,8 @@ const paymentStatusConfig: Record<
     textColor: "text-blue-800",
     icon: Clock,
   },
-  completed: {
-    label: "Completed",
+  paid: {
+    label: "Paid",
     color: "bg-green-100",
     textColor: "text-green-800",
     icon: CheckCircle,
@@ -98,18 +105,6 @@ const paymentStatusConfig: Record<
     color: "bg-red-100",
     textColor: "text-red-800",
     icon: XCircle,
-  },
-  disputed: {
-    label: "Disputed",
-    color: "bg-orange-100",
-    textColor: "text-orange-800",
-    icon: AlertCircle,
-  },
-  amount_mismatch: {
-    label: "Amount Mismatch",
-    color: "bg-orange-100",
-    textColor: "text-orange-800",
-    icon: AlertCircle,
   },
 };
 
@@ -140,101 +135,58 @@ export default function Rentals() {
   const fetchRentals = async () => {
     setIsLoading(true);
     try {
-      const { data: rentalsData, error: rentalsError } = await supabase
-        .from("rentals")
+      // Single canonical query: rental_intents + rental_access + titles + customer
+      const { data, error } = await supabase
+        .from("v_admin_rental_records" as never)
         .select(
-          "id, user_id, content_id, content_type, status, created_at, expires_at",
+          "intent_id, user_id, user_name, user_email, content_id, content_title, content_type, amount, payment_method, payment_status, paystack_reference, created_at, expires_at, rental_status",
         )
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
-      if (rentalsError) throw rentalsError;
-      if (!rentalsData || rentalsData.length === 0) {
-        setRentals([]);
-        return;
-      }
+      if (error) throw error;
 
-      const userIds = [...new Set(rentalsData.map((r: { user_id: string }) => r.user_id))] as string[];
-      const rentalIds = rentalsData.map((r: { id: string }) => r.id);
-
-      // payment data is optional for admin display
-      type PaymentRow = {
-        payment_status?: RentalRecord["payment_status"];
-        payment_channel?: string;
-        paystack_reference?: string;
-        amount?: number | null;
-      };
-      let paymentMap = new Map<string, PaymentRow>();
-      try {
-        const { data: paymentData, error: paymentError } = await supabase
-          .from("rental_payments")
-          .select(
-            "rental_id, payment_status, payment_channel, paystack_reference, amount",
-          )
-          .in("rental_id", rentalIds);
-
-        if (paymentData) {
-          paymentMap = new Map(
-            (paymentData as Array<{ rental_id: string; payment_status?: RentalRecord["payment_status"]; payment_channel?: string; paystack_reference?: string }>).map(
-              (p) => [p.rental_id, p],
-            ),
-          );
-        } else if (paymentError) {
-          console.warn(
-            "Notice: Payment data not available (rental_payments table missing?)",
-            paymentError?.message,
-          );
-        }
-      } catch (e) {
-        console.warn("Notice: Skipping payment data", e);
-      }
-
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("user_id, name, email")
-        .in("user_id", userIds);
-
-      if (profilesError) throw profilesError;
-
-      const profileMap = new Map(
-        (profilesData || []).map(
-          (p: { user_id: string; name?: string; email?: string }) => [p.user_id, p],
-        ),
-      );
-
-      const formattedRentals: RentalRecord[] = (rentalsData as Array<{
-        id: string | number;
+      type ViewRow = {
+        intent_id: string;
         user_id: string;
-        content_id: string;
-        content_type: RentalContentType | string;
-        status?: RentalStatus | string;
+        user_name: string | null;
+        user_email: string | null;
+        content_id: string | null;
+        content_title: string | null;
+        content_type: string;
+        amount: number | string | null;
+        payment_method: string | null;
+        payment_status: string | null;
+        paystack_reference: string | null;
         created_at: string;
-        expires_at: string;
-      }>).map((r) => {
-        const contentType = r.content_type as RentalContentType;
-        const paymentRow = paymentMap.get(String(r.id));
+        expires_at: string | null;
+        rental_status: string;
+      };
 
-        return {
-          id: String(r.id),
-          user_id: String(r.user_id),
-          user_email: profileMap.get(r.user_id)?.email || "Unknown User",
-          user_name: profileMap.get(r.user_id)?.name || "Unknown User",
-          content_id: String(r.content_id),
-          // `content_title` is not guaranteed to exist on `rentals`.
-          // Prefer it if present in schema; otherwise fall back.
-          content_title: "Unknown Content",
-          content_type: contentType,
-          // Prefer the amount from rental_payments when available (admin accuracy)
-          amount: typeof paymentRow?.amount === "number" ? paymentRow.amount : 0,
-          status: (r.status as RentalStatus) || "expired",
-          created_at: String(r.created_at),
-          expires_at: String(r.expires_at),
-          payment_status: paymentRow?.payment_status,
-          payment_channel: paymentRow?.payment_channel,
-          paystack_reference: paymentRow?.paystack_reference,
-        };
-      });
+      const formatted: RentalRecord[] = ((data ?? []) as unknown as ViewRow[]).map((r) => ({
+        id: r.intent_id,
+        user_id: r.user_id,
+        user_email: r.user_email || "Unknown",
+        user_name: r.user_name || "Unknown User",
+        content_id: r.content_id || "",
+        content_title: r.content_title || "Unknown Content",
+        content_type: (["movie", "season", "episode"].includes(r.content_type)
+          ? r.content_type
+          : "movie") as RentalContentType,
+        amount: typeof r.amount === "string" ? Number(r.amount) || 0 : r.amount || 0,
+        status: (["active", "expired", "revoked", "none"].includes(r.rental_status)
+          ? r.rental_status
+          : "none") as RentalStatus,
+        created_at: r.created_at,
+        expires_at: r.expires_at,
+        payment_status: (["pending", "paid", "failed"].includes(r.payment_status || "")
+          ? r.payment_status
+          : "pending") as RentalPaymentStatus,
+        payment_channel: r.payment_method,
+        paystack_reference: r.paystack_reference,
+      }));
 
-      setRentals(formattedRentals);
+      setRentals(formatted);
     } catch (e) {
       console.error("Error fetching rentals:", e);
       toast({
@@ -327,7 +279,8 @@ export default function Rentals() {
         (r) =>
           r.user_email.toLowerCase().includes(q) ||
           r.user_name.toLowerCase().includes(q) ||
-          r.content_title.toLowerCase().includes(q),
+          r.content_title.toLowerCase().includes(q) ||
+          (r.paystack_reference || "").toLowerCase().includes(q),
       );
     }
 
@@ -340,9 +293,7 @@ export default function Rentals() {
     }
 
     if (paymentStatusFilter !== "all") {
-      filtered = filtered.filter(
-        (r) => (r.payment_status ?? "pending") === paymentStatusFilter,
-      );
+      filtered = filtered.filter((r) => r.payment_status === paymentStatusFilter);
     }
 
     if (startDate) {
@@ -363,19 +314,26 @@ export default function Rentals() {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, contentTypeFilter, paymentStatusFilter, startDate, endDate]);
 
-  const stats = (() => {
-    const total = rentals.length;
-    const totalRevenue = rentals.reduce((sum, r) => sum + (r.amount || 0), 0);
-    const active = rentals.filter((r) => r.status === "active").length;
-    const expired = rentals.filter((r) => r.status === "expired").length;
+  // Stats are derived from the currently filtered set so they always match the table
+  const stats = useMemo(() => {
+    const total = filteredRentals.length;
+    const paid = filteredRentals.filter((r) => r.payment_status === "paid");
+    const totalRevenue = paid.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const active = filteredRentals.filter((r) => r.status === "active").length;
+    const expired = filteredRentals.filter((r) => r.status === "expired").length;
+    const pending = filteredRentals.filter((r) => r.payment_status === "pending").length;
+    const failed = filteredRentals.filter((r) => r.payment_status === "failed").length;
     return {
       total,
+      paidCount: paid.length,
       totalRevenue,
       active,
       expired,
-      averagePrice: total > 0 ? totalRevenue / total : 0,
+      pending,
+      failed,
+      averagePrice: paid.length > 0 ? totalRevenue / paid.length : 0,
     };
-  })();
+  }, [filteredRentals]);
 
   const exportReport = () => {
     const csv = [
@@ -383,7 +341,10 @@ export default function Rentals() {
       [],
       ["Summary"],
       ["Total Rentals", stats.total],
-      ["Total Revenue", formatNaira(stats.totalRevenue)],
+      ["Paid Rentals", stats.paidCount],
+      ["Total Revenue (paid only)", formatNaira(stats.totalRevenue)],
+      ["Pending Payments", stats.pending],
+      ["Failed Payments", stats.failed],
       ["Expired Rentals", stats.expired],
       ["Active Rentals", stats.active],
       ["Average Price", formatNaira(stats.averagePrice)],
@@ -396,7 +357,7 @@ export default function Rentals() {
         "Type",
         "Status",
         "Payment Status",
-        "Payment Channel",
+        "Payment Method",
         "Paystack Reference",
         "Amount",
         "Created",
@@ -413,11 +374,20 @@ export default function Rentals() {
         r.paystack_reference || "N/A",
         formatNaira(r.amount || 0),
         new Date(r.created_at).toLocaleDateString(),
-        new Date(r.expires_at).toLocaleDateString(),
+        r.expires_at ? new Date(r.expires_at).toLocaleDateString() : "N/A",
       ]),
     ];
 
-    const csvContent = csv.map((row) => row.join(",")).join("\n");
+    const csvContent = csv
+      .map((row) =>
+        row
+          .map((cell) => {
+            const value = cell === null || cell === undefined ? "" : String(cell);
+            return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+          })
+          .join(","),
+      )
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -464,7 +434,9 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">All time</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.paidCount} paid · {stats.pending} pending · {stats.failed} failed
+            </p>
           </CardContent>
         </Card>
 
@@ -476,7 +448,7 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNaira(stats.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">From all rentals</p>
+            <p className="text-xs text-muted-foreground mt-1">Paid rentals only</p>
           </CardContent>
         </Card>
 
@@ -488,7 +460,7 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.active}</div>
-            <p className="text-xs text-muted-foreground mt-1">Currently active</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats.expired} expired</p>
           </CardContent>
         </Card>
 
@@ -500,7 +472,7 @@ export default function Rentals() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNaira(stats.averagePrice)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Per rental</p>
+            <p className="text-xs text-muted-foreground mt-1">Per paid rental</p>
           </CardContent>
         </Card>
       </div>
@@ -529,6 +501,8 @@ export default function Rentals() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="revoked">Revoked</SelectItem>
+                <SelectItem value="none">No Access</SelectItem>
               </SelectContent>
             </Select>
 
@@ -542,9 +516,8 @@ export default function Rentals() {
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="movie">Movie</SelectItem>
-                <SelectItem value="tv">TV Show</SelectItem>
-                <SelectItem value="episode">Episode</SelectItem>
                 <SelectItem value="season">Season</SelectItem>
+                <SelectItem value="episode">Episode</SelectItem>
               </SelectContent>
             </Select>
 
@@ -558,10 +531,8 @@ export default function Rentals() {
               <SelectContent>
                 <SelectItem value="all">All Payment Status</SelectItem>
                 <SelectItem value="pending">Payment Pending</SelectItem>
-                <SelectItem value="completed">Payment Completed</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="failed">Payment Failed</SelectItem>
-                <SelectItem value="disputed">Payment Disputed</SelectItem>
-                <SelectItem value="amount_mismatch">Amount Mismatch</SelectItem>
               </SelectContent>
             </Select>
 

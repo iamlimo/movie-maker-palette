@@ -1336,6 +1336,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rental_access_rental_intent_id_fkey"
+            columns: ["rental_intent_id"]
+            isOneToOne: false
+            referencedRelation: "v_admin_rental_records"
+            referencedColumns: ["intent_id"]
+          },
+          {
             foreignKeyName: "rental_access_season_id_fkey"
             columns: ["season_id"]
             isOneToOne: false
@@ -2509,6 +2516,40 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "creator_profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_admin_rental_records: {
+        Row: {
+          access_id: string | null
+          amount: number | null
+          content_id: string | null
+          content_title: string | null
+          content_type: string | null
+          created_at: string | null
+          discount_amount: number | null
+          expires_at: string | null
+          intent_id: string | null
+          paid_at: string | null
+          payment_method: string | null
+          payment_status:
+            | Database["public"]["Enums"]["rental_intent_status"]
+            | null
+          paystack_reference: string | null
+          provider_reference: string | null
+          rental_status: string | null
+          revoked_at: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_intents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
