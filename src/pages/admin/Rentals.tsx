@@ -279,7 +279,8 @@ export default function Rentals() {
         (r) =>
           r.user_email.toLowerCase().includes(q) ||
           r.user_name.toLowerCase().includes(q) ||
-          r.content_title.toLowerCase().includes(q),
+          r.content_title.toLowerCase().includes(q) ||
+          (r.paystack_reference || "").toLowerCase().includes(q),
       );
     }
 
@@ -292,9 +293,7 @@ export default function Rentals() {
     }
 
     if (paymentStatusFilter !== "all") {
-      filtered = filtered.filter(
-        (r) => (r.payment_status ?? "pending") === paymentStatusFilter,
-      );
+      filtered = filtered.filter((r) => r.payment_status === paymentStatusFilter);
     }
 
     if (startDate) {
@@ -315,19 +314,26 @@ export default function Rentals() {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, contentTypeFilter, paymentStatusFilter, startDate, endDate]);
 
-  const stats = (() => {
-    const total = rentals.length;
-    const totalRevenue = rentals.reduce((sum, r) => sum + (r.amount || 0), 0);
-    const active = rentals.filter((r) => r.status === "active").length;
-    const expired = rentals.filter((r) => r.status === "expired").length;
+  // Stats are derived from the currently filtered set so they always match the table
+  const stats = useMemo(() => {
+    const total = filteredRentals.length;
+    const paid = filteredRentals.filter((r) => r.payment_status === "paid");
+    const totalRevenue = paid.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const active = filteredRentals.filter((r) => r.status === "active").length;
+    const expired = filteredRentals.filter((r) => r.status === "expired").length;
+    const pending = filteredRentals.filter((r) => r.payment_status === "pending").length;
+    const failed = filteredRentals.filter((r) => r.payment_status === "failed").length;
     return {
       total,
+      paidCount: paid.length,
       totalRevenue,
       active,
       expired,
-      averagePrice: total > 0 ? totalRevenue / total : 0,
+      pending,
+      failed,
+      averagePrice: paid.length > 0 ? totalRevenue / paid.length : 0,
     };
-  })();
+  }, [filteredRentals]);
 
   const exportReport = () => {
     const csv = [
