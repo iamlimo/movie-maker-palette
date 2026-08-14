@@ -34,8 +34,9 @@ import { formatNaira } from "@/lib/priceUtils";
 import { useRole } from "@/hooks/useRole";
 import { Navigate } from "react-router-dom";
 
-type RentalContentType = "movie" | "tv" | "episode" | "season";
-type RentalStatus = "active" | "expired";
+type RentalContentType = "movie" | "episode" | "season";
+type RentalStatus = "active" | "expired" | "revoked" | "none";
+type RentalPaymentStatus = "pending" | "paid" | "failed";
 
 type BadgeIcon = React.ComponentType<{ className?: string }> | ((props: { className?: string }) => JSX.Element);
 
@@ -50,35 +51,41 @@ interface RentalRecord {
   amount: number;
   status: RentalStatus;
   created_at: string;
-  expires_at: string;
-  payment_status?:
-    | "pending"
-    | "completed"
-    | "failed"
-    | "disputed"
-    | "amount_mismatch";
-  payment_channel?: string;
-  paystack_reference?: string;
+  expires_at: string | null;
+  payment_status: RentalPaymentStatus;
+  payment_channel?: string | null;
+  paystack_reference?: string | null;
 }
 
-const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: BadgeIcon }> =
-  {
-    active: {
-      label: "Active",
-      color: "bg-green-100",
-      textColor: "text-green-800",
-      icon: CheckCircle,
-    },
-    expired: {
-      label: "Expired",
-      color: "bg-gray-100",
-      textColor: "text-gray-800",
-      icon: AlertCircle,
-    },
-  };
+const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: BadgeIcon }> = {
+  active: {
+    label: "Active",
+    color: "bg-green-100",
+    textColor: "text-green-800",
+    icon: CheckCircle,
+  },
+  expired: {
+    label: "Expired",
+    color: "bg-gray-100",
+    textColor: "text-gray-800",
+    icon: AlertCircle,
+  },
+  revoked: {
+    label: "Revoked",
+    color: "bg-orange-100",
+    textColor: "text-orange-800",
+    icon: XCircle,
+  },
+  none: {
+    label: "No Access",
+    color: "bg-slate-100",
+    textColor: "text-slate-700",
+    icon: Clock,
+  },
+};
 
 const paymentStatusConfig: Record<
-  NonNullable<RentalRecord["payment_status"]> | "pending",
+  RentalPaymentStatus,
   { label: string; color: string; textColor: string; icon: BadgeIcon }
 > = {
   pending: {
@@ -87,8 +94,8 @@ const paymentStatusConfig: Record<
     textColor: "text-blue-800",
     icon: Clock,
   },
-  completed: {
-    label: "Completed",
+  paid: {
+    label: "Paid",
     color: "bg-green-100",
     textColor: "text-green-800",
     icon: CheckCircle,
@@ -98,18 +105,6 @@ const paymentStatusConfig: Record<
     color: "bg-red-100",
     textColor: "text-red-800",
     icon: XCircle,
-  },
-  disputed: {
-    label: "Disputed",
-    color: "bg-orange-100",
-    textColor: "text-orange-800",
-    icon: AlertCircle,
-  },
-  amount_mismatch: {
-    label: "Amount Mismatch",
-    color: "bg-orange-100",
-    textColor: "text-orange-800",
-    icon: AlertCircle,
   },
 };
 
