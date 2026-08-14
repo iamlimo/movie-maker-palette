@@ -135,101 +135,58 @@ export default function Rentals() {
   const fetchRentals = async () => {
     setIsLoading(true);
     try {
-      const { data: rentalsData, error: rentalsError } = await supabase
-        .from("rentals")
+      // Single canonical query: rental_intents + rental_access + titles + customer
+      const { data, error } = await supabase
+        .from("v_admin_rental_records" as never)
         .select(
-          "id, user_id, content_id, content_type, status, created_at, expires_at",
+          "intent_id, user_id, user_name, user_email, content_id, content_title, content_type, amount, payment_method, payment_status, paystack_reference, created_at, expires_at, rental_status",
         )
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
-      if (rentalsError) throw rentalsError;
-      if (!rentalsData || rentalsData.length === 0) {
-        setRentals([]);
-        return;
-      }
+      if (error) throw error;
 
-      const userIds = [...new Set(rentalsData.map((r: { user_id: string }) => r.user_id))] as string[];
-      const rentalIds = rentalsData.map((r: { id: string }) => r.id);
-
-      // payment data is optional for admin display
-      type PaymentRow = {
-        payment_status?: RentalRecord["payment_status"];
-        payment_channel?: string;
-        paystack_reference?: string;
-        amount?: number | null;
-      };
-      let paymentMap = new Map<string, PaymentRow>();
-      try {
-        const { data: paymentData, error: paymentError } = await supabase
-          .from("rental_payments")
-          .select(
-            "rental_id, payment_status, payment_channel, paystack_reference, amount",
-          )
-          .in("rental_id", rentalIds);
-
-        if (paymentData) {
-          paymentMap = new Map(
-            (paymentData as Array<{ rental_id: string; payment_status?: RentalRecord["payment_status"]; payment_channel?: string; paystack_reference?: string }>).map(
-              (p) => [p.rental_id, p],
-            ),
-          );
-        } else if (paymentError) {
-          console.warn(
-            "Notice: Payment data not available (rental_payments table missing?)",
-            paymentError?.message,
-          );
-        }
-      } catch (e) {
-        console.warn("Notice: Skipping payment data", e);
-      }
-
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("user_id, name, email")
-        .in("user_id", userIds);
-
-      if (profilesError) throw profilesError;
-
-      const profileMap = new Map(
-        (profilesData || []).map(
-          (p: { user_id: string; name?: string; email?: string }) => [p.user_id, p],
-        ),
-      );
-
-      const formattedRentals: RentalRecord[] = (rentalsData as Array<{
-        id: string | number;
+      type ViewRow = {
+        intent_id: string;
         user_id: string;
-        content_id: string;
-        content_type: RentalContentType | string;
-        status?: RentalStatus | string;
+        user_name: string | null;
+        user_email: string | null;
+        content_id: string | null;
+        content_title: string | null;
+        content_type: string;
+        amount: number | string | null;
+        payment_method: string | null;
+        payment_status: string | null;
+        paystack_reference: string | null;
         created_at: string;
-        expires_at: string;
-      }>).map((r) => {
-        const contentType = r.content_type as RentalContentType;
-        const paymentRow = paymentMap.get(String(r.id));
+        expires_at: string | null;
+        rental_status: string;
+      };
 
-        return {
-          id: String(r.id),
-          user_id: String(r.user_id),
-          user_email: profileMap.get(r.user_id)?.email || "Unknown User",
-          user_name: profileMap.get(r.user_id)?.name || "Unknown User",
-          content_id: String(r.content_id),
-          // `content_title` is not guaranteed to exist on `rentals`.
-          // Prefer it if present in schema; otherwise fall back.
-          content_title: "Unknown Content",
-          content_type: contentType,
-          // Prefer the amount from rental_payments when available (admin accuracy)
-          amount: typeof paymentRow?.amount === "number" ? paymentRow.amount : 0,
-          status: (r.status as RentalStatus) || "expired",
-          created_at: String(r.created_at),
-          expires_at: String(r.expires_at),
-          payment_status: paymentRow?.payment_status,
-          payment_channel: paymentRow?.payment_channel,
-          paystack_reference: paymentRow?.paystack_reference,
-        };
-      });
+      const formatted: RentalRecord[] = ((data ?? []) as unknown as ViewRow[]).map((r) => ({
+        id: r.intent_id,
+        user_id: r.user_id,
+        user_email: r.user_email || "Unknown",
+        user_name: r.user_name || "Unknown User",
+        content_id: r.content_id || "",
+        content_title: r.content_title || "Unknown Content",
+        content_type: (["movie", "season", "episode"].includes(r.content_type)
+          ? r.content_type
+          : "movie") as RentalContentType,
+        amount: typeof r.amount === "string" ? Number(r.amount) || 0 : r.amount || 0,
+        status: (["active", "expired", "revoked", "none"].includes(r.rental_status)
+          ? r.rental_status
+          : "none") as RentalStatus,
+        created_at: r.created_at,
+        expires_at: r.expires_at,
+        payment_status: (["pending", "paid", "failed"].includes(r.payment_status || "")
+          ? r.payment_status
+          : "pending") as RentalPaymentStatus,
+        payment_channel: r.payment_method,
+        paystack_reference: r.paystack_reference,
+      }));
 
-      setRentals(formattedRentals);
+      setRentals(formatted);
     } catch (e) {
       console.error("Error fetching rentals:", e);
       toast({
