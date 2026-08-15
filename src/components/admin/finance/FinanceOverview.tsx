@@ -50,20 +50,25 @@ export const FinanceOverview = () => {
   const fetchMetrics = async () => {
     setIsLoading(true);
     try {
-      // Fetch revenue metrics
+      // Fetch revenue metrics (successful payments use status = 'completed';
+      // enhanced_status = 'success' is only set by newer flows)
       const { data: payments } = await supabase
         .from('payments')
-        .select('amount, created_at, enhanced_status')
-        .eq('enhanced_status', 'success');
+        .select('amount, created_at, status, enhanced_status')
+        .or('status.eq.completed,enhanced_status.in.(completed,success)');
 
       const { data: payouts } = await supabase
         .from('payouts')
         .select('amount, status')
         .eq('status', 'queued');
 
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id, last_sign_in_at');
+      // Active users = distinct users with a successful payment in the last 30 days
+      const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentPayers } = await supabase
+        .from('payments')
+        .select('user_id')
+        .or('status.eq.completed,enhanced_status.in.(completed,success)')
+        .gte('created_at', thirtyDaysAgoIso);
 
       if (payments) {
         const totalRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -96,14 +101,9 @@ export const FinanceOverview = () => {
           revenueGrowth = ((monthlyRevenue - previousMonthRevenue) / previousMonthRevenue) * 100;
         }
 
-        // Count active users (users who have signed in within last 30 days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const activeUsers = ((users as any[]) || []).filter((user: any) => {
-          if (!user.last_sign_in_at) return false;
-          return new Date(user.last_sign_in_at) > thirtyDaysAgo;
-        }).length;
+        const activeUsers = new Set(
+          ((recentPayers as any[]) || []).map((p: any) => p.user_id).filter(Boolean),
+        ).size;
 
         const pendingPayouts = payouts?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
