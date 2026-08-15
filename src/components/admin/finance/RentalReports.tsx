@@ -66,13 +66,6 @@ interface PaymentMethodData {
   count: number;
 }
 
-interface RentalPaymentRecord {
-  amount: number;
-  method: string | null;
-  provider: string | null;
-  metadata: Record<string, unknown> | null;
-}
-
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#a4de6c'];
 
 export const RentalReports = () => {
@@ -95,7 +88,6 @@ export const RentalReports = () => {
   const fetchRentalMetrics = async () => {
     setIsLoading(true);
     try {
-      // Calculate date range
       const now = new Date();
       const startDate = new Date();
       if (timeRange === '7d') startDate.setDate(now.getDate() - 7);
@@ -103,155 +95,110 @@ export const RentalReports = () => {
       else if (timeRange === '90d') startDate.setDate(now.getDate() - 90);
       else startDate.setFullYear(now.getFullYear() - 1);
 
-      // Fetch rentals data
-      const { data: rentals, error: rentalsError } = await supabase
-        .from('rentals')
-        .select('*')
-        .gte('created_at', startDate.toISOString());
+      // Canonical rental source: rental_intents + rental_access + titles
+      const { data, error } = await supabase
+        .from('v_admin_rental_records' as never)
+        .select(
+          'intent_id, content_id, content_type, content_title, amount, payment_method, payment_status, created_at, rental_status',
+        )
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(5000);
 
-      if (rentalsError) {
-        console.error('Error fetching rentals:', rentalsError);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch rental data',
-          variant: 'destructive',
-        });
-        return;
+      if (error) throw error;
+
+      const rows = ((data as unknown as any[]) || []).map((r) => ({
+        intentId: r.intent_id as string,
+        contentId: r.content_id as string,
+        contentType: (r.content_type as string) || 'movie',
+        title: (r.content_title as string) || 'Untitled',
+        amount: Number(r.amount) || 0,
+        method: (r.payment_method as string) || 'unknown',
+        paymentStatus: (r.payment_status as string) || 'pending',
+        rentalStatus: (r.rental_status as string) || 'none',
+        createdAt: r.created_at as string,
+      }));
+
+      const paid = rows.filter((r) => r.paymentStatus === 'paid');
+      const totalRevenue = paid.reduce((sum, r) => sum + r.amount, 0);
+      const movieRentals = paid.filter((r) => r.contentType === 'movie').length;
+      const tvRentals = paid.filter((r) => r.contentType === 'season' || r.contentType === 'episode').length;
+      const activeRentals = paid.filter((r) => r.rentalStatus === 'active').length;
+      const expiredRentals = paid.filter((r) => r.rentalStatus === 'expired').length;
+      const successRate = rows.length > 0 ? (paid.length / rows.length) * 100 : 0;
+
+      setMetrics({
+        totalRentals: paid.length,
+        totalRentalRevenue: totalRevenue,
+        averageRentalPrice: paid.length > 0 ? totalRevenue / paid.length : 0,
+        movieRentals,
+        tvRentals,
+        activeRentals,
+        expiredRentals,
+        rentalSuccessRate: Math.min(successRate, 100),
+      });
+
+      // Top rented content
+      const contentMap = new Map<string, { title: string; type: 'movie' | 'tv'; count: number; revenue: number }>();
+      for (const r of paid) {
+        const type: 'movie' | 'tv' = r.contentType === 'movie' ? 'movie' : 'tv';
+        const key = `${r.contentId}-${r.contentType}`;
+        const existing = contentMap.get(key) || { title: r.title, type, count: 0, revenue: 0 };
+        existing.count += 1;
+        existing.revenue += r.amount;
+        contentMap.set(key, existing);
       }
 
-      // Fetch payments for rental transactions
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('purpose', 'rental')
-        .gte('created_at', startDate.toISOString());
-
-      if (rentals) {
-        // Calculate metrics
-        const movieRentals = rentals.filter(r => r.content_type === 'movie').length;
-        const tvRentals = rentals.filter(r => r.content_type === 'tv').length;
-        const activeRentals = rentals.filter(r => r.status === 'active').length;
-        const expiredRentals = rentals.filter(r => r.status === 'expired').length;
-        const totalRevenue = rentals.reduce((sum, r) => sum + (r.price || 0), 0);
-        const successRate = payments ? (rentals.length / (payments.length || 1)) * 100 : 0;
-
-        setMetrics({
-          totalRentals: rentals.length,
-          totalRentalRevenue: totalRevenue,
-          averageRentalPrice: rentals.length > 0 ? totalRevenue / rentals.length : 0,
-          movieRentals,
-          tvRentals,
-          activeRentals,
-          expiredRentals,
-          rentalSuccessRate: Math.min(successRate, 100),
-        });
-
-        // Fetch content titles from movies and tv_shows tables
-        const movieIds = rentals.filter(r => r.content_type === 'movie').map(r => r.content_id);
-        const tvIds = rentals.filter(r => r.content_type === 'tv').map(r => r.content_id);
-
-        const [{ data: movies }, { data: tvShows }] = await Promise.all([
-          movieIds.length > 0 
-            ? supabase.from('movies').select('id, title').in('id', movieIds)
-            : Promise.resolve({ data: [] }),
-          tvIds.length > 0
-            ? supabase.from('tv_shows').select('id, title').in('id', tvIds)
-            : Promise.resolve({ data: [] }),
-        ]);
-
-        // Build content map with titles
-        const contentTitleMap = new Map<string, string>();
-        (movies || []).forEach(m => contentTitleMap.set(`movie-${m.id}`, m.title));
-        (tvShows || []).forEach(tv => contentTitleMap.set(`tv-${tv.id}`, tv.title));
-
-        // Get top rented content
-        const contentMap = new Map<string, { title: string; type: 'movie' | 'tv'; count: number; revenue: number }>();
-        
-        for (const rental of rentals) {
-          if (rental.content_type !== 'movie' && rental.content_type !== 'tv') {
-            continue;
-          }
-
-          const contentType = rental.content_type;
-          const key = `${rental.content_id}-${contentType}`;
-          const title = contentTitleMap.get(`${contentType}-${rental.content_id}`) || 'Unknown Content';
-          const existing = contentMap.get(key) || {
-            title,
-            type: contentType,
-            count: 0,
-            revenue: 0,
-          };
-          existing.count += 1;
-          existing.revenue += rental.price || 0;
-          contentMap.set(key, existing);
-        }
-
-        const topContent = Array.from(contentMap.entries())
-          .map(([, data]) => ({
+      setContentRentals(
+        Array.from(contentMap.values())
+          .map((d) => ({
             contentId: '',
-            contentTitle: data.title,
-            contentType: data.type,
-            rentalCount: data.count,
-            totalRevenue: data.revenue,
-            averagePrice: data.revenue / data.count,
+            contentTitle: d.title,
+            contentType: d.type,
+            rentalCount: d.count,
+            totalRevenue: d.revenue,
+            averagePrice: d.revenue / d.count,
           }))
           .sort((a, b) => b.totalRevenue - a.totalRevenue)
-          .slice(0, 10);
+          .slice(0, 10),
+      );
 
-        setContentRentals(topContent);
-
-        // Generate trend data
-        const trendMap = new Map<string, { rentals: number; revenue: number }>();
-        const dateRange = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        for (let i = 0; i < dateRange; i++) {
-          const date = new Date(startDate);
-          date.setDate(date.getDate() + i);
-          const dateStr = date.toISOString().split('T')[0];
-          trendMap.set(dateStr, { rentals: 0, revenue: 0 });
-        }
-
-        for (const rental of rentals) {
-          const dateStr = rental.created_at.split('T')[0];
-          const existing = trendMap.get(dateStr) || { rentals: 0, revenue: 0 };
-          existing.rentals += 1;
-          existing.revenue += rental.price || 0;
-          trendMap.set(dateStr, existing);
-        }
-
-        const trends = Array.from(trendMap.entries())
-          .map(([date, data]) => ({
-            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            rentals: data.rentals,
-            revenue: data.revenue,
-          }))
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        setRentalTrends(trends);
-
-        // Get payment method breakdown
-        const paymentList = (payments || []) as RentalPaymentRecord[];
-        const paymentMethodMap = new Map<string, { count: number; revenue: number }>();
-        for (const payment of paymentList) {
-          const metadataPaymentMethod =
-            payment.metadata && typeof payment.metadata['payment_method'] === 'string'
-              ? (payment.metadata['payment_method'] as string)
-              : null;
-          const method = payment.method || metadataPaymentMethod || payment.provider || 'unknown';
-          const existing = paymentMethodMap.get(method) || { count: 0, revenue: 0 };
-          existing.count += 1;
-          existing.revenue += payment.amount || 0;
-          paymentMethodMap.set(method, existing);
-        }
-
-        const methods = Array.from(paymentMethodMap.entries()).map(([name, data]) => ({
-          name,
-          value: data.revenue,
-          count: data.count,
-        }));
-
-        setPaymentMethods(methods);
+      // Trends
+      const trendMap = new Map<string, { rentals: number; revenue: number }>();
+      const dateRange = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / 86400000));
+      for (let i = 0; i < dateRange; i++) {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + i);
+        trendMap.set(date.toISOString().split('T')[0], { rentals: 0, revenue: 0 });
       }
+      for (const r of paid) {
+        const dateStr = r.createdAt.split('T')[0];
+        const existing = trendMap.get(dateStr) || { rentals: 0, revenue: 0 };
+        existing.rentals += 1;
+        existing.revenue += r.amount;
+        trendMap.set(dateStr, existing);
+      }
+      setRentalTrends(
+        Array.from(trendMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([date, d]) => ({
+            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            rentals: d.rentals,
+            revenue: d.revenue,
+          })),
+      );
+
+      // Payment method breakdown
+      const methodMap = new Map<string, { count: number; revenue: number }>();
+      for (const r of paid) {
+        const existing = methodMap.get(r.method) || { count: 0, revenue: 0 };
+        existing.count += 1;
+        existing.revenue += r.amount;
+        methodMap.set(r.method, existing);
+      }
+      setPaymentMethods(
+        Array.from(methodMap.entries()).map(([name, d]) => ({ name, value: d.revenue, count: d.count })),
+      );
     } catch (error) {
       console.error('Error fetching rental metrics:', error);
       toast({

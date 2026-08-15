@@ -28,10 +28,18 @@ export default function SalesPanel() {
         const iso = startOfMonth.toISOString();
 
         const [allPay, monthPay, refCodes, rentals, users] = await Promise.all([
-          supabase.from('payments').select('amount').eq('status', 'completed'),
-          supabase.from('payments').select('amount').eq('status', 'completed').gte('created_at', iso),
+          supabase.from('payments').select('amount').or('status.eq.completed,enhanced_status.in.(completed,success)'),
+          supabase
+            .from('payments')
+            .select('amount')
+            .or('status.eq.completed,enhanced_status.in.(completed,success)')
+            .gte('created_at', iso),
           supabase.from('referral_codes').select('*', { count: 'exact', head: true }).eq('is_active', true),
-          supabase.from('rentals').select('*', { count: 'exact', head: true }).gte('created_at', iso),
+          supabase
+            .from('v_admin_rental_records' as never)
+            .select('*', { count: 'exact', head: true })
+            .eq('payment_status', 'paid')
+            .gte('created_at', iso),
           supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', iso),
         ]);
 

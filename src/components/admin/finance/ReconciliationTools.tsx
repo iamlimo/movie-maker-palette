@@ -74,16 +74,23 @@ export const ReconciliationTools = () => {
         .select('*')
         .eq('purpose', 'rental');
 
+      // Canonical rental source (rental_intents + rental_access), not the legacy rentals table
       const { data: rentals, error: rentalsError } = await supabase
-        .from('rentals')
-        .select('*');
+        .from('v_admin_rental_records' as never)
+        .select('intent_id, user_id, amount, payment_status, created_at')
+        .eq('payment_status', 'paid')
+        .limit(5000);
 
       if (paymentsError || rentalsError) {
         throw new Error('Failed to fetch data');
       }
 
       const paymentsList = (payments as any[]) || [];
-      const rentalsList = ((rentals as any[]) || []).map((r: any) => ({ ...r, amount: r.amount ?? r.price ?? 0 }));
+      const rentalsList = ((rentals as unknown as any[]) || []).map((r: any) => ({
+        ...r,
+        id: r.intent_id,
+        amount: Number(r.amount) || 0,
+      }));
 
       // Try to match payments with rentals
       const matched = new Set<string>();
