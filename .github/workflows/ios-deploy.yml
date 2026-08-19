@@ -2,84 +2,21 @@ name: iOS Deploy (App Store)
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  build-and-deploy:
-    name: Build and Deploy to App Store
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Ruby and Bundler
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.1
-          bundler-cache: true
-
-      - name: Install fastlane gems
-        working-directory: ios/fastlane
-        run: |
-          bundle install --jobs 4 --path vendor/bundle
-
-      - name: Install CocoaPods
-        run: |
-          cd ios/App
-          pod install --repo-update
-
-      - name: Ensure App Store Connect API key file
-        run: |
-          # Prefer checked-in AuthKey_*.p8, else use secrets (raw or base64)
-          set -e
-          if ls ios/fastlane/AuthKey_*.p8 1> /dev/null 2>&1; then
-            cp ios/fastlane/AuthKey_*.p8 ios/fastlane/AuthKey.p8
-            chmod 0600 ios/fastlane/AuthKey.p8
-            echo "Using checked-in App Store Connect key"
-          elif [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
-            printf '%s\n' "${{ secrets.APP_STORE_CONNECT_KEY }}" > ios/fastlane/AuthKey.p8
-            chmod 0600 ios/fastlane/AuthKey.p8
-            echo "Wrote key from APP_STORE_CONNECT_KEY secret"
-          elif [ -n "${{ secrets.APP_STORE_CONNECT_KEY_B64 }}" ]; then
-            echo "${{ secrets.APP_STORE_CONNECT_KEY_B64 }}" | base64 --decode > ios/fastlane/AuthKey.p8
-            chmod 0600 ios/fastlane/AuthKey.p8
-            echo "Wrote key from APP_STORE_CONNECT_KEY_B64 secret (base64)"
-          else
-            echo "No App Store Connect key found (checked-in or secret). Exiting.";
-            exit 1
-          fi
-
-      - name: Run Fastlane release lane
-        working-directory: ios/fastlane
-        env:
-          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
-          FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          XCODE_WORKSPACE: "../App/App.xcworkspace"
-          XCODE_SCHEME: "App"
-        run: |
-          bundle exec fastlane ios release
-name: iOS Deploy to App Store
-
-on:
-  push:
     branches:
       - main
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
 
 jobs:
-  build-and-release:
-    name: Build and Release iOS
+  build-and-deploy:
+    name: Build and Deploy iOS
     runs-on: macos-latest
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
 
     steps:
       - name: Checkout
@@ -107,25 +44,42 @@ jobs:
           bundle config set path 'vendor/bundle'
           bundle install --jobs 4 --retry 3
 
-      - name: Decode App Store Connect Key
-        env:
-          APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+      - name: Install CocoaPods
         run: |
-          if [ -z "$APP_STORE_CONNECT_KEY" ]; then
-            echo "No APP_STORE_CONNECT_KEY provided; skipping write"
-          else
-            mkdir -p ios/fastlane
-            echo "$APP_STORE_CONNECT_KEY" | base64 --decode > ios/fastlane/AuthKey.p8
+          cd ios/App
+          pod install --repo-update
+
+      - name: Ensure App Store Connect API key file
+        run: |
+          set -e
+          # Prefer checked-in AuthKey_*.p8, then raw secret, then base64 secret
+          if ls ios/fastlane/AuthKey_*.p8 1> /dev/null 2>&1; then
+            cp ios/fastlane/AuthKey_*.p8 ios/fastlane/AuthKey.p8
             chmod 0600 ios/fastlane/AuthKey.p8
+            echo "Using checked-in App Store Connect key"
+          elif [ -n "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
+            printf '%s\n' "${{ secrets.APP_STORE_CONNECT_KEY }}" > ios/fastlane/AuthKey.p8
+            chmod 0600 ios/fastlane/AuthKey.p8
+            echo "Wrote key from APP_STORE_CONNECT_KEY secret"
+          elif [ -n "${{ secrets.APP_STORE_CONNECT_KEY_B64 }}" ]; then
+            echo "${{ secrets.APP_STORE_CONNECT_KEY_B64 }}" | base64 --decode > ios/fastlane/AuthKey.p8
+            chmod 0600 ios/fastlane/AuthKey.p8
+            echo "Wrote key from APP_STORE_CONNECT_KEY_B64 secret (base64)"
+          else
+            echo "No App Store Connect key found (checked-in or secret). Exiting.";
+            exit 1
           fi
 
-      - name: Run fastlane release
+      - name: Run Fastlane release lane
         working-directory: ios/fastlane
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_TEAM_ID: ${{ secrets.APP_STORE_TEAM_ID }}
-          XCODE_WORKSPACE: ${{ secrets.XCODE_WORKSPACE }}
-          XCODE_SCHEME: ${{ secrets.XCODE_SCHEME }}
+          FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+          FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          XCODE_WORKSPACE: "../App/App.xcworkspace"
+          XCODE_SCHEME: "App"
         run: |
-          bundle exec fastlane release
+          bundle exec fastlane ios release

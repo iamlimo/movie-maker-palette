@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# fastlane AuthKey
+ios/fastlane/AuthKey.p8
+ios/fastlane/vendor/
 *.local
 
 # Editor directories and files
