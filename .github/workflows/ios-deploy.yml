@@ -44,6 +44,15 @@ jobs:
           bundle config set path 'vendor/bundle'
           bundle install --jobs 4 --retry 3
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install JS dependencies
+        run: |
+          npm ci
+
       - name: Install CocoaPods
         run: |
           cd ios/App
