@@ -31,8 +31,7 @@ platform :ios do
       workspace: workspace_path,
       scheme: ENV['XCODE_SCHEME'] || "App",
       export_method: "app-store",
-      clean: true,
-      api_key: api_key
+      clean: true
     )
 
     upload_to_app_store(api_key: api_key)
