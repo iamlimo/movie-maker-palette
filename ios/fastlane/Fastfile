@@ -1,0 +1,30 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload a new App Store release"
+  lane :release do
+    # Prefer any checked-in AuthKey file (e.g. AuthKey_JU8UAQT8UV.p8), fall back to ENV
+    key_path = Dir.glob("AuthKey*.p8").find { |p| File.exist?(p) }
+    key_content = ENV['APP_STORE_CONNECT_KEY'] || (key_path ? File.read(key_path) : nil)
+
+    # Try to use provided env vars, otherwise attempt to extract key_id from filename (AuthKey_<KEYID>.p8)
+    key_id = ENV['APP_STORE_CONNECT_KEY_ID'] || (key_path && File.basename(key_path).match(/AuthKey_(.+)\.p8/)&.captures&.first)
+    issuer_id = ENV['APP_STORE_CONNECT_ISSUER_ID']
+
+    api_key = app_store_connect_api_key(
+      key_id: key_id,
+      issuer_id: issuer_id,
+      key: key_content
+    )
+
+    build_app(
+      workspace: ENV['XCODE_WORKSPACE'] || "ios/App/App.xcworkspace",
+      scheme: ENV['XCODE_SCHEME'] || "App",
+      export_method: "app-store",
+      clean: true,
+      api_key: api_key
+    )
+
+    upload_to_app_store(api_key: api_key)
+  end
+end

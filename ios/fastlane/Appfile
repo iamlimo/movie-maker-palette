@@ -1,0 +1,3 @@
+app_identifier "com.leoblueprints.signaturetv"
+apple_id "signaturepicturesnetwork@gmail.com" # replace with your Apple ID or set via FASTLANE_USER secret
+# You can set team_id via ENV['APP_STORE_TEAM_ID'] if required
