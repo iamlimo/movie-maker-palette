@@ -17,8 +17,18 @@ platform :ios do
       key_content: key_content
     )
 
+    # Resolve workspace path relative to the fastlane directory to avoid
+    # issues with runner working directories. Fastfile lives in ios/fastlane.
+    fastlane_dir = File.expand_path(File.dirname(__FILE__))
+    workspace_env = ENV['XCODE_WORKSPACE']
+    workspace_path = if workspace_env && !workspace_env.empty?
+      File.expand_path(workspace_env, fastlane_dir)
+    else
+      File.expand_path('../App/App.xcworkspace', fastlane_dir)
+    end
+
     build_app(
-      workspace: ENV['XCODE_WORKSPACE'] || "ios/App/App.xcworkspace",
+      workspace: workspace_path,
       scheme: ENV['XCODE_SCHEME'] || "App",
       export_method: "app-store",
       clean: true,
