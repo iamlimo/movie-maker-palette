@@ -44,6 +44,19 @@ platform :ios do
       build_opts[:export_team_id] = ENV['APP_STORE_TEAM_ID']
     end
 
+    # Optional: use fastlane `match` to sync certificates/profiles from a secure
+    # git repo. CI should set `MATCH_GIT_URL` and `MATCH_PASSWORD` for this to run.
+    if ENV['MATCH_GIT_URL'] && ENV['MATCH_PASSWORD']
+      match(
+        type: "appstore",
+        git_url: ENV['MATCH_GIT_URL'],
+        readonly: false,
+        username: ENV['FASTLANE_USER']
+      )
+    else
+      UI.message("Skipping match: set MATCH_GIT_URL and MATCH_PASSWORD to enable automatic provisioning sync")
+    end
+
     build_app(**build_opts)
 
     upload_to_app_store(api_key: api_key)
