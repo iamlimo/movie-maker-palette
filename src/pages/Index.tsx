@@ -179,7 +179,7 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen mobile-content-padding">
         <Header />
         
         {/* Hero Skeleton */}

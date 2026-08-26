@@ -23,7 +23,7 @@ export default function Wallet() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 mobile-content-padding">
       <Header />
       
       <main className="container mx-auto px-4 pt-24 pb-12">

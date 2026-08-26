@@ -20,12 +20,30 @@ const ALLOWED_ORIGINS = [
   "https://www.signaturetv.co",
   "https://movie-maker-palette.lovable.app",
   "https://id-preview--35c19387-a3ec-428d-a8fc-4ab933986941.lovable.app",
+  "https://localhost",
+  "https://localhost:8080",
+  "https://localhost:5173",
+  "https://localhost:3000",
+  "http://localhost",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
+  "https://127.0.0.1",
+  "https://127.0.0.1:8080",
+  "https://127.0.0.1:5173",
+  "https://127.0.0.1:3000",
+  "http://127.0.0.1",
   "http://127.0.0.1:8080",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:3000",
+  "https://10.0.2.2",
+  "https://10.0.2.2:8080",
+  "https://10.0.2.2:5173",
+  "http://10.0.2.2",
+  "http://10.0.2.2:8080",
+  "http://10.0.2.2:5173",
+  "capacitor://localhost",
+  "capacitor://",
 ];
 
 function isAllowedOrigin(origin: string) {
@@ -33,6 +51,18 @@ function isAllowedOrigin(origin: string) {
 
   // Allow explicit origins
   if (ALLOWED_ORIGINS.includes(origin)) {
+    return true;
+  }
+
+  if (
+    origin.startsWith("https://localhost") ||
+    origin.startsWith("https://127.0.0.1") ||
+    origin.startsWith("https://10.0.2.2") ||
+    origin.startsWith("capacitor://") ||
+    origin.startsWith("http://localhost") ||
+    origin.startsWith("http://127.0.0.1") ||
+    origin.startsWith("http://10.0.2.2")
+  ) {
     return true;
   }
 

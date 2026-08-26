@@ -15,6 +15,7 @@ import {
   Shield,
   Play,
   CircleHelp,
+  LogOut,
 } from 'lucide-react';
 
 interface ProfileSidebarProps {
@@ -23,6 +24,8 @@ interface ProfileSidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   className?: string;
+  onSignOut?: () => void | Promise<void>;
+  isSigningOut?: boolean;
 }
 
 const tabs = [
@@ -40,7 +43,9 @@ export function ProfileSidebar({
   onTabChange, 
   isCollapsed, 
   onToggleCollapse, 
-  className 
+  className,
+  onSignOut,
+  isSigningOut = false
 }: ProfileSidebarProps) {
   return (
     <div className={cn(
@@ -120,6 +125,33 @@ export function ProfileSidebar({
             </div>
           )}
         </Link>
+
+        <div className="my-3 border-t border-border" />
+        
+        {/* Sign Out Button */}
+        {onSignOut && (
+          <Button
+            onClick={onSignOut}
+            disabled={isSigningOut}
+            variant="ghost"
+            className={cn(
+              "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-200",
+              isCollapsed ? "px-2" : "px-3"
+            )}
+            aria-label="Sign out from your account"
+          >
+            <LogOut size={18} className={cn(
+              "flex-shrink-0",
+              !isCollapsed && "mr-3"
+            )} />
+            {!isCollapsed && (
+              <div className="flex-1 text-left">
+                <div className="font-medium">{isSigningOut ? "Signing Out..." : "Sign Out"}</div>
+                <div className="text-xs text-muted-foreground">Logout from your account</div>
+              </div>
+            )}
+          </Button>
+        )}
       </nav>
     </div>
   );

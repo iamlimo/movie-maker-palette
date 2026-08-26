@@ -36,7 +36,7 @@ const TVShows = () => {
     }) || [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background mobile-content-padding">
       <Header />
       
       <main className="pt-24 pb-12">

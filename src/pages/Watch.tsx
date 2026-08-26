@@ -6,7 +6,6 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 import { usePlatform } from "@/hooks/usePlatform";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useFullscreenLandscape } from "@/hooks/useFullscreenLandscape";
 import { Loader2, ArrowLeft } from "lucide-react"; // Unified line here
 import { resolveWatchPath } from "@/lib/watchPaths";
 
@@ -41,11 +40,6 @@ const Watch = () => {
       requestId === requestIdRef.current
     );
   };
-
-  useFullscreenLandscape({
-    containerRef: fullscreenContainerRef,
-    enabled: !!videoUrl && (isNative || isMobile),
-  });
 
   useEffect(() => {
     // New params => invalidate previous async work

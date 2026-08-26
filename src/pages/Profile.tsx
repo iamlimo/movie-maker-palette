@@ -248,8 +248,8 @@ const Profile = () => {
     );
   }
 
-  return (
-      <div className="min-h-screen bg-background">
+    return (
+      <div className="min-h-screen bg-background mobile-content-padding">
         {/* Pull-to-refresh indicator */}
         {isRefreshing && isMobile && (
           <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-primary/90 backdrop-blur-sm text-primary-foreground px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
@@ -323,6 +323,8 @@ const Profile = () => {
               isCollapsed={sidebarCollapsed}
               onToggleCollapse={() => setSidebarCollapsed(true)}
               className="h-full"
+              onSignOut={handleSignOut}
+              isSigningOut={isSigningOut}
             />
           </div>
 
@@ -948,11 +950,11 @@ const Profile = () => {
                         <p className="font-medium">Log out of your account</p>
                         <p className="text-sm text-muted-foreground">You will need to sign in again to access your content.</p>
                       </div>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="destructive"
                         onClick={handleSignOut}
                         disabled={isSigningOut}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="w-full md:w-auto min-w-[140px] md:min-w-[160px]"
                       >
                         <LogOut size={16} className="mr-2" />
                         {isSigningOut ? "Signing Out..." : "Sign Out"}
