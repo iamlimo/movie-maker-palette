@@ -59,7 +59,7 @@ serve(async (req) => {
       });
     }
 
-    const { amount } = await req.json();
+    const { amount, platform } = await req.json();
 
     // Validate amount using shared validation utility
     const amountValidation = validatePaymentAmount(amount);
@@ -98,6 +98,11 @@ serve(async (req) => {
     if (paymentError) throw paymentError;
 
     // Initialize Paystack
+    const callbackUrl =
+      platform === 'android' || platform === 'ios'
+        ? `signaturetv://payment/callback?kind=wallet&paymentId=${encodeURIComponent(payment.id)}&returnTo=${encodeURIComponent('/wallet')}`
+        : `${getFrontendOrigin(req)}/payment/callback?kind=wallet&paymentId=${encodeURIComponent(payment.id)}&returnTo=${encodeURIComponent('/wallet')}`;
+
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -108,10 +113,7 @@ serve(async (req) => {
         email: profile?.email || user.email,
         amount: amount,
         reference: payment.intent_id,
-        callback_url:
-          `${getFrontendOrigin(req)}/payment/callback` +
-          `?kind=wallet&paymentId=${encodeURIComponent(payment.id)}` +
-          `&returnTo=${encodeURIComponent('/wallet')}`,
+        callback_url: callbackUrl,
         metadata: {
           payment_id: payment.id,
           user_id: user.id,

@@ -81,6 +81,14 @@ function getFrontendOrigin(origin?: string) {
   return origin && isAllowedOrigin(origin) ? origin : "https://signaturetv.co";
 }
 
+function getPaystackCallbackUrl(origin: string | undefined, platform?: string, params: string) {
+  if (platform === "android" || platform === "ios") {
+    return `signaturetv://payment/callback${params}`;
+  }
+
+  return `${getFrontendOrigin(origin)}/payment/callback${params}`;
+}
+
 interface ProcessRentalRequest {
   userId: string;
   contentId: string;
@@ -88,6 +96,7 @@ interface ProcessRentalRequest {
   price: number;
   paymentMethod: "wallet" | "paystack";
   referralCode?: string;
+  platform?: "android" | "ios" | "web";
 }
 
 interface ReferralCodeRow {
@@ -441,6 +450,7 @@ async function createPaystackRental(
     referralCode?: string;
     discountApplied: number;
     metadata: Record<string, unknown>;
+    platform?: "android" | "ios" | "web";
   },
   origin?: string,
 ) {
@@ -544,13 +554,15 @@ async function createPaystackRental(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      callback_url:
-        `${getFrontendOrigin(origin)}/payment/callback` +
+      callback_url: getPaystackCallbackUrl(
+        origin,
+        input.platform,
         `?kind=rental&rentalId=${encodeURIComponent(intentId)}` +
-        `&paymentId=${encodeURIComponent(payment.id)}` +
-        `&contentType=${encodeURIComponent(input.contentType)}` +
-        `&contentId=${encodeURIComponent(input.contentId)}` +
-        `&returnTo=${encodeURIComponent(`/watch/${input.contentType}/${input.contentId}`)}`,
+          `&paymentId=${encodeURIComponent(payment.id)}` +
+          `&contentType=${encodeURIComponent(input.contentType)}` +
+          `&contentId=${encodeURIComponent(input.contentId)}` +
+          `&returnTo=${encodeURIComponent(`/watch/${input.contentType}/${input.contentId}`)}`,
+      ),
       email: profile.email,
       // Paystack expects kobo. Internal prices are already stored/passed in kobo.
       amount: Math.round(input.finalPrice),
@@ -651,8 +663,8 @@ serve(async (req: Request) => {
       return createResponse({ error: "Invalid request body" }, 400, origin);
     }
 
-    const { userId, contentId, contentType, price, paymentMethod, referralCode } = body;
-    console.log(`[${requestId}] 📦 Request: userId=${userId}, contentId=${contentId}, contentType=${contentType}, price=${price}, method=${paymentMethod}`);
+    const { userId, contentId, contentType, price, paymentMethod, referralCode, platform } = body;
+    console.log(`[${requestId}] 📦 Request: userId=${userId}, contentId=${contentId}, contentType=${contentType}, price=${price}, method=${paymentMethod}, platform=${platform ?? 'unknown'}`);
     
     const normalizedType = normalizeContentType(contentType);
 
@@ -831,6 +843,7 @@ serve(async (req: Request) => {
           referralCode: referralCode || undefined,
           discountApplied,
           metadata: paymentMetadata,
+          platform,
         },
         origin,
       );

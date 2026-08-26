@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWallet } from '@/hooks/useWallet';
@@ -185,6 +186,7 @@ export const useOptimizedRentals = () => {
             price,
             paymentMethod,
             referralCode,
+            platform: Capacitor.getPlatform(),
           },
         });
 

@@ -8,6 +8,7 @@ import { Loader2, Wallet, CreditCard } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { formatNaira } from '@/lib/priceUtils';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 
 interface FundWalletModalProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('initiate-wallet-funding', {
-        body: { amount }
+        body: { amount, platform: Capacitor.getPlatform() }
       });
 
       if (error) throw error;
@@ -56,7 +57,9 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
       if (data.success) {
         const authUrl = data.authorization_url;
         
-        if (shouldUseRedirect) {
+        if (isNative) {
+          await Browser.open({ url: authUrl });
+        } else if (isMobileBrowser) {
           window.location.href = authUrl;
         } else {
           window.open(authUrl, '_blank', 'width=500,height=700');

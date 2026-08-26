@@ -50,11 +50,12 @@ export function isBottomNavRoute(pathname: string): boolean {
 export function parseDeepLink(url: string): string | null {
   try {
     const urlObj = new URL(url);
-    
+
     // Handle signaturetv:// scheme
     if (urlObj.protocol === "signaturetv:") {
-      const path = urlObj.hostname + urlObj.pathname;
-      
+      const path = `${urlObj.hostname}${urlObj.pathname}`.replace(/\/+$/, "");
+      const query = urlObj.search;
+
       // Map deep link paths to app routes
       const pathMap: Record<string, string> = {
         "": "/",
@@ -63,21 +64,35 @@ export function parseDeepLink(url: string): string | null {
         "search": "/movies",
         "rentals": "/watchlist",
         "profile": "/profile",
+        "wallet": "/wallet",
+        "payment/callback": "/payment/callback",
       };
 
       // Handle watch/:slug pattern
       if (path.startsWith("watch/")) {
         const slug = path.split("/")[1];
-        return `/movie/${slug}`;
+        return `/movie/${slug}${query}`;
       }
 
       // Handle search with query
       if (path === "search" && urlObj.searchParams.has("q")) {
-        const query = urlObj.searchParams.get("q");
-        return `/movies?search=${encodeURIComponent(query || "")}`;
+        const queryValue = urlObj.searchParams.get("q");
+        return `/movies?search=${encodeURIComponent(queryValue || "")}`;
       }
 
-      return pathMap[path] || "/";
+      if (path === "payment/callback") {
+        return `/payment/callback${query}`;
+      }
+
+      if (pathMap[path]) {
+        return `${pathMap[path]}${query}`;
+      }
+
+      if (path) {
+        return `/${path}${query}`;
+      }
+
+      return "/";
     }
 
     return null;

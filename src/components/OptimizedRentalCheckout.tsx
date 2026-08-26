@@ -40,6 +40,7 @@ import { buildWebUnlockUrl } from '@/lib/webUnlockPaths';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 interface OptimizedRentalCheckoutProps {
@@ -407,41 +408,42 @@ export const OptimizedRentalCheckout = ({
           description: 'Complete your payment in Paystack. Access will unlock automatically after confirmation.',
         });
 
-        const paystackWindow =
-          isNative || isMobileBrowser
-            ? null
-            : window.open(result.authorizationUrl, 'paystack_checkout', 'width=520,height=720');
-
-        if (isNative || isMobileBrowser || !paystackWindow) {
+        if (isNative) {
+          await Browser.open({ url: result.authorizationUrl });
+        } else if (isMobileBrowser) {
           window.location.href = result.authorizationUrl;
-        }
+        } else {
+          const paystackWindow = window.open(result.authorizationUrl, 'paystack_checkout', 'width=520,height=720');
 
-        if (!isNative && !isMobileBrowser && paystackWindow) {
-          paystackWindow.focus();
-          const closeWatcher = window.setInterval(async () => {
-            if (!paystackWindow.closed) return;
-            window.clearInterval(closeWatcher);
-            try {
-              const hasAccess = await verifyPaystackAccess({
-                rentalId: result.rentalId,
-                paymentId: result.paymentId,
-                reference: result.paystackReference,
-                contentId,
-                contentType,
-              });
-              await refreshEntitlements();
-              if (!hasAccess) {
-                toast({
-                  title: 'Payment not completed',
-                  description: 'Paystack did not confirm this rental. You can try again.',
-                  variant: 'destructive',
+          if (!paystackWindow) {
+            window.location.href = result.authorizationUrl;
+          } else {
+            paystackWindow.focus();
+            const closeWatcher = window.setInterval(async () => {
+              if (!paystackWindow.closed) return;
+              window.clearInterval(closeWatcher);
+              try {
+                const hasAccess = await verifyPaystackAccess({
+                  rentalId: result.rentalId,
+                  paymentId: result.paymentId,
+                  reference: result.paystackReference,
+                  contentId,
+                  contentType,
                 });
+                await refreshEntitlements();
+                if (!hasAccess) {
+                  toast({
+                    title: 'Payment not completed',
+                    description: 'Paystack did not confirm this rental. You can try again.',
+                    variant: 'destructive',
+                  });
+                }
+              } catch (error) {
+                console.warn('Paystack close verification failed:', error);
+                await refreshEntitlements();
               }
-            } catch (error) {
-              console.warn('Paystack close verification failed:', error);
-              await refreshEntitlements();
-            }
-          }, 1000);
+            }, 1000);
+          }
         }
 
         onOpenChange(false);
