@@ -37,7 +37,7 @@ const Index = lazy(() => import("./pages/Index"));
 const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
 const Help = lazy(() => import("./pages/Help"));
 const Contact = lazy(() => import("./pages/Contact"));
-const Terms = lazy(() => import("./pages/Terms"));  
+const Terms = lazy(() => import("./pages/Terms"));
 const Docs = lazy(() => import("./pages/Docs"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsAndConditions = lazy(() => import("./pages/GeneralTerms"));
@@ -46,7 +46,7 @@ const JobApplication = lazy(() => import("./pages/JobApplication"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Watch = lazy(() => import("./pages/Watch"));
-
+const Bio = lazy(() => import("./pages/Bio"));
 
 // Lazy load ALL admin routes
 const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"));
@@ -97,7 +97,6 @@ const queryClient = new QueryClient({
   },
 });
 
-
 function AppContent() {
   useDeepLinking();
   useServiceWorker();
@@ -119,7 +118,10 @@ function AppContent() {
           }
         >
           <Routes>
-            <Route path="/" element={isMaintenanceOn() ? <Maintenance /> : <Index />} />
+            <Route
+              path="/"
+              element={isMaintenanceOn() ? <Maintenance /> : <Index />}
+            />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/confirm" element={<ConfirmEmail />} />
@@ -147,6 +149,7 @@ function AppContent() {
             <Route path="/docs" element={<Docs />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/bio" element={<Bio />} />
 
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/general-terms" element={<TermsAndConditions />} />
@@ -157,59 +160,259 @@ function AppContent() {
             <Route
               path="/admin"
               element={
-                <RoleRoute roles={[...STAFF_ROLES, 'creator']} redirectTo="/">
+                <RoleRoute roles={[...STAFF_ROLES, "creator"]} redirectTo="/">
                   <AdminLayout />
                 </RoleRoute>
               }
             >
               <Route index element={<AdminDashboard />} />
-              <Route path="movies" element={<RoleRoute page="movies"><AdminMovies /></RoleRoute>} />
-              <Route path="movies/add" element={<RoleRoute page="movies"><AddMovieNew /></RoleRoute>} />
-              <Route path="movies/view/:id" element={<RoleRoute page="movies"><ViewMovie /></RoleRoute>} />
-              <Route path="movies/edit/:id" element={<RoleRoute page="movies"><EditMovie /></RoleRoute>} />
-              <Route path="tv-shows" element={<RoleRoute page="tvshows"><AdminTVShows /></RoleRoute>} />
-              <Route path="tv-shows/add" element={<RoleRoute page="tvshows"><AddTVShow /></RoleRoute>} />
+              <Route
+                path="movies"
+                element={
+                  <RoleRoute page="movies">
+                    <AdminMovies />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="movies/add"
+                element={
+                  <RoleRoute page="movies">
+                    <AddMovieNew />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="movies/view/:id"
+                element={
+                  <RoleRoute page="movies">
+                    <ViewMovie />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="movies/edit/:id"
+                element={
+                  <RoleRoute page="movies">
+                    <EditMovie />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="tv-shows"
+                element={
+                  <RoleRoute page="tvshows">
+                    <AdminTVShows />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="tv-shows/add"
+                element={
+                  <RoleRoute page="tvshows">
+                    <AddTVShow />
+                  </RoleRoute>
+                }
+              />
               <Route
                 path="tv-shows/:showId/add-season"
-                element={<RoleRoute page="tvshows"><AddSeason /></RoleRoute>}
+                element={
+                  <RoleRoute page="tvshows">
+                    <AddSeason />
+                  </RoleRoute>
+                }
               />
               <Route
                 path="tv-shows/:showId/seasons/:seasonId/add-episode"
-                element={<RoleRoute page="tvshows"><AddEpisode /></RoleRoute>}
+                element={
+                  <RoleRoute page="tvshows">
+                    <AddEpisode />
+                  </RoleRoute>
+                }
               />
               <Route
                 path="tv-shows/:showId/seasons/:seasonId/edit"
-                element={<RoleRoute page="tvshows"><EditSeason /></RoleRoute>}
+                element={
+                  <RoleRoute page="tvshows">
+                    <EditSeason />
+                  </RoleRoute>
+                }
               />
               <Route
                 path="tv-shows/:showId/seasons/:seasonId/episodes/:episodeId/edit"
-                element={<RoleRoute page="tvshows"><EditEpisode /></RoleRoute>}
+                element={
+                  <RoleRoute page="tvshows">
+                    <EditEpisode />
+                  </RoleRoute>
+                }
               />
 
-              <Route path="tv-shows/view/:id" element={<RoleRoute page="tvshows"><ViewTVShow /></RoleRoute>} />
-              <Route path="tv-shows/edit/:id" element={<RoleRoute page="tvshows"><EditTVShow /></RoleRoute>} />
-              <Route path="submissions" element={<RoleRoute page="submissions"><Submissions /></RoleRoute>} />
-              <Route path="users" element={<RoleRoute page="users"><Users /></RoleRoute>} />
-              <Route path="finance" element={<RoleRoute page="finance"><Finance /></RoleRoute>} />
-              <Route path="rentals" element={<RoleRoute page="rentals"><AdminRentals /></RoleRoute>} />
-              <Route path="creators" element={<RoleRoute page="creators"><Creators /></RoleRoute>} />
-              <Route path="sections" element={<RoleRoute page="sections"><Sections /></RoleRoute>} />
-              <Route path="hero-slider" element={<RoleRoute page="hero-slider"><HeroSlider /></RoleRoute>} />
-              <Route path="banners" element={<RoleRoute page="banners"><Banners /></RoleRoute>} />
-              <Route path="wallets" element={<RoleRoute page="wallets"><Wallets /></RoleRoute>} />
-              <Route path="webhook-events" element={<RoleRoute page="webhook-events"><WebhookEvents /></RoleRoute>} />
-              <Route path="settings" element={<SuperAdminRoute><Settings /></SuperAdminRoute>} />
-              <Route path="permissions" element={<Navigate to="/admin/settings?tab=permissions" replace />} />
-              <Route path="job-listings" element={<RoleRoute page="job-listings"><JobListingsAdmin /></RoleRoute>} />
-              <Route path="applications" element={<RoleRoute page="job-applications"><JobApplicationsAdmin /></RoleRoute>} />
-              <Route path="referral-codes" element={<RoleRoute page="referral-codes"><ReferralCodes /></RoleRoute>} />
-              <Route path="tickets" element={<RoleRoute page="tickets"><TicketsList /></RoleRoute>} />
-              <Route path="tickets/create" element={<RoleRoute page="tickets"><CreateTicket /></RoleRoute>} />
-              <Route path="tickets/:ticketId" element={<RoleRoute page="tickets"><TicketDetails /></RoleRoute>} />
+              <Route
+                path="tv-shows/view/:id"
+                element={
+                  <RoleRoute page="tvshows">
+                    <ViewTVShow />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="tv-shows/edit/:id"
+                element={
+                  <RoleRoute page="tvshows">
+                    <EditTVShow />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="submissions"
+                element={
+                  <RoleRoute page="submissions">
+                    <Submissions />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="users"
+                element={
+                  <RoleRoute page="users">
+                    <Users />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="finance"
+                element={
+                  <RoleRoute page="finance">
+                    <Finance />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="rentals"
+                element={
+                  <RoleRoute page="rentals">
+                    <AdminRentals />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="creators"
+                element={
+                  <RoleRoute page="creators">
+                    <Creators />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="sections"
+                element={
+                  <RoleRoute page="sections">
+                    <Sections />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="hero-slider"
+                element={
+                  <RoleRoute page="hero-slider">
+                    <HeroSlider />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="banners"
+                element={
+                  <RoleRoute page="banners">
+                    <Banners />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="wallets"
+                element={
+                  <RoleRoute page="wallets">
+                    <Wallets />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="webhook-events"
+                element={
+                  <RoleRoute page="webhook-events">
+                    <WebhookEvents />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="settings"
+                element={
+                  <SuperAdminRoute>
+                    <Settings />
+                  </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="permissions"
+                element={
+                  <Navigate to="/admin/settings?tab=permissions" replace />
+                }
+              />
+              <Route
+                path="job-listings"
+                element={
+                  <RoleRoute page="job-listings">
+                    <JobListingsAdmin />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="applications"
+                element={
+                  <RoleRoute page="job-applications">
+                    <JobApplicationsAdmin />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="referral-codes"
+                element={
+                  <RoleRoute page="referral-codes">
+                    <ReferralCodes />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="tickets"
+                element={
+                  <RoleRoute page="tickets">
+                    <TicketsList />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="tickets/create"
+                element={
+                  <RoleRoute page="tickets">
+                    <CreateTicket />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="tickets/:ticketId"
+                element={
+                  <RoleRoute page="tickets">
+                    <TicketDetails />
+                  </RoleRoute>
+                }
+              />
 
               <Route
                 path="push-notifications"
-                element={<RoleRoute page="push-notifications"><PushNotifications /></RoleRoute>}
+                element={
+                  <RoleRoute page="push-notifications">
+                    <PushNotifications />
+                  </RoleRoute>
+                }
               />
             </Route>
 

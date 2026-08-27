@@ -13,7 +13,7 @@ const routeHierarchy = [
 
 export function getNavigationDirection(
   from: string,
-  to: string
+  to: string,
 ): NavigationDirection {
   // Check if both are tab routes
   const fromIsTab = tabRoutes.includes(from);
@@ -37,10 +37,13 @@ export function getNavigationDirection(
 export function isBottomNavRoute(pathname: string): boolean {
   // Don't show bottom nav on admin routes
   if (pathname.startsWith("/admin")) return false;
-  
+
+  // The bio page is a standalone public link hub.
+  if (pathname === "/bio") return false;
+
   // Don't show on auth pages
   if (pathname === "/auth") return false;
-  
+
   // Don't show on watch (video playback) - it overlaps player controls
   if (pathname.startsWith("/watch")) return false;
 
@@ -59,12 +62,12 @@ export function parseDeepLink(url: string): string | null {
       // Map deep link paths to app routes
       const pathMap: Record<string, string> = {
         "": "/",
-        "home": "/",
-        "movies": "/movies",
-        "search": "/movies",
-        "rentals": "/watchlist",
-        "profile": "/profile",
-        "wallet": "/wallet",
+        home: "/",
+        movies: "/movies",
+        search: "/movies",
+        rentals: "/watchlist",
+        profile: "/profile",
+        wallet: "/wallet",
         "payment/callback": "/payment/callback",
       };
 
