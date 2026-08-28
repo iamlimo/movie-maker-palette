@@ -7,13 +7,11 @@ import {
   defaultLayoutIcons,
   DefaultVideoLayout,
 } from "@vidstack/react/player/layouts/default";
-import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
-import { VideoPlayerControls } from "./VideoPlayerControls";
 import { MovieInfoOverlay } from "./MovieInfoOverlay";
 
 // Client-side URL cache
@@ -746,52 +744,6 @@ export const VideoPlayer = ({
           <DefaultVideoLayout icons={defaultLayoutIcons as any} />
         </MediaProvider>
       </MediaPlayer>
-
-      {/* Video Controls */}
-      {controlsVisible && (
-        <VideoPlayerControls
-          id={controlsId}
-          isPlaying={isPlaying}
-          isMuted={isMuted}
-          volume={volume}
-          currentTime={currentTime}
-          duration={duration}
-          isFullscreen={isFullscreen}
-          hasNextEpisode={hasNextEpisode}
-          showSkipIntro={showSkipIntro}
-          onPlay={togglePlay}
-          onPause={togglePlay}
-          onMute={toggleMute}
-          onVolumeChange={handleVolumeChange}
-          onSeek={handleSeek}
-          onFullscreen={toggleFullscreen}
-          onSkipIntro={handleSkipIntro}
-          onNextEpisode={onNextEpisode}
-          onReplay10s={handleReplay10s}
-          onCastToTV={handleCastToTV}
-          onQualityChange={handleQualityChange}
-          onSubtitlesChange={handleSubtitlesChange}
-          availableQualities={availableQualities}
-          availableSubtitles={availableSubtitles}
-          currentQuality={currentQuality}
-          currentSubtitle={currentSubtitle}
-        />
-      )}
-
-      {/* Play Button Overlay - Center */}
-      {!isPlaying && (
-        <div className="absolute inset-0 flex items-center justify-center z-20">
-          <Button
-            variant="ghost"
-            size="lg"
-            onClick={togglePlay}
-            className="bg-[#FD8307] hover:bg-[#e77706] text-white rounded-full p-4 shadow-[0_0_0_8px_rgba(253,131,7,0.18)] ring-4 ring-white/10 transition-all duration-200 hover:scale-110 active:scale-100"
-            aria-label="Play"
-          >
-            <Play size={48} fill="white" />
-          </Button>
-        </div>
-      )}
 
       {/* Movie Info Overlay - Shows when paused */}
       <MovieInfoOverlay
