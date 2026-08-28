@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 // Vidstack player for improved HLS support and uniform inline playback on mobile
 import "@vidstack/react/player/styles/default/theme.css";
 import "@vidstack/react/player/styles/default/layouts/video.css";
-import { MediaPlayer } from "@vidstack/react";
+import { MediaPlayer, MediaProvider } from "@vidstack/react";
 import {
   defaultLayoutIcons,
   DefaultVideoLayout,
@@ -91,7 +91,7 @@ export const VideoPlayer = ({
   const [skipIntroClicked, setSkipIntroClicked] = useState(false);
   const [showSkipIntro, setShowSkipIntro] = useState(true);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<any>(null);
   const [hlsLevels, setHlsLevels] = useState<
@@ -303,10 +303,10 @@ export const VideoPlayer = ({
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
-      videoRef.current.pause();
+      void videoRef.current.pause();
       setShowMovieInfo(true);
     } else {
-      videoRef.current.play();
+      void videoRef.current.play();
       setShowMovieInfo(false);
     }
     setIsPlaying(!isPlaying);
@@ -358,7 +358,7 @@ export const VideoPlayer = ({
     }
 
     // Start auto-save
-    startAutoSave(videoRef.current);
+    startAutoSave(videoRef.current.provider?.media || videoRef.current);
   };
 
   const handleSeek = (newTime: number) => {
@@ -562,9 +562,13 @@ export const VideoPlayer = ({
         const Hls = (await import("hls.js")).default;
         if (!mounted) return;
         if (Hls.isSupported()) {
+          const mediaEl =
+            videoRef.current?.provider?.media ||
+            videoRef.current?.media ||
+            videoRef.current;
           const hls = new Hls({ capLevelToPlayerSize: true });
           hlsRef.current = hls;
-          hls.attachMedia(videoRef.current as any);
+          if (mediaEl) hls.attachMedia(mediaEl as any);
           hls.on(Hls.Events.MEDIA_ATTACHED, () => {
             hls.loadSource(url);
           });
@@ -579,11 +583,10 @@ export const VideoPlayer = ({
 
           hls.on(Hls.Events.LEVEL_SWITCHED, (_: any, data: any) => {
             const level = hls.levels[data.level];
-            setCurrentQuality(
-              level?.height
-                ? `${level.height}p`
-                : `${Math.round((level?.bitrate || 0) / 1000)}kbps`,
-            );
+            const nextQuality = level?.height
+              ? `${level.height}p`
+              : `${Math.round((level?.bitrate || 0) / 1000)}kbps`;
+            setCurrentQuality(nextQuality);
           });
         } else {
           // Some browsers (Safari) support native HLS - let the MediaPlayer handle it
@@ -699,6 +702,22 @@ export const VideoPlayer = ({
         playsinline
         controls={false}
         className="w-full h-full object-contain"
+        style={{
+          ["--media-brand" as any]: "#FD8307",
+          ["--video-brand" as any]: "#FD8307",
+          ["--media-slider-track-fill-bg" as any]: "#FD8307",
+          ["--media-button-hover-bg" as any]: "rgba(253, 131, 7, 0.22)",
+          ["--media-menu-bg" as any]: "rgba(15, 15, 15, 0.94)",
+          ["--video-volume-bg" as any]: "rgba(17, 17, 17, 0.9)",
+          ["--media-button-color" as any]: "#ffffff",
+          ["--video-focus-ring-color" as any]: "#FD8307",
+          ["--media-focus-ring-color" as any]: "#FD8307",
+          ["--media-controls-color" as any]: "#ffffff",
+          ["--video-controls-color" as any]: "#ffffff",
+          ["--media-buffering-track-fill-color" as any]: "#FD8307",
+          ["--video-border-radius" as any]: "14px",
+          ["--video-border" as any]: "1px solid rgba(255,255,255,0.12)",
+        }}
         onTimeUpdate={handleTimeUpdate as any}
         onLoadedMetadata={handleLoadedMetadata as any}
         onPlay={() => {
@@ -713,23 +732,20 @@ export const VideoPlayer = ({
         crossOrigin="anonymous"
         autoPlay={autoPlay}
       >
-        {subtitleUrl && currentSubtitle !== null && (
-          <track
-            key={`track-${currentSubtitle}`}
-            kind="subtitles"
-            src={subtitleUrl}
-            srcLang="en"
-            label="English"
-            default
-          />
-        )}
-        <DefaultVideoLayout icons={defaultLayoutIcons as any} />
+        <MediaProvider>
+          {subtitleUrl && currentSubtitle !== null && (
+            <track
+              key={`track-${currentSubtitle}`}
+              kind="subtitles"
+              src={subtitleUrl}
+              srcLang="en"
+              label="English"
+              default
+            />
+          )}
+          <DefaultVideoLayout icons={defaultLayoutIcons as any} />
+        </MediaProvider>
       </MediaPlayer>
-
-      {/* Debug badge to confirm Vidstack rendering in-browser */}
-      <div className="absolute top-2 right-2 z-50 text-xs bg-emerald-600 text-white px-2 py-1 rounded opacity-90">
-        VIDSTACK
-      </div>
 
       {/* Video Controls */}
       {controlsVisible && (
@@ -769,7 +785,7 @@ export const VideoPlayer = ({
             variant="ghost"
             size="lg"
             onClick={togglePlay}
-            className="bg-white/20 hover:bg-white/30 text-white rounded-full p-4 transition-all hover:scale-110"
+            className="bg-[#FD8307] hover:bg-[#e77706] text-white rounded-full p-4 shadow-[0_0_0_8px_rgba(253,131,7,0.18)] ring-4 ring-white/10 transition-all duration-200 hover:scale-110 active:scale-100"
             aria-label="Play"
           >
             <Play size={48} fill="white" />

@@ -484,6 +484,20 @@ const Watch = () => {
 
       {videoUrl && content && (
         <>
+          {(() => {
+            const branch = isNative && (isIOS || isAndroid)
+              ? "NativeVideoPlayer"
+              : "VideoPlayer";
+            console.log("[Watch] rendering player branch:", {
+              isNative,
+              isIOS,
+              isAndroid,
+              branch,
+              contentType,
+              contentId,
+            });
+            return null;
+          })()}
           {/* Use NativeVideoPlayer only on Capacitor native builds; use web VideoPlayer for browsers */}
           {isNative && (isIOS || isAndroid) ? (
             <NativeVideoPlayer
