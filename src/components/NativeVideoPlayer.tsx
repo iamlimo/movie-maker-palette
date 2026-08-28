@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { VideoPlayer } from "./VideoPlayer";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
 import { useWatchHistory } from "@/hooks/useWatchHistory";
 import { useExoPlayer } from "@/hooks/useExoPlayer";
-import { Loader2, AlertCircle, ChevronLeft, Play, Pause, RefreshCw, WifiOff } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  ChevronLeft,
+  Play,
+  Pause,
+  RefreshCw,
+  WifiOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface NativeVideoPlayerProps {
@@ -43,6 +52,13 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lastSavedRef = useRef(0);
   const loadedRef = useRef(false);
+  const [capgoAvailable, setCapgoAvailable] = useState(false);
+  const capgoPlayerRef = useRef<any>(null);
+  const capgoModuleRef = useRef<any>(null);
+  const capgoPollRef = useRef<number | null>(null);
+  const [nativeIsPlaying, setNativeIsPlaying] = useState(false);
+  const [nativeCurrentTime, setNativeCurrentTime] = useState(0);
+  const [nativeDuration, setNativeDuration] = useState(0);
 
   const [showControls, setShowControls] = useState(true);
 
@@ -66,7 +82,9 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     const sync = () => {
       const r = el.getBoundingClientRect();
-      exo.setRect({ x: r.left, y: r.top, width: r.width, height: r.height }).catch(() => {});
+      exo
+        .setRect({ x: r.left, y: r.top, width: r.width, height: r.height })
+        .catch(() => {});
     };
     sync();
     const ro = new ResizeObserver(sync);
@@ -97,6 +115,82 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     });
 
     (async () => {
+      // Try Capgo / capacitor-video-player first (dynamic import)
+      try {
+        const mod = await import("@capgo/capacitor-video-player");
+        capgoModuleRef.current = mod;
+        const plugin =
+          (mod as any).CapacitorVideoPlayer ??
+          (mod as any).VideoPlayer ??
+          (mod as any).default ??
+          (mod as any);
+
+        if (plugin) {
+          // Mark available so UI can adapt if necessary
+          setCapgoAvailable(true);
+
+          // Validate URL
+          if (!videoUrl || !videoUrl.startsWith("http")) {
+            throw new Error("Invalid video URL provided");
+          }
+
+          const startPos = (await getLastPosition()) || 0;
+          const startMs = startPos > 5 ? Math.floor(startPos * 1000) : 0;
+
+          // Some capgo builds expect a create/init + play flow. We'll try both safe methods.
+          try {
+            // Prefer a create API if available
+            if (typeof plugin.create === "function") {
+              const createOpts = {
+                mode: "fullscreen",
+                url: videoUrl,
+                title: title,
+                subtitle: subtitleUrl || undefined,
+                isHLS: isHls(videoUrl),
+                startPosition: startMs,
+              } as any;
+              const res = await plugin.create(createOpts);
+              capgoPlayerRef.current =
+                res?.playerId ?? res?.id ?? "capgo-player";
+
+              if (typeof plugin.play === "function") {
+                await plugin.play({ playerId: capgoPlayerRef.current });
+                setNativeIsPlaying(true);
+              }
+            } else if (typeof plugin.play === "function") {
+              // Fallback: direct play call
+              await plugin.play({
+                url: videoUrl,
+                isHLS: isHls(videoUrl),
+                startPosition: startMs,
+              });
+              setNativeIsPlaying(true);
+              capgoPlayerRef.current = "capgo-player";
+            }
+
+            if (startMs > 0) {
+              toast({
+                title: "Resumed",
+                description: `Continuing from ${Math.round(startPos)}s`,
+              });
+            }
+
+            // Capgo handled playback, don't initialize exo
+            return;
+          } catch (capgoErr) {
+            console.warn(
+              "Capgo player failed, falling back to ExoPlayer",
+              capgoErr,
+            );
+            // proceed to exo fallback below
+          }
+        }
+      } catch (importErr) {
+        // module not available or errored — fall back to existing exo
+        // console.debug('capgo plugin not available', importErr);
+      }
+
+      // Fallback: existing ExoPlayer flow
       try {
         // Validate URL before load
         if (!videoUrl || !videoUrl.startsWith("http")) {
@@ -126,7 +220,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
         console.error("ExoPlayer load failed for rented content", {
           contentId,
           contentType,
-          videoUrl: videoUrl.substring(0, 50) + "...",
+          videoUrl: videoUrl?.substring(0, 50) + "...",
           error: e,
         });
         toast({
@@ -152,6 +246,103 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     retryKey,
   ]);
 
+  // Poll Capgo player for state and expose simple control bindings
+  useEffect(() => {
+    if (!capgoAvailable || !capgoModuleRef.current) return;
+    const instance = capgoModuleRef.current as any;
+
+    const poll = window.setInterval(async () => {
+      try {
+        if (!instance) return;
+        if (typeof instance.getCurrentPosition === "function") {
+          const pos = await instance.getCurrentPosition({
+            playerId: capgoPlayerRef.current,
+          });
+          const millis = Number(pos?.position ?? pos ?? 0);
+          setNativeCurrentTime(millis / 1000);
+        }
+        if (typeof instance.getDuration === "function") {
+          const dur = await instance.getDuration({
+            playerId: capgoPlayerRef.current,
+          });
+          const millis = Number(dur?.duration ?? dur ?? 0);
+          setNativeDuration(millis / 1000);
+        }
+        if (typeof instance.isPlaying === "function") {
+          const p = await instance.isPlaying({
+            playerId: capgoPlayerRef.current,
+          });
+          setNativeIsPlaying(!!(p?.isPlaying ?? p));
+        }
+      } catch (e) {
+        // ignore polling errors
+      }
+    }, 1000);
+
+    capgoPollRef.current = poll;
+
+    return () => {
+      if (capgoPollRef.current) {
+        clearInterval(capgoPollRef.current);
+        capgoPollRef.current = null;
+      }
+    };
+  }, [capgoAvailable]);
+
+  const capgoPlay = async () => {
+    try {
+      const plugin = capgoModuleRef.current as any;
+      const instance =
+        plugin?.CapacitorVideoPlayer ??
+        plugin?.VideoPlayer ??
+        plugin?.default ??
+        plugin;
+      if (instance && typeof instance.play === "function") {
+        await instance.play({ playerId: capgoPlayerRef.current });
+        setNativeIsPlaying(true);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const capgoPause = async () => {
+    try {
+      const plugin = capgoModuleRef.current as any;
+      const instance =
+        plugin?.CapacitorVideoPlayer ??
+        plugin?.VideoPlayer ??
+        plugin?.default ??
+        plugin;
+      if (instance && typeof instance.pause === "function") {
+        await instance.pause({ playerId: capgoPlayerRef.current });
+        setNativeIsPlaying(false);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const capgoSeek = async (seconds: number) => {
+    try {
+      const plugin = capgoModuleRef.current as any;
+      const instance =
+        plugin?.CapacitorVideoPlayer ??
+        plugin?.VideoPlayer ??
+        plugin?.default ??
+        plugin;
+      if (instance && typeof instance.seek === "function") {
+        await instance.seek({
+          playerId: capgoPlayerRef.current,
+          position: Math.floor(seconds * 1000),
+        });
+      }
+      setNativeCurrentTime(seconds);
+    } catch (e) {
+      // ignore
+    }
+  };
+
   // Save position on unmount
   useEffect(() => {
     return () => {
@@ -162,10 +353,52 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- Render: Android in-page overlay ----
-  if (isAndroid && exo.isAvailable) {
-    const showLoader =
-      exo.state === "loading" || exo.state === "buffering" || exo.isBuffering;
+  // Cleanup Capgo player on unmount if used
+  useEffect(() => {
+    return () => {
+      (async () => {
+        try {
+          const plugin = capgoModuleRef.current ?? null;
+          const playerId = capgoPlayerRef.current;
+          if (plugin && playerId) {
+            const instance =
+              (plugin as any).CapacitorVideoPlayer ??
+              (plugin as any).VideoPlayer ??
+              (plugin as any).default ??
+              plugin;
+            if (instance) {
+              if (typeof instance.stop === "function") {
+                await instance.stop({ playerId });
+              }
+              if (typeof instance.destroy === "function") {
+                await instance.destroy({ playerId });
+              }
+              if (typeof instance.close === "function") {
+                await instance.close({ playerId });
+              }
+            }
+          }
+          if (capgoPollRef.current) {
+            clearInterval(capgoPollRef.current);
+            capgoPollRef.current = null;
+          }
+        } catch (err) {
+          // swallow cleanup errors
+        }
+      })();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Render: Native in-page overlay (Exo or Capgo) ----
+  if (
+    (isAndroid && exo.isAvailable) ||
+    (capgoAvailable && (platform === "android" || platform === "ios"))
+  ) {
+    const usingExo = isAndroid && exo.isAvailable;
+    const showLoader = usingExo
+      ? exo.state === "loading" || exo.state === "buffering" || exo.isBuffering
+      : false;
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <div className="flex items-center justify-between p-3 bg-background/80 backdrop-blur sticky top-0 z-10">
@@ -174,11 +407,34 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             size="sm"
             onClick={async () => {
               try {
-                await exo.pause();
-                if (exo.currentTime > 0 && exo.duration > 0) {
-                  await saveProgress(exo.currentTime, exo.duration);
+                if (usingExo) {
+                  await exo.pause();
+                  if (exo.currentTime > 0 && exo.duration > 0) {
+                    await saveProgress(exo.currentTime, exo.duration);
+                  }
+                  await exo.release();
+                } else {
+                  // Try to stop/destroy capgo player if present
+                  const plugin = capgoModuleRef.current ?? null;
+                  const playerId = capgoPlayerRef.current;
+                  const instance = plugin
+                    ? plugin.CapacitorVideoPlayer ??
+                      plugin.VideoPlayer ??
+                      plugin.default ??
+                      plugin
+                    : null;
+                  if (instance) {
+                    if (typeof instance.stop === "function") {
+                      await instance.stop({ playerId });
+                    }
+                    if (typeof instance.destroy === "function") {
+                      await instance.destroy({ playerId });
+                    }
+                    if (typeof instance.close === "function") {
+                      await instance.close({ playerId });
+                    }
+                  }
                 }
-                await exo.release();
               } finally {
                 navigate(-1);
               }
@@ -192,7 +448,6 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
           </span>
           <span className="w-12" />
         </div>
-
         {/* Native player overlays on top of this transparent area */}
         <div
           ref={containerRef}
@@ -205,7 +460,9 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
             </div>
           )}
-          {exo.state === "error" && (
+
+          {/* Exo-specific error UI */}
+          {usingExo && exo.state === "error" && (
             <div
               className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-black/80 via-black/90 to-black backdrop-blur-md animate-in fade-in zoom-in-95 duration-300"
               onClick={(e) => e.stopPropagation()}
@@ -248,9 +505,46 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
               </div>
             </div>
           )}
+
+          {/* Capgo: if plugin used and exo not available show minimal placeholder */}
+          {!usingExo && capgoAvailable && (
+            <div className="absolute inset-0 flex items-center justify-center text-center p-4 text-white">
+              <div>
+                <div className="mb-4">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary/80 mx-auto" />
+                </div>
+                <h3 className="text-lg font-semibold">
+                  Playing in native player
+                </h3>
+                <p className="text-sm text-white/70 mt-2">
+                  The native player handles playback. Use device controls to
+                  manage playback.
+                </p>
+              </div>
+            </div>
+          )}
+          {/* Capgo controls when available */}
+          {showControls && !usingExo && capgoAvailable && (
+            <div className="flex items-center justify-center gap-3 p-4 bg-background absolute bottom-0 left-0 right-0 z-20">
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={() => (nativeIsPlaying ? capgoPause() : capgoPlay())}
+              >
+                {nativeIsPlaying ? (
+                  <Pause className="h-5 w-5" />
+                ) : (
+                  <Play className="h-5 w-5" />
+                )}
+              </Button>
+              <div className="text-xs text-muted-foreground tabular-nums">
+                {formatTime(nativeCurrentTime)} / {formatTime(nativeDuration)}
+              </div>
+            </div>
+          )}
         </div>
 
-        {showControls && (
+        {showControls && usingExo && (
           <div className="flex items-center justify-center gap-3 p-4 bg-background">
             <Button
               size="icon"
@@ -274,36 +568,18 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     );
   }
 
-  // ---- Fallback: native plugin not available or load error (use web player via Watch.tsx routing) ----
+  // ---- Fallback: native plugin not available or load error -> use web VideoPlayer ----
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-white">
-      <AlertCircle className="h-16 w-16 text-destructive/70 mb-6" />
-      <h1 className="text-2xl font-bold mb-2">Native Playback Unavailable</h1>
-      <p className="text-lg text-white/80 mb-8 max-w-md text-center">
-        Plugin error or iOS - falling back to web player automatically.
-      </p>
-      <div className="flex gap-3">
-        <Button
-          onClick={() => navigate(0)}
-          size="lg"
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
-          Retry Native
-        </Button>
-        <Button
-          onClick={() => navigate(-1)}
-          variant="outline"
-          size="lg"
-          className="border-white/50 text-white hover:bg-white/10"
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-      </div>
-      <p className="text-sm text-white/60 mt-6">
-        Content loads in web player if native fails
-      </p>
-    </div>
+    <VideoPlayer
+      src={videoUrl}
+      contentId={contentId}
+      contentType={contentType}
+      title={title}
+      poster={poster}
+      subtitleUrl={subtitleUrl}
+      autoPlay={autoPlay}
+      immersive={true}
+    />
   );
 };
 

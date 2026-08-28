@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Play,
   Pause,
@@ -11,9 +11,9 @@ import {
   SkipForward,
   RotateCcw,
   Tv,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +21,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 
 interface VideoPlayerControlsProps {
+  id?: string;
   isPlaying: boolean;
   isMuted: boolean;
   volume: number;
@@ -54,18 +55,21 @@ interface VideoPlayerControlsProps {
 }
 
 const formatTime = (seconds: number) => {
-  if (!Number.isFinite(seconds)) return '0:00';
+  if (!Number.isFinite(seconds)) return "0:00";
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
 
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 };
 
 export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
+  id,
   isPlaying,
   isMuted,
   volume,
@@ -86,16 +90,17 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
   onCastToTV,
   onQualityChange,
   onSubtitlesChange,
-  availableQualities = ['Auto', '1080p', '720p', '480p', '240p'],
+  availableQualities = ["Auto", "1080p", "720p", "480p", "240p"],
   availableSubtitles = [
-    { code: 'en', label: 'English' },
-    { code: 'es', label: 'Spanish' },
-    { code: 'fr', label: 'French' },
+    { code: "en", label: "English" },
+    { code: "es", label: "Spanish" },
+    { code: "fr", label: "French" },
   ],
-  currentQuality = 'Auto',
+  currentQuality = "Auto",
   currentSubtitle = null,
 }) => {
   const [showSettings, setShowSettings] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -108,8 +113,13 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pt-12
-                    opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+    <div
+      id={id}
+      className="absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pt-12
+                    opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+      role="group"
+      aria-label="Playback controls"
+    >
       {/* Progress Bar with Preview */}
       <div className="mb-3">
         <div
@@ -118,6 +128,28 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
             const rect = e.currentTarget.getBoundingClientRect();
             const percent = (e.clientX - rect.left) / rect.width;
             onSeek(percent * duration);
+          }}
+          role="slider"
+          aria-label="Seek"
+          aria-valuemin={0}
+          aria-valuemax={Math.max(0, duration)}
+          aria-valuenow={Math.max(0, currentTime)}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (!Number.isFinite(duration) || duration <= 0) return;
+            if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              onSeek(Math.max(0, currentTime - 10));
+            } else if (e.key === "ArrowRight") {
+              e.preventDefault();
+              onSeek(Math.min(duration, currentTime + 10));
+            } else if (e.key === "Home") {
+              e.preventDefault();
+              onSeek(0);
+            } else if (e.key === "End") {
+              e.preventDefault();
+              onSeek(duration);
+            }
           }}
         >
           <div
@@ -143,7 +175,8 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
             size="sm"
             onClick={handlePlayPause}
             className="text-white hover:bg-white/20 transition-colors"
-            title={isPlaying ? 'Pause' : 'Play'}
+            title={isPlaying ? "Pause" : "Play"}
+            aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? <Pause size={20} /> : <Play size={20} />}
           </Button>
@@ -154,9 +187,14 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
             size="sm"
             onClick={onMute}
             className="text-white hover:bg-white/20 transition-colors"
-            title={isMuted ? 'Unmute' : 'Mute'}
+            title={isMuted ? "Unmute" : "Mute"}
+            aria-label={isMuted ? "Unmute" : "Mute"}
           >
-            {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+            {isMuted || volume === 0 ? (
+              <VolumeX size={20} />
+            ) : (
+              <Volume2 size={20} />
+            )}
           </Button>
 
           <div className="w-20 px-2">
@@ -177,6 +215,7 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
               onClick={onSkipIntro}
               className="text-white hover:bg-white/20 transition-colors text-xs hidden sm:flex"
               title="Skip Intro"
+              aria-label="Skip Intro"
             >
               <SkipForward size={18} className="mr-1" />
               <span className="hidden md:inline">Intro</span>
@@ -191,6 +230,7 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
               onClick={onReplay10s}
               className="text-white hover:bg-white/20 transition-colors text-xs hidden sm:flex"
               title="Replay Last 10 Seconds"
+              aria-label="Replay 10 seconds"
             >
               <RotateCcw size={18} className="mr-1" />
               <span className="hidden md:inline">10s</span>
@@ -235,12 +275,18 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
               onClick={() => setShowSettings(!showSettings)}
               className="text-white hover:bg-white/20 transition-colors"
               title="Settings"
+              aria-label="Settings"
             >
               <Settings size={20} />
             </Button>
-            <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-700">
+            <DropdownMenuContent
+              align="end"
+              className="w-56 bg-gray-900 border-gray-700"
+            >
               {/* Quality Settings */}
-              <DropdownMenuLabel className="text-white">Quality</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-white">
+                Quality
+              </DropdownMenuLabel>
               {availableQualities.map((quality) => (
                 <DropdownMenuCheckboxItem
                   key={quality}
@@ -257,7 +303,9 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
               <DropdownMenuSeparator className="bg-gray-700" />
 
               {/* Subtitles Settings */}
-              <DropdownMenuLabel className="text-white">Subtitles</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-white">
+                Subtitles
+              </DropdownMenuLabel>
               <DropdownMenuCheckboxItem
                 checked={currentSubtitle === null}
                 onCheckedChange={() => {
@@ -288,7 +336,8 @@ export const VideoPlayerControls: React.FC<VideoPlayerControlsProps> = ({
             size="sm"
             onClick={onFullscreen}
             className="text-white hover:bg-white/20 transition-colors"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
           </Button>

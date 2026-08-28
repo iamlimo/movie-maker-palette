@@ -20,6 +20,7 @@ const Watch = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState("Access Denied");
+  const [retryAttempt, setRetryAttempt] = useState<number | null>(null);
   const [content, setContent] = useState<unknown>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -84,11 +85,14 @@ const Watch = () => {
       // Season rentals are more prone to this race condition, so we give them
       // a longer retry window before showing Access Denied.
       const isSeasonWatch = contentType === "season";
-      const isEpisodeAfterSeasonRedirect = contentType === "episode" && !!fromSeasonId;
+      const isEpisodeAfterSeasonRedirect =
+        contentType === "episode" && !!fromSeasonId;
       const maxRetries = isSeasonWatch || isEpisodeAfterSeasonRedirect ? 12 : 3; // ~6s after checkout vs ~1.5s default
-      const retryDelay = isSeasonWatch ? 500 : 500;
+      const baseDelay = 500;
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
 
       if (!accessToken) {
@@ -103,16 +107,17 @@ const Watch = () => {
       // 1. Access Guard (edge function is the canonical entitlement checker)
       // This avoids false negatives caused by RPC timing/episode delegation.
       while (retryCount < maxRetries) {
-        const { data: accessData, error: accessError } = await supabase.functions.invoke(
-          "rental-access",
-          {
+        const { data: accessData, error: accessError } =
+          await supabase.functions.invoke("rental-access", {
             body: {
               content_id: contentId,
               content_type: contentType,
             },
             headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        );
+          });
+
+        // expose retry progress for UI feedback
+        if (guardSetState(requestId)) setRetryAttempt(retryCount + 1);
 
         const hasAccessNow = (() => {
           if (!accessData || typeof accessData !== "object") return false;
@@ -138,22 +143,21 @@ const Watch = () => {
             })());
 
           if (seasonId) {
-            const { data: seasonAccessData, error: seasonAccessError } = await supabase.functions.invoke(
-              "rental-access",
-              {
+            const { data: seasonAccessData, error: seasonAccessError } =
+              await supabase.functions.invoke("rental-access", {
                 body: {
                   content_id: seasonId,
                   content_type: "season",
                 },
                 headers: { Authorization: `Bearer ${accessToken}` },
-              }
-            );
+              });
 
             const hasSeasonAccess =
               !seasonAccessError &&
               !!seasonAccessData &&
               typeof seasonAccessData === "object" &&
-              (seasonAccessData as Record<string, unknown>)["has_access"] === true;
+              (seasonAccessData as Record<string, unknown>)["has_access"] ===
+                true;
 
             if (hasSeasonAccess) {
               hasAccess = true;
@@ -164,15 +168,23 @@ const Watch = () => {
 
         retryCount++;
         if (retryCount < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          // exponential backoff with cap
+          const nextDelay = Math.min(
+            2000,
+            Math.round(baseDelay * Math.pow(1.5, retryCount)),
+          );
+          await new Promise((resolve) => setTimeout(resolve, nextDelay));
         }
       }
 
       if (!hasAccess) {
         if (!guardSetState(requestId)) return;
-        setErrorTitle("Access Denied");
-        setError("You don't have an active rental for this content");
+        setErrorTitle("Verification timed out");
+        setError(
+          "We couldn't confirm your rental yet. You can retry verification or return to the previous page.",
+        );
         setLoading(false);
+        setRetryAttempt(null);
         return;
       }
 
@@ -189,7 +201,8 @@ const Watch = () => {
         // FIXED: Relational nested fetch to grab parent TV Show details natively
         const { data } = await supabase
           .from("episodes")
-          .select(`
+          .select(
+            `
             *,
             seasons!inner (
               season_number,
@@ -198,7 +211,8 @@ const Watch = () => {
                 thumbnail_url
               )
             )
-          `)
+          `,
+          )
           .eq("id", contentId)
           .single();
         contentData = data;
@@ -242,8 +256,15 @@ const Watch = () => {
           return;
         }
 
-        const resolvedPath = await resolveWatchPath("season", contentId, user.id);
-        navigate(resolvedPath, { replace: true, state: { fromSeasonId: contentId } });
+        const resolvedPath = await resolveWatchPath(
+          "season",
+          contentId,
+          user.id,
+        );
+        navigate(resolvedPath, {
+          replace: true,
+          state: { fromSeasonId: contentId },
+        });
         return;
       }
 
@@ -261,30 +282,38 @@ const Watch = () => {
       let videoUrlData: { url: string } | null = null;
 
       if (contentType === "movie") {
-        const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
-          body: { movieId: contentId },
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const { data: urlData, error: urlError } =
+          await supabase.functions.invoke("get-video-url", {
+            body: { movieId: contentId },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
 
         const typedContentData = contentData as { video_url?: string } | null;
-        videoUrlData = (urlError || !urlData?.signedUrl)
-          ? { url: typedContentData?.video_url ?? "" }
-          : { url: urlData.signedUrl };
-
+        videoUrlData =
+          urlError || !urlData?.signedUrl
+            ? { url: typedContentData?.video_url ?? "" }
+            : { url: urlData.signedUrl };
       } else if (contentType === "episode") {
-        const { data: urlData, error: urlError } = await supabase.functions.invoke("get-video-url", {
-          body: { contentId, episodeId: contentId, contentType: "episode", expiryHours: 24 },
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const { data: urlData, error: urlError } =
+          await supabase.functions.invoke("get-video-url", {
+            body: {
+              contentId,
+              episodeId: contentId,
+              contentType: "episode",
+              expiryHours: 24,
+            },
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
 
         const resolveSignedUrl = (input: unknown): string | null => {
           if (input == null) return null;
 
           if (typeof input === "string") {
             try {
-              const parsed = JSON.parse(input) as
-                | { signedUrl?: unknown; data?: { signedUrl?: unknown } }
-                | null;
+              const parsed = JSON.parse(input) as {
+                signedUrl?: unknown;
+                data?: { signedUrl?: unknown };
+              } | null;
               const signedUrl = parsed?.signedUrl;
               if (typeof signedUrl === "string") return signedUrl;
 
@@ -316,7 +345,10 @@ const Watch = () => {
         if (urlError || !signedUrl) {
           if (!guardSetState(requestId)) return;
           setErrorTitle("Video Unavailable");
-          setError(urlError?.message || "Secure token generation failed for media stream");
+          setError(
+            urlError?.message ||
+              "Secure token generation failed for media stream",
+          );
           setLoading(false);
           return;
         }
@@ -334,6 +366,7 @@ const Watch = () => {
 
       if (!guardSetState(requestId)) return;
       setVideoUrl(videoUrlData.url);
+      setRetryAttempt(null);
       setLoading(false);
     } catch (err) {
       if (!guardSetState(requestId)) return;
@@ -344,10 +377,28 @@ const Watch = () => {
     }
   };
 
+  const manualRetry = () => {
+    // bump request id and re-run check
+    requestIdRef.current += 1;
+    const newRequestId = requestIdRef.current;
+    setLoading(true);
+    setError(null);
+    setErrorTitle("Access Denied");
+    setRetryAttempt(null);
+    checkAccessAndLoad(newRequestId);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
+          {retryAttempt ? (
+            <div className="text-white text-sm">
+              Verifying payment... (attempt {retryAttempt})
+            </div>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -358,44 +409,67 @@ const Watch = () => {
         <div className="text-center text-white p-6">
           <h1 className="text-2xl font-bold mb-4">{errorTitle}</h1>
           <p className="mb-4 text-gray-400">{error}</p>
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90 transition"
-          >
-            Go Back
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            {errorTitle === "Verification timed out" ? (
+              <>
+                <button
+                  onClick={manualRetry}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:opacity-90 transition"
+                >
+                  Retry Verification
+                </button>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90 transition"
+                >
+                  Go Back
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => navigate(-1)}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded hover:opacity-90 transition"
+              >
+                Go Back
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   // Formatting strings safely out of unified object types
-  const typedContent = content as
-    | null
-    | {
-        title?: string;
-        thumbnail_url?: string;
-        subtitle_url?: string;
-        video_url?: string;
-        episode_number?: number;
-        seasons?: {
-          season_number?: number;
-          tv_shows?: { title?: string; thumbnail_url?: string };
-        };
-        [key: string]: unknown;
-      };
+  const typedContent = content as null | {
+    title?: string;
+    thumbnail_url?: string;
+    subtitle_url?: string;
+    video_url?: string;
+    episode_number?: number;
+    seasons?: {
+      season_number?: number;
+      tv_shows?: { title?: string; thumbnail_url?: string };
+    };
+    [key: string]: unknown;
+  };
 
-  const contentTitle = contentType === "movie"
-    ? (typedContent?.title ?? "Untitled Movie")
-    : `${typedContent?.seasons?.tv_shows?.title ?? "Show"} - Season ${typedContent?.seasons?.season_number ?? ""} Ep ${typedContent?.episode_number ?? ""}`;
+  const contentTitle =
+    contentType === "movie"
+      ? typedContent?.title ?? "Untitled Movie"
+      : `${typedContent?.seasons?.tv_shows?.title ?? "Show"} - Season ${
+          typedContent?.seasons?.season_number ?? ""
+        } Ep ${typedContent?.episode_number ?? ""}`;
 
-  const contentPoster = contentType === "movie"
-    ? (typedContent?.thumbnail_url ?? "")
-    : (typedContent?.seasons?.tv_shows?.thumbnail_url ?? typedContent?.thumbnail_url ?? "");
+  const contentPoster =
+    contentType === "movie"
+      ? typedContent?.thumbnail_url ?? ""
+      : typedContent?.seasons?.tv_shows?.thumbnail_url ??
+        typedContent?.thumbnail_url ??
+        "";
 
-return (
-    <div 
-      ref={fullscreenContainerRef} 
+  return (
+    <div
+      ref={fullscreenContainerRef}
       className="min-h-screen bg-black relative group select-none"
     >
       {/* Premium Floating Back Button Layer */}
@@ -410,7 +484,7 @@ return (
 
       {videoUrl && content && (
         <>
-          {/* Use Native Player on iOS/Android if available */}
+          {/* Use NativeVideoPlayer only on Capacitor native builds; use web VideoPlayer for browsers */}
           {isNative && (isIOS || isAndroid) ? (
             <NativeVideoPlayer
               contentId={contentId!}
@@ -422,7 +496,6 @@ return (
               autoPlay={true}
             />
           ) : (
-            /* Fallback to Web Player on desktop or web platforms */
             <VideoPlayer
               src={videoUrl}
               contentId={contentId!}
