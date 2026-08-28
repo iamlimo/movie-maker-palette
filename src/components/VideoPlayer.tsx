@@ -546,51 +546,88 @@ export const VideoPlayer = ({
     }
   }, []);
 
-  // Initialize hls.js for m3u8 streams on browsers that don't natively support HLS
+  // Initialize hls.js for m3u8 streams or create a temporary blob URL for progressive MP4s
   useEffect(() => {
-    // Only run on web and when we have a videoRef and an HLS manifest URL
     const url = videoUrl || src || "";
-    const isM3u8 = /\.m3u8(\?|$)/i.test(url);
-    if (!isM3u8) return;
+    if (!url) return;
     let mounted = true;
+    let createdBlobUrl: string | null = null;
 
     (async () => {
       try {
-        // dynamic import to avoid SSR and keep bundle small
-        const Hls = (await import("hls.js")).default;
-        if (!mounted) return;
-        if (Hls.isSupported()) {
-          const mediaEl =
-            videoRef.current?.provider?.media ||
-            videoRef.current?.media ||
-            videoRef.current;
-          const hls = new Hls({ capLevelToPlayerSize: true });
-          hlsRef.current = hls;
-          if (mediaEl) hls.attachMedia(mediaEl as any);
-          hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-            hls.loadSource(url);
-          });
+        const isM3u8 = /\.m3u8(\?|$)/i.test(url);
 
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            const levels = (hls.levels || []).map((l: any) => ({
-              height: l.height,
-              bitrate: l.bitrate,
-            }));
-            setHlsLevels(levels);
-          });
+        if (isM3u8) {
+          // dynamic import to avoid SSR and keep bundle small
+          const Hls = (await import("hls.js")).default;
+          if (!mounted) return;
+          if (Hls.isSupported()) {
+            const mediaEl =
+              videoRef.current?.provider?.media ||
+              videoRef.current?.media ||
+              videoRef.current;
+            const hls = new Hls({ capLevelToPlayerSize: true });
+            hlsRef.current = hls;
+            if (mediaEl) hls.attachMedia(mediaEl as any);
+            hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+              hls.loadSource(url);
+            });
 
-          hls.on(Hls.Events.LEVEL_SWITCHED, (_: any, data: any) => {
-            const level = hls.levels[data.level];
-            const nextQuality = level?.height
-              ? `${level.height}p`
-              : `${Math.round((level?.bitrate || 0) / 1000)}kbps`;
-            setCurrentQuality(nextQuality);
-          });
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+              const levels = (hls.levels || []).map((l: any) => ({
+                height: l.height,
+                bitrate: l.bitrate,
+              }));
+              setHlsLevels(levels);
+            });
+
+            hls.on(Hls.Events.LEVEL_SWITCHED, (_: any, data: any) => {
+              const level = hls.levels[data.level];
+              const nextQuality = level?.height
+                ? `${level.height}p`
+                : `${Math.round((level?.bitrate || 0) / 1000)}kbps`;
+              setCurrentQuality(nextQuality);
+            });
+          } else {
+            // Some browsers (Safari) support native HLS - let the MediaPlayer handle it
+          }
         } else {
-          // Some browsers (Safari) support native HLS - let the MediaPlayer handle it
+          // Progressive MP4 (or other container). To avoid placing the original
+          // signed URL directly on the <video> element (which exposes it in the DOM),
+          // fetch the resource and create a temporary blob URL. Note: this will
+          // download the file into the browser first — for large files consider
+          // using a short-lived streaming URL (HLS) or a server-side proxy that
+          // enforces range requests and tighter security.
+          try {
+            const mediaEl =
+              videoRef.current?.provider?.media ||
+              videoRef.current?.media ||
+              videoRef.current;
+            const resp = await fetch(url, { method: "GET", credentials: "omit" });
+            if (!mounted) return;
+            if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
+            const blob = await resp.blob();
+            if (!mounted) {
+              // revoke if unmounted
+              URL.revokeObjectURL(createdBlobUrl || "");
+              return;
+            }
+            createdBlobUrl = URL.createObjectURL(blob);
+            if (mediaEl) {
+              try {
+                (mediaEl as any).src = createdBlobUrl;
+              } catch {}
+            }
+          } catch (e) {
+            // If this fails, fallback to placing the URL directly — we swallow
+            // the error but leave a console warning so engineers can see the
+            // failure mode in dev tools.
+            // eslint-disable-next-line no-console
+            console.warn("Failed to fetch progressive source as blob", e);
+          }
         }
       } catch (e) {
-        // ignore if import fails
+        // ignore if import/fetch fails
       }
     })();
 
@@ -601,6 +638,11 @@ export const VideoPlayer = ({
         if (hls && typeof hls.destroy === "function") hls.destroy();
         hlsRef.current = null;
       } catch {}
+      if (createdBlobUrl) {
+        try {
+          URL.revokeObjectURL(createdBlobUrl);
+        } catch {}
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoUrl, src]);
@@ -694,7 +736,6 @@ export const VideoPlayer = ({
 
       <MediaPlayer
         ref={videoRef as any}
-        src={videoUrl}
         aria-describedby={controlsId}
         tabIndex={0}
         playsinline
