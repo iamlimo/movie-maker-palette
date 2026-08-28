@@ -25,3 +25,4 @@ ios/fastlane/vendor/
 *.njsproj
 *.sln
 *.sw?
+.refact/
