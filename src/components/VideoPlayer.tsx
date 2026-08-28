@@ -726,6 +726,11 @@ export const VideoPlayer = ({
         <DefaultVideoLayout icons={defaultLayoutIcons as any} />
       </MediaPlayer>
 
+      {/* Debug badge to confirm Vidstack rendering in-browser */}
+      <div className="absolute top-2 right-2 z-50 text-xs bg-emerald-600 text-white px-2 py-1 rounded opacity-90">
+        VIDSTACK
+      </div>
+
       {/* Video Controls */}
       {controlsVisible && (
         <VideoPlayerControls
