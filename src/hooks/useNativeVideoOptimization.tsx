@@ -19,12 +19,9 @@ export const useNativeVideoOptimization = () => {
       const currentPlatform = Capacitor.getPlatform();
       setPlatform(currentPlatform as any);
 
-      // Native player availability:
-      // - Android: custom ExoPlayer Capacitor plugin (registered as "ExoPlayer")
-      // - iOS: legacy capacitor-community/video-player if installed (best-effort)
-      if (currentPlatform === 'android') {
-        setSupportsNativePlayer(Capacitor.isPluginAvailable('ExoPlayer'));
-      } else if (currentPlatform === 'ios') {
+      // Capgo VideoPlayer is the default native player for both Android and iOS.
+      // ExoPlayer is intentionally disabled to avoid a second native player path.
+      if (currentPlatform === 'android' || currentPlatform === 'ios') {
         setSupportsNativePlayer(Capacitor.isPluginAvailable('VideoPlayer'));
       } else {
         setSupportsNativePlayer(false);

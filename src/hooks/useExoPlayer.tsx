@@ -26,7 +26,9 @@ export interface UseExoPlayerResult {
  * On non-Android platforms, isAvailable is false and methods are no-ops.
  */
 export function useExoPlayer(options?: { onProgress?: (currentTime: number, duration: number) => void; onEnded?: () => void; }): UseExoPlayerResult {
-  const isAvailable = Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('ExoPlayer');
+  // ExoPlayer is intentionally disabled. Capgo VideoPlayer is the default
+  // native player for both iOS and Android in the Capacitor app.
+  const isAvailable = false;
 
   const [state, setState] = useState<ExoPlayerState>('idle');
   const [isBuffering, setIsBuffering] = useState(false);

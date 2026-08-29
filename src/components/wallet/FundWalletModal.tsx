@@ -9,6 +9,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { formatNaira } from '@/lib/priceUtils';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
+import { usePlatform } from '@/hooks/usePlatform';
 
 interface FundWalletModalProps {
   isOpen: boolean;
@@ -22,12 +23,26 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { refreshWallet } = useWallet();
+  const { isIOS } = usePlatform();
+
+  if (isIOS) {
+    return null;
+  }
 
   const isNative = Capacitor.isNativePlatform();
   const isMobileBrowser = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
   const shouldUseRedirect = isNative || isMobileBrowser;
 
   const handleFund = async () => {
+    if (isIOS) {
+      toast({
+        title: 'Wallet top-up unavailable',
+        description: 'Wallet funding is disabled on iOS in the app.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     if (amount < 100) {
       toast({
         title: 'Invalid Amount',

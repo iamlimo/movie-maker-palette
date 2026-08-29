@@ -67,15 +67,20 @@ export default function Wallet() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="relative">
-              <Button 
-                onClick={() => setIsFundModalOpen(true)}
-                className="w-full sm:w-auto gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Fund Wallet
-              </Button>
-
+            <CardContent className="relative space-y-3">
+              {isIOS ? (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                  Wallet top-up is unavailable on iOS in the app. Please use the web version to fund your wallet.
+                </div>
+              ) : (
+                <Button 
+                  onClick={() => setIsFundModalOpen(true)}
+                  className="w-full sm:w-auto gradient-accent text-primary-foreground shadow-glow hover:scale-105 transition-bounce"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Fund Wallet
+                </Button>
+              )}
             </CardContent>
           </Card>
 
@@ -124,10 +129,12 @@ export default function Wallet() {
       </main>
 
       {/* Fund Wallet Modal */}
-      <FundWalletModal 
-        isOpen={isFundModalOpen}
-        onClose={() => setIsFundModalOpen(false)}
-      />
+      {!isIOS && (
+        <FundWalletModal 
+          isOpen={isFundModalOpen}
+          onClose={() => setIsFundModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
