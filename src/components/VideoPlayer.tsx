@@ -1,24 +1,19 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-// Vidstack player for improved HLS support and uniform inline playback on mobile
-import "@vidstack/react/player/styles/default/theme.css";
-import "@vidstack/react/player/styles/default/layouts/video.css";
-import { MediaPlayer, MediaProvider } from "@vidstack/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { ArrowLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import {
-  defaultLayoutIcons,
+  MediaPlayer,
+  MediaProvider,
+  Track,
+  type MediaPlayerInstance,
+} from "@vidstack/react";
+import "@vidstack/react/player/styles/default/theme.css";
+import {
   DefaultVideoLayout,
+  defaultLayoutIcons,
 } from "@vidstack/react/player/layouts/default";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useVideoProgress } from "@/hooks/useVideoProgress";
-import { MovieInfoOverlay } from "./MovieInfoOverlay";
-
-// Client-side URL cache
-const urlCache = new Map<
-  string,
-  { url: string; expiresAt: Date; source: string }
->();
 
 interface VideoPlayerProps {
   src?: string;
@@ -31,7 +26,6 @@ interface VideoPlayerProps {
   subtitleUrl?: string;
   autoPlay?: boolean;
   immersive?: boolean;
-  // Enhanced props
   cast?: string[];
   director?: string;
   description?: string;
@@ -42,13 +36,11 @@ interface VideoPlayerProps {
   onNextEpisode?: () => void;
   availableQualities?: string[];
   availableSubtitles?: { code: string; label: string }[];
+  onBack?: () => void;
 }
 
 export const VideoPlayer = ({
   src,
-  movieId,
-  contentId,
-  contentType,
   title,
   poster,
   className = "",
@@ -61,751 +53,326 @@ export const VideoPlayer = ({
   episodeTitle,
   seasonNumber,
   episodeNumber,
-  hasNextEpisode = false,
-  onNextEpisode,
-  availableQualities = ["Auto", "1080p", "720p", "480p", "240p"],
-  availableSubtitles = [],
+  contentType,
+  onBack,
 }: VideoPlayerProps) => {
-  const controlsId = `video-controls-${contentId ?? movieId ?? "player"}`;
-  const [videoUrl, setVideoUrl] = useState<string>(src || "");
-  const [isPlaying, setIsPlaying] = useState(autoPlay);
+  const [isPaused, setIsPaused] = useState(!autoPlay);
+  const [playerError, setPlayerError] = useState("");
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(100);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
-  const [isBandwidthLimited, setIsBandwidthLimited] = useState(false);
-  const [showMovieInfo, setShowMovieInfo] = useState(false);
-  const [currentQuality, setCurrentQuality] = useState("Auto");
-  const [currentSubtitle, setCurrentSubtitle] = useState<string | null>(
-    subtitleUrl ? "en" : null,
-  );
-  const [hideControlsTimeout, setHideControlsTimeout] = useState<ReturnType<
-    typeof setTimeout
-  > | null>(null);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const [skipIntroClicked, setSkipIntroClicked] = useState(false);
-  const [showSkipIntro, setShowSkipIntro] = useState(true);
+  const [isHovering, setIsHovering] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const playerRef = useRef<MediaPlayerInstance | null>(null);
 
-  const videoRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const hlsRef = useRef<any>(null);
-  const [hlsLevels, setHlsLevels] = useState<
-    Array<{ height?: number; bitrate?: number }>
-  >([]);
-  const { toast } = useToast();
+  const handleClose = useCallback(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
 
-  const { saveProgress, getLastPosition, startAutoSave, stopAutoSave } =
-    useVideoProgress(
-      contentId || movieId || "",
-      contentType === "episode" || contentType === "movie"
-        ? contentType
-        : "movie",
-    );
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
 
-  const isTypingTarget = (el: EventTarget | null) => {
-    const node = el as HTMLElement | null;
+    window.location.href = "/";
+  }, [onBack]);
+
+  const isTypingTarget = (target: EventTarget | null) => {
+    const node = target as HTMLElement | null;
     if (!node) return false;
     const tag = node.tagName?.toLowerCase();
-    const isContentEditable = !!(node as HTMLElement).isContentEditable;
-    return tag === "input" || tag === "textarea" || isContentEditable;
+    const isEditable = node.isContentEditable;
+    return tag === "input" || tag === "textarea" || isEditable;
   };
 
-  // Keyboard shortcuts (web only):
-  // - Space: play/pause (when not typing)
-  // - F: toggle fullscreen (when not typing)
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
-      if (isTypingTarget(e.target)) return;
-
-      if (e.code === "Space" || e.key === " ") {
-        e.preventDefault();
-        togglePlay();
-      } else if (e.key?.toLowerCase?.() === "f") {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown, { passive: false });
-    return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFullscreen, isPlaying]);
-
-  // Auto-hide controls in fullscreen
-  useEffect(() => {
-    const handleMouseMove = () => {
-      setControlsVisible(true);
-
-      if (hideControlsTimeout) clearTimeout(hideControlsTimeout);
-
-      if (isFullscreen && isPlaying) {
-        const timeout = setTimeout(() => {
-          setControlsVisible(false);
-        }, 3000);
-        setHideControlsTimeout(timeout);
-      }
-    };
-
-    if (isFullscreen) {
-      containerRef.current?.addEventListener("mousemove", handleMouseMove);
-      return () => {
-        containerRef.current?.removeEventListener("mousemove", handleMouseMove);
-      };
-    }
-  }, [isFullscreen, isPlaying, hideControlsTimeout]);
-
-  // double-click toggles fullscreen (desktop expectation)
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleFullscreen();
-  };
-
-  const fetchVideoUrl = useCallback(
-    async (retryCount = 0) => {
-      if (src) {
-        setVideoUrl(src);
-        setLoading(false);
-        return;
-      }
-
-      if (!movieId) {
-        setError("No video source provided");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError("");
-        setIsBandwidthLimited(false);
-
-        // Check cache first
-        const cached = urlCache.get(movieId);
-        if (cached && new Date() < cached.expiresAt) {
-          console.log("Using cached video URL");
-          setVideoUrl(cached.url);
-          setLoading(false);
-          return;
-        }
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          setError("Please log in to watch this video");
-          return;
-        }
-
-        const { data, error, response } = await supabase.functions.invoke(
-          "get-video-url",
-          {
-            body: {
-              movieId: movieId,
-              expiryHours: 24,
-            },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          },
-        );
-
-        const isBwLimited =
-          response?.headers?.get("X-Bandwidth-Limited") === "true";
-        if (isBwLimited) {
-          setIsBandwidthLimited(true);
-        }
-
-        const apiError =
-          data?.error || error?.message || "Failed to load video";
-        const accessDenied =
-          apiError.toLowerCase().includes("access denied") ||
-          apiError.toLowerCase().includes("forbidden");
-
-        if (error || !data?.success) {
-          if (retryCount === 0 && accessDenied) {
-            setTimeout(() => fetchVideoUrl(1), 1500);
-          }
-
-          setError(apiError);
-          toast({
-            title: "Error",
-            description: apiError,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const finalUrl = data.signedUrl;
-
-        // Cache the URL
-        const expiresAt = new Date(data.expiresAt);
-        urlCache.set(movieId, {
-          url: finalUrl,
-          expiresAt,
-          source: data.source || "backblaze",
-        });
-        setVideoUrl(finalUrl);
-
-        if (isBwLimited) {
-          toast({
-            title: "Using Backup Server",
-            description:
-              "Backblaze bandwidth limit reached. Using Supabase storage.",
-            variant: "default",
-          });
-        }
-      } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to load video";
-        setError(errorMessage);
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [movieId, toast],
-  );
-
-  useEffect(() => {
-    fetchVideoUrl();
-    return () => {
-      // cleanup hls instance on unmount or src change
-      try {
-        const hls = hlsRef.current;
-        if (hls && typeof hls.destroy === "function") hls.destroy();
-        hlsRef.current = null;
-      } catch {}
-    };
-  }, [fetchVideoUrl]);
-
-  // If the subtitle URL changes (switching content), reset subtitle state.
-  useEffect(() => {
-    setCurrentSubtitle(subtitleUrl ? "en" : null);
-  }, [subtitleUrl]);
-
-  // Cleanup auto-save on unmount
-  useEffect(() => {
-    return () => {
-      stopAutoSave();
-    };
-  }, [stopAutoSave]);
-
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      void videoRef.current.pause();
-      setShowMovieInfo(true);
-    } else {
-      void videoRef.current.play();
-      setShowMovieInfo(false);
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const toggleMute = () => {
-    if (!videoRef.current) return;
-
-    videoRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
-  };
-
-  const handleVolumeChange = (newVolume: number) => {
-    if (!videoRef.current) return;
-
-    const nextVolume = Math.max(0, Math.min(100, newVolume));
-    videoRef.current.volume = nextVolume / 100;
-    setVolume(nextVolume);
-
-    if (nextVolume === 0) {
-      videoRef.current.muted = true;
-      setIsMuted(true);
+    if (!src) {
+      setPlayerError("Video is not available right now.");
       return;
     }
 
-    videoRef.current.muted = false;
-    setIsMuted(false);
-  };
-
-  const handleTimeUpdate = () => {
-    if (!videoRef.current) return;
-    setCurrentTime(videoRef.current.currentTime);
-
-    // Hide skip intro after 1:30 (90 seconds) of playback
-    if (videoRef.current.currentTime >= 90 && showSkipIntro) {
-      setShowSkipIntro(false);
-    }
-  };
-
-  const handleLoadedMetadata = async () => {
-    if (!videoRef.current) return;
-    setDuration(videoRef.current.duration);
-
-    // Restore last position
-    const lastPos = await getLastPosition();
-    if (lastPos > 0 && lastPos < videoRef.current.duration - 10) {
-      videoRef.current.currentTime = lastPos;
-      setCurrentTime(lastPos);
-    }
-
-    // Start auto-save
-    startAutoSave(videoRef.current.provider?.media || videoRef.current);
-  };
-
-  const handleSeek = (newTime: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-  };
-
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-
-    if (!isFullscreen) {
-      if (containerRef.current.requestFullscreen) {
-        containerRef.current.requestFullscreen();
-        setIsFullscreen(true);
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-        setIsFullscreen(false);
-      }
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-  };
-
-  const handleSkipIntro = () => {
-    if (!videoRef.current) return;
-    // Typically skip intro is 90 seconds, but this can be customized
-    videoRef.current.currentTime += 90;
-    setSkipIntroClicked(true);
-    setShowSkipIntro(false);
-    toast({
-      title: "Skipped",
-      description: "Intro skipped",
-    });
-  };
-
-  const handleReplay10s = () => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = Math.max(
-      0,
-      videoRef.current.currentTime - 10,
-    );
-  };
-
-  const handleCastToTV = () => {
-    // Implementation for Google Cast API (stub)
-    const w = window as Window & { chrome?: { cast?: unknown } };
-    const hasCast = !!w.chrome?.cast;
-
-    if (hasCast) {
-      toast({
-        title: "Cast",
-        description: "Casting to TV...",
-      });
-    } else {
-      toast({
-        title: "Cast not available",
-        description: "Chromecast is not available on this device",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleQualityChange = (quality: string) => {
-    setCurrentQuality(quality);
-    // HLS.js level switching: set currentLevel to index or -1 for Auto
-    try {
-      const hls = hlsRef.current;
-      if (hls) {
-        if (quality === "Auto") {
-          hls.currentLevel = -1; // enable ABR
-          toast({ title: "Quality", description: `Auto (adaptive)` });
-          return;
-        }
-
-        const targetHeight = parseInt(
-          String(quality).replace(/[^0-9]/g, ""),
-          10,
-        );
-        const levels = hls.levels || [];
-        let bestIdx = -1;
-        for (let i = 0; i < levels.length; i++) {
-          const lvl = levels[i];
-          if (lvl && lvl.height === targetHeight) {
-            bestIdx = i;
-            break;
-          }
-        }
-        if (bestIdx === -1 && levels.length > 0) {
-          // fallback: choose nearest by height
-          let nearest = 0;
-          let diff = Infinity;
-          for (let i = 0; i < levels.length; i++) {
-            const h = levels[i].height || 0;
-            const d = Math.abs((h || 0) - targetHeight);
-            if (d < diff) {
-              diff = d;
-              nearest = i;
-            }
-          }
-          bestIdx = nearest;
-        }
-
-        if (bestIdx >= 0) {
-          hls.currentLevel = bestIdx;
-          toast({ title: "Quality", description: `Set ${quality}` });
-          return;
-        }
-      }
-
-      // Non-hls fallback: just toast
-      toast({
-        title: "Quality Changed",
-        description: `Switched to ${quality}`,
-      });
-    } catch (e) {
-      toast({
-        title: "Quality Change Failed",
-        description: String(e),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSubtitlesChange = (subtitle: string | null) => {
-    // DB only provides a single English subtitle_url for now.
-    if (!subtitleUrl) {
-      setCurrentSubtitle(null);
-      toast({
-        title: "Subtitles",
-        description: "Subtitles are not available for this content",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const next = subtitle === null ? null : "en";
-    setCurrentSubtitle(next);
-
-    toast({
-      title: "Subtitles",
-      description: next ? "English captions on" : "Subtitles off",
-    });
-  };
+    setPlayerError("");
+  }, [src]);
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, []);
-
-  // Prevent right-click on video to protect against piracy
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target === videoRef.current ||
-        containerRef.current?.contains(target)
-      ) {
-        e.preventDefault();
-        return false;
+    const handleContextMenu = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!containerRef.current || !target) return;
+      if (containerRef.current.contains(target)) {
+        event.preventDefault();
       }
     };
 
-    if (videoRef.current) {
-      videoRef.current.addEventListener(
-        "contextmenu",
-        handleContextMenu as EventListener,
-      );
-      return () => {
-        videoRef.current?.removeEventListener(
-          "contextmenu",
-          handleContextMenu as EventListener,
-        );
-      };
-    }
-  }, []);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (isTypingTarget(event.target)) return;
 
-  // Initialize hls.js for m3u8 streams or create a temporary blob URL for progressive MP4s
-  useEffect(() => {
-    const url = videoUrl || src || "";
-    if (!url) return;
-    let mounted = true;
-    let createdBlobUrl: string | null = null;
+      if (event.key.toLowerCase() === "s" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
 
-    (async () => {
-      try {
-        const isM3u8 = /\.m3u8(\?|$)/i.test(url);
-
-        if (isM3u8) {
-          // dynamic import to avoid SSR and keep bundle small
-          const Hls = (await import("hls.js")).default;
-          if (!mounted) return;
-          if (Hls.isSupported()) {
-            const mediaEl =
-              videoRef.current?.provider?.media ||
-              videoRef.current?.media ||
-              videoRef.current;
-            const hls = new Hls({ capLevelToPlayerSize: true });
-            hlsRef.current = hls;
-            if (mediaEl) hls.attachMedia(mediaEl as any);
-            hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-              hls.loadSource(url);
-            });
-
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              const levels = (hls.levels || []).map((l: any) => ({
-                height: l.height,
-                bitrate: l.bitrate,
-              }));
-              setHlsLevels(levels);
-            });
-
-            hls.on(Hls.Events.LEVEL_SWITCHED, (_: any, data: any) => {
-              const level = hls.levels[data.level];
-              const nextQuality = level?.height
-                ? `${level.height}p`
-                : `${Math.round((level?.bitrate || 0) / 1000)}kbps`;
-              setCurrentQuality(nextQuality);
-            });
+      if (event.code === "Space" || event.key === " ") {
+        event.preventDefault();
+        if (playerRef.current) {
+          if (playerRef.current.paused) {
+            void playerRef.current.play();
           } else {
-            // Some browsers (Safari) support native HLS - let the MediaPlayer handle it
-          }
-        } else {
-          // Progressive MP4 (or other container). To avoid placing the original
-          // signed URL directly on the <video> element (which exposes it in the DOM),
-          // fetch the resource and create a temporary blob URL. Note: this will
-          // download the file into the browser first — for large files consider
-          // using a short-lived streaming URL (HLS) or a server-side proxy that
-          // enforces range requests and tighter security.
-          try {
-            const mediaEl =
-              videoRef.current?.provider?.media ||
-              videoRef.current?.media ||
-              videoRef.current;
-            const resp = await fetch(url, { method: "GET", credentials: "omit" });
-            if (!mounted) return;
-            if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-            const blob = await resp.blob();
-            if (!mounted) {
-              // revoke if unmounted
-              URL.revokeObjectURL(createdBlobUrl || "");
-              return;
-            }
-            createdBlobUrl = URL.createObjectURL(blob);
-            if (mediaEl) {
-              try {
-                (mediaEl as any).src = createdBlobUrl;
-              } catch {}
-            }
-          } catch (e) {
-            // If this fails, fallback to placing the URL directly — we swallow
-            // the error but leave a console warning so engineers can see the
-            // failure mode in dev tools.
-            // eslint-disable-next-line no-console
-            console.warn("Failed to fetch progressive source as blob", e);
+            void playerRef.current.pause();
           }
         }
-      } catch (e) {
-        // ignore if import/fetch fails
+        return;
       }
-    })();
 
-    return () => {
-      mounted = false;
-      try {
-        const hls = hlsRef.current;
-        if (hls && typeof hls.destroy === "function") hls.destroy();
-        hlsRef.current = null;
-      } catch {}
-      if (createdBlobUrl) {
-        try {
-          URL.revokeObjectURL(createdBlobUrl);
-        } catch {}
+      if (event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        if (!containerRef.current) return;
+        if (document.fullscreenElement) {
+          void document.exitFullscreen();
+        } else {
+          void containerRef.current.requestFullscreen();
+        }
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        if (playerRef.current) {
+          playerRef.current.currentTime = Math.min(
+            playerRef.current.currentTime + 10,
+            playerRef.current.duration || 0,
+          );
+        }
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        if (playerRef.current) {
+          playerRef.current.currentTime = Math.max(
+            playerRef.current.currentTime - 10,
+            0,
+          );
+        }
+      }
+
+      if (event.key.toLowerCase() === "m") {
+        event.preventDefault();
+        const nextValue = !isMuted;
+        if (playerRef.current) {
+          playerRef.current.muted = nextValue;
+        }
+        setIsMuted(nextValue);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoUrl, src]);
 
-  if (loading) {
-    return (
-      <div className={`bg-black rounded-lg overflow-hidden ${className}`}>
-        {poster ? (
-          <div className="relative w-full aspect-video bg-black overflow-hidden">
-            <img
-              src={poster}
-              alt={title ?? "Poster"}
-              className="w-full h-full object-cover opacity-90 transform transition-transform duration-700 ease-out group-focus-within:scale-105 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Skeleton className="w-24 h-24 rounded-full" />
-            </div>
-            {title && (
-              <div className="absolute left-4 bottom-4 text-white/90 text-sm drop-shadow">
-                {title}
-              </div>
-            )}
-          </div>
-        ) : (
-          <Skeleton className="w-full aspect-video rounded-none" />
-        )}
-      </div>
-    );
-  }
+    const current = containerRef.current;
+    current?.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("keydown", handleKeyDown, { passive: false });
 
-  if (error) {
-    return (
-      <div
-        className={`flex flex-col items-center justify-center bg-black rounded-lg p-6 ${className}`}
-        role="alert"
-        aria-live="assertive"
-      >
-        <div className="text-white text-center max-w-lg">
-          <p className="text-lg font-semibold mb-2">Playback Error</p>
-          <p className="text-sm mb-4">{error}</p>
-          <div className="flex items-center justify-center gap-3">
-            <Button variant="default" onClick={() => fetchVideoUrl()}>
-              Retry
-            </Button>
-            <Button variant="outline" onClick={() => setError("")}>
-              Dismiss
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    return () => {
+      current?.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMuted]);
 
-  const showControlsAndMaybePlay = () => {
-    setControlsVisible(true);
+  const label = [
+    title,
+    episodeTitle,
+    seasonNumber && episodeNumber
+      ? `S${seasonNumber} • E${episodeNumber}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
 
-    // If paused, start playing (primary tap-to-toggle behavior)
-    if (videoRef.current && !isPlaying) {
-      togglePlay();
-    }
+  const mediaHeader =
+    contentType === "episode"
+      ? "Episode"
+      : contentType === "season"
+      ? "Season"
+      : contentType === "movie"
+      ? "Movie"
+      : "Watch";
+
+  const playerStyle: CSSProperties & Record<`--${string}`, string | number> = {
+    ["--media-brand" as `--${string}`]: "#FD8208",
+    ["--media-brand-hover" as `--${string}`]: "#FF9C3A",
+    ["--media-focus-ring-color" as `--${string}`]: "#FD8208",
+    ["--media-slider-track-fill-bg" as `--${string}`]: "#FD8208",
+    ["--media-slider-track-buffer-bg" as `--${string}`]:
+      "rgba(255,255,255,0.3)",
+    ["--media-slider-thumb-bg" as `--${string}`]: "#ffffff",
+    ["--media-menu-bg" as `--${string}`]: "rgba(9, 9, 11, 0.94)",
+    ["--media-menu-item-hover-bg" as `--${string}`]: "rgba(253, 130, 8, 0.16)",
+    ["--media-control-hover-bg" as `--${string}`]: "rgba(253, 130, 8, 0.18)",
+    ["--media-control-color" as `--${string}`]: "#ffffff",
+    ["--media-button-bg" as `--${string}`]: "rgba(255,255,255,0.06)",
+    ["--media-button-hover-bg" as `--${string}`]: "rgba(253, 130, 8, 0.2)",
+    ["--media-button-text" as `--${string}`]: "#fff",
+    ["--media-text-color" as `--${string}`]: "#fff",
+    ["--media-range-track-height" as `--${string}`]: "0.25rem",
+    ["--media-range-thumb-size" as `--${string}`]: "0.9rem",
   };
 
   return (
     <div
       ref={containerRef}
-      onClick={() => showControlsAndMaybePlay()}
-      onDoubleClick={handleDoubleClick}
-      onKeyDown={(e) => {
-        if (e.key === " " || e.key === "Enter") {
-          e.preventDefault();
-          showControlsAndMaybePlay();
-        }
-      }}
-      tabIndex={0}
-      role="region"
-      aria-label={`Video player: ${title ?? "content"}`}
-      className={`relative bg-black ${
-        immersive ? "w-screen h-screen" : "rounded-lg overflow-hidden"
-      } ${className} group cursor-default focus:outline-none focus-visible:ring-4 focus-visible:ring-white/20`}
+      className={`group relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#060606] shadow-[0_24px_80px_rgba(0,0,0,0.55)] ${
+        immersive ? "h-screen w-full" : "aspect-video w-full"
+      } ${className}`}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+      onFocus={() => setIsHovering(true)}
+      onBlur={() => setIsHovering(false)}
+      aria-label={`Video player for ${title ?? "content"}`}
     >
-      {/* Bandwidth Limited Banner */}
-      {isBandwidthLimited && (
-        <div className="absolute top-0 left-0 right-0 z-50 bg-amber-900/80 text-amber-100 px-4 py-2 text-sm flex items-center gap-2">
-          <span>⚠️</span>
-          <span>
-            Using backup server due to bandwidth limits. Service will resume
-            tomorrow.
-          </span>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/40 z-10 pointer-events-none" />
+
+      <button
+        type="button"
+        onClick={handleClose}
+        className={`absolute left-4 top-4 z-30 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/35 px-3 py-2 text-sm font-medium text-white backdrop-blur-md transition-all duration-200 ${
+          isHovering
+            ? "opacity-100 translate-y-0"
+            : "pointer-events-none opacity-0 -translate-y-2"
+        }`}
+        aria-label="Go back"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </button>
+
+      <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+        <div className="rounded-full border border-[#FD8208]/40 bg-[#FD8208]/15 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.22em] text-[#FFD9B2] backdrop-blur-sm">
+          HD
+        </div>
+      </div>
+
+      {playerError ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/85 px-6">
+          <div className="max-w-md rounded-2xl border border-white/10 bg-white/5 p-6 text-center backdrop-blur-sm">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-[#FD8208]">
+              Playback error
+            </p>
+            <h3 className="mt-4 text-2xl font-semibold text-white">
+              Video unavailable
+            </h3>
+            <p className="mt-2 text-sm text-slate-300">{playerError}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              className="mt-6 bg-[#FD8208] text-black hover:bg-[#ff9b4a]"
+            >
+              Refresh
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <MediaPlayer
+          ref={playerRef}
+          src={src}
+          title={title || "Signature TV"}
+          poster={poster}
+          className="h-full w-full"
+          style={playerStyle}
+          playsInline
+          preload="metadata"
+          autoPlay={autoPlay}
+          onPlay={() => setIsPaused(false)}
+          onPause={() => setIsPaused(true)}
+          onError={() => setPlayerError("This video could not be loaded.")}
+        >
+          <MediaProvider>
+            {subtitleUrl && (
+              <Track
+                kind="subtitles"
+                src={subtitleUrl}
+                lang="en"
+                label="English"
+                default
+              />
+            )}
+          </MediaProvider>
+          <DefaultVideoLayout
+            icons={defaultLayoutIcons}
+            className="!absolute inset-0"
+          />
+        </MediaPlayer>
+      )}
+
+      {!playerError && isPaused && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-end p-5 md:p-8">
+          <div className="max-w-xl rounded-2xl border border-white/10 bg-black/35 p-4 shadow-[0_16px_32px_rgba(0,0,0,0.4)] backdrop-blur-md md:p-5">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#FD8208]">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#FD8208]" />
+              {mediaHeader}
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold text-white md:text-4xl">
+              {title}
+            </h2>
+            {(episodeTitle || description) && (
+              <p className="mt-2 max-w-lg text-sm text-slate-200 md:text-base">
+                {episodeTitle || description}
+              </p>
+            )}
+            {(seasonNumber || episodeNumber) && (
+              <p className="mt-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-300">
+                {seasonNumber ? `Season ${seasonNumber}` : "Season"}
+                {episodeNumber ? ` • Episode ${episodeNumber}` : ""}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
-      <MediaPlayer
-        ref={videoRef as any}
-        aria-describedby={controlsId}
-        tabIndex={0}
-        playsinline
-        controls={false}
-        className="w-full h-full object-contain"
-        style={{
-          ["--media-brand" as any]: "#FD8307",
-          ["--video-brand" as any]: "#FD8307",
-          ["--media-slider-track-fill-bg" as any]: "#FD8307",
-          ["--media-button-hover-bg" as any]: "rgba(253, 131, 7, 0.22)",
-          ["--media-menu-bg" as any]: "rgba(15, 15, 15, 0.94)",
-          ["--video-volume-bg" as any]: "rgba(17, 17, 17, 0.9)",
-          ["--media-button-color" as any]: "#ffffff",
-          ["--video-focus-ring-color" as any]: "#FD8307",
-          ["--media-focus-ring-color" as any]: "#FD8307",
-          ["--media-controls-color" as any]: "#ffffff",
-          ["--video-controls-color" as any]: "#ffffff",
-          ["--media-buffering-track-fill-color" as any]: "#FD8307",
-          ["--video-border-radius" as any]: "14px",
-          ["--video-border" as any]: "1px solid rgba(255,255,255,0.12)",
-        }}
-        onTimeUpdate={handleTimeUpdate as any}
-        onLoadedMetadata={handleLoadedMetadata as any}
-        onPlay={() => {
-          setIsPlaying(true);
-          setShowMovieInfo(false);
-        }}
-        onPause={() => {
-          setIsPlaying(false);
-          setShowMovieInfo(true);
-        }}
-        preload="metadata"
-        crossOrigin="anonymous"
-        autoPlay={autoPlay}
-      >
-        <MediaProvider>
-          {subtitleUrl && currentSubtitle !== null && (
-            <track
-              key={`track-${currentSubtitle}`}
-              kind="subtitles"
-              src={subtitleUrl}
-              srcLang="en"
-              label="English"
-              default
-            />
-          )}
-          <DefaultVideoLayout icons={defaultLayoutIcons as any} />
-        </MediaProvider>
-      </MediaPlayer>
+      {!playerError && (
+        <div className="pointer-events-none absolute bottom-4 right-4 z-30 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-200">
+          <button
+            type="button"
+            aria-label={isPaused ? "Play" : "Pause"}
+            onClick={() => {
+              if (playerRef.current) {
+                if (isPaused) {
+                  void playerRef.current.play();
+                } else {
+                  void playerRef.current.pause();
+                }
+              }
+            }}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white transition hover:bg-[#FD8208] hover:text-black"
+          >
+            {isPaused ? (
+              <Play className="ml-0.5 h-4 w-4" />
+            ) : (
+              <Pause className="h-4 w-4" />
+            )}
+          </button>
+          <button
+            type="button"
+            aria-label={isMuted ? "Unmute" : "Mute"}
+            onClick={() => {
+              const nextValue = !isMuted;
+              if (playerRef.current) {
+                playerRef.current.muted = nextValue;
+              }
+              setIsMuted(nextValue);
+            }}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white transition hover:bg-[#FD8208] hover:text-black"
+          >
+            {isMuted ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+      )}
 
-      {/* Movie Info Overlay - Shows when paused */}
-      <MovieInfoOverlay
-        isVisible={showMovieInfo && !isPlaying}
-        title={title}
-        subtitle={episodeTitle}
-        cast={cast}
-        director={director}
-        description={description}
-        posterUrl={poster}
-        episodeTitle={episodeTitle}
-        seasonNumber={seasonNumber}
-        episodeNumber={episodeNumber}
-        onClose={() => {
-          setShowMovieInfo(false);
-          if (!isPlaying && videoRef.current) {
-            videoRef.current.play();
-            setIsPlaying(true);
-          }
-        }}
-      />
+      {!poster && !src && !playerError && (
+        <div className="absolute inset-0 z-10 bg-black/30">
+          <Skeleton className="h-full w-full rounded-none" />
+        </div>
+      )}
     </div>
   );
 };

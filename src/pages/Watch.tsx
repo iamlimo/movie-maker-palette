@@ -391,14 +391,7 @@ const Watch = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-white" />
-          {retryAttempt ? (
-            <div className="text-white text-sm">
-              Verifying payment... (attempt {retryAttempt})
-            </div>
-          ) : null}
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }
@@ -472,22 +465,13 @@ const Watch = () => {
       ref={fullscreenContainerRef}
       className="min-h-screen bg-black relative group select-none"
     >
-      {/* Premium Floating Back Button Layer */}
-      <button
-        onClick={() => navigate(-1)}
-        className="absolute top-6 left-6 z-50 flex items-center justify-center bg-black/40 hover:bg-black/70 text-white p-3 rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out transform -translate-x-2 group-hover:translate-x-0 cursor-pointer shadow-2xl border border-white/10 hover:scale-105 active:scale-95"
-        title="Go Back"
-        aria-label="Return to previous page"
-      >
-        <ArrowLeft className="h-6 w-6 transition-transform group-hover/btn:-translate-x-0.5" />
-      </button>
-
       {videoUrl && content && (
         <>
           {(() => {
-            const branch = isNative && (isIOS || isAndroid)
-              ? "NativeVideoPlayer"
-              : "VideoPlayer";
+            const branch =
+              isNative && (isIOS || isAndroid)
+                ? "NativeVideoPlayer"
+                : "VideoPlayer";
             console.log("[Watch] rendering player branch:", {
               isNative,
               isIOS,

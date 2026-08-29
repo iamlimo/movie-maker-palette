@@ -1,18 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { VideoPlayer } from "./VideoPlayer";
 import { Capacitor } from "@capacitor/core";
-import { VideoPlayer as CapgoVideoPlayer } from "@capgo/capacitor-video-player";
-import { useToast } from "@/hooks/use-toast";
+import { ScreenOrientation } from "@capacitor/screen-orientation";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import Plyr from "plyr";
+import "plyr/dist/plyr.css";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
-import { useWatchHistory } from "@/hooks/useWatchHistory";
-import {
-  Loader2,
-  ChevronLeft,
-  Play,
-  Pause,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { VideoPlayer } from "./VideoPlayer";
 
 interface NativeVideoPlayerProps {
   contentId: string;
@@ -25,7 +20,21 @@ interface NativeVideoPlayerProps {
   watermarkText?: string;
 }
 
-const isHls = (url: string) => /\.m3u8($|\?)/i.test(url);
+const formatTime = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "0:00";
+  const total = Math.floor(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(
+      secs,
+    ).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(secs).padStart(2, "0")}`;
+};
 
 const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   contentId,
@@ -37,356 +46,282 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   autoPlay = true,
 }) => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { saveProgress, getLastPosition } = useVideoProgress(
     contentId,
     contentType === "episode" ? "episode" : "movie",
   );
-  const platform = Capacitor.getPlatform();
-  const isAndroid = platform === "android";
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const lastSavedRef = useRef(0);
-  const loadedRef = useRef(false);
-  const [capgoAvailable, setCapgoAvailable] = useState(false);
-  const capgoPlayerRef = useRef<any>(null);
-  const capgoModuleRef = useRef<any>(null);
-  const capgoPollRef = useRef<number | null>(null);
-  const [nativeIsPlaying, setNativeIsPlaying] = useState(false);
-  const [nativeCurrentTime, setNativeCurrentTime] = useState(0);
-  const [nativeDuration, setNativeDuration] = useState(0);
 
-  const [showControls, setShowControls] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const playerRef = useRef<Plyr | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const touchRef = useRef<{ time: number; x: number } | null>(null);
 
-  const [retryKey, setRetryKey] = useState(0);
-
-  const handleRetry = async () => {
-    loadedRef.current = false;
-    setRetryKey((k) => k + 1);
-  };
+  const [isReady, setIsReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isNativePlatform, setIsNativePlatform] = useState(false);
 
   useEffect(() => {
-    if (!["android", "ios"].includes(platform) || loadedRef.current) return;
-    loadedRef.current = true;
+    const native = Capacitor.isNativePlatform();
+    const platform = Capacitor.getPlatform();
+    const supported = native && (platform === "ios" || platform === "android");
+    setIsNativePlatform(supported);
 
-    console.log("Loading rented video in NativeVideoPlayer:", {
-      contentId,
-      contentType,
-      videoUrl: videoUrl.substring(0, 50) + "...",
-      platform,
-      isHls: isHls(videoUrl),
-    });
+    if (!supported) return;
 
-    (async () => {
-      const capgo = Capacitor.isPluginAvailable("VideoPlayer") ? CapgoVideoPlayer : null;
-      capgoModuleRef.current = capgo;
-
-      if (capgo) {
-        try {
-          setCapgoAvailable(true);
-
-          if (!videoUrl || !videoUrl.startsWith("http")) {
-            throw new Error("Invalid video URL provided");
-          }
-
-          const startPos = (await getLastPosition()) || 0;
-          const playerId = `rental-player-${contentId}-${contentType}`;
-          capgoPlayerRef.current = playerId;
-
-          await capgo.initPlayer({
-            mode: "fullscreen",
-            playerId,
-            url: videoUrl,
-            title,
-            smallTitle:
-              contentType === "episode" ? "Episode video" : "Movie video",
-            artwork: poster || undefined,
-            subtitle: subtitleUrl || undefined,
-            language: subtitleUrl ? "en" : undefined,
-            showControls: true,
-            pipEnabled: true,
-            bkmodeEnabled: true,
-            displayMode: "all",
-            accentColor: "#7c3aed",
-            chromecast: true,
-          } as any);
-
-          if (startPos > 5) {
-            await capgo.setCurrentTime({
-              playerId,
-              seektime: startPos,
-            });
-          }
-
-          if (autoPlay) {
-            await capgo.play({ playerId });
-          }
-
-          setNativeIsPlaying(true);
-
-          if (startPos > 5) {
-            toast({
-              title: "Resumed",
-              description: `Continuing from ${Math.round(startPos)}s`,
-            });
-          }
-
-          return;
-        } catch (capgoErr) {
-          console.warn("Capgo player failed, falling back to web player", capgoErr);
-        }
+    try {
+      if (Capacitor.isPluginAvailable("StatusBar")) {
+        StatusBar.setOverlaysWebView({ overlay: true });
+        StatusBar.setStyle({ style: Style.Dark });
+        StatusBar.hide();
       }
 
-      toast({
-        title: "Native Player Unavailable",
-        description: "Switching to the web player for this video.",
-        variant: "destructive",
-      });
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    isAndroid,
-    videoUrl,
-    contentId,
-    contentType,
-    platform,
-    toast,
-    autoPlay,
-    subtitleUrl,
-    getLastPosition,
-    retryKey,
-  ]);
+      if (Capacitor.isPluginAvailable("ScreenOrientation")) {
+        ScreenOrientation.lock({ orientation: "landscape" });
+      }
+    } catch (error) {
+      console.warn("Native video shell setup failed:", error);
+    }
 
-  // Poll Capgo player for state and expose simple control bindings
-  useEffect(() => {
-    const instance =
-      capgoModuleRef.current ??
-      (Capacitor.isPluginAvailable("VideoPlayer") ? CapgoVideoPlayer : null);
-    if (!capgoAvailable || !instance) return;
-
-    const poll = window.setInterval(async () => {
+    return () => {
       try {
-        const playerId = capgoPlayerRef.current;
-        if (!playerId) return;
-
-        if (typeof instance.getCurrentTime === "function") {
-          const pos = await instance.getCurrentTime({ playerId });
-          const seconds = Number(pos?.value ?? pos?.currentTime ?? pos ?? 0);
-          setNativeCurrentTime(Number.isFinite(seconds) ? seconds : 0);
+        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
+          ScreenOrientation.unlock();
         }
-        if (typeof instance.getDuration === "function") {
-          const dur = await instance.getDuration({ playerId });
-          const seconds = Number(dur?.value ?? dur ?? 0);
-          setNativeDuration(Number.isFinite(seconds) ? seconds : 0);
+        if (Capacitor.isPluginAvailable("StatusBar")) {
+          StatusBar.show();
+          StatusBar.setStyle({ style: Style.Light });
         }
-        if (typeof instance.isPlaying === "function") {
-          const p = await instance.isPlaying({ playerId });
-          const playing = !!(p?.value ?? p?.isPlaying ?? p);
-          setNativeIsPlaying(playing);
-        }
-      } catch (e) {
-        // ignore polling errors
-      }
-    }, 1000);
-
-    capgoPollRef.current = poll;
-
-    return () => {
-      if (capgoPollRef.current) {
-        clearInterval(capgoPollRef.current);
-        capgoPollRef.current = null;
+      } catch (error) {
+        console.warn("Native video shell cleanup failed:", error);
       }
     };
-  }, [capgoAvailable]);
-
-  const capgoPlay = async () => {
-    try {
-      const instance =
-        capgoModuleRef.current ??
-        (Capacitor.isPluginAvailable("VideoPlayer") ? CapgoVideoPlayer : null);
-      const playerId = capgoPlayerRef.current;
-      if (instance && typeof instance.play === "function" && playerId) {
-        await instance.play({ playerId });
-        setNativeIsPlaying(true);
-      }
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  const capgoPause = async () => {
-    try {
-      const instance =
-        capgoModuleRef.current ??
-        (Capacitor.isPluginAvailable("VideoPlayer") ? CapgoVideoPlayer : null);
-      const playerId = capgoPlayerRef.current;
-      if (instance && typeof instance.pause === "function" && playerId) {
-        await instance.pause({ playerId });
-        setNativeIsPlaying(false);
-      }
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  const capgoSeek = async (seconds: number) => {
-    try {
-      const instance =
-        capgoModuleRef.current ??
-        (Capacitor.isPluginAvailable("VideoPlayer") ? CapgoVideoPlayer : null);
-      const playerId = capgoPlayerRef.current;
-      if (instance && typeof instance.setCurrentTime === "function" && playerId) {
-        await instance.setCurrentTime({ playerId, seektime: seconds });
-      }
-      setNativeCurrentTime(seconds);
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  // Save position on unmount
-  useEffect(() => {
-    return () => {
-      if (nativeCurrentTime > 0 && nativeDuration > 0) {
-        saveProgress(nativeCurrentTime, nativeDuration);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nativeCurrentTime, nativeDuration, saveProgress]);
-
-  // Cleanup Capgo player on unmount if used
-  useEffect(() => {
-    return () => {
-      (async () => {
-        try {
-          const instance =
-            capgoModuleRef.current ??
-            (Capacitor.isPluginAvailable("VideoPlayer") ? CapgoVideoPlayer : null);
-          const playerId = capgoPlayerRef.current;
-
-          if (instance && playerId) {
-            if (typeof instance.exitPlayer === "function") {
-              await instance.exitPlayer();
-            }
-            if (typeof instance.stopAllPlayers === "function") {
-              await instance.stopAllPlayers();
-            }
-          }
-          if (capgoPollRef.current) {
-            clearInterval(capgoPollRef.current);
-            capgoPollRef.current = null;
-          }
-        } catch (err) {
-          // swallow cleanup errors
-        }
-      })();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- Render: Native in-page overlay (Exo or Capgo) ----
-  if (capgoAvailable && (platform === "android" || platform === "ios")) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex items-center justify-between p-3 bg-background/80 backdrop-blur sticky top-0 z-10">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={async () => {
-              try {
-                const instance =
-                  capgoModuleRef.current ??
-                  (Capacitor.isPluginAvailable("VideoPlayer") ? CapgoVideoPlayer : null);
-                const playerId = capgoPlayerRef.current;
-                if (instance && playerId) {
-                  if (typeof instance.exitPlayer === "function") {
-                    await instance.exitPlayer();
-                  }
-                  if (typeof instance.stopAllPlayers === "function") {
-                    await instance.stopAllPlayers();
-                  }
-                }
-              } finally {
-                navigate(-1);
-              }
-            }}
-            className="gap-1"
-          >
-            <ChevronLeft className="h-4 w-4" /> Back
-          </Button>
-          <span className="text-sm font-medium truncate max-w-[60%] text-foreground">
-            {title}
-          </span>
-          <span className="w-12" />
-        </div>
-        {/* Native player overlays on top of this transparent area */}
-        <div
-          ref={containerRef}
-          className="relative w-full bg-black"
-          style={{ aspectRatio: "16 / 9" }}
-          onClick={() => setShowControls((s) => !s)}
-        >
-          <div className="absolute inset-0 flex items-center justify-center text-center p-4 text-white pointer-events-none">
-            <div>
-              <div className="mb-4">
-                <Loader2 className="h-12 w-12 animate-spin text-primary/80 mx-auto" />
-              </div>
-              <h3 className="text-lg font-semibold">
-                Playing in native player
-              </h3>
-              <p className="text-sm text-white/70 mt-2">
-                Capgo handles playback with built-in controls enabled.
-              </p>
-            </div>
-          </div>
-          {/* Capgo controls when available */}
-          {showControls && (
-            <div className="flex items-center justify-center gap-3 p-4 bg-background absolute bottom-0 left-0 right-0 z-20">
-              <Button
-                size="icon"
-                variant="secondary"
-                onClick={() => (nativeIsPlaying ? capgoPause() : capgoPlay())}
-              >
-                {nativeIsPlaying ? (
-                  <Pause className="h-5 w-5" />
-                ) : (
-                  <Play className="h-5 w-5" />
-                )}
-              </Button>
-              <div className="text-xs text-muted-foreground tabular-nums">
-                {formatTime(nativeCurrentTime)} / {formatTime(nativeDuration)}
-              </div>
-            </div>
-          )}
-        </div>
+  useEffect(() => {
+    if (!isNativePlatform || !videoRef.current) return;
 
-      </div>
+    const video = videoRef.current;
+    const player = new Plyr(video, {
+      controls: [
+        "play-large",
+        "play",
+        "progress",
+        "current-time",
+        "mute",
+        "volume",
+        "fullscreen",
+      ],
+      invertTime: false,
+      autoplay: autoPlay,
+      muted: false,
+      clickToPlay: true,
+      keyboard: { focused: true, global: false },
+      i18n: {
+        restart: "Restart",
+        rewind: "Rewind 10s",
+        play: "Play",
+        pause: "Pause",
+        fastForward: "Forward 10s",
+        currentTime: "Current time",
+        duration: "Duration",
+        mute: "Mute",
+        unmute: "Unmute",
+        volume: "Volume",
+        fullscreen: "Fullscreen",
+      },
+      ratio: "16:9",
+      hideControls: false,
+      tooltips: { controls: true, seek: true },
+      fullscreen: { enabled: true, iosNative: true },
+      loadSprite: true,
+    });
+
+    playerRef.current = player;
+
+    const handleReady = async () => {
+      setIsReady(true);
+      const startPosition = (await getLastPosition()) || 0;
+      if (
+        startPosition > 5 &&
+        video.duration &&
+        startPosition < video.duration - 5
+      ) {
+        video.currentTime = startPosition;
+        setCurrentTime(startPosition);
+      }
+
+      if (autoPlay) {
+        void Promise.resolve(player.play()).catch(() => undefined);
+      }
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime || 0);
+    };
+
+    const handleLoadedMetadata = () => {
+      setDuration(video.duration || 0);
+      setCurrentTime(video.currentTime || 0);
+    };
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
+    player.on("ready", handleReady);
+    player.on("timeupdate", handleTimeUpdate);
+    player.on("loadedmetadata", handleLoadedMetadata);
+    player.on("play", handlePlay);
+    player.on("pause", handlePause);
+
+    video.src = videoUrl;
+    video.poster = poster || "";
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("preload", "metadata");
+
+    return () => {
+      player.off("ready", handleReady);
+      player.off("timeupdate", handleTimeUpdate);
+      player.off("loadedmetadata", handleLoadedMetadata);
+      player.off("play", handlePlay);
+      player.off("pause", handlePause);
+      player.destroy();
+      playerRef.current = null;
+    };
+  }, [
+    autoPlay,
+    contentId,
+    getLastPosition,
+    isNativePlatform,
+    poster,
+    videoUrl,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (currentTime > 0 && duration > 0) {
+        saveProgress(currentTime, duration);
+      }
+    };
+  }, [currentTime, duration, saveProgress]);
+
+  const handleBack = () => {
+    if (playerRef.current) {
+      playerRef.current.destroy();
+      playerRef.current = null;
+    }
+    navigate(-1);
+  };
+
+  const handleDoubleTapSeek = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!videoRef.current) return;
+
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    const now = Date.now();
+    const lastTouch = touchRef.current;
+
+    if (lastTouch && now - lastTouch.time < 280) {
+      const delta = touch.clientX - lastTouch.x;
+      const nextTime = Math.min(
+        Math.max(videoRef.current.currentTime + (delta > 0 ? 10 : -10), 0),
+        videoRef.current.duration || 0,
+      );
+      videoRef.current.currentTime = nextTime;
+      setCurrentTime(nextTime);
+      touchRef.current = null;
+      return;
+    }
+
+    touchRef.current = { time: now, x: touch.clientX };
+  };
+
+  if (!isNativePlatform) {
+    return (
+      <VideoPlayer
+        src={videoUrl}
+        contentId={contentId}
+        contentType={contentType}
+        title={title}
+        poster={poster}
+        subtitleUrl={subtitleUrl}
+        autoPlay={autoPlay}
+        immersive={true}
+      />
     );
   }
 
-  // ---- Fallback: native plugin not available or load error -> use web VideoPlayer ----
   return (
-    <VideoPlayer
-      src={videoUrl}
-      contentId={contentId}
-      contentType={contentType}
-      title={title}
-      poster={poster}
-      subtitleUrl={subtitleUrl}
-      autoPlay={autoPlay}
-      immersive={true}
-    />
+    <div
+      ref={wrapperRef}
+      className="native-player-shell"
+      onTouchStart={handleDoubleTapSeek}
+      style={{
+        background: "#000000",
+        minHeight: "100vh",
+        position: "relative",
+        overflow: "hidden",
+        color: "white",
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
+        ["--plyr-color-main" as any]: "#FD8208",
+        ["--plyr-control-icon-size" as any]: "18px",
+        ["--plyr-control-radius" as any]: "12px",
+        ["--plyr-menu-background" as any]: "rgba(12, 12, 12, 0.96)",
+      }}
+    >
+      <div className="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-4 pt-5 pb-3 bg-gradient-to-b from-black/80 via-black/35 to-transparent">
+        <button
+          onClick={handleBack}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md transition hover:bg-black/60"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+
+        <div className="max-w-[55%] truncate text-sm font-medium text-white/90">
+          {title}
+        </div>
+
+        <div className="w-10" />
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-4 pb-5 pt-10">
+        <div className="flex items-center justify-between gap-3 text-[11px] text-white/80">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+
+      {!isReady && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+          <Loader2 className="h-9 w-9 animate-spin text-[#FD8208]" />
+        </div>
+      )}
+
+      <div
+        className="mx-auto w-full max-w-full"
+        style={{ aspectRatio: "16 / 9" }}
+      >
+        <video
+          ref={videoRef}
+          className="h-full w-full object-cover"
+          controls={false}
+          playsInline
+          poster={poster}
+          preload="metadata"
+        />
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 z-10 px-2 pb-2">
+        <div className="flex items-center justify-center gap-2 rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white/75 backdrop-blur-md">
+          <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[#FD8208]" />
+          {isPlaying ? "Playing" : "Ready"}
+        </div>
+      </div>
+    </div>
   );
 };
-
-function formatTime(seconds: number): string {
-  if (!seconds || !isFinite(seconds)) return "0:00";
-  const total = Math.floor(seconds);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0)
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 export default NativeVideoPlayer;
