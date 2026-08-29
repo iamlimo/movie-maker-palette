@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { ScreenOrientation } from "@capacitor/screen-orientation";
 import {
   MediaPlayer,
   MediaProvider,
@@ -93,6 +95,25 @@ export const VideoPlayer = ({
 
     setPlayerError("");
   }, [src]);
+
+  useEffect(() => {
+    // Ensure that if native screen orientation was locked by other components/plugins,
+    // we unlock it when this player unmounts so the app returns to normal auto-rotation.
+    return () => {
+      try {
+        if (
+          Capacitor.isPluginAvailable &&
+          Capacitor.isPluginAvailable("ScreenOrientation")
+        ) {
+          ScreenOrientation.unlock();
+        }
+      } catch (error) {
+        // keep non-fatal: log for visibility
+        // eslint-disable-next-line no-console
+        console.warn("ScreenOrientation unlock failed:", error);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleContextMenu = (event: MouseEvent) => {
