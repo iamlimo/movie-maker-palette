@@ -3,6 +3,9 @@ import type { CSSProperties } from "react";
 import { ArrowLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { ExoPlayer } from "@/plugins/exo-player";
+import { Preferences } from "@capacitor/preferences";
 import {
   MediaPlayer,
   MediaProvider,
@@ -114,6 +117,76 @@ export const VideoPlayer = ({
       }
     };
   }, []);
+
+  useEffect(() => {
+    // When in immersive mode on native platforms, request a strict landscape
+    // fullscreen experience and hide the status bar. Cleanup restores defaults.
+    const native = Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+    if (!native || !immersive) return;
+
+    try {
+      if (Capacitor.isPluginAvailable("StatusBar")) {
+        StatusBar.setOverlaysWebView({ overlay: true });
+        StatusBar.setStyle({ style: Style.Dark });
+        StatusBar.hide();
+      }
+
+      if (Capacitor.isPluginAvailable("ScreenOrientation")) {
+        void ScreenOrientation.lock({ orientation: "landscape" }).catch(() =>
+          ScreenOrientation.lock({ orientation: "landscape-primary" }).catch(
+            () => undefined,
+          ),
+        );
+        try {
+          if (ExoPlayer && typeof ExoPlayer.lockOrientation === "function") {
+            void ExoPlayer.lockOrientation().catch(() => {});
+          }
+        } catch (e) {
+          // ignore
+        }
+        try {
+          void Preferences.set({ key: "forceLandscape", value: "true" });
+        } catch (e) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      // non-fatal
+    }
+
+    return () => {
+      try {
+        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
+          void ScreenOrientation.unlock();
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        if (ExoPlayer && typeof ExoPlayer.unlockOrientation === "function") {
+          void ExoPlayer.unlockOrientation().catch(() => {});
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        void Preferences.set({ key: "forceLandscape", value: "false" });
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        if (Capacitor.isPluginAvailable("StatusBar")) {
+          StatusBar.show();
+          StatusBar.setStyle({ style: Style.Light });
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, [immersive]);
 
   useEffect(() => {
     const handleContextMenu = (event: MouseEvent) => {

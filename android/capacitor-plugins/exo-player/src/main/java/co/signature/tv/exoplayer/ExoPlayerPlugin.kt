@@ -6,6 +6,7 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import android.content.pm.ActivityInfo
 
 @UnstableApi
 @CapacitorPlugin(name = "ExoPlayer")
@@ -96,6 +97,26 @@ class ExoPlayerPlugin : Plugin() {
         bridge?.activity?.runOnUiThread {
             cv.ensureAttached()
             cv.setRect((x * density).toInt(), (y * density).toInt(), (w * density).toInt(), (h * density).toInt())
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun lockOrientation(call: PluginCall) {
+        bridge?.activity?.runOnUiThread {
+            try {
+                bridge.activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            } catch (_: Throwable) {}
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun unlockOrientation(call: PluginCall) {
+        bridge?.activity?.runOnUiThread {
+            try {
+                bridge.activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            } catch (_: Throwable) {}
             call.resolve()
         }
     }

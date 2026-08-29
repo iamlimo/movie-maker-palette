@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
 import { StatusBar, Style } from "@capacitor/status-bar";
+import { ExoPlayer } from "@/plugins/exo-player";
+import { Preferences } from "@capacitor/preferences";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
@@ -71,14 +73,52 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     if (!supported) return;
 
     try {
+      // Try to provide a cinema-like experience by hiding the status bar
+      // and strictly requesting landscape orientation. We attempt multiple
+      // approaches so it works reliably across Android and iOS Capacitor builds.
       if (Capacitor.isPluginAvailable("StatusBar")) {
         StatusBar.setOverlaysWebView({ overlay: true });
         StatusBar.setStyle({ style: Style.Dark });
         StatusBar.hide();
       }
 
+      // Primary attempt: use the official ScreenOrientation plugin.
       if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-        ScreenOrientation.lock({ orientation: "landscape" });
+        // Request both landscape variants to be permissive across platforms.
+        // Some devices/reserved APIs respond better to the explicit primary variant.
+        void ScreenOrientation.lock({ orientation: "landscape" }).catch(() =>
+          // best-effort fallback to primary landscape if plain "landscape" fails
+          ScreenOrientation.lock({ orientation: "landscape-primary" }).catch(
+            () => undefined,
+          ),
+        );
+        // Also attempt to call the native ExoPlayer plugin which exposes a
+        // platform-specific orientation API on Android.
+        try {
+          if (ExoPlayer && typeof ExoPlayer.lockOrientation === "function") {
+            void ExoPlayer.lockOrientation().catch(() => {});
+          }
+        } catch (e) {
+          // ignore
+        }
+        try {
+          void Preferences.set({ key: "forceLandscape", value: "true" });
+        } catch (e) {}
+      }
+
+      // Secondary/fallback: attempt a programmatic rotation via the webview
+      // bridge. This is a non-standard best-effort step that may be picked up
+      // by some Capacitor native wrappers that forward such requests.
+      try {
+        const win = window as any;
+        if (win && win.Capacitor && win.Capacitor.Plugins) {
+          const so = win.Capacitor.Plugins.ScreenOrientation;
+          if (so && typeof so.lock === "function") {
+            void so.lock({ orientation: "landscape" });
+          }
+        }
+      } catch (e) {
+        // non-fatal
       }
     } catch (error) {
       console.warn("Native video shell setup failed:", error);
@@ -86,13 +126,36 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     return () => {
       try {
-        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-          ScreenOrientation.unlock();
+        // Restore normal behaviour when leaving the player: unlock screen
+        // orientation and show the status bar again. Use best-effort calls
+        // and swallow errors so unmount remains safe.
+        try {
+          if (Capacitor.isPluginAvailable("ScreenOrientation")) {
+            void ScreenOrientation.unlock();
+          }
+        } catch (e) {
+          // ignore
         }
-        if (Capacitor.isPluginAvailable("StatusBar")) {
-          StatusBar.show();
-          StatusBar.setStyle({ style: Style.Light });
+
+        try {
+          if (Capacitor.isPluginAvailable("StatusBar")) {
+            StatusBar.show();
+            StatusBar.setStyle({ style: Style.Light });
+          }
+        } catch (e) {
+          // ignore
         }
+        try {
+          if (ExoPlayer && typeof ExoPlayer.unlockOrientation === "function") {
+            void ExoPlayer.unlockOrientation().catch(() => {});
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        try {
+          void Preferences.set({ key: "forceLandscape", value: "false" });
+        } catch (e) {}
       } catch (error) {
         console.warn("Native video shell cleanup failed:", error);
       }
@@ -174,6 +237,52 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     player.on("loadedmetadata", handleLoadedMetadata);
     player.on("play", handlePlay);
     player.on("pause", handlePause);
+    // Fullscreen enter/exit handlers to provide native-like cinema mode
+    const handleEnterFullscreen = async () => {
+      try {
+        if (Capacitor.isPluginAvailable("StatusBar")) {
+          await StatusBar.hide();
+        }
+        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
+          await ScreenOrientation.lock({ orientation: "landscape" });
+          try {
+            if (ExoPlayer && typeof ExoPlayer.lockOrientation === "function") {
+              await ExoPlayer.lockOrientation();
+            }
+          } catch (e) {}
+        }
+      } catch (err) {
+        // non-fatal
+        // eslint-disable-next-line no-console
+        console.warn("enter fullscreen handling failed:", err);
+      }
+    };
+
+    const handleExitFullscreen = async () => {
+      try {
+        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
+          await ScreenOrientation.unlock();
+          try {
+            if (
+              ExoPlayer &&
+              typeof ExoPlayer.unlockOrientation === "function"
+            ) {
+              await ExoPlayer.unlockOrientation();
+            }
+          } catch (e) {}
+        }
+        if (Capacitor.isPluginAvailable("StatusBar")) {
+          await StatusBar.show();
+          await StatusBar.setStyle({ style: Style.Light });
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("exit fullscreen handling failed:", err);
+      }
+    };
+
+    player.on("enterfullscreen", handleEnterFullscreen);
+    player.on("exitfullscreen", handleExitFullscreen);
 
     video.src = videoUrl;
     video.poster = poster || "";

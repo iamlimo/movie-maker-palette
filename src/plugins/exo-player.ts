@@ -1,6 +1,6 @@
-import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+import { registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 
-export type ExoPlayerSourceType = 'hls' | 'progressive';
+export type ExoPlayerSourceType = "hls" | "progressive";
 
 export interface ExoPlayerLoadOptions {
   url: string;
@@ -20,7 +20,7 @@ export interface ExoPlayerRect {
 
 export interface ExoPlayerProgressEvent {
   currentTime: number; // seconds
-  duration: number;    // seconds
+  duration: number; // seconds
 }
 
 export interface ExoPlayerErrorEvent {
@@ -44,15 +44,38 @@ export interface ExoPlayerPlugin {
   getDuration(): Promise<{ duration: number }>;
   getCurrentTime(): Promise<{ currentTime: number }>;
   setPlaybackRate(options: { rate: number }): Promise<void>;
+  lockOrientation?: () => Promise<void>;
+  unlockOrientation?: () => Promise<void>;
 
-  addListener(eventName: 'onReady', cb: (e: ExoPlayerReadyEvent) => void): Promise<PluginListenerHandle>;
-  addListener(eventName: 'onBuffering', cb: () => void): Promise<PluginListenerHandle>;
-  addListener(eventName: 'onPlaying', cb: () => void): Promise<PluginListenerHandle>;
-  addListener(eventName: 'onPaused', cb: () => void): Promise<PluginListenerHandle>;
-  addListener(eventName: 'onEnded', cb: () => void): Promise<PluginListenerHandle>;
-  addListener(eventName: 'onError', cb: (e: ExoPlayerErrorEvent) => void): Promise<PluginListenerHandle>;
-  addListener(eventName: 'onProgress', cb: (e: ExoPlayerProgressEvent) => void): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "onReady",
+    cb: (e: ExoPlayerReadyEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "onBuffering",
+    cb: () => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "onPlaying",
+    cb: () => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "onPaused",
+    cb: () => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "onEnded",
+    cb: () => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "onError",
+    cb: (e: ExoPlayerErrorEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "onProgress",
+    cb: (e: ExoPlayerProgressEvent) => void,
+  ): Promise<PluginListenerHandle>;
   removeAllListeners(): Promise<void>;
 }
 
-export const ExoPlayer = registerPlugin<ExoPlayerPlugin>('ExoPlayer');
+export const ExoPlayer = registerPlugin<ExoPlayerPlugin>("ExoPlayer");

@@ -10,6 +10,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // Honor a UserDefaults flag `forceLandscape` so JavaScript can request the
+    // app to present in landscape even if the device rotation lock is enabled.
+    // This is a best-effort approach that reads a simple boolean flag.
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        let force = UserDefaults.standard.bool(forKey: "forceLandscape")
+        if force {
+            return .landscape
+        }
+        return .allButUpsideDown
+    }
+
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.

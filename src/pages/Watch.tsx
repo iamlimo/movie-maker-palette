@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
+import MobileMoviePlayer from "@/components/MobileMoviePlayer";
 import { usePlatform } from "@/hooks/usePlatform";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2, ArrowLeft } from "lucide-react"; // Unified line here
@@ -471,18 +472,21 @@ const Watch = () => {
             const branch =
               isNative && (isIOS || isAndroid)
                 ? "NativeVideoPlayer"
+                : !isNative && isMobile && (isIOS || isAndroid)
+                ? "MobileMoviePlayer"
                 : "VideoPlayer";
             console.log("[Watch] rendering player branch:", {
               isNative,
               isIOS,
               isAndroid,
+              isMobile,
               branch,
               contentType,
               contentId,
             });
             return null;
           })()}
-          {/* Use NativeVideoPlayer only on Capacitor native builds; use web VideoPlayer for browsers */}
+          {/* Use NativeVideoPlayer on Capacitor native builds; use MobileMoviePlayer on mobile browsers; use Vidstack VideoPlayer on desktop */}
           {isNative && (isIOS || isAndroid) ? (
             <NativeVideoPlayer
               contentId={contentId!}
@@ -491,6 +495,13 @@ const Watch = () => {
               title={contentTitle}
               poster={contentPoster}
               subtitleUrl={typedContent?.subtitle_url ?? ""}
+              autoPlay={true}
+            />
+          ) : !isNative && isMobile && (isIOS || isAndroid) ? (
+            <MobileMoviePlayer
+              streamUrl={videoUrl}
+              title={contentTitle}
+              poster={contentPoster}
               autoPlay={true}
             />
           ) : (
