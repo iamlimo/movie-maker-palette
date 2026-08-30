@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plyr } from "plyr-react";
 import "plyr/dist/plyr.css";
+import { ScreenOrientation } from "@capacitor/screen-orientation";
+import { StatusBar } from "@capacitor/status-bar";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
@@ -67,6 +69,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
         styleEl.setAttribute("data-native-player-topnav", "1");
         styleEl.innerHTML = `
           .cinema-top-navigation-bar { z-index: 100001 !important; pointer-events: auto !important; }
+          .native-player-shell { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; background: #000 !important; }
         `;
         document.head.appendChild(styleEl);
       } catch (e) {
@@ -262,6 +265,39 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       }
     };
   }, [currentTime, duration, saveProgress]);
+
+  // Force hardware orientation to landscape on native apps and hide status bar
+  useEffect(() => {
+    const forceCinemaLayoutOnDevice = async () => {
+      try {
+        // Force the phone to flip horizontally sideways immediately
+        await ScreenOrientation.lock({ orientation: "landscape" } as any);
+        await StatusBar.hide();
+      } catch (err) {
+        console.warn(
+          "Native orientation locks only execute inside compiled mobile app wrappers:",
+          err,
+        );
+      }
+    };
+
+    forceCinemaLayoutOnDevice();
+
+    // --- THE CRITICAL REVERT CLEANUP ---
+    // When the user leaves the player or clicks back, immediately restore portrait profile rules
+    return () => {
+      const restoreAppProfileLayout = async () => {
+        try {
+          await ScreenOrientation.unlock();
+          await ScreenOrientation.lock({ orientation: "portrait" } as any);
+          await StatusBar.show();
+        } catch (err) {
+          console.error("Failed to clean up device window layout:", err);
+        }
+      };
+      restoreAppProfileLayout();
+    };
+  }, []);
 
   const handleBackNavigation = async () => {
     try {
