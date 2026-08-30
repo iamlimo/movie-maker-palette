@@ -60,6 +60,20 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   useEffect(() => {
     const player = plyrRef.current?.plyr as any | undefined;
     let hls: any | undefined;
+    let styleEl: HTMLStyleElement | null = null;
+    const ensureTopNavStyle = () => {
+      try {
+        styleEl = document.createElement("style");
+        styleEl.setAttribute("data-native-player-topnav", "1");
+        styleEl.innerHTML = `
+          .cinema-top-navigation-bar { z-index: 100001 !important; pointer-events: auto !important; }
+        `;
+        document.head.appendChild(styleEl);
+      } catch (e) {
+        // ignore
+      }
+    };
+    ensureTopNavStyle();
 
     const attachHls = (media: HTMLMediaElement | null) => {
       if (!media) return;
@@ -85,6 +99,45 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     const mediaEl = plyrRef.current?.plyr?.media ?? null;
     attachHls(mediaEl as HTMLMediaElement | null);
 
+    // Watchdog: abort network if stuck loading for >5s
+    let watchdogTimer: any = null;
+    const clearWatchdog = () => {
+      try {
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
+      } catch (e) {}
+    };
+
+    const startWatchdog = () => {
+      clearWatchdog();
+      watchdogTimer = setTimeout(() => {
+        try {
+          const media = plyrRef.current?.plyr?.media as
+            | HTMLMediaElement
+            | undefined;
+          // If still not ready, force abort and surface playback error
+          if (!isReady) {
+            if (media) {
+              try {
+                media.pause();
+                media.src = "";
+                // attempt to force browser to drop sockets
+                media.load();
+              } catch (e) {}
+            }
+            setPlaybackError(
+              "Video unavailable. Playback timed out while loading the stream.",
+            );
+          }
+        } catch (e) {}
+      }, 5000);
+    };
+
+    // Start watchdog when mount / when media starts attaching
+    startWatchdog();
+
     const handleMediaError = (event: any) => {
       console.error(
         "[NativeVideoPlayer] Core media playback error encountered:",
@@ -101,6 +154,11 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     if (mediaEl) {
       mediaEl.addEventListener("error", handleMediaError, { passive: true });
+      // clear watchdog when native canplay or loadedmetadata fire
+      mediaEl.addEventListener("canplay", clearWatchdog, { passive: true });
+      mediaEl.addEventListener("loadedmetadata", clearWatchdog, {
+        passive: true,
+      });
     }
 
     const handleReady = async () => {
@@ -159,6 +217,15 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     return () => {
       try {
+        // remove injected style
+        if (styleEl && styleEl.parentNode)
+          styleEl.parentNode.removeChild(styleEl);
+      } catch (e) {}
+
+      try {
+        clearWatchdog();
+      } catch (e) {}
+      try {
         if (player && player.off) {
           player.off("error", handleMediaError);
           player.off("ready", handleReady);
@@ -175,6 +242,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             handleMediaError as EventListener,
           );
           mediaEl.removeEventListener("timeupdate", onDomTime as any);
+          mediaEl.removeEventListener("canplay", clearWatchdog as any);
+          mediaEl.removeEventListener("loadedmetadata", clearWatchdog as any);
         }
       } catch {}
       try {
@@ -194,10 +263,29 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     };
   }, [currentTime, duration, saveProgress]);
 
-  const handleBack = () => {
+  const handleBackNavigation = async () => {
+    try {
+      const player = plyrRef.current?.plyr;
+      if (player && player.media) {
+        try {
+          player.media.pause();
+        } catch (e) {}
+        try {
+          player.media.src = ""; // Empties the stream allocation path
+        } catch (e) {}
+        try {
+          player.media.load(); // Forces browser to dump the hanging network sockets
+        } catch (e) {}
+      }
+    } catch (e) {
+      console.warn("Failed to gracefully abort loading stream:", e);
+    }
+
     try {
       plyrRef.current?.plyr?.destroy();
     } catch (e) {}
+
+    // Route back safely now that the thread is unfrozen
     navigate(-1);
   };
 
@@ -406,9 +494,9 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
         ["--plyr-menu-background" as any]: "rgba(12, 12, 12, 0.96)",
       }}
     >
-      <div className="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-4 pt-5 pb-3 bg-gradient-to-b from-black/80 via-black/35 to-transparent">
+      <div className="cinema-top-navigation-bar absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-5 pb-3 bg-gradient-to-b from-black/80 via-black/35 to-transparent">
         <button
-          onClick={handleBack}
+          onClick={handleBackNavigation}
           className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md transition hover:bg-black/60"
           aria-label="Go back"
         >
