@@ -65,7 +65,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       if (!media) return;
       try {
         // lazy-load HLS if .m3u8 and supported
-        if (videoUrl.includes(".m3u8")) {
+        if (typeof videoUrl === "string" && videoUrl.includes(".m3u8")) {
           const Hls = (window as any).Hls;
           if (Hls && Hls.isSupported && Hls.isSupported()) {
             hls = new Hls();
@@ -75,7 +75,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             media.src = videoUrl;
           }
         } else {
-          media.src = videoUrl;
+          if (typeof videoUrl === "string") media.src = videoUrl;
         }
       } catch (err) {
         // non-fatal
@@ -274,10 +274,11 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     poster: poster ?? undefined,
     sources: [
       {
-        src: videoUrl,
-        type: videoUrl.includes(".m3u8")
-          ? "application/x-mpegURL"
-          : "video/mp4",
+        src: typeof videoUrl === "string" ? videoUrl : "",
+        type:
+          typeof videoUrl === "string" && videoUrl.includes(".m3u8")
+            ? "application/x-mpegURL"
+            : "video/mp4",
       },
     ],
   } as any;
