@@ -175,8 +175,9 @@
 }
 
 @layer components {
-  .native-player-shell .plyr {
-    --plyr-color-main: #fd8208;
+  .native-player-shell .plyr,
+  .mobile-cinema-container .plyr {
+    --plyr-color-main: hsl(var(--foreground, 0 0% 98%));
     --plyr-audio-controls-background: rgba(15, 15, 15, 0.9);
     --plyr-control-icon-size: 18px;
     --plyr-control-radius: 10px;

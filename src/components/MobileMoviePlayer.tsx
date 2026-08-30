@@ -216,6 +216,9 @@ const MobileMoviePlayer: React.FC<MobilePlayerProps> = ({
     autoplay: autoPlay,
     hideControls: false,
     clickToPlay: true,
+    playsinline: true,
+    webkitPlaysinline: true,
+    fullscreen: { enabled: true, iosNative: false, fallback: true },
   } as any;
 
   const source = {

@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
-import { ScreenOrientation } from "@capacitor/screen-orientation";
-import { StatusBar, Style } from "@capacitor/status-bar";
-import { ExoPlayer } from "@/plugins/exo-player";
-import { Preferences } from "@capacitor/preferences";
-import Plyr from "plyr";
+import { Plyr } from "plyr-react";
 import "plyr/dist/plyr.css";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { VideoPlayer } from "./VideoPlayer";
 
 interface NativeVideoPlayerProps {
   contentId: string;
@@ -53,8 +47,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     contentType === "episode" ? "episode" : "movie",
   );
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<Plyr | null>(null);
+  const plyrRef = useRef<any>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const touchRef = useRef<{ time: number; x: number } | null>(null);
 
@@ -62,250 +55,111 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isNativePlatform, setIsNativePlatform] = useState(false);
 
   useEffect(() => {
-    const native = Capacitor.isNativePlatform();
-    const platform = Capacitor.getPlatform();
-    const supported = native && (platform === "ios" || platform === "android");
-    setIsNativePlatform(supported);
+    const player = plyrRef.current?.plyr as any | undefined;
+    let hls: any | undefined;
 
-    if (!supported) return;
-
-    try {
-      // Try to provide a cinema-like experience by hiding the status bar
-      // and strictly requesting landscape orientation. We attempt multiple
-      // approaches so it works reliably across Android and iOS Capacitor builds.
-      if (Capacitor.isPluginAvailable("StatusBar")) {
-        StatusBar.setOverlaysWebView({ overlay: true });
-        StatusBar.setStyle({ style: Style.Dark });
-        StatusBar.hide();
-      }
-
-      // Primary attempt: use the official ScreenOrientation plugin.
-      if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-        // Request both landscape variants to be permissive across platforms.
-        // Some devices/reserved APIs respond better to the explicit primary variant.
-        void ScreenOrientation.lock({ orientation: "landscape" }).catch(() =>
-          // best-effort fallback to primary landscape if plain "landscape" fails
-          ScreenOrientation.lock({ orientation: "landscape-primary" }).catch(
-            () => undefined,
-          ),
-        );
-        // Also attempt to call the native ExoPlayer plugin which exposes a
-        // platform-specific orientation API on Android.
-        try {
-          if (ExoPlayer && typeof ExoPlayer.lockOrientation === "function") {
-            void ExoPlayer.lockOrientation().catch(() => {});
-          }
-        } catch (e) {
-          // ignore
-        }
-        try {
-          void Preferences.set({ key: "forceLandscape", value: "true" });
-        } catch (e) {}
-      }
-
-      // Secondary/fallback: attempt a programmatic rotation via the webview
-      // bridge. This is a non-standard best-effort step that may be picked up
-      // by some Capacitor native wrappers that forward such requests.
+    const attachHls = (media: HTMLMediaElement | null) => {
+      if (!media) return;
       try {
-        const win = window as any;
-        if (win && win.Capacitor && win.Capacitor.Plugins) {
-          const so = win.Capacitor.Plugins.ScreenOrientation;
-          if (so && typeof so.lock === "function") {
-            void so.lock({ orientation: "landscape" });
+        // lazy-load HLS if .m3u8 and supported
+        if (videoUrl.includes(".m3u8")) {
+          const Hls = (window as any).Hls;
+          if (Hls && Hls.isSupported && Hls.isSupported()) {
+            hls = new Hls();
+            hls.loadSource(videoUrl);
+            hls.attachMedia(media);
+          } else if (media.canPlayType("application/vnd.apple.mpegurl")) {
+            media.src = videoUrl;
           }
+        } else {
+          media.src = videoUrl;
         }
-      } catch (e) {
+      } catch (err) {
         // non-fatal
       }
-    } catch (error) {
-      console.warn("Native video shell setup failed:", error);
-    }
-
-    return () => {
-      try {
-        // Restore normal behaviour when leaving the player: unlock screen
-        // orientation and show the status bar again. Use best-effort calls
-        // and swallow errors so unmount remains safe.
-        try {
-          if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-            void ScreenOrientation.unlock();
-          }
-        } catch (e) {
-          // ignore
-        }
-
-        try {
-          if (Capacitor.isPluginAvailable("StatusBar")) {
-            StatusBar.show();
-            StatusBar.setStyle({ style: Style.Light });
-          }
-        } catch (e) {
-          // ignore
-        }
-        try {
-          if (ExoPlayer && typeof ExoPlayer.unlockOrientation === "function") {
-            void ExoPlayer.unlockOrientation().catch(() => {});
-          }
-        } catch (e) {
-          // ignore
-        }
-
-        try {
-          void Preferences.set({ key: "forceLandscape", value: "false" });
-        } catch (e) {}
-      } catch (error) {
-        console.warn("Native video shell cleanup failed:", error);
-      }
     };
-  }, []);
 
-  useEffect(() => {
-    if (!isNativePlatform || !videoRef.current) return;
-
-    const video = videoRef.current;
-    const player = new Plyr(video, {
-      controls: [
-        "play-large",
-        "play",
-        "progress",
-        "current-time",
-        "mute",
-        "volume",
-        "fullscreen",
-      ],
-      invertTime: false,
-      autoplay: autoPlay,
-      muted: false,
-      clickToPlay: true,
-      keyboard: { focused: true, global: false },
-      i18n: {
-        restart: "Restart",
-        rewind: "Rewind 10s",
-        play: "Play",
-        pause: "Pause",
-        fastForward: "Forward 10s",
-        currentTime: "Current time",
-        duration: "Duration",
-        mute: "Mute",
-        unmute: "Unmute",
-        volume: "Volume",
-        fullscreen: "Fullscreen",
-      },
-      ratio: "16:9",
-      hideControls: false,
-      tooltips: { controls: true, seek: true },
-      fullscreen: { enabled: true, iosNative: true },
-      loadSprite: true,
-    });
-
-    playerRef.current = player;
+    const mediaEl = plyrRef.current?.plyr?.media ?? null;
+    attachHls(mediaEl as HTMLMediaElement | null);
 
     const handleReady = async () => {
       setIsReady(true);
       const startPosition = (await getLastPosition()) || 0;
-      if (
-        startPosition > 5 &&
-        video.duration &&
-        startPosition < video.duration - 5
-      ) {
-        video.currentTime = startPosition;
-        setCurrentTime(startPosition);
-      }
+      try {
+        if (
+          startPosition > 5 &&
+          mediaEl &&
+          mediaEl.duration &&
+          startPosition < mediaEl.duration - 5
+        ) {
+          mediaEl.currentTime = startPosition;
+          setCurrentTime(startPosition);
+        }
+      } catch (e) {}
 
       if (autoPlay) {
-        void Promise.resolve(player.play()).catch(() => undefined);
+        try {
+          await plyrRef.current?.plyr?.play();
+        } catch {}
       }
     };
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime || 0);
+      try {
+        const t = (mediaEl as HTMLMediaElement)?.currentTime || 0;
+        setCurrentTime(t);
+      } catch {}
     };
 
-    const handleLoadedMetadata = () => {
-      setDuration(video.duration || 0);
-      setCurrentTime(video.currentTime || 0);
+    const handleLoaded = () => {
+      try {
+        const d = (mediaEl as HTMLMediaElement)?.duration || 0;
+        setDuration(d);
+        setCurrentTime((mediaEl as HTMLMediaElement)?.currentTime || 0);
+      } catch {}
     };
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
-    player.on("ready", handleReady);
-    player.on("timeupdate", handleTimeUpdate);
-    player.on("loadedmetadata", handleLoadedMetadata);
-    player.on("play", handlePlay);
-    player.on("pause", handlePause);
-    // Fullscreen enter/exit handlers to provide native-like cinema mode
-    const handleEnterFullscreen = async () => {
-      try {
-        if (Capacitor.isPluginAvailable("StatusBar")) {
-          await StatusBar.hide();
-        }
-        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-          await ScreenOrientation.lock({ orientation: "landscape" });
-          try {
-            if (ExoPlayer && typeof ExoPlayer.lockOrientation === "function") {
-              await ExoPlayer.lockOrientation();
-            }
-          } catch (e) {}
-        }
-      } catch (err) {
-        // non-fatal
-        // eslint-disable-next-line no-console
-        console.warn("enter fullscreen handling failed:", err);
+    try {
+      if (player && player.on) {
+        player.on("ready", handleReady);
+        player.on("timeupdate", handleTimeUpdate);
+        player.on("loadedmetadata", handleLoaded);
+        player.on("play", handlePlay);
+        player.on("pause", handlePause);
       }
-    };
+    } catch (e) {}
 
-    const handleExitFullscreen = async () => {
-      try {
-        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-          await ScreenOrientation.unlock();
-          try {
-            if (
-              ExoPlayer &&
-              typeof ExoPlayer.unlockOrientation === "function"
-            ) {
-              await ExoPlayer.unlockOrientation();
-            }
-          } catch (e) {}
-        }
-        if (Capacitor.isPluginAvailable("StatusBar")) {
-          await StatusBar.show();
-          await StatusBar.setStyle({ style: Style.Light });
-        }
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn("exit fullscreen handling failed:", err);
-      }
-    };
-
-    player.on("enterfullscreen", handleEnterFullscreen);
-    player.on("exitfullscreen", handleExitFullscreen);
-
-    video.src = videoUrl;
-    video.poster = poster || "";
-    video.setAttribute("playsinline", "true");
-    video.setAttribute("preload", "metadata");
+    const onDomTime = () => handleTimeUpdate();
+    if (mediaEl)
+      mediaEl.addEventListener("timeupdate", onDomTime, { passive: true });
 
     return () => {
-      player.off("ready", handleReady);
-      player.off("timeupdate", handleTimeUpdate);
-      player.off("loadedmetadata", handleLoadedMetadata);
-      player.off("play", handlePlay);
-      player.off("pause", handlePause);
-      player.destroy();
-      playerRef.current = null;
+      try {
+        if (player && player.off) {
+          player.off("ready", handleReady);
+          player.off("timeupdate", handleTimeUpdate);
+          player.off("loadedmetadata", handleLoaded);
+          player.off("play", handlePlay);
+          player.off("pause", handlePause);
+        }
+      } catch {}
+      try {
+        if (mediaEl)
+          mediaEl.removeEventListener("timeupdate", onDomTime as any);
+      } catch {}
+      try {
+        if (hls) {
+          hls.destroy();
+          hls = undefined;
+        }
+      } catch {}
     };
-  }, [
-    autoPlay,
-    contentId,
-    getLastPosition,
-    isNativePlatform,
-    poster,
-    videoUrl,
-  ]);
+  }, [videoUrl, autoPlay, getLastPosition]);
 
   useEffect(() => {
     return () => {
@@ -316,15 +170,15 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   }, [currentTime, duration, saveProgress]);
 
   const handleBack = () => {
-    if (playerRef.current) {
-      playerRef.current.destroy();
-      playerRef.current = null;
-    }
+    try {
+      plyrRef.current?.plyr?.destroy();
+    } catch (e) {}
     navigate(-1);
   };
 
   const handleDoubleTapSeek = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (!videoRef.current) return;
+    const media = plyrRef.current?.plyr?.media as HTMLMediaElement | undefined;
+    if (!media) return;
 
     const touch = event.touches[0];
     if (!touch) return;
@@ -335,10 +189,10 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     if (lastTouch && now - lastTouch.time < 280) {
       const delta = touch.clientX - lastTouch.x;
       const nextTime = Math.min(
-        Math.max(videoRef.current.currentTime + (delta > 0 ? 10 : -10), 0),
-        videoRef.current.duration || 0,
+        Math.max((media.currentTime || 0) + (delta > 0 ? 10 : -10), 0),
+        media.duration || 0,
       );
-      videoRef.current.currentTime = nextTime;
+      media.currentTime = nextTime;
       setCurrentTime(nextTime);
       touchRef.current = null;
       return;
@@ -346,21 +200,62 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     touchRef.current = { time: now, x: touch.clientX };
   };
+  const options = {
+    controls: [
+      "play-large",
+      "play",
+      "progress",
+      "current-time",
+      "mute",
+      "volume",
+      "fullscreen",
+    ],
+    invertTime: false,
+    autoplay: autoPlay,
+    muted: false,
+    clickToPlay: true,
+    keyboard: { focused: true, global: false },
+    i18n: {
+      restart: "Restart",
+      rewind: "Rewind 10s",
+      play: "Play",
+      pause: "Pause",
+      fastForward: "Forward 10s",
+      currentTime: "Current time",
+      duration: "Duration",
+      mute: "Mute",
+      unmute: "Unmute",
+      volume: "Volume",
+      fullscreen: "Fullscreen",
+    },
+    ratio: "16:9",
+    hideControls: false,
+    tooltips: { controls: true, seek: true },
+    playsinline: true,
+    webkitPlaysinline: true,
+    fullscreen: {
+      enabled: true,
+      fallback: true,
+      iosNative: false,
+      // Use the app's own viewport instead of the native OS fullscreen controller.
+      container: wrapperRef.current ?? undefined,
+    },
+    loadSprite: true,
+  } as any;
 
-  if (!isNativePlatform) {
-    return (
-      <VideoPlayer
-        src={videoUrl}
-        contentId={contentId}
-        contentType={contentType}
-        title={title}
-        poster={poster}
-        subtitleUrl={subtitleUrl}
-        autoPlay={autoPlay}
-        immersive={true}
-      />
-    );
-  }
+  const source = {
+    type: "video",
+    title: title ?? "",
+    poster: poster ?? undefined,
+    sources: [
+      {
+        src: videoUrl,
+        type: videoUrl.includes(".m3u8")
+          ? "application/x-mpegURL"
+          : "video/mp4",
+      },
+    ],
+  } as any;
 
   return (
     <div
@@ -370,11 +265,18 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       style={{
         background: "#000000",
         minHeight: "100vh",
-        position: "relative",
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100vh",
+        zIndex: 9999,
         overflow: "hidden",
         color: "white",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
-        ["--plyr-color-main" as any]: "#FD8208",
+        ["--plyr-color-main" as any]: "hsl(var(--foreground, 0 0% 98%))",
         ["--plyr-control-icon-size" as any]: "18px",
         ["--plyr-control-radius" as any]: "12px",
         ["--plyr-menu-background" as any]: "rgba(12, 12, 12, 0.96)",
@@ -411,16 +313,16 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
       <div
         className="mx-auto w-full max-w-full"
-        style={{ aspectRatio: "16 / 9" }}
+        style={{
+          aspectRatio: "16 / 9",
+          width: "100%",
+          maxWidth: "100vw",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
       >
-        <video
-          ref={videoRef}
-          className="h-full w-full object-cover"
-          controls={false}
-          playsInline
-          poster={poster}
-          preload="metadata"
-        />
+        <Plyr ref={plyrRef} source={source} options={options} />
       </div>
 
       <div className="absolute inset-x-0 bottom-0 z-10 px-2 pb-2">
