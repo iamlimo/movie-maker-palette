@@ -55,6 +55,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   useEffect(() => {
     const player = plyrRef.current?.plyr as any | undefined;
@@ -83,6 +84,24 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     const mediaEl = plyrRef.current?.plyr?.media ?? null;
     attachHls(mediaEl as HTMLMediaElement | null);
+
+    const handleMediaError = (event: any) => {
+      console.error(
+        "[NativeVideoPlayer] Core media playback error encountered:",
+        event,
+      );
+      setPlaybackError(
+        "Video unavailable. This video could not be loaded due to a network or server limitation.",
+      );
+    };
+
+    if (player && player.on) {
+      player.on("error", handleMediaError);
+    }
+
+    if (mediaEl) {
+      mediaEl.addEventListener("error", handleMediaError, { passive: true });
+    }
 
     const handleReady = async () => {
       setIsReady(true);
@@ -141,6 +160,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     return () => {
       try {
         if (player && player.off) {
+          player.off("error", handleMediaError);
           player.off("ready", handleReady);
           player.off("timeupdate", handleTimeUpdate);
           player.off("loadedmetadata", handleLoaded);
@@ -149,8 +169,13 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
         }
       } catch {}
       try {
-        if (mediaEl)
+        if (mediaEl) {
+          mediaEl.removeEventListener(
+            "error",
+            handleMediaError as EventListener,
+          );
           mediaEl.removeEventListener("timeupdate", onDomTime as any);
+        }
       } catch {}
       try {
         if (hls) {
@@ -256,6 +281,104 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       },
     ],
   } as any;
+
+  if (playbackError) {
+    return (
+      <div
+        className="ux-player-container error-state"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          background: "#000",
+          color: "#fff",
+          textAlign: "center",
+          padding: "24px",
+        }}
+      >
+        <div
+          style={{
+            background: "#141414",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "12px",
+            padding: "32px",
+            maxWidth: "420px",
+            width: "100%",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#E50914",
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+            }}
+          >
+            Playback Error
+          </span>
+          <h2
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              margin: "12px 0 8px 0",
+              color: "#fff",
+            }}
+          >
+            Video Unavailable
+          </h2>
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "rgba(255,255,255,0.6)",
+              lineHeight: 1.5,
+              margin: "0 0 24px 0",
+            }}
+          >
+            {playbackError}
+          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: "12px",
+              justifyContent: "center",
+            }}
+          >
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                color: "#fff",
+                border: "none",
+                padding: "10px 20px",
+                borderRadius: "6px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Go Back
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: "#fff",
+                color: "#000",
+                border: "none",
+                padding: "10px 20px",
+                borderRadius: "6px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
