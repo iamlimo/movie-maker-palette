@@ -4,10 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
-import MobileMoviePlayer from "@/components/MobileMoviePlayer";
 import { usePlatform } from "@/hooks/usePlatform";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Loader2, ArrowLeft } from "lucide-react"; // Unified line here
+import { Loader2 } from "lucide-react";
 import { resolveWatchPath } from "@/lib/watchPaths";
 
 const Watch = () => {
@@ -16,7 +14,6 @@ const Watch = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isNative, isIOS, isAndroid } = usePlatform();
-  const isMobile = useIsMobile();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -439,20 +436,28 @@ const Watch = () => {
     thumbnail_url?: string;
     subtitle_url?: string;
     video_url?: string;
-    episode_number?: number;
+    episode_number?: number | string;
     seasons?: {
-      season_number?: number;
+      season_number?: number | string;
       tv_shows?: { title?: string; thumbnail_url?: string };
     };
     [key: string]: unknown;
   };
 
-  const contentTitle =
-    contentType === "movie"
-      ? typedContent?.title ?? "Untitled Movie"
-      : `${typedContent?.seasons?.tv_shows?.title ?? "Show"} - Season ${
-          typedContent?.seasons?.season_number ?? ""
-        } Ep ${typedContent?.episode_number ?? ""}`;
+  // Build a clean display title with fallbacks
+  let contentTitle = "";
+  if (contentType === "movie") {
+    contentTitle = typedContent?.title ?? "Untitled Movie";
+  } else {
+    const showTitle =
+      typedContent?.seasons?.tv_shows?.title ??
+      (typedContent?.seasons as any)?.title ??
+      "Show";
+    const seasonNumber = typedContent?.seasons?.season_number ?? "";
+    const episodeNumber = typedContent?.episode_number ?? "";
+    const episodeTitle = typedContent?.title ?? "Untitled Episode";
+    contentTitle = `${showTitle} - S${seasonNumber}E${episodeNumber}: ${episodeTitle}`;
+  }
 
   const contentPoster =
     contentType === "movie"
@@ -468,42 +473,9 @@ const Watch = () => {
     >
       {videoUrl && content && (
         <>
-          {(() => {
-            const branch =
-              isNative && (isIOS || isAndroid)
-                ? "NativeVideoPlayer"
-                : !isNative && isMobile && (isIOS || isAndroid)
-                ? "MobileMoviePlayer"
-                : "VideoPlayer";
-            console.log("[Watch] rendering player branch:", {
-              isNative,
-              isIOS,
-              isAndroid,
-              isMobile,
-              branch,
-              contentType,
-              contentId,
-            });
-            return null;
-          })()}
-          {/* Use NativeVideoPlayer on Capacitor native builds; use MobileMoviePlayer on mobile browsers; use Vidstack VideoPlayer on desktop */}
+          {/* Native builds use the native player; all web builds use the desktop player */}
           {isNative && (isIOS || isAndroid) ? (
-            <NativeVideoPlayer
-              contentId={contentId!}
-              contentType={contentType as "movie" | "episode"}
-              videoUrl={videoUrl}
-              title={contentTitle}
-              poster={contentPoster}
-              subtitleUrl={typedContent?.subtitle_url ?? ""}
-              autoPlay={true}
-            />
-          ) : !isNative && isMobile && (isIOS || isAndroid) ? (
-            <MobileMoviePlayer
-              streamUrl={videoUrl}
-              title={contentTitle}
-              poster={contentPoster}
-              autoPlay={true}
-            />
+            <NativeVideoPlayer streamUrl={videoUrl} title={contentTitle} />
           ) : (
             <VideoPlayer
               src={videoUrl}
