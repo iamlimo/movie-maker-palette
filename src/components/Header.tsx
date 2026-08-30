@@ -65,10 +65,14 @@ const Header = () => {
       className={cn(
         "fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border",
         showBottomNav && "md:block hidden",
-        // Ensure the header respects the device safe-area on mobile web and native
-        (isMobile || isNative) && "pt-[env(safe-area-inset-top)]",
+        // Keep existing classes for responsive behavior
         isNative && isAndroid && "pt-1",
       )}
+      // Inline safe-area padding ensures the header is visually clear under device status bars
+      style={{
+        paddingTop:
+          isMobile || isNative ? "env(safe-area-inset-top, 16px)" : undefined,
+      }}
     >
       <div className="container mx-auto px-3 sm:px-4 lg:px-6 h-14 md:h-16 flex items-center justify-between">
         {/* Logo */}
