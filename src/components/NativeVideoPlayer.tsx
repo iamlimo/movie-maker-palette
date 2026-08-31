@@ -62,6 +62,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   useEffect(() => {
     const player = plyrRef.current?.plyr as any | undefined;
     let hls: any | undefined;
+    const watchdogRef = { id: null as number | null };
     let styleEl: HTMLStyleElement | null = null;
     const ensureTopNavStyle = () => {
       try {
@@ -80,6 +81,41 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     const attachHls = (media: HTMLMediaElement | null) => {
       if (!media) return;
+      const clearWatchdog = () => {
+        try {
+          if (watchdogRef.id) {
+            clearTimeout(watchdogRef.id);
+            watchdogRef.id = null;
+          }
+        } catch (e) {}
+      };
+
+      const startWatchdog = () => {
+        clearWatchdog();
+        try {
+          watchdogRef.id = window.setTimeout(() => {
+            console.error(
+              "[NativeVideoPlayer] Playback watchdog timeout (30s)",
+            );
+            setPlaybackError(
+              "Playback timed out. Please check your network connection or try again.",
+            );
+          }, 30000);
+        } catch (e) {}
+      };
+
+      // clear watchdog when media becomes ready
+      const watchdogClearListener = () => clearWatchdog();
+      media.addEventListener("canplay", watchdogClearListener, {
+        passive: true,
+      });
+      media.addEventListener("loadedmetadata", watchdogClearListener, {
+        passive: true,
+      });
+      media.addEventListener("timeupdate", watchdogClearListener, {
+        passive: true,
+      });
+      // start the watchdog after attempting to attach source
       try {
         // lazy-load HLS if .m3u8 and supported
         if (typeof videoUrl === "string" && videoUrl.includes(".m3u8")) {
@@ -94,9 +130,26 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
         } else {
           if (typeof videoUrl === "string") media.src = videoUrl;
         }
+        // start watchdog to detect stuck loading
+        startWatchdog();
       } catch (err) {
         // non-fatal
       }
+
+      // cleanup watchdog listeners when detach
+      const removeWatchdogListeners = () => {
+        try {
+          media.removeEventListener("canplay", watchdogClearListener as any);
+          media.removeEventListener(
+            "loadedmetadata",
+            watchdogClearListener as any,
+          );
+          media.removeEventListener("timeupdate", watchdogClearListener as any);
+          clearWatchdog();
+        } catch (e) {}
+      };
+      // attach removal to media element dataset so cleanup code can find it
+      (media as any).__removeWatchdogListeners = removeWatchdogListeners;
     };
 
     const mediaEl = plyrRef.current?.plyr?.media ?? null;
@@ -195,6 +248,16 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     const handleLoaded = () => {
       try {
+        try {
+          // clear possible watchdog when metadata loads
+          const media = plyrRef.current?.plyr?.media as
+            | HTMLMediaElement
+            | undefined;
+          if (media && (media as any).__removeWatchdogListeners) {
+            (media as any).__removeWatchdogListeners();
+            delete (media as any).__removeWatchdogListeners;
+          }
+        } catch (e) {}
         const d = (mediaEl as HTMLMediaElement)?.duration || 0;
         setDuration(d);
         setCurrentTime((mediaEl as HTMLMediaElement)?.currentTime || 0);
