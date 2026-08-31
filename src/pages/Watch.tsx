@@ -475,7 +475,14 @@ const Watch = () => {
         <>
           {/* Native builds use the native player; all web builds use the desktop player */}
           {isNative && (isIOS || isAndroid) ? (
-            <NativeVideoPlayer streamUrl={videoUrl} title={contentTitle} />
+            <NativeVideoPlayer
+              contentId={contentId!}
+              contentType={contentType!}
+              streamUrl={videoUrl}
+              title={contentTitle}
+              poster={contentPoster}
+              autoPlay={true}
+            />
           ) : (
             <VideoPlayer
               src={videoUrl}

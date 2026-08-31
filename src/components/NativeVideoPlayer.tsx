@@ -134,11 +134,21 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             hls.loadSource(resolvedVideoUrl);
             hls.attachMedia(media);
           } else if (media.canPlayType("application/vnd.apple.mpegurl")) {
+            media.crossOrigin = "anonymous";
+            try {
+              media.setAttribute("crossorigin", "anonymous");
+            } catch {}
             media.src = resolvedVideoUrl;
           }
         } else {
-          if (typeof resolvedVideoUrl === "string")
+          if (typeof resolvedVideoUrl === "string") {
+            // ensure CORS for cross-origin MP4 assets to allow fetching in webviews
+            media.crossOrigin = "anonymous";
+            try {
+              media.setAttribute("crossorigin", "anonymous");
+            } catch {}
             media.src = resolvedVideoUrl;
+          }
         }
         // start watchdog to detect stuck loading
         startWatchdog();
@@ -434,7 +444,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       "fullscreen",
     ],
     invertTime: false,
-    autoplay: autoPlay,
+    // disable Plyr autoplay to avoid early auto-initialized UI in webviews
+    autoplay: false,
     muted: false,
     clickToPlay: true,
     keyboard: { focused: true, global: false },
@@ -473,6 +484,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     sources: [
       {
         src: typeof resolvedVideoUrl === "string" ? resolvedVideoUrl : "",
+        crossorigin: "anonymous",
         type:
           typeof resolvedVideoUrl === "string" &&
           resolvedVideoUrl.includes(".m3u8")
@@ -643,6 +655,9 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          // hide the player visually until it's fully ready to avoid tiny preview UI
+          opacity: isReady ? 1 : 0,
+          pointerEvents: isReady ? "auto" : "none",
         }}
       >
         <Plyr ref={plyrRef} source={source} options={options} />
