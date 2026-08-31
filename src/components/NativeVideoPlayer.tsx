@@ -92,6 +92,29 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       } catch (e) {}
     };
 
+    const markReady = () => {
+      readyRef.current = true;
+      setIsReady(true);
+      clearWatchdog();
+    };
+
+    const markReadyIfMediaIsLive = () => {
+      const media = plyrRef.current?.plyr?.media as
+        | HTMLMediaElement
+        | undefined;
+
+      if (!media) return;
+
+      const isMediaLoaded =
+        media.readyState >= 2 ||
+        !!media.currentSrc ||
+        Number.isFinite(media.duration) && media.duration > 0;
+
+      if (isMediaLoaded) {
+        markReady();
+      }
+    };
+
     const startWatchdog = () => {
       clearWatchdog();
       try {
@@ -100,10 +123,9 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             | HTMLMediaElement
             | undefined;
 
+          markReadyIfMediaIsLive();
+
           if (!readyRef.current && media) {
-            console.warn(
-              "[NativeVideoPlayer] Playback watchdog timer fired before media became ready.",
-            );
             try {
               media.pause();
               media.src = "";
@@ -116,14 +138,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
               "Video unavailable. Playback timed out while loading the stream.",
             );
           }
-        }, 15000);
+        }, 30000);
       } catch (e) {}
-    };
-
-    const markReady = () => {
-      readyRef.current = true;
-      setIsReady(true);
-      clearWatchdog();
     };
 
     const mediaEl = plyrRef.current?.plyr?.media ?? null;
@@ -146,8 +162,14 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     if (mediaEl) {
       mediaEl.addEventListener("error", handleMediaError, { passive: true });
-      mediaEl.addEventListener("canplay", markReady, { passive: true });
-      mediaEl.addEventListener("loadedmetadata", markReady, {
+      mediaEl.addEventListener("loadedmetadata", markReadyIfMediaIsLive, {
+        passive: true,
+      });
+      mediaEl.addEventListener("canplay", markReadyIfMediaIsLive, {
+        passive: true,
+      });
+      mediaEl.addEventListener("playing", markReady, { passive: true });
+      mediaEl.addEventListener("progress", markReadyIfMediaIsLive, {
         passive: true,
       });
     }
@@ -229,8 +251,13 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             handleMediaError as EventListener,
           );
           mediaEl.removeEventListener("timeupdate", onDomTime as any);
-          mediaEl.removeEventListener("canplay", markReady as any);
-          mediaEl.removeEventListener("loadedmetadata", markReady as any);
+          mediaEl.removeEventListener("canplay", markReadyIfMediaIsLive as any);
+          mediaEl.removeEventListener(
+            "loadedmetadata",
+            markReadyIfMediaIsLive as any,
+          );
+          mediaEl.removeEventListener("playing", markReady as any);
+          mediaEl.removeEventListener("progress", markReadyIfMediaIsLive as any);
         }
       } catch {}
     };
