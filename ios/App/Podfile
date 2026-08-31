@@ -19,8 +19,7 @@ def capacitor_pods
   pod 'CapacitorPreferences', :path => '../../node_modules/@capacitor/preferences'
   pod 'CapacitorScreenOrientation', :path => '../../node_modules/@capacitor/screen-orientation'
   pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
-  # Capgo video player disabled: removed to enforce Plyr-only playback
-  # pod 'CapgoCapacitorVideoPlayer', :path => '../../node_modules/@capgo/capacitor-video-player'
+  pod 'CapacitorStatusBar', :path => '../../node_modules/@capacitor/status-bar'
 end
 
 target 'App' do
