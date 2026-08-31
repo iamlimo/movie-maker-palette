@@ -64,9 +64,10 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
   useEffect(() => {
     const player = plyrRef.current?.plyr as any | undefined;
-    let hls: any | undefined;
+    const readyRef = { current: false };
     const watchdogRef = { id: null as number | null };
     let styleEl: HTMLStyleElement | null = null;
+
     const ensureTopNavStyle = () => {
       try {
         styleEl = document.createElement("style");
@@ -82,137 +83,50 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     };
     ensureTopNavStyle();
 
-    // resolvedVideoUrl prefers explicit `streamUrl` prop (used by Watch.tsx)
-    const resolvedVideoUrl = streamUrl ?? videoUrl ?? null;
-
-    const attachHls = (media: HTMLMediaElement | null) => {
-      if (!media) return;
-      const clearWatchdog = () => {
-        try {
-          if (watchdogRef.id) {
-            clearTimeout(watchdogRef.id);
-            watchdogRef.id = null;
-          }
-        } catch (e) {}
-      };
-
-      const startWatchdog = () => {
-        clearWatchdog();
-        try {
-          watchdogRef.id = window.setTimeout(() => {
-            console.error(
-              "[NativeVideoPlayer] Playback watchdog timeout (120s)",
-            );
-            setPlaybackError(
-              "Playback timed out after 2 minutes. Please check your network connection or try again.",
-            );
-          }, 120000);
-        } catch (e) {}
-      };
-
-      // clear watchdog when media becomes ready
-      const watchdogClearListener = () => clearWatchdog();
-      media.addEventListener("canplay", watchdogClearListener, {
-        passive: true,
-      });
-      media.addEventListener("loadedmetadata", watchdogClearListener, {
-        passive: true,
-      });
-      media.addEventListener("timeupdate", watchdogClearListener, {
-        passive: true,
-      });
-      // start the watchdog after attempting to attach source
-      try {
-        // lazy-load HLS if .m3u8 and supported
-        if (
-          typeof resolvedVideoUrl === "string" &&
-          resolvedVideoUrl.includes(".m3u8")
-        ) {
-          const Hls = (window as any).Hls;
-          if (Hls && Hls.isSupported && Hls.isSupported()) {
-            hls = new Hls();
-            hls.loadSource(resolvedVideoUrl);
-            hls.attachMedia(media);
-          } else if (media.canPlayType("application/vnd.apple.mpegurl")) {
-            media.crossOrigin = "anonymous";
-            try {
-              media.setAttribute("crossorigin", "anonymous");
-            } catch {}
-            media.src = resolvedVideoUrl;
-          }
-        } else {
-          if (typeof resolvedVideoUrl === "string") {
-            // ensure CORS for cross-origin MP4 assets to allow fetching in webviews
-            media.crossOrigin = "anonymous";
-            try {
-              media.setAttribute("crossorigin", "anonymous");
-            } catch {}
-            media.src = resolvedVideoUrl;
-          }
-        }
-        // start watchdog to detect stuck loading
-        startWatchdog();
-      } catch (err) {
-        // non-fatal
-      }
-
-      // cleanup watchdog listeners when detach
-      const removeWatchdogListeners = () => {
-        try {
-          media.removeEventListener("canplay", watchdogClearListener as any);
-          media.removeEventListener(
-            "loadedmetadata",
-            watchdogClearListener as any,
-          );
-          media.removeEventListener("timeupdate", watchdogClearListener as any);
-          clearWatchdog();
-        } catch (e) {}
-      };
-      // attach removal to media element dataset so cleanup code can find it
-      (media as any).__removeWatchdogListeners = removeWatchdogListeners;
-    };
-
-    const mediaEl = plyrRef.current?.plyr?.media ?? null;
-    attachHls(mediaEl as HTMLMediaElement | null);
-
-    // Watchdog: abort network if stuck loading for >5s
-    let watchdogTimer: any = null;
     const clearWatchdog = () => {
       try {
-        if (watchdogTimer) {
-          clearTimeout(watchdogTimer);
-          watchdogTimer = null;
+        if (watchdogRef.id) {
+          clearTimeout(watchdogRef.id);
+          watchdogRef.id = null;
         }
       } catch (e) {}
     };
 
     const startWatchdog = () => {
       clearWatchdog();
-      watchdogTimer = setTimeout(() => {
-        try {
+      try {
+        watchdogRef.id = window.setTimeout(() => {
           const media = plyrRef.current?.plyr?.media as
             | HTMLMediaElement
             | undefined;
-          // If still not ready, force abort and surface playback error
-          if (!isReady) {
-            if (media) {
-              try {
-                media.pause();
-                media.src = "";
-                // attempt to force browser to drop sockets
-                media.load();
-              } catch (e) {}
-            }
+
+          if (!readyRef.current && media) {
+            console.warn(
+              "[NativeVideoPlayer] Playback watchdog timer fired before media became ready.",
+            );
+            try {
+              media.pause();
+              media.src = "";
+              media.load();
+            } catch (e) {}
+          }
+
+          if (!readyRef.current) {
             setPlaybackError(
               "Video unavailable. Playback timed out while loading the stream.",
             );
           }
-        } catch (e) {}
-      }, 5000);
+        }, 15000);
+      } catch (e) {}
     };
 
-    // Start watchdog when mount / when media starts attaching
-    startWatchdog();
+    const markReady = () => {
+      readyRef.current = true;
+      setIsReady(true);
+      clearWatchdog();
+    };
+
+    const mediaEl = plyrRef.current?.plyr?.media ?? null;
 
     const handleMediaError = (event: any) => {
       console.error(
@@ -222,6 +136,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       setPlaybackError(
         "Video unavailable. This video could not be loaded due to a network or server limitation.",
       );
+      readyRef.current = false;
+      clearWatchdog();
     };
 
     if (player && player.on) {
@@ -230,21 +146,16 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     if (mediaEl) {
       mediaEl.addEventListener("error", handleMediaError, { passive: true });
-      // clear watchdog when native canplay or loadedmetadata fire
-      mediaEl.addEventListener("canplay", clearWatchdog, { passive: true });
-      mediaEl.addEventListener("loadedmetadata", clearWatchdog, {
+      mediaEl.addEventListener("canplay", markReady, { passive: true });
+      mediaEl.addEventListener("loadedmetadata", markReady, {
         passive: true,
       });
     }
 
     const handleReady = async () => {
-      setIsReady(true);
+      markReady();
       const startPosition = (await getLastPosition()) || 0;
       try {
-        if (player && player.on) {
-          player.on("error", handleMediaError);
-        }
-
         if (mediaEl) {
           mediaEl.currentTime = startPosition;
           setCurrentTime(startPosition);
@@ -267,16 +178,6 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     const handleLoaded = () => {
       try {
-        try {
-          // clear possible watchdog when metadata loads
-          const media = plyrRef.current?.plyr?.media as
-            | HTMLMediaElement
-            | undefined;
-          if (media && (media as any).__removeWatchdogListeners) {
-            (media as any).__removeWatchdogListeners();
-            delete (media as any).__removeWatchdogListeners;
-          }
-        } catch (e) {}
         const d = (mediaEl as HTMLMediaElement)?.duration || 0;
         setDuration(d);
         setCurrentTime((mediaEl as HTMLMediaElement)?.currentTime || 0);
@@ -300,9 +201,10 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     if (mediaEl)
       mediaEl.addEventListener("timeupdate", onDomTime, { passive: true });
 
+    startWatchdog();
+
     return () => {
       try {
-        // remove injected style
         if (styleEl && styleEl.parentNode)
           styleEl.parentNode.removeChild(styleEl);
       } catch (e) {}
@@ -327,14 +229,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             handleMediaError as EventListener,
           );
           mediaEl.removeEventListener("timeupdate", onDomTime as any);
-          mediaEl.removeEventListener("canplay", clearWatchdog as any);
-          mediaEl.removeEventListener("loadedmetadata", clearWatchdog as any);
-        }
-      } catch {}
-      try {
-        if (hls) {
-          hls.destroy();
-          hls = undefined;
+          mediaEl.removeEventListener("canplay", markReady as any);
+          mediaEl.removeEventListener("loadedmetadata", markReady as any);
         }
       } catch {}
     };
