@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plyr } from "plyr-react";
-import "plyr/dist/plyr.css";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
 import { StatusBar } from "@capacitor/status-bar";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
@@ -52,7 +50,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     contentType === "episode" ? "episode" : "movie",
   );
 
-  const plyrRef = useRef<any>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const touchRef = useRef<{ time: number; x: number } | null>(null);
 
@@ -62,34 +60,29 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
+  const markReadyIfMediaIsLive = () => {
+    const media = videoRef.current;
+    if (!media) return;
+
+    const isMediaLoaded =
+      media.readyState >= 2 ||
+      !!media.currentSrc ||
+      (Number.isFinite(media.duration) && media.duration > 0);
+
+    if (isMediaLoaded) {
+      setIsReady(true);
+    }
+  };
+
   useEffect(() => {
-    const player = plyrRef.current?.plyr as any | undefined;
     const readyRef = { current: false };
     const watchdogRef = { id: null as number | null };
-    let styleEl: HTMLStyleElement | null = null;
-
-    const ensureTopNavStyle = () => {
-      try {
-        styleEl = document.createElement("style");
-        styleEl.setAttribute("data-native-player-topnav", "1");
-        styleEl.innerHTML = `
-          .cinema-top-navigation-bar { z-index: 100001 !important; pointer-events: auto !important; }
-          .native-player-shell { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; background: #000 !important; }
-        `;
-        document.head.appendChild(styleEl);
-      } catch (e) {
-        // ignore
-      }
-    };
-    ensureTopNavStyle();
 
     const clearWatchdog = () => {
-      try {
-        if (watchdogRef.id) {
-          clearTimeout(watchdogRef.id);
-          watchdogRef.id = null;
-        }
-      } catch (e) {}
+      if (watchdogRef.id) {
+        clearTimeout(watchdogRef.id);
+        watchdogRef.id = null;
+      }
     };
 
     const markReady = () => {
@@ -98,67 +91,37 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       clearWatchdog();
     };
 
-    const markReadyIfMediaIsLive = () => {
-      const media = plyrRef.current?.plyr?.media as
-        | HTMLMediaElement
-        | undefined;
-
-      if (!media) return;
-
-      const isMediaLoaded =
-        media.readyState >= 2 ||
-        !!media.currentSrc ||
-        Number.isFinite(media.duration) && media.duration > 0;
-
-      if (isMediaLoaded) {
-        markReady();
-      }
-    };
-
     const startWatchdog = () => {
       clearWatchdog();
-      try {
-        watchdogRef.id = window.setTimeout(() => {
-          const media = plyrRef.current?.plyr?.media as
-            | HTMLMediaElement
-            | undefined;
+      watchdogRef.id = window.setTimeout(() => {
+        const media = videoRef.current;
+        markReadyIfMediaIsLive();
 
-          markReadyIfMediaIsLive();
+        if (!readyRef.current && media) {
+          try {
+            media.pause();
+            media.removeAttribute("src");
+            media.load();
+          } catch (e) {}
+        }
 
-          if (!readyRef.current && media) {
-            try {
-              media.pause();
-              media.src = "";
-              media.load();
-            } catch (e) {}
-          }
-
-          if (!readyRef.current) {
-            setPlaybackError(
-              "Video unavailable. Playback timed out while loading the stream.",
-            );
-          }
-        }, 30000);
-      } catch (e) {}
+        if (!readyRef.current) {
+          setPlaybackError(
+            "Video unavailable. Playback timed out while loading the stream.",
+          );
+        }
+      }, 30000);
     };
 
-    const mediaEl = plyrRef.current?.plyr?.media ?? null;
-
-    const handleMediaError = (event: any) => {
-      console.error(
-        "[NativeVideoPlayer] Core media playback error encountered:",
-        event,
-      );
+    const mediaEl = videoRef.current;
+    const handleMediaError = () => {
+      console.error("[NativeVideoPlayer] Core media playback error encountered");
       setPlaybackError(
         "Video unavailable. This video could not be loaded due to a network or server limitation.",
       );
       readyRef.current = false;
       clearWatchdog();
     };
-
-    if (player && player.on) {
-      player.on("error", handleMediaError);
-    }
 
     if (mediaEl) {
       mediaEl.addEventListener("error", handleMediaError, { passive: true });
@@ -172,97 +135,40 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       mediaEl.addEventListener("progress", markReadyIfMediaIsLive, {
         passive: true,
       });
+      mediaEl.addEventListener("timeupdate", () => {
+        setCurrentTime(mediaEl.currentTime || 0);
+      }, { passive: true });
     }
 
-    const handleReady = async () => {
-      setIsReady(true);
-      readyRef.current = true;
-      clearWatchdog();
-
+    const hydratePosition = async () => {
       const startPosition = (await getLastPosition()) || 0;
-      try {
-        if (mediaEl) {
-          mediaEl.currentTime = startPosition;
-          setCurrentTime(startPosition);
-        }
-      } catch (e) {}
-
+      if (videoRef.current) {
+        videoRef.current.currentTime = startPosition;
+        setCurrentTime(startPosition);
+      }
       if (autoPlay) {
         try {
-          await plyrRef.current?.plyr?.play();
-        } catch {}
+          await videoRef.current?.play();
+        } catch (e) {}
       }
     };
 
-    const handleTimeUpdate = () => {
-      try {
-        const t = (mediaEl as HTMLMediaElement)?.currentTime || 0;
-        setCurrentTime(t);
-      } catch {}
-    };
-
-    const handleLoaded = () => {
-      try {
-        const d = (mediaEl as HTMLMediaElement)?.duration || 0;
-        setDuration(d);
-        setCurrentTime((mediaEl as HTMLMediaElement)?.currentTime || 0);
-      } catch {}
-    };
-
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-
-    try {
-      if (player && player.on) {
-        player.on("ready", handleReady);
-        player.on("timeupdate", handleTimeUpdate);
-        player.on("loadedmetadata", handleLoaded);
-        player.on("play", handlePlay);
-        player.on("pause", handlePause);
-      }
-    } catch (e) {}
-
-    const onDomTime = () => handleTimeUpdate();
-    if (mediaEl)
-      mediaEl.addEventListener("timeupdate", onDomTime, { passive: true });
+    videoRef.current?.addEventListener("loadedmetadata", hydratePosition, {
+      passive: true,
+      once: true,
+    });
 
     startWatchdog();
 
     return () => {
-      try {
-        if (styleEl && styleEl.parentNode)
-          styleEl.parentNode.removeChild(styleEl);
-      } catch (e) {}
-
-      try {
-        clearWatchdog();
-      } catch (e) {}
-      try {
-        if (player && player.off) {
-          player.off("error", handleMediaError);
-          player.off("ready", handleReady);
-          player.off("timeupdate", handleTimeUpdate);
-          player.off("loadedmetadata", handleLoaded);
-          player.off("play", handlePlay);
-          player.off("pause", handlePause);
-        }
-      } catch {}
-      try {
-        if (mediaEl) {
-          mediaEl.removeEventListener(
-            "error",
-            handleMediaError as EventListener,
-          );
-          mediaEl.removeEventListener("timeupdate", onDomTime as any);
-          mediaEl.removeEventListener("canplay", markReadyIfMediaIsLive as any);
-          mediaEl.removeEventListener(
-            "loadedmetadata",
-            markReadyIfMediaIsLive as any,
-          );
-          mediaEl.removeEventListener("playing", markReady as any);
-          mediaEl.removeEventListener("progress", markReadyIfMediaIsLive as any);
-        }
-      } catch {}
+      clearWatchdog();
+      if (mediaEl) {
+        mediaEl.removeEventListener("error", handleMediaError);
+        mediaEl.removeEventListener("loadedmetadata", markReadyIfMediaIsLive);
+        mediaEl.removeEventListener("canplay", markReadyIfMediaIsLive);
+        mediaEl.removeEventListener("playing", markReady);
+        mediaEl.removeEventListener("progress", markReadyIfMediaIsLive);
+      }
     };
   }, [streamUrl, videoUrl, autoPlay, getLastPosition]);
 
@@ -296,32 +202,27 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
   const handleBackNavigation = async () => {
     try {
-      const player = plyrRef.current?.plyr;
-      if (player && player.media) {
+      const media = videoRef.current;
+      if (media) {
         try {
-          player.media.pause();
+          media.pause();
         } catch (e) {}
         try {
-          player.media.src = ""; // Empties the stream allocation path
+          media.removeAttribute("src");
         } catch (e) {}
         try {
-          player.media.load(); // Forces browser to dump the hanging network sockets
+          media.load();
         } catch (e) {}
       }
     } catch (e) {
       console.warn("Failed to gracefully abort loading stream:", e);
     }
 
-    try {
-      plyrRef.current?.plyr?.destroy();
-    } catch (e) {}
-
-    // Route back safely now that the thread is unfrozen
     navigate(-1);
   };
 
   const handleDoubleTapSeek = (event: React.TouchEvent<HTMLDivElement>) => {
-    const media = plyrRef.current?.plyr?.media as HTMLMediaElement | undefined;
+    const media = videoRef.current;
     if (!media) return;
 
     const touch = event.touches[0];
@@ -345,67 +246,6 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     touchRef.current = { time: now, x: touch.clientX };
   };
   const resolvedVideoUrl = streamUrl ?? videoUrl ?? null;
-
-  const options = {
-    controls: [
-      "play-large",
-      "play",
-      "progress",
-      "current-time",
-      "mute",
-      "volume",
-      "fullscreen",
-    ],
-    invertTime: false,
-    // disable Plyr autoplay to avoid early auto-initialized UI in webviews
-    autoplay: false,
-    muted: false,
-    clickToPlay: true,
-    keyboard: { focused: true, global: false },
-    i18n: {
-      restart: "Restart",
-      rewind: "Rewind 10s",
-      play: "Play",
-      pause: "Pause",
-      fastForward: "Forward 10s",
-      currentTime: "Current time",
-      duration: "Duration",
-      mute: "Mute",
-      unmute: "Unmute",
-      volume: "Volume",
-      fullscreen: "Fullscreen",
-    },
-    ratio: "16:9",
-    hideControls: false,
-    tooltips: { controls: true, seek: true },
-    playsinline: true,
-    webkitPlaysinline: true,
-    fullscreen: {
-      enabled: true,
-      fallback: true,
-      iosNative: false,
-      // Use the app's own viewport instead of the native OS fullscreen controller.
-      container: wrapperRef.current ?? undefined,
-    },
-    loadSprite: true,
-  } as any;
-
-  const source = {
-    type: "video",
-    title: title ?? "",
-    poster: poster ?? undefined,
-    sources: [
-      {
-        src: typeof resolvedVideoUrl === "string" ? resolvedVideoUrl : "",
-        crossorigin: "anonymous",
-        type:
-          typeof resolvedVideoUrl === "string" &&
-          resolvedVideoUrl.includes(".m3u8")
-            ? "application/x-mpegURL"
-            : "video/mp4",
-      },
-    ],
-  } as any;
 
   if (playbackError) {
     return (
@@ -568,12 +408,63 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          // hide the player visually until it's fully ready to avoid tiny preview UI
           opacity: isReady ? 1 : 0,
           pointerEvents: isReady ? "auto" : "none",
         }}
       >
-        <Plyr ref={plyrRef} source={source} options={options} />
+        <video
+          ref={videoRef}
+          src={resolvedVideoUrl ?? undefined}
+          key={resolvedVideoUrl || "native-player-video"}
+          autoPlay={autoPlay}
+          playsInline
+          controls
+          muted={false}
+          preload="metadata"
+          poster={poster ?? undefined}
+          className="h-full w-full object-cover"
+          onLoadedMetadata={async () => {
+            const startPosition = (await getLastPosition()) || 0;
+            if (videoRef.current) {
+              videoRef.current.currentTime = startPosition;
+              setCurrentTime(startPosition);
+            }
+            setDuration(videoRef.current?.duration || 0);
+            markReadyIfMediaIsLive();
+            if (autoPlay) {
+              videoRef.current?.play().catch(() => {});
+            }
+          }}
+          onCanPlay={() => {
+            const media = videoRef.current;
+            if (!media) return;
+            setDuration(media.duration || 0);
+            setCurrentTime(media.currentTime || 0);
+            markReadyIfMediaIsLive();
+            if (autoPlay) {
+              media.play().catch(() => {});
+            }
+          }}
+          onTimeUpdate={() => {
+            if (videoRef.current) {
+              setCurrentTime(videoRef.current.currentTime || 0);
+            }
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onError={() => {
+            setPlaybackError(
+              "Video unavailable. This video could not be loaded due to a network or server limitation.",
+            );
+          }}
+          onEnded={() => setIsPlaying(false)}
+          style={{
+            background: "#000",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
       </div>
 
       <div className="absolute inset-x-0 bottom-0 z-10 px-2 pb-2">
