@@ -175,7 +175,10 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     }
 
     const handleReady = async () => {
-      markReady();
+      setIsReady(true);
+      readyRef.current = true;
+      clearWatchdog();
+
       const startPosition = (await getLastPosition()) || 0;
       try {
         if (mediaEl) {
@@ -273,34 +276,21 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
   // Force hardware orientation to landscape on native apps and hide status bar
   useEffect(() => {
-    const forceCinemaLayoutOnDevice = async () => {
+    const restoreAppProfileLayout = async () => {
       try {
-        // Force the phone to flip horizontally sideways immediately
-        await ScreenOrientation.lock({ orientation: "landscape" } as any);
-        await StatusBar.hide();
+        if (typeof ScreenOrientation?.unlock === "function") {
+          await ScreenOrientation.unlock();
+        }
+        if (typeof StatusBar?.show === "function") {
+          await StatusBar.show();
+        }
       } catch (err) {
-        console.warn(
-          "Native orientation locks only execute inside compiled mobile app wrappers:",
-          err,
-        );
+        console.warn("Failed to clean up device window layout:", err);
       }
     };
 
-    forceCinemaLayoutOnDevice();
-
-    // --- THE CRITICAL REVERT CLEANUP ---
-    // When the user leaves the player or clicks back, immediately restore portrait profile rules
     return () => {
-      const restoreAppProfileLayout = async () => {
-        try {
-          await ScreenOrientation.unlock();
-          await ScreenOrientation.lock({ orientation: "portrait" } as any);
-          await StatusBar.show();
-        } catch (err) {
-          console.error("Failed to clean up device window layout:", err);
-        }
-      };
-      restoreAppProfileLayout();
+      void restoreAppProfileLayout();
     };
   }, []);
 
