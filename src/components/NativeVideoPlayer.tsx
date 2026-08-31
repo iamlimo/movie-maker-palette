@@ -10,7 +10,9 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 interface NativeVideoPlayerProps {
   contentId: string;
   contentType: "movie" | "episode";
-  videoUrl: string;
+  // `streamUrl` is accepted as an alias for `videoUrl` from callers
+  videoUrl?: string;
+  streamUrl?: string;
   title: string;
   poster?: string;
   subtitleUrl?: string;
@@ -38,6 +40,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   contentId,
   contentType,
   videoUrl,
+  streamUrl,
   title,
   poster,
   subtitleUrl,
@@ -79,6 +82,9 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     };
     ensureTopNavStyle();
 
+    // resolvedVideoUrl prefers explicit `streamUrl` prop (used by Watch.tsx)
+    const resolvedVideoUrl = (streamUrl ?? videoUrl) ?? null;
+
     const attachHls = (media: HTMLMediaElement | null) => {
       if (!media) return;
       const clearWatchdog = () => {
@@ -118,17 +124,17 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       // start the watchdog after attempting to attach source
       try {
         // lazy-load HLS if .m3u8 and supported
-        if (typeof videoUrl === "string" && videoUrl.includes(".m3u8")) {
+        if (typeof resolvedVideoUrl === "string" && resolvedVideoUrl.includes(".m3u8")) {
           const Hls = (window as any).Hls;
           if (Hls && Hls.isSupported && Hls.isSupported()) {
             hls = new Hls();
-            hls.loadSource(videoUrl);
+            hls.loadSource(resolvedVideoUrl);
             hls.attachMedia(media);
           } else if (media.canPlayType("application/vnd.apple.mpegurl")) {
-            media.src = videoUrl;
+            media.src = resolvedVideoUrl;
           }
         } else {
-          if (typeof videoUrl === "string") media.src = videoUrl;
+          if (typeof resolvedVideoUrl === "string") media.src = resolvedVideoUrl;
         }
         // start watchdog to detect stuck loading
         startWatchdog();
@@ -221,12 +227,12 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       setIsReady(true);
       const startPosition = (await getLastPosition()) || 0;
       try {
-        if (
-          startPosition > 5 &&
-          mediaEl &&
-          mediaEl.duration &&
-          startPosition < mediaEl.duration - 5
-        ) {
+        try {
+          if (player && player.on) {
+            player.on("error", handleMediaError);
+          }
+    
+        if (mediaEl) {
           mediaEl.currentTime = startPosition;
           setCurrentTime(startPosition);
         }
@@ -319,7 +325,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
         }
       } catch {}
     };
-  }, [videoUrl, autoPlay, getLastPosition]);
+  }, [streamUrl, videoUrl, autoPlay, getLastPosition]);
 
   useEffect(() => {
     return () => {
@@ -412,6 +418,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     touchRef.current = { time: now, x: touch.clientX };
   };
+  const resolvedVideoUrl = (streamUrl ?? videoUrl) ?? null;
+
   const options = {
     controls: [
       "play-large",
@@ -461,9 +469,9 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     poster: poster ?? undefined,
     sources: [
       {
-        src: typeof videoUrl === "string" ? videoUrl : "",
+        src: typeof resolvedVideoUrl === "string" ? resolvedVideoUrl : "",
         type:
-          typeof videoUrl === "string" && videoUrl.includes(".m3u8")
+          typeof resolvedVideoUrl === "string" && resolvedVideoUrl.includes(".m3u8")
             ? "application/x-mpegURL"
             : "video/mp4",
       },
