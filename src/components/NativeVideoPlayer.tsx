@@ -95,12 +95,12 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
         try {
           watchdogRef.id = window.setTimeout(() => {
             console.error(
-              "[NativeVideoPlayer] Playback watchdog timeout (30s)",
+              "[NativeVideoPlayer] Playback watchdog timeout (120s)",
             );
             setPlaybackError(
-              "Playback timed out. Please check your network connection or try again.",
+              "Playback timed out after 2 minutes. Please check your network connection or try again.",
             );
-          }, 30000);
+          }, 120000);
         } catch (e) {}
       };
 
