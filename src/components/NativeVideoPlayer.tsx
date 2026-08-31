@@ -1,20 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
-import { StatusBar, Style } from "@capacitor/status-bar";
-import { ExoPlayer } from "@/plugins/exo-player";
-import { Preferences } from "@capacitor/preferences";
-import Plyr from "plyr";
-import "plyr/dist/plyr.css";
+import { StatusBar } from "@capacitor/status-bar";
 import { useVideoProgress } from "@/hooks/useVideoProgress";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { VideoPlayer } from "./VideoPlayer";
 
 interface NativeVideoPlayerProps {
   contentId: string;
   contentType: "movie" | "episode";
-  videoUrl: string;
+  // `streamUrl` is accepted as an alias for `videoUrl` from callers
+  videoUrl?: string;
+  streamUrl?: string;
   title: string;
   poster?: string;
   subtitleUrl?: string;
@@ -42,6 +38,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   contentId,
   contentType,
   videoUrl,
+  streamUrl,
   title,
   poster,
   subtitleUrl,
@@ -54,7 +51,6 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   );
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<Plyr | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const touchRef = useRef<{ time: number; x: number } | null>(null);
 
@@ -62,250 +58,119 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isNativePlatform, setIsNativePlatform] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+
+  const markReadyIfMediaIsLive = () => {
+    const media = videoRef.current;
+    if (!media) return;
+
+    const isMediaLoaded =
+      media.readyState >= 2 ||
+      !!media.currentSrc ||
+      (Number.isFinite(media.duration) && media.duration > 0);
+
+    if (isMediaLoaded) {
+      setIsReady(true);
+    }
+  };
 
   useEffect(() => {
-    const native = Capacitor.isNativePlatform();
-    const platform = Capacitor.getPlatform();
-    const supported = native && (platform === "ios" || platform === "android");
-    setIsNativePlatform(supported);
+    const readyRef = { current: false };
+    const watchdogRef = { id: null as number | null };
 
-    if (!supported) return;
-
-    try {
-      // Try to provide a cinema-like experience by hiding the status bar
-      // and strictly requesting landscape orientation. We attempt multiple
-      // approaches so it works reliably across Android and iOS Capacitor builds.
-      if (Capacitor.isPluginAvailable("StatusBar")) {
-        StatusBar.setOverlaysWebView({ overlay: true });
-        StatusBar.setStyle({ style: Style.Dark });
-        StatusBar.hide();
+    const clearWatchdog = () => {
+      if (watchdogRef.id) {
+        clearTimeout(watchdogRef.id);
+        watchdogRef.id = null;
       }
+    };
 
-      // Primary attempt: use the official ScreenOrientation plugin.
-      if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-        // Request both landscape variants to be permissive across platforms.
-        // Some devices/reserved APIs respond better to the explicit primary variant.
-        void ScreenOrientation.lock({ orientation: "landscape" }).catch(() =>
-          // best-effort fallback to primary landscape if plain "landscape" fails
-          ScreenOrientation.lock({ orientation: "landscape-primary" }).catch(
-            () => undefined,
-          ),
-        );
-        // Also attempt to call the native ExoPlayer plugin which exposes a
-        // platform-specific orientation API on Android.
-        try {
-          if (ExoPlayer && typeof ExoPlayer.lockOrientation === "function") {
-            void ExoPlayer.lockOrientation().catch(() => {});
-          }
-        } catch (e) {
-          // ignore
+    const markReady = () => {
+      readyRef.current = true;
+      setIsReady(true);
+      clearWatchdog();
+    };
+
+    const startWatchdog = () => {
+      clearWatchdog();
+      watchdogRef.id = window.setTimeout(() => {
+        const media = videoRef.current;
+        markReadyIfMediaIsLive();
+
+        if (!readyRef.current && media) {
+          try {
+            media.pause();
+            media.removeAttribute("src");
+            media.load();
+          } catch (e) {}
         }
-        try {
-          void Preferences.set({ key: "forceLandscape", value: "true" });
-        } catch (e) {}
-      }
 
-      // Secondary/fallback: attempt a programmatic rotation via the webview
-      // bridge. This is a non-standard best-effort step that may be picked up
-      // by some Capacitor native wrappers that forward such requests.
-      try {
-        const win = window as any;
-        if (win && win.Capacitor && win.Capacitor.Plugins) {
-          const so = win.Capacitor.Plugins.ScreenOrientation;
-          if (so && typeof so.lock === "function") {
-            void so.lock({ orientation: "landscape" });
-          }
+        if (!readyRef.current) {
+          setPlaybackError(
+            "Video unavailable. Playback timed out while loading the stream.",
+          );
         }
-      } catch (e) {
-        // non-fatal
-      }
-    } catch (error) {
-      console.warn("Native video shell setup failed:", error);
+      }, 30000);
+    };
+
+    const mediaEl = videoRef.current;
+    const handleMediaError = () => {
+      console.error("[NativeVideoPlayer] Core media playback error encountered");
+      setPlaybackError(
+        "Video unavailable. This video could not be loaded due to a network or server limitation.",
+      );
+      readyRef.current = false;
+      clearWatchdog();
+    };
+
+    if (mediaEl) {
+      mediaEl.addEventListener("error", handleMediaError, { passive: true });
+      mediaEl.addEventListener("loadedmetadata", markReadyIfMediaIsLive, {
+        passive: true,
+      });
+      mediaEl.addEventListener("canplay", markReadyIfMediaIsLive, {
+        passive: true,
+      });
+      mediaEl.addEventListener("playing", markReady, { passive: true });
+      mediaEl.addEventListener("progress", markReadyIfMediaIsLive, {
+        passive: true,
+      });
+      mediaEl.addEventListener("timeupdate", () => {
+        setCurrentTime(mediaEl.currentTime || 0);
+      }, { passive: true });
     }
 
-    return () => {
-      try {
-        // Restore normal behaviour when leaving the player: unlock screen
-        // orientation and show the status bar again. Use best-effort calls
-        // and swallow errors so unmount remains safe.
-        try {
-          if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-            void ScreenOrientation.unlock();
-          }
-        } catch (e) {
-          // ignore
-        }
-
-        try {
-          if (Capacitor.isPluginAvailable("StatusBar")) {
-            StatusBar.show();
-            StatusBar.setStyle({ style: Style.Light });
-          }
-        } catch (e) {
-          // ignore
-        }
-        try {
-          if (ExoPlayer && typeof ExoPlayer.unlockOrientation === "function") {
-            void ExoPlayer.unlockOrientation().catch(() => {});
-          }
-        } catch (e) {
-          // ignore
-        }
-
-        try {
-          void Preferences.set({ key: "forceLandscape", value: "false" });
-        } catch (e) {}
-      } catch (error) {
-        console.warn("Native video shell cleanup failed:", error);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isNativePlatform || !videoRef.current) return;
-
-    const video = videoRef.current;
-    const player = new Plyr(video, {
-      controls: [
-        "play-large",
-        "play",
-        "progress",
-        "current-time",
-        "mute",
-        "volume",
-        "fullscreen",
-      ],
-      invertTime: false,
-      autoplay: autoPlay,
-      muted: false,
-      clickToPlay: true,
-      keyboard: { focused: true, global: false },
-      i18n: {
-        restart: "Restart",
-        rewind: "Rewind 10s",
-        play: "Play",
-        pause: "Pause",
-        fastForward: "Forward 10s",
-        currentTime: "Current time",
-        duration: "Duration",
-        mute: "Mute",
-        unmute: "Unmute",
-        volume: "Volume",
-        fullscreen: "Fullscreen",
-      },
-      ratio: "16:9",
-      hideControls: false,
-      tooltips: { controls: true, seek: true },
-      fullscreen: { enabled: true, iosNative: true },
-      loadSprite: true,
-    });
-
-    playerRef.current = player;
-
-    const handleReady = async () => {
-      setIsReady(true);
+    const hydratePosition = async () => {
       const startPosition = (await getLastPosition()) || 0;
-      if (
-        startPosition > 5 &&
-        video.duration &&
-        startPosition < video.duration - 5
-      ) {
-        video.currentTime = startPosition;
+      if (videoRef.current) {
+        videoRef.current.currentTime = startPosition;
         setCurrentTime(startPosition);
       }
-
       if (autoPlay) {
-        void Promise.resolve(player.play()).catch(() => undefined);
+        try {
+          await videoRef.current?.play();
+        } catch (e) {}
       }
     };
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime || 0);
-    };
+    videoRef.current?.addEventListener("loadedmetadata", hydratePosition, {
+      passive: true,
+      once: true,
+    });
 
-    const handleLoadedMetadata = () => {
-      setDuration(video.duration || 0);
-      setCurrentTime(video.currentTime || 0);
-    };
-
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-
-    player.on("ready", handleReady);
-    player.on("timeupdate", handleTimeUpdate);
-    player.on("loadedmetadata", handleLoadedMetadata);
-    player.on("play", handlePlay);
-    player.on("pause", handlePause);
-    // Fullscreen enter/exit handlers to provide native-like cinema mode
-    const handleEnterFullscreen = async () => {
-      try {
-        if (Capacitor.isPluginAvailable("StatusBar")) {
-          await StatusBar.hide();
-        }
-        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-          await ScreenOrientation.lock({ orientation: "landscape" });
-          try {
-            if (ExoPlayer && typeof ExoPlayer.lockOrientation === "function") {
-              await ExoPlayer.lockOrientation();
-            }
-          } catch (e) {}
-        }
-      } catch (err) {
-        // non-fatal
-        // eslint-disable-next-line no-console
-        console.warn("enter fullscreen handling failed:", err);
-      }
-    };
-
-    const handleExitFullscreen = async () => {
-      try {
-        if (Capacitor.isPluginAvailable("ScreenOrientation")) {
-          await ScreenOrientation.unlock();
-          try {
-            if (
-              ExoPlayer &&
-              typeof ExoPlayer.unlockOrientation === "function"
-            ) {
-              await ExoPlayer.unlockOrientation();
-            }
-          } catch (e) {}
-        }
-        if (Capacitor.isPluginAvailable("StatusBar")) {
-          await StatusBar.show();
-          await StatusBar.setStyle({ style: Style.Light });
-        }
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn("exit fullscreen handling failed:", err);
-      }
-    };
-
-    player.on("enterfullscreen", handleEnterFullscreen);
-    player.on("exitfullscreen", handleExitFullscreen);
-
-    video.src = videoUrl;
-    video.poster = poster || "";
-    video.setAttribute("playsinline", "true");
-    video.setAttribute("preload", "metadata");
+    startWatchdog();
 
     return () => {
-      player.off("ready", handleReady);
-      player.off("timeupdate", handleTimeUpdate);
-      player.off("loadedmetadata", handleLoadedMetadata);
-      player.off("play", handlePlay);
-      player.off("pause", handlePause);
-      player.destroy();
-      playerRef.current = null;
+      clearWatchdog();
+      if (mediaEl) {
+        mediaEl.removeEventListener("error", handleMediaError);
+        mediaEl.removeEventListener("loadedmetadata", markReadyIfMediaIsLive);
+        mediaEl.removeEventListener("canplay", markReadyIfMediaIsLive);
+        mediaEl.removeEventListener("playing", markReady);
+        mediaEl.removeEventListener("progress", markReadyIfMediaIsLive);
+      }
     };
-  }, [
-    autoPlay,
-    contentId,
-    getLastPosition,
-    isNativePlatform,
-    poster,
-    videoUrl,
-  ]);
+  }, [streamUrl, videoUrl, autoPlay, getLastPosition]);
 
   useEffect(() => {
     return () => {
@@ -315,16 +180,50 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     };
   }, [currentTime, duration, saveProgress]);
 
-  const handleBack = () => {
-    if (playerRef.current) {
-      playerRef.current.destroy();
-      playerRef.current = null;
+  // Force hardware orientation to landscape on native apps and hide status bar
+  useEffect(() => {
+    const restoreAppProfileLayout = async () => {
+      try {
+        if (typeof ScreenOrientation?.unlock === "function") {
+          await ScreenOrientation.unlock();
+        }
+        if (typeof StatusBar?.show === "function") {
+          await StatusBar.show();
+        }
+      } catch (err) {
+        console.warn("Failed to clean up device window layout:", err);
+      }
+    };
+
+    return () => {
+      void restoreAppProfileLayout();
+    };
+  }, []);
+
+  const handleBackNavigation = async () => {
+    try {
+      const media = videoRef.current;
+      if (media) {
+        try {
+          media.pause();
+        } catch (e) {}
+        try {
+          media.removeAttribute("src");
+        } catch (e) {}
+        try {
+          media.load();
+        } catch (e) {}
+      }
+    } catch (e) {
+      console.warn("Failed to gracefully abort loading stream:", e);
     }
+
     navigate(-1);
   };
 
   const handleDoubleTapSeek = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (!videoRef.current) return;
+    const media = videoRef.current;
+    if (!media) return;
 
     const touch = event.touches[0];
     if (!touch) return;
@@ -335,10 +234,10 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     if (lastTouch && now - lastTouch.time < 280) {
       const delta = touch.clientX - lastTouch.x;
       const nextTime = Math.min(
-        Math.max(videoRef.current.currentTime + (delta > 0 ? 10 : -10), 0),
-        videoRef.current.duration || 0,
+        Math.max((media.currentTime || 0) + (delta > 0 ? 10 : -10), 0),
+        media.duration || 0,
       );
-      videoRef.current.currentTime = nextTime;
+      media.currentTime = nextTime;
       setCurrentTime(nextTime);
       touchRef.current = null;
       return;
@@ -346,19 +245,103 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     touchRef.current = { time: now, x: touch.clientX };
   };
+  const resolvedVideoUrl = streamUrl ?? videoUrl ?? null;
 
-  if (!isNativePlatform) {
+  if (playbackError) {
     return (
-      <VideoPlayer
-        src={videoUrl}
-        contentId={contentId}
-        contentType={contentType}
-        title={title}
-        poster={poster}
-        subtitleUrl={subtitleUrl}
-        autoPlay={autoPlay}
-        immersive={true}
-      />
+      <div
+        className="ux-player-container error-state"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          background: "#000",
+          color: "#fff",
+          textAlign: "center",
+          padding: "24px",
+        }}
+      >
+        <div
+          style={{
+            background: "#141414",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "12px",
+            padding: "32px",
+            maxWidth: "420px",
+            width: "100%",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#E50914",
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+            }}
+          >
+            Playback Error
+          </span>
+          <h2
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              margin: "12px 0 8px 0",
+              color: "#fff",
+            }}
+          >
+            Video Unavailable
+          </h2>
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "rgba(255,255,255,0.6)",
+              lineHeight: 1.5,
+              margin: "0 0 24px 0",
+            }}
+          >
+            {playbackError}
+          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: "12px",
+              justifyContent: "center",
+            }}
+          >
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                color: "#fff",
+                border: "none",
+                padding: "10px 20px",
+                borderRadius: "6px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Go Back
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                background: "#fff",
+                color: "#000",
+                border: "none",
+                padding: "10px 20px",
+                borderRadius: "6px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -370,19 +353,26 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       style={{
         background: "#000000",
         minHeight: "100vh",
-        position: "relative",
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100vh",
+        zIndex: 9999,
         overflow: "hidden",
         color: "white",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
-        ["--plyr-color-main" as any]: "#FD8208",
+        ["--plyr-color-main" as any]: "hsl(var(--foreground, 0 0% 98%))",
         ["--plyr-control-icon-size" as any]: "18px",
         ["--plyr-control-radius" as any]: "12px",
         ["--plyr-menu-background" as any]: "rgba(12, 12, 12, 0.96)",
       }}
     >
-      <div className="absolute inset-x-0 top-0 z-40 flex items-center justify-between px-4 pt-5 pb-3 bg-gradient-to-b from-black/80 via-black/35 to-transparent">
+      <div className="cinema-top-navigation-bar absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-5 pb-3 bg-gradient-to-b from-black/80 via-black/35 to-transparent">
         <button
-          onClick={handleBack}
+          onClick={handleBackNavigation}
           className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md transition hover:bg-black/60"
           aria-label="Go back"
         >
@@ -411,15 +401,69 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
       <div
         className="mx-auto w-full max-w-full"
-        style={{ aspectRatio: "16 / 9" }}
+        style={{
+          aspectRatio: "16 / 9",
+          width: "100%",
+          maxWidth: "100vw",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: isReady ? 1 : 0,
+          pointerEvents: isReady ? "auto" : "none",
+        }}
       >
         <video
           ref={videoRef}
-          className="h-full w-full object-cover"
-          controls={false}
+          src={resolvedVideoUrl ?? undefined}
+          key={resolvedVideoUrl || "native-player-video"}
+          autoPlay={autoPlay}
           playsInline
-          poster={poster}
+          controls
+          muted={false}
           preload="metadata"
+          poster={poster ?? undefined}
+          className="h-full w-full object-cover"
+          onLoadedMetadata={async () => {
+            const startPosition = (await getLastPosition()) || 0;
+            if (videoRef.current) {
+              videoRef.current.currentTime = startPosition;
+              setCurrentTime(startPosition);
+            }
+            setDuration(videoRef.current?.duration || 0);
+            markReadyIfMediaIsLive();
+            if (autoPlay) {
+              videoRef.current?.play().catch(() => {});
+            }
+          }}
+          onCanPlay={() => {
+            const media = videoRef.current;
+            if (!media) return;
+            setDuration(media.duration || 0);
+            setCurrentTime(media.currentTime || 0);
+            markReadyIfMediaIsLive();
+            if (autoPlay) {
+              media.play().catch(() => {});
+            }
+          }}
+          onTimeUpdate={() => {
+            if (videoRef.current) {
+              setCurrentTime(videoRef.current.currentTime || 0);
+            }
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onError={() => {
+            setPlaybackError(
+              "Video unavailable. This video could not be loaded due to a network or server limitation.",
+            );
+          }}
+          onEnded={() => setIsPlaying(false)}
+          style={{
+            background: "#000",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
         />
       </div>
 

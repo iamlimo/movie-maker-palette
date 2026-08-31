@@ -45,7 +45,8 @@ export function isBottomNavRoute(pathname: string): boolean {
   if (pathname === "/auth") return false;
 
   // Don't show on watch (video playback) - it overlaps player controls
-  if (pathname.startsWith("/watch")) return false;
+  // Exclude only the playback route `/watch` or `/watch/...` but not `/watchlist`.
+  if (pathname === "/watch" || pathname.startsWith("/watch/")) return false;
 
   return true;
 }

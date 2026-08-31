@@ -56,6 +56,10 @@
         color: hsl(var(--foreground));
         margin: 0;
         font-family: system-ui, -apple-system, sans-serif;
+        /* Respect device safe-area (notch/status bar) on supported devices */
+        padding-top: env(safe-area-inset-top);
+        /* Legacy iOS support */
+        padding-top: constant(safe-area-inset-top);
       }
       #root {
         min-height: 100vh;

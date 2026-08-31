@@ -4,10 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
-import MobileMoviePlayer from "@/components/MobileMoviePlayer";
 import { usePlatform } from "@/hooks/usePlatform";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Loader2, ArrowLeft } from "lucide-react"; // Unified line here
+import { Loader2 } from "lucide-react";
 import { resolveWatchPath } from "@/lib/watchPaths";
 
 const Watch = () => {
@@ -16,7 +14,6 @@ const Watch = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isNative, isIOS, isAndroid } = usePlatform();
-  const isMobile = useIsMobile();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +69,41 @@ const Watch = () => {
     checkAccessAndLoad(requestId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, contentType, contentId, navigate]);
+
+  const resolveVideoUrlSafely = async (
+    request: Promise<{ data?: any; error?: { message?: string } | null }>,
+    fallbackUrl: string | null,
+    requestLabel: string,
+  ): Promise<{ url: string } | null> => {
+    try {
+      const { data, error } = await Promise.race([
+        request,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`${requestLabel} timed out`));
+          }, 8000);
+        }),
+      ]);
+
+      if (error) {
+        console.warn(`[Watch] ${requestLabel} failed:`, error);
+        return fallbackUrl ? { url: fallbackUrl } : null;
+      }
+
+      const raw = data as Record<string, unknown> | null;
+      const signedUrl =
+        typeof raw?.signedUrl === "string"
+          ? raw.signedUrl
+          : typeof raw?.data === "object" && raw.data && typeof (raw.data as { signedUrl?: unknown }).signedUrl === "string"
+            ? (raw.data as { signedUrl: string }).signedUrl
+            : null;
+
+      return signedUrl || fallbackUrl ? { url: signedUrl || fallbackUrl || "" } : null;
+    } catch (error) {
+      console.warn(`[Watch] ${requestLabel} timed out or failed:`, error);
+      return fallbackUrl ? { url: fallbackUrl } : null;
+    }
+  };
 
   const checkAccessAndLoad = async (requestId: number) => {
     try {
@@ -282,21 +314,31 @@ const Watch = () => {
       // 3. Resolve Media Asset Streams
       let videoUrlData: { url: string } | null = null;
 
+      const typedContentData = contentData as { video_url?: string } | null;
+      const fallbackUrl = typedContentData?.video_url ?? null;
+
       if (contentType === "movie") {
-        const { data: urlData, error: urlError } =
-          await supabase.functions.invoke("get-video-url", {
+        const result = await resolveVideoUrlSafely(
+          supabase.functions.invoke("get-video-url", {
             body: { movieId: contentId },
             headers: { Authorization: `Bearer ${accessToken}` },
-          });
+          }),
+          fallbackUrl,
+          "movie stream lookup",
+        );
 
-        const typedContentData = contentData as { video_url?: string } | null;
-        videoUrlData =
-          urlError || !urlData?.signedUrl
-            ? { url: typedContentData?.video_url ?? "" }
-            : { url: urlData.signedUrl };
+        if (!result) {
+          if (!guardSetState(requestId)) return;
+          setErrorTitle("Video Unavailable");
+          setError("Stream URI resolution failed");
+          setLoading(false);
+          return;
+        }
+
+        videoUrlData = result;
       } else if (contentType === "episode") {
-        const { data: urlData, error: urlError } =
-          await supabase.functions.invoke("get-video-url", {
+        const result = await resolveVideoUrlSafely(
+          supabase.functions.invoke("get-video-url", {
             body: {
               contentId,
               episodeId: contentId,
@@ -304,57 +346,20 @@ const Watch = () => {
               expiryHours: 24,
             },
             headers: { Authorization: `Bearer ${accessToken}` },
-          });
+          }),
+          fallbackUrl,
+          "episode stream lookup",
+        );
 
-        const resolveSignedUrl = (input: unknown): string | null => {
-          if (input == null) return null;
-
-          if (typeof input === "string") {
-            try {
-              const parsed = JSON.parse(input) as {
-                signedUrl?: unknown;
-                data?: { signedUrl?: unknown };
-              } | null;
-              const signedUrl = parsed?.signedUrl;
-              if (typeof signedUrl === "string") return signedUrl;
-
-              const dataSignedUrl = parsed?.data?.signedUrl;
-              if (typeof dataSignedUrl === "string") return dataSignedUrl;
-            } catch {
-              return null;
-            }
-          }
-
-          if (typeof input === "object") {
-            const obj = input as Record<string, unknown>;
-            const signedUrl = obj["signedUrl"];
-            if (typeof signedUrl === "string") return signedUrl;
-
-            const data = obj["data"];
-            if (typeof data === "object" && data !== null) {
-              const dataObj = data as Record<string, unknown>;
-              const dataSignedUrl = dataObj["signedUrl"];
-              if (typeof dataSignedUrl === "string") return dataSignedUrl;
-            }
-          }
-
-          return null;
-        };
-
-        const signedUrl = resolveSignedUrl(urlData);
-
-        if (urlError || !signedUrl) {
+        if (!result) {
           if (!guardSetState(requestId)) return;
           setErrorTitle("Video Unavailable");
-          setError(
-            urlError?.message ||
-              "Secure token generation failed for media stream",
-          );
+          setError("Secure token generation failed for media stream");
           setLoading(false);
           return;
         }
 
-        videoUrlData = { url: signedUrl };
+        videoUrlData = result;
       }
 
       if (!videoUrlData?.url) {
@@ -439,20 +444,28 @@ const Watch = () => {
     thumbnail_url?: string;
     subtitle_url?: string;
     video_url?: string;
-    episode_number?: number;
+    episode_number?: number | string;
     seasons?: {
-      season_number?: number;
+      season_number?: number | string;
       tv_shows?: { title?: string; thumbnail_url?: string };
     };
     [key: string]: unknown;
   };
 
-  const contentTitle =
-    contentType === "movie"
-      ? typedContent?.title ?? "Untitled Movie"
-      : `${typedContent?.seasons?.tv_shows?.title ?? "Show"} - Season ${
-          typedContent?.seasons?.season_number ?? ""
-        } Ep ${typedContent?.episode_number ?? ""}`;
+  // Build a clean display title with fallbacks
+  let contentTitle = "";
+  if (contentType === "movie") {
+    contentTitle = typedContent?.title ?? "Untitled Movie";
+  } else {
+    const showTitle =
+      typedContent?.seasons?.tv_shows?.title ??
+      (typedContent?.seasons as any)?.title ??
+      "Show";
+    const seasonNumber = typedContent?.seasons?.season_number ?? "";
+    const episodeNumber = typedContent?.episode_number ?? "";
+    const episodeTitle = typedContent?.title ?? "Untitled Episode";
+    contentTitle = `${showTitle} - S${seasonNumber}E${episodeNumber}: ${episodeTitle}`;
+  }
 
   const contentPoster =
     contentType === "movie"
@@ -468,37 +481,11 @@ const Watch = () => {
     >
       {videoUrl && content && (
         <>
-          {(() => {
-            const branch =
-              isNative && (isIOS || isAndroid)
-                ? "NativeVideoPlayer"
-                : !isNative && isMobile && (isIOS || isAndroid)
-                ? "MobileMoviePlayer"
-                : "VideoPlayer";
-            console.log("[Watch] rendering player branch:", {
-              isNative,
-              isIOS,
-              isAndroid,
-              isMobile,
-              branch,
-              contentType,
-              contentId,
-            });
-            return null;
-          })()}
-          {/* Use NativeVideoPlayer on Capacitor native builds; use MobileMoviePlayer on mobile browsers; use Vidstack VideoPlayer on desktop */}
+          {/* Native builds use the native player; all web builds use the desktop player */}
           {isNative && (isIOS || isAndroid) ? (
             <NativeVideoPlayer
               contentId={contentId!}
               contentType={contentType as "movie" | "episode"}
-              videoUrl={videoUrl}
-              title={contentTitle}
-              poster={contentPoster}
-              subtitleUrl={typedContent?.subtitle_url ?? ""}
-              autoPlay={true}
-            />
-          ) : !isNative && isMobile && (isIOS || isAndroid) ? (
-            <MobileMoviePlayer
               streamUrl={videoUrl}
               title={contentTitle}
               poster={contentPoster}
@@ -508,7 +495,7 @@ const Watch = () => {
             <VideoPlayer
               src={videoUrl}
               contentId={contentId!}
-              contentType={contentType!}
+              contentType={contentType as "movie" | "episode"}
               title={contentTitle}
               poster={contentPoster}
               autoPlay={true}

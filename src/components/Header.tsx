@@ -22,8 +22,13 @@ import { cn } from "@/lib/utils";
 const Header = () => {
   const { user, signOut, profile, loading } = useAuth();
   // const { isSuperAdmin } = useRole();
-  const { isSuperAdmin, isStaff, isSales, isAccounting, isSupport, userRole } = useRole();
-  const { formatBalance, isLoading: walletLoading, error: walletError } = useWallet();
+  const { isSuperAdmin, isStaff, isSales, isAccounting, isSupport, userRole } =
+    useRole();
+  const {
+    formatBalance,
+    isLoading: walletLoading,
+    error: walletError,
+  } = useWallet();
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -31,7 +36,7 @@ const Header = () => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const { isIOS, isAndroid, isNative } = usePlatform();
-  
+
   const showBottomNav = isMobile && isBottomNavRoute(location.pathname);
 
   const handleSignOut = async () => {
@@ -60,9 +65,14 @@ const Header = () => {
       className={cn(
         "fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-border",
         showBottomNav && "md:block hidden",
-        isNative && isIOS && "pt-[env(safe-area-inset-top)]",
+        // Keep existing classes for responsive behavior
         isNative && isAndroid && "pt-1",
       )}
+      // Inline safe-area padding ensures the header is visually clear under device status bars
+      style={{
+        paddingTop:
+          isMobile || isNative ? "env(safe-area-inset-top, 16px)" : undefined,
+      }}
     >
       <div className="container mx-auto px-3 sm:px-4 lg:px-6 h-14 md:h-16 flex items-center justify-between">
         {/* Logo */}
@@ -84,7 +94,7 @@ const Header = () => {
           >
             Home
           </Link>
-         
+
           <Link
             to="/movies"
             className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
@@ -109,7 +119,7 @@ const Header = () => {
           >
             Watchlist
           </Link>
-           <Link
+          <Link
             to="/about"
             className="text-sm lg:text-base text-muted-foreground hover:text-primary transition-smooth whitespace-nowrap"
           >
@@ -145,84 +155,111 @@ const Header = () => {
                 </Button>
               </Link>
 
+              <DropdownMenu>
+                {/* The Trigger must be inside the DropdownMenu */}
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:bg-secondary h-8 lg:h-9 px-2 lg:px-3"
+                  >
+                    <User className="h-4 w-4 lg:h-5 lg:w-5" />
+                    <span className="hidden lg:inline text-sm truncate max-w-[120px]">
+                      {profile?.name || user?.email || "Account"}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
 
-<DropdownMenu>
-  {/* The Trigger must be inside the DropdownMenu */}
-  <DropdownMenuTrigger asChild>
-    <Button
-      variant="ghost"
-      size="sm"
-      className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:bg-secondary h-8 lg:h-9 px-2 lg:px-3"
-    >
-      <User className="h-4 w-4 lg:h-5 lg:w-5" />
-      <span className="hidden lg:inline text-sm truncate max-w-[120px]">
-        {profile?.name || user?.email || "Account"}
-      </span>
-    </Button>
-  </DropdownMenuTrigger>
+                {/* The Content must also be inside the DropdownMenu */}
+                <DropdownMenuContent
+                  align="end"
+                  className="w-48 bg-card border-border"
+                >
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/profile"
+                      className="flex items-center text-foreground"
+                    >
+                      <User className="mr-2 h-4 w-4" /> Profile
+                    </Link>
+                  </DropdownMenuItem>
 
-  {/* The Content must also be inside the DropdownMenu */}
-  <DropdownMenuContent align="end" className="w-48 bg-card border-border">
-    <DropdownMenuItem asChild>
-      <Link to="/profile" className="flex items-center text-foreground">
-        <User className="mr-2 h-4 w-4" /> Profile
-      </Link>
-    </DropdownMenuItem>
-    
-    <DropdownMenuItem asChild>
-      <Link to="/wallet" className="flex items-center text-foreground">
-        <Wallet className="mr-2 h-4 w-4" /> My Wallet
-      </Link>
-    </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/wallet"
+                      className="flex items-center text-foreground"
+                    >
+                      <Wallet className="mr-2 h-4 w-4" /> My Wallet
+                    </Link>
+                  </DropdownMenuItem>
 
-    {isStaff() && <DropdownMenuSeparator className="bg-border" />}
+                  {isStaff() && <DropdownMenuSeparator className="bg-border" />}
 
-    {isSuperAdmin() && (
-      <DropdownMenuItem asChild>
-        <Link to="/admin" className="flex items-center text-foreground">
-          <Settings className="mr-2 h-4 w-4" /> Admin Panel
-        </Link>
-      </DropdownMenuItem>
-    )}
+                  {isSuperAdmin() && (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        to="/admin"
+                        className="flex items-center text-foreground"
+                      >
+                        <Settings className="mr-2 h-4 w-4" /> Admin Panel
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
 
-    {isSales() && (
-      <DropdownMenuItem asChild>
-        <Link to="/admin" className="flex items-center text-foreground">
-          <Settings className="mr-2 h-4 w-4" /> Sales Dashboard
-        </Link>
-      </DropdownMenuItem>
-    )}
+                  {isSales() && (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        to="/admin"
+                        className="flex items-center text-foreground"
+                      >
+                        <Settings className="mr-2 h-4 w-4" /> Sales Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
 
-    {isAccounting() && (
-      <DropdownMenuItem asChild>
-        <Link to="/admin" className="flex items-center text-foreground">
-          <Settings className="mr-2 h-4 w-4" /> Accounting Dashboard
-        </Link>
-      </DropdownMenuItem>
-    )}
+                  {isAccounting() && (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        to="/admin"
+                        className="flex items-center text-foreground"
+                      >
+                        <Settings className="mr-2 h-4 w-4" /> Accounting
+                        Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
 
-    {isSupport() && (
-      <DropdownMenuItem asChild>
-        <Link to="/admin" className="flex items-center text-foreground">
-          <Settings className="mr-2 h-4 w-4" /> Support Dashboard
-        </Link>
-      </DropdownMenuItem>
-    )}
+                  {isSupport() && (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        to="/admin"
+                        className="flex items-center text-foreground"
+                      >
+                        <Settings className="mr-2 h-4 w-4" /> Support Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
 
-    {userRole === 'creator' && (
-      <DropdownMenuItem asChild>
-        <Link to="/admin" className="flex items-center text-foreground">
-          <Settings className="mr-2 h-4 w-4" /> Creator Dashboard
-        </Link>
-      </DropdownMenuItem>
-    )}
+                  {userRole === "creator" && (
+                    <DropdownMenuItem asChild>
+                      <Link
+                        to="/admin"
+                        className="flex items-center text-foreground"
+                      >
+                        <Settings className="mr-2 h-4 w-4" /> Creator Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
 
-    <DropdownMenuSeparator className="bg-border" />
-    <DropdownMenuItem onClick={handleSignOut} className="text-foreground hover:bg-destructive/10">
-      <LogOut className="mr-2 h-4 w-4" /> Sign Out
-    </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
+                  <DropdownMenuSeparator className="bg-border" />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="text-foreground hover:bg-destructive/10"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {/* <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -283,8 +320,6 @@ const Header = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu> */}
-
-
 
               {/* Quick Sign Out Button - Only on large screens */}
               <Button
