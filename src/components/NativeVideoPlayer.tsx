@@ -83,7 +83,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
     ensureTopNavStyle();
 
     // resolvedVideoUrl prefers explicit `streamUrl` prop (used by Watch.tsx)
-    const resolvedVideoUrl = (streamUrl ?? videoUrl) ?? null;
+    const resolvedVideoUrl = streamUrl ?? videoUrl ?? null;
 
     const attachHls = (media: HTMLMediaElement | null) => {
       if (!media) return;
@@ -124,7 +124,10 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       // start the watchdog after attempting to attach source
       try {
         // lazy-load HLS if .m3u8 and supported
-        if (typeof resolvedVideoUrl === "string" && resolvedVideoUrl.includes(".m3u8")) {
+        if (
+          typeof resolvedVideoUrl === "string" &&
+          resolvedVideoUrl.includes(".m3u8")
+        ) {
           const Hls = (window as any).Hls;
           if (Hls && Hls.isSupported && Hls.isSupported()) {
             hls = new Hls();
@@ -134,7 +137,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
             media.src = resolvedVideoUrl;
           }
         } else {
-          if (typeof resolvedVideoUrl === "string") media.src = resolvedVideoUrl;
+          if (typeof resolvedVideoUrl === "string")
+            media.src = resolvedVideoUrl;
         }
         // start watchdog to detect stuck loading
         startWatchdog();
@@ -227,11 +231,10 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       setIsReady(true);
       const startPosition = (await getLastPosition()) || 0;
       try {
-        try {
-          if (player && player.on) {
-            player.on("error", handleMediaError);
-          }
-    
+        if (player && player.on) {
+          player.on("error", handleMediaError);
+        }
+
         if (mediaEl) {
           mediaEl.currentTime = startPosition;
           setCurrentTime(startPosition);
@@ -418,7 +421,7 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
 
     touchRef.current = { time: now, x: touch.clientX };
   };
-  const resolvedVideoUrl = (streamUrl ?? videoUrl) ?? null;
+  const resolvedVideoUrl = streamUrl ?? videoUrl ?? null;
 
   const options = {
     controls: [
@@ -471,7 +474,8 @@ const NativeVideoPlayer: React.FC<NativeVideoPlayerProps> = ({
       {
         src: typeof resolvedVideoUrl === "string" ? resolvedVideoUrl : "",
         type:
-          typeof resolvedVideoUrl === "string" && resolvedVideoUrl.includes(".m3u8")
+          typeof resolvedVideoUrl === "string" &&
+          resolvedVideoUrl.includes(".m3u8")
             ? "application/x-mpegURL"
             : "video/mp4",
       },
