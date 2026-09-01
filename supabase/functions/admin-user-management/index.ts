@@ -186,6 +186,44 @@ serve(async (req) => {
         }
       });
 
+      // Pre-clean records guarded by ON DELETE RESTRICT constraints:
+      // ticket_activity_log.performed_by, ticket_comments.author_id, tickets.created_by
+      const { error: activityError } = await supabaseClient
+        .from('ticket_activity_log')
+        .delete()
+        .eq('performed_by', user_id);
+      if (activityError) throw activityError;
+
+      const { error: commentsError } = await supabaseClient
+        .from('ticket_comments')
+        .delete()
+        .eq('author_id', user_id);
+      if (commentsError) throw commentsError;
+
+      // Deleting tickets cascades their comments/activity via ticket_id
+      const { error: ticketsError } = await supabaseClient
+        .from('tickets')
+        .delete()
+        .eq('created_by', user_id);
+      if (ticketsError) throw ticketsError;
+
+      // Detach references without ON DELETE actions so auth deletion succeeds
+      const detachments: Array<{ table: string; column: string }> = [
+        { table: 'movies', column: 'uploaded_by' },
+        { table: 'tv_shows', column: 'uploaded_by' },
+        { table: 'producers', column: 'reviewer_id' },
+        { table: 'submissions', column: 'reviewer_id' },
+        { table: 'creator_profiles', column: 'created_by' }
+      ];
+
+      for (const { table, column } of detachments) {
+        const { error } = await supabaseClient
+          .from(table)
+          .update({ [column]: null })
+          .eq(column, user_id);
+        if (error) throw error;
+      }
+
       // Delete from auth (cascade will handle related records)
       const { error: deleteError } = await supabaseClient.auth.admin.deleteUser(user_id);
 
