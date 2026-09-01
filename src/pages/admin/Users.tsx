@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download, Headphones, TrendingUp, Calculator } from 'lucide-react';
+import { Search, Users as UsersIcon, UserPlus, Shield, ShieldCheck, Crown, MoreHorizontal, Calendar, Mail, Phone, Ban, CheckCircle, Trash2, Eye, Wallet as WalletIcon, Download, Headphones, TrendingUp, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatNaira } from '@/lib/priceUtils';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
@@ -181,7 +181,8 @@ export default function Users() {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.phone_number || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
     return matchesSearch && matchesRole && matchesStatus;
@@ -512,6 +513,7 @@ export default function Users() {
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead>Wallet Balance</TableHead>
                   <TableHead>Join Date</TableHead>
@@ -554,6 +556,19 @@ export default function Users() {
                           <><CheckCircle className="h-3 w-3 mr-1" /> Active</>
                         )}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.phone_number ? (
+                        <a
+                          href={`tel:${user.phone_number}`}
+                          className="text-sm flex items-center gap-1 hover:text-primary"
+                        >
+                          <Phone className="h-3 w-3" />
+                          {user.phone_number}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Not provided</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
