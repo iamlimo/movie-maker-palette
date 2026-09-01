@@ -512,6 +512,7 @@ export default function Users() {
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead>Wallet Balance</TableHead>
                   <TableHead>Join Date</TableHead>
