@@ -557,6 +557,19 @@ export default function Users() {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      {user.phone_number ? (
+                        <a
+                          href={`tel:${user.phone_number}`}
+                          className="text-sm flex items-center gap-1 hover:text-primary"
+                        >
+                          <Phone className="h-3 w-3" />
+                          {user.phone_number}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Not provided</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="text-sm">
                         {user.country || 'Not specified'}
                       </div>
