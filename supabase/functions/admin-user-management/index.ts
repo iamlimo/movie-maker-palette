@@ -186,6 +186,27 @@ serve(async (req) => {
         }
       });
 
+      // Pre-clean records guarded by ON DELETE RESTRICT constraints:
+      // ticket_activity_log.performed_by, ticket_comments.author_id, tickets.created_by
+      const { error: activityError } = await supabaseClient
+        .from('ticket_activity_log')
+        .delete()
+        .eq('performed_by', user_id);
+      if (activityError) throw activityError;
+
+      const { error: commentsError } = await supabaseClient
+        .from('ticket_comments')
+        .delete()
+        .eq('author_id', user_id);
+      if (commentsError) throw commentsError;
+
+      // Deleting tickets cascades their comments/activity via ticket_id
+      const { error: ticketsError } = await supabaseClient
+        .from('tickets')
+        .delete()
+        .eq('created_by', user_id);
+      if (ticketsError) throw ticketsError;
+
       // Delete from auth (cascade will handle related records)
       const { error: deleteError } = await supabaseClient.auth.admin.deleteUser(user_id);
 
