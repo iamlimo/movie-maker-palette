@@ -371,7 +371,7 @@ export const VideoPlayer = ({
           src={src}
           title={title || "Signature TV"}
           poster={poster}
-          className="h-full w-full"
+          className="stv-player h-full w-full"
           style={playerStyle}
           playsInline
           preload="metadata"
