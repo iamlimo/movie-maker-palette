@@ -337,11 +337,14 @@ export const VideoPlayer = ({
         Back
       </button>
 
-      <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
-        <div className="rounded-full border border-[#FD8208]/40 bg-[#FD8208]/15 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.22em] text-[#FFD9B2] backdrop-blur-sm">
-          HD
-        </div>
+      <div
+        className={`absolute right-4 top-4 z-30 rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.2em] text-white/70 backdrop-blur-sm transition-opacity duration-200 ${
+          isHovering ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        HD
       </div>
+
 
       {playerError ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/85 px-6">
