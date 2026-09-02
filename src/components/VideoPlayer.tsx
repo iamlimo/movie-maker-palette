@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { ArrowLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
 import { StatusBar, Style } from "@capacitor/status-bar";
@@ -321,12 +321,12 @@ export const VideoPlayer = ({
       onBlur={() => setIsHovering(false)}
       aria-label={`Video player for ${title ?? "content"}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/40 z-10 pointer-events-none" />
+      <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/45 via-transparent to-black/25 pointer-events-none" />
 
       <button
         type="button"
         onClick={handleClose}
-        className={`absolute left-4 top-4 z-30 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/35 px-3 py-2 text-sm font-medium text-white backdrop-blur-md transition-all duration-200 ${
+        className={`absolute left-4 top-4 z-30 inline-flex items-center gap-2 rounded-full bg-black/40 px-3 py-1.5 text-[13px] font-medium text-white backdrop-blur-md transition-all duration-200 hover:bg-black/60 ${
           isHovering
             ? "opacity-100 translate-y-0"
             : "pointer-events-none opacity-0 -translate-y-2"
@@ -337,11 +337,16 @@ export const VideoPlayer = ({
         Back
       </button>
 
-      <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
-        <div className="rounded-full border border-[#FD8208]/40 bg-[#FD8208]/15 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.22em] text-[#FFD9B2] backdrop-blur-sm">
+      <div
+        className={`absolute right-4 top-4 z-30 flex items-center gap-2 transition-opacity duration-200 ${
+          isHovering ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-semibold tracking-[0.18em] text-white/70 backdrop-blur-md">
           HD
         </div>
       </div>
+
 
       {playerError ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/85 px-6">
@@ -367,7 +372,7 @@ export const VideoPlayer = ({
           src={src}
           title={title || "Signature TV"}
           poster={poster}
-          className="h-full w-full"
+          className="sig-player h-full w-full"
           style={playerStyle}
           playsInline
           preload="metadata"
@@ -419,48 +424,6 @@ export const VideoPlayer = ({
         </div>
       )}
 
-      {!playerError && (
-        <div className="pointer-events-none absolute bottom-4 right-4 z-30 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-200">
-          <button
-            type="button"
-            aria-label={isPaused ? "Play" : "Pause"}
-            onClick={() => {
-              if (playerRef.current) {
-                if (isPaused) {
-                  void playerRef.current.play();
-                } else {
-                  void playerRef.current.pause();
-                }
-              }
-            }}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white transition hover:bg-[#FD8208] hover:text-black"
-          >
-            {isPaused ? (
-              <Play className="ml-0.5 h-4 w-4" />
-            ) : (
-              <Pause className="h-4 w-4" />
-            )}
-          </button>
-          <button
-            type="button"
-            aria-label={isMuted ? "Unmute" : "Mute"}
-            onClick={() => {
-              const nextValue = !isMuted;
-              if (playerRef.current) {
-                playerRef.current.muted = nextValue;
-              }
-              setIsMuted(nextValue);
-            }}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white transition hover:bg-[#FD8208] hover:text-black"
-          >
-            {isMuted ? (
-              <VolumeX className="h-4 w-4" />
-            ) : (
-              <Volume2 className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      )}
 
       {!poster && !src && !playerError && (
         <div className="absolute inset-0 z-10 bg-black/30">
