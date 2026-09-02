@@ -483,7 +483,47 @@
 /* ============================================================
    Signature TV — Desktop web video player (Vidstack) refinement
    Scoped to .sig-player so nothing else is affected.
+   Accent color: Signature TV Orange (#FD8208).
    ============================================================ */
+
+/* Brand color tokens scoped to the web player */
+.sig-player {
+  --sig-player-brand: #FD8208;
+  --sig-player-brand-hover: #FF9C3A;
+  --sig-player-brand-focus: #FD8208;
+
+  --media-brand: #FD8208;
+  --video-brand: #FD8208;
+  --media-brand-hover: #FF9C3A;
+  --video-brand-hover: #FF9C3A;
+  --media-focus-ring: 0 0 0 3px rgba(253, 130, 8, 0.45);
+  --video-focus-ring: 0 0 0 3px rgba(253, 130, 8, 0.45);
+
+  --media-slider-track-fill-bg: #FD8208;
+  --video-slider-track-fill-bg: #FD8208;
+  --media-slider-track-active-bg: #FD8208;
+  --video-slider-track-active-bg: #FD8208;
+  --media-slider-thumb-bg: #ffffff;
+  --video-slider-thumb-bg: #ffffff;
+
+  --media-menu-item-hover-bg: rgba(253, 130, 8, 0.16);
+  --video-menu-item-hover-bg: rgba(253, 130, 8, 0.16);
+  --media-menu-item-active-bg: rgba(253, 130, 8, 0.22);
+  --video-menu-item-active-bg: rgba(253, 130, 8, 0.22);
+  --media-menu-item-active-fg: #FD8208;
+  --video-menu-item-active-fg: #FD8208;
+
+  --media-control-hover-bg: rgba(253, 130, 8, 0.18);
+  --video-control-hover-bg: rgba(253, 130, 8, 0.18);
+  --media-button-icon-color: rgba(255, 255, 255, 0.92);
+  --video-button-icon-color: rgba(255, 255, 255, 0.92);
+  --media-button-icon-hover-color: #FD8208;
+  --video-button-icon-hover-color: #FD8208;
+
+  --media-time-color: rgba(255, 255, 255, 0.82);
+  --video-time-color: rgba(255, 255, 255, 0.82);
+}
+
 .sig-player .vds-controls {
   padding: 0.25rem 0.5rem 0.5rem;
 }
@@ -498,13 +538,20 @@
   height: 2.25rem;
   border-radius: 9999px;
   background: transparent;
+  color: rgba(255, 255, 255, 0.92);
   transition: background-color 150ms ease, transform 150ms ease,
     color 150ms ease;
 }
 
 .sig-player .vds-button:hover {
-  background: hsl(0 0% 100% / 0.12);
+  background: rgba(253, 130, 8, 0.18);
+  color: #FD8208;
   transform: translateY(-1px);
+}
+
+.sig-player .vds-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(253, 130, 8, 0.45);
 }
 
 .sig-player .vds-button svg {
@@ -516,6 +563,11 @@
 .sig-player .vds-play-button svg {
   width: 1.45rem;
   height: 1.45rem;
+}
+
+.sig-player .vds-play-button:hover {
+  background: rgba(253, 130, 8, 0.2);
+  color: #FD8208;
 }
 
 /* Time scrubber: slim by default, grows on hover */
@@ -534,8 +586,15 @@
   height: 5px;
 }
 
+/* Ensure progress fill uses Signature TV orange */
+.sig-player .vds-slider-track-fill {
+  background: #FD8208;
+}
+
 .sig-player .vds-slider-thumb {
-  box-shadow: 0 1px 6px hsl(0 0% 0% / 0.5);
+  background: #FD8208;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 
 /* Volume: short, tidy slider that only expands on hover/focus */
@@ -569,6 +628,10 @@
   border-radius: 9999px;
 }
 
+.sig-player .vds-volume-slider .vds-slider-track-fill {
+  background: #FD8208;
+}
+
 /* Hide the noisy percentage bubble above the volume slider */
 .sig-player .vds-volume-slider .vds-slider-preview {
   display: none;
@@ -580,26 +643,41 @@
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
-  color: hsl(0 0% 100% / 0.82);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 /* Title in the control bar stays understated */
 .sig-player .vds-chapter-title {
   font-size: 0.8rem;
   font-weight: 500;
-  color: hsl(0 0% 100% / 0.7);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* Menus: soft, rounded, blurred */
 .sig-player .vds-menu-items {
   border-radius: 0.9rem;
-  border: 1px solid hsl(0 0% 100% / 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 9, 11, 0.94);
   backdrop-filter: blur(14px);
-  box-shadow: 0 18px 50px hsl(0 0% 0% / 0.55);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
 }
 
 .sig-player .vds-menu-item {
   border-radius: 0.55rem;
+  color: rgba(255, 255, 255, 0.88);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.sig-player .vds-menu-item:hover,
+.sig-player .vds-menu-item[data-focus] {
+  background: rgba(253, 130, 8, 0.16);
+  color: #FD8208;
+}
+
+.sig-player .vds-menu-item[aria-checked="true"],
+.sig-player .vds-menu-item[data-selected] {
+  color: #FD8208;
+  background: rgba(253, 130, 8, 0.12);
 }
 
 /* Tooltips */
@@ -607,11 +685,23 @@
   border-radius: 0.5rem;
   font-size: 0.72rem;
   padding: 0.25rem 0.5rem;
-  background: hsl(0 0% 4% / 0.92);
-  border: 1px solid hsl(0 0% 100% / 0.08);
+  background: rgba(4, 4, 5, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Live indicator / badges */
+.sig-player .vds-live-button[data-active] {
+  color: #FD8208;
+}
+
+/* Loading spinner */
+.sig-player .vds-media-loading-icon {
+  color: #FD8208;
 }
 
 /* Gentler gradient behind the controls */
 .sig-player .vds-controls[data-visible] {
   animation: none;
 }
+
