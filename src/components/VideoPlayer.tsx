@@ -419,48 +419,6 @@ export const VideoPlayer = ({
         </div>
       )}
 
-      {!playerError && (
-        <div className="pointer-events-none absolute bottom-4 right-4 z-30 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-200">
-          <button
-            type="button"
-            aria-label={isPaused ? "Play" : "Pause"}
-            onClick={() => {
-              if (playerRef.current) {
-                if (isPaused) {
-                  void playerRef.current.play();
-                } else {
-                  void playerRef.current.pause();
-                }
-              }
-            }}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white transition hover:bg-[#FD8208] hover:text-black"
-          >
-            {isPaused ? (
-              <Play className="ml-0.5 h-4 w-4" />
-            ) : (
-              <Pause className="h-4 w-4" />
-            )}
-          </button>
-          <button
-            type="button"
-            aria-label={isMuted ? "Unmute" : "Mute"}
-            onClick={() => {
-              const nextValue = !isMuted;
-              if (playerRef.current) {
-                playerRef.current.muted = nextValue;
-              }
-              setIsMuted(nextValue);
-            }}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white transition hover:bg-[#FD8208] hover:text-black"
-          >
-            {isMuted ? (
-              <VolumeX className="h-4 w-4" />
-            ) : (
-              <Volume2 className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-      )}
 
       {!poster && !src && !playerError && (
         <div className="absolute inset-0 z-10 bg-black/30">
