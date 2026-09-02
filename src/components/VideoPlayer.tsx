@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { ArrowLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { ScreenOrientation } from "@capacitor/screen-orientation";
 import { StatusBar, Style } from "@capacitor/status-bar";
