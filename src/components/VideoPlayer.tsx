@@ -399,22 +399,21 @@ export const VideoPlayer = ({
       )}
 
       {!playerError && isPaused && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-end p-5 md:p-8">
-          <div className="max-w-xl rounded-2xl border border-white/10 bg-black/35 p-4 shadow-[0_16px_32px_rgba(0,0,0,0.4)] backdrop-blur-md md:p-5">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[#FD8208]">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#FD8208]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end px-5 pb-24 md:px-8 md:pb-28">
+          <div className="max-w-xl">
+            <div className="text-[10px] font-medium uppercase tracking-[0.28em] text-white/55">
               {mediaHeader}
             </div>
-            <h2 className="mt-3 text-2xl font-semibold text-white md:text-4xl">
+            <h2 className="mt-2 text-xl font-semibold text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] md:text-3xl">
               {title}
             </h2>
             {(episodeTitle || description) && (
-              <p className="mt-2 max-w-lg text-sm text-slate-200 md:text-base">
+              <p className="mt-1.5 max-w-lg text-sm text-white/70 line-clamp-2">
                 {episodeTitle || description}
               </p>
             )}
             {(seasonNumber || episodeNumber) && (
-              <p className="mt-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-300">
+              <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.2em] text-white/50">
                 {seasonNumber ? `Season ${seasonNumber}` : "Season"}
                 {episodeNumber ? ` • Episode ${episodeNumber}` : ""}
               </p>
