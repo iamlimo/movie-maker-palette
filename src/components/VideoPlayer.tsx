@@ -301,18 +301,18 @@ export const VideoPlayer = ({
     ["--media-menu-item-hover-bg" as `--${string}`]: "rgba(253, 130, 8, 0.16)",
     ["--media-control-hover-bg" as `--${string}`]: "rgba(253, 130, 8, 0.18)",
     ["--media-control-color" as `--${string}`]: "#ffffff",
-    ["--media-button-bg" as `--${string}`]: "rgba(255,255,255,0.06)",
-    ["--media-button-hover-bg" as `--${string}`]: "rgba(253, 130, 8, 0.2)",
+    ["--media-button-bg" as `--${string}`]: "transparent",
+    ["--media-button-hover-bg" as `--${string}`]: "rgba(255,255,255,0.12)",
     ["--media-button-text" as `--${string}`]: "#fff",
     ["--media-text-color" as `--${string}`]: "#fff",
-    ["--media-range-track-height" as `--${string}`]: "0.25rem",
-    ["--media-range-thumb-size" as `--${string}`]: "0.9rem",
+    ["--media-range-track-height" as `--${string}`]: "3px",
+    ["--media-range-thumb-size" as `--${string}`]: "0.7rem",
   };
 
   return (
     <div
       ref={containerRef}
-      className={`group relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#060606] shadow-[0_24px_80px_rgba(0,0,0,0.55)] ${
+      className={`group relative overflow-hidden rounded-2xl bg-black shadow-[0_16px_50px_rgba(0,0,0,0.45)] ${
         immersive ? "h-screen w-full" : "aspect-video w-full"
       } ${className}`}
       onMouseEnter={() => setIsHovering(true)}
