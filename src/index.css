@@ -479,3 +479,139 @@
     backface-visibility: hidden;
   }
 }
+
+/* ============================================================
+   Signature TV — Desktop web video player (Vidstack) refinement
+   Scoped to .sig-player so nothing else is affected.
+   ============================================================ */
+.sig-player .vds-controls {
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.sig-player .vds-controls-group {
+  gap: 0.15rem;
+}
+
+/* Compact, minimal control buttons */
+.sig-player .vds-button {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: transparent;
+  transition: background-color 150ms ease, transform 150ms ease,
+    color 150ms ease;
+}
+
+.sig-player .vds-button:hover {
+  background: hsl(0 0% 100% / 0.12);
+  transform: translateY(-1px);
+}
+
+.sig-player .vds-button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* Larger, primary play button on the left */
+.sig-player .vds-play-button svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+/* Time scrubber: slim by default, grows on hover */
+.sig-player .vds-time-slider {
+  margin-bottom: 0.15rem;
+}
+
+.sig-player .vds-time-slider .vds-slider-track {
+  height: 3px;
+  border-radius: 9999px;
+  transition: height 150ms ease;
+}
+
+.sig-player .vds-time-slider:hover .vds-slider-track,
+.sig-player .vds-time-slider[data-focus] .vds-slider-track {
+  height: 5px;
+}
+
+.sig-player .vds-slider-thumb {
+  box-shadow: 0 1px 6px hsl(0 0% 0% / 0.5);
+}
+
+/* Volume: short, tidy slider that only expands on hover/focus */
+.sig-player .vds-volume-popup {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.sig-player .vds-volume-slider {
+  width: 0;
+  max-width: 4.5rem;
+  min-width: 0;
+  opacity: 0;
+  margin-inline: 0;
+  transition: width 180ms ease, opacity 180ms ease, margin 180ms ease;
+}
+
+.sig-player .vds-volume-popup:hover .vds-volume-slider,
+.sig-player .vds-volume-popup:focus-within .vds-volume-slider,
+.sig-player .vds-volume-slider[data-focus],
+.sig-player .vds-volume-slider[data-dragging] {
+  width: 4.5rem;
+  opacity: 1;
+  margin-inline: 0.15rem 0.35rem;
+}
+
+.sig-player .vds-volume-slider .vds-slider-track {
+  height: 3px;
+  border-radius: 9999px;
+}
+
+/* Hide the noisy percentage bubble above the volume slider */
+.sig-player .vds-volume-slider .vds-slider-preview {
+  display: none;
+}
+
+/* Time text: quieter, monospaced-ish alignment */
+.sig-player .vds-time-group,
+.sig-player .vds-time {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: hsl(0 0% 100% / 0.82);
+}
+
+/* Title in the control bar stays understated */
+.sig-player .vds-chapter-title {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: hsl(0 0% 100% / 0.7);
+}
+
+/* Menus: soft, rounded, blurred */
+.sig-player .vds-menu-items {
+  border-radius: 0.9rem;
+  border: 1px solid hsl(0 0% 100% / 0.08);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 50px hsl(0 0% 0% / 0.55);
+}
+
+.sig-player .vds-menu-item {
+  border-radius: 0.55rem;
+}
+
+/* Tooltips */
+.sig-player .vds-tooltip-content {
+  border-radius: 0.5rem;
+  font-size: 0.72rem;
+  padding: 0.25rem 0.5rem;
+  background: hsl(0 0% 4% / 0.92);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+}
+
+/* Gentler gradient behind the controls */
+.sig-player .vds-controls[data-visible] {
+  animation: none;
+}
