@@ -322,7 +322,7 @@ export const VideoPlayer = ({
       onBlur={() => setIsHovering(false)}
       aria-label={`Video player for ${title ?? "content"}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/40 z-10 pointer-events-none" />
+      <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/45 via-transparent to-black/25 pointer-events-none" />
 
       <button
         type="button"
