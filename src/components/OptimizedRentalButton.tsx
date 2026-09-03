@@ -111,29 +111,26 @@ export const OptimizedRentalButton = ({
   }
 
   if (isIOS && entitlement.state !== 'ACTIVE') {
+    const iosLabel =
+      contentType === 'season' ? 'Season' : contentType === 'episode' ? 'Episode' : 'Movie';
     return (
       <div className="space-y-2">
-        {/* <Button
-          onClick={() => navigate(buildWebUnlockUrl(contentType, contentId))}
-          variant="default"
-          className="w-full bg-green-600 hover:bg-green-700"
+        <Button
+          disabled
+          variant="secondary"
+          className="w-full min-h-[44px] whitespace-normal text-center leading-tight opacity-100 disabled:opacity-70"
         >
-          <AlertCircle className="h-4 w-4 mr-2" />
-          Unlock on Web
-        </Button> */}
-         <Button
-          className="w-full bg-[#FD8208] hover:bg-green-700"
-        >
-          <AlertCircle className="h-4 w-4 mr-2" />
-          Unlock on Web
+          <Lock className="h-4 w-4 mr-2 shrink-0" />
+          Rent {iosLabel} — Unavailable in App
         </Button>
-        
-        <p className="text-xs text-muted-foreground text-center">
-          To rent content on iOS, please unlock it on the website in Safari browser.
+
+        <p className="text-[11px] sm:text-xs text-muted-foreground text-center leading-snug">
+          Renting isn’t available in the iOS app. Visit our website in Safari to unlock this {iosLabel.toLowerCase()}.
         </p>
       </div>
     );
   }
+
 
   const effectiveEntitlement =
     entitlement.state === 'ACTIVE' && isExpiredHardStop

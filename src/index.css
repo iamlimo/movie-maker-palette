@@ -374,6 +374,17 @@
 }
 
 @layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe-page {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5rem);
+  }
+
   /* Bottom navigation safe area support */
   .bottom-nav-safe {
     padding-bottom: env(safe-area-inset-bottom);
