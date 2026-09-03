@@ -665,11 +665,12 @@ const TVShowPreview = () => {
             value={selectedSeason.toString()}
             onValueChange={(value) => setSelectedSeason(parseInt(String(value), 10))}
           >
-            <TabsList className="w-full justify-start">
+            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap no-scrollbar">
               {seasons.map((season) => (
-                <TabsTrigger key={season.id} value={season.season_number.toString()}>
+                <TabsTrigger key={season.id} value={season.season_number.toString()} className="whitespace-nowrap flex-shrink-0">
                   Season {season.season_number} ({(episodes[season.id] || []).length})
                 </TabsTrigger>
+
               ))}
             </TabsList>
 
