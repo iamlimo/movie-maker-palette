@@ -55,7 +55,7 @@ const Bio = () => {
         <header className="animate-slide-in-up flex flex-col items-center text-center">
           <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-[2rem] border border-white/15 bg-black/30 p-4 shadow-2xl shadow-orange-950/40 backdrop-blur-sm">
             <img
-              src="/signature-tv-logo.png"
+              src="/signature logo/1b.svg"
               alt="Signature TV"
               className="h-auto w-full"
             />
