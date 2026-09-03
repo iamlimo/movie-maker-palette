@@ -32,8 +32,8 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    name?: string,
-    phoneNumber?: string,
+    name: string,
+    phoneNumber: string,
   ) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -304,8 +304,8 @@ useEffect(() => {
   const signUp = async (
     email: string,
     password: string,
-    name?: string,
-    phoneNumber?: string,
+    name: string,
+    phoneNumber: string,
   ) => {
     const redirectUrl = `${window.location.origin}/auth/confirm`;
 

@@ -134,6 +134,16 @@ const Auth = () => {
       return;
     }
 
+    const cleanPhone = signupData.phoneNumber.trim();
+    if (!cleanPhone) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter a valid phone number to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -332,8 +342,7 @@ const Auth = () => {
 
       <div className="space-y-2">
         <Label htmlFor="native-signup-phone" className="text-foreground">
-          Phone Number{" "}
-          <span className="text-muted-foreground text-xs">(optional)</span>
+          Phone Number <span className="text-destructive">*</span>
         </Label>
         <div className="relative">
           <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -348,6 +357,7 @@ const Auth = () => {
               setSignupData({ ...signupData, phoneNumber: e.target.value })
             }
             className="pl-10 bg-background/50 border-border focus:border-primary"
+            required
           />
         </div>
       </div>
@@ -706,13 +716,15 @@ const Auth = () => {
 
                     <div className="space-y-2">
                       <Label htmlFor="signup-phone" className="text-foreground">
-                        Phone Number <span className="text-muted-foreground text-xs">(optional)</span>
+                        Phone Number <span className="text-destructive">*</span>
                       </Label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="signup-phone"
                           type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
                           placeholder="e.g. +234 800 000 0000"
                           value={signupData.phoneNumber}
                           onChange={(e) =>
@@ -722,6 +734,7 @@ const Auth = () => {
                             })
                           }
                           className="pl-10 bg-background/50 border-border focus:border-primary"
+                          required
                         />
                       </div>
                     </div>
