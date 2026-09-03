@@ -134,6 +134,16 @@ const Auth = () => {
       return;
     }
 
+    const cleanPhone = signupData.phoneNumber.trim();
+    if (!cleanPhone) {
+      toast({
+        title: "Phone Number Required",
+        description: "Please enter a valid phone number to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
