@@ -768,7 +768,7 @@ const TVShowPreview = () => {
                                         variant="default"
                                         size="sm"
                                         onClick={() => navigate(`/watch/episode/${episode.id}`)}
-                                        className="bg-green-600 hover:bg-green-700 text-white animate-in fade-in-50 duration-500"
+                                        className="w-full sm:w-auto min-h-[44px] bg-green-600 hover:bg-green-700 text-white animate-in fade-in-50 duration-500"
                                       >
                                         <Play className="h-4 w-4 mr-1" />
                                         Watch Now
