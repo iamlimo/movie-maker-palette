@@ -579,32 +579,42 @@ const TVShowPreview = () => {
 
         </div>
 
-        {!isIOS && currentSeason && (
+        {currentSeason && (
           <div className="lg:hidden mt-8 p-4 rounded-xl border bg-card">
-            <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
+            <h3 className="text-lg font-bold mb-4">
+              {isIOS ? "Season & Episodes" : "Pricing Options"}
+            </h3>
             <div className="space-y-3">
               <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
                 <Badge variant="default" className="mb-2 text-xs">
                   Best Value
                 </Badge>
                 <p className="text-sm font-semibold mb-1">Full Season</p>
-                <p className="text-xl font-bold text-primary mb-2">
-                  {formatNaira(
-                    upgradeQuote?.qualifies === true
-                      ? Math.max(0, upgradeQuote.upgradePrice)
-                      : currentSeason.price,
-                  )}
+                {!isIOS && (
+                  <>
+                    <p className="text-xl font-bold text-primary mb-2">
+                      {formatNaira(
+                        upgradeQuote?.qualifies === true
+                          ? Math.max(0, upgradeQuote.upgradePrice)
+                          : currentSeason.price,
+                      )}
+                    </p>
+
+                    {upgradeQuote?.qualifies === true && (
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Smart Upgrade: instead of {formatNaira(upgradeQuote.fullPrice)}
+                      </p>
+                    )}
+
+                    {upgradeQuoteLoading && (
+                      <p className="text-xs text-muted-foreground mb-2">Checking Smart Upgrade…</p>
+                    )}
+                  </>
+                )}
+
+                <p className="text-xs text-muted-foreground mb-3">
+                  {currentEpisodes.length} episodes • {currentSeason.rental_expiry_duration}h access
                 </p>
-
-                {upgradeQuote?.qualifies === true && (
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Smart Upgrade: instead of {formatNaira(upgradeQuote.fullPrice)}
-                  </p>
-                )}
-
-                {upgradeQuoteLoading && (
-                  <p className="text-xs text-muted-foreground mb-2">Checking Smart Upgrade…</p>
-                )}
 
                 <OptimizedRentalButton
                   contentId={currentSeason.id}
@@ -620,14 +630,16 @@ const TVShowPreview = () => {
               </div>
               <div className="p-3 rounded-lg border">
                 <p className="text-sm font-semibold mb-1">Individual Episodes</p>
-                <p className="text-lg font-bold mb-2">
-                  From{" "}
-                  {formatNaira(
-                    currentEpisodes.length
-                      ? Math.min(...currentEpisodes.map((e) => e.price))
-                      : 0,
-                  )}
-                </p>
+                {!isIOS && (
+                  <p className="text-lg font-bold mb-2">
+                    From{" "}
+                    {formatNaira(
+                      currentEpisodes.length
+                        ? Math.min(...currentEpisodes.map((e) => e.price))
+                        : 0,
+                    )}
+                  </p>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -640,6 +652,7 @@ const TVShowPreview = () => {
             </div>
           </div>
         )}
+
       </div>
 
       {seasons.length > 0 && (
