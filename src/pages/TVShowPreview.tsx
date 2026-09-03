@@ -501,54 +501,60 @@ const TVShowPreview = () => {
             )}
           </div>
 
-          {!isIOS && (
-            <div className="hidden lg:block space-y-6">
-              <div className="p-6 rounded-xl border bg-card">
-                <h3 className="text-lg font-bold mb-4">Pricing Options</h3>
-                {currentSeason && (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                      <Badge variant="default" className="mb-2">
-                        Best Value
-                      </Badge>
-                      <p className="text-sm font-semibold mb-1">Full Season</p>
+          <div className="hidden lg:block space-y-6">
+            <div className="p-6 rounded-xl border bg-card">
+              <h3 className="text-lg font-bold mb-4">
+                {isIOS ? "Season & Episodes" : "Pricing Options"}
+              </h3>
+              {currentSeason && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <Badge variant="default" className="mb-2">
+                      Best Value
+                    </Badge>
+                    <p className="text-sm font-semibold mb-1">Full Season</p>
 
-                      <p className="text-2xl font-bold text-primary mb-2">
-                        {formatNaira(
-                          upgradeQuote?.qualifies === true
-                            ? Math.max(0, upgradeQuote.upgradePrice)
-                            : currentSeason.price,
-                        )}
-                      </p>
-
-                      {upgradeQuote?.qualifies === true && (
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Smart Upgrade: instead of {formatNaira(upgradeQuote.fullPrice)}
+                    {!isIOS && (
+                      <>
+                        <p className="text-2xl font-bold text-primary mb-2">
+                          {formatNaira(
+                            upgradeQuote?.qualifies === true
+                              ? Math.max(0, upgradeQuote.upgradePrice)
+                              : currentSeason.price,
+                          )}
                         </p>
-                      )}
 
-                      {upgradeQuoteLoading && (
-                        <p className="text-xs text-muted-foreground mb-2">Checking Smart Upgrade…</p>
-                      )}
+                        {upgradeQuote?.qualifies === true && (
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Smart Upgrade: instead of {formatNaira(upgradeQuote.fullPrice)}
+                          </p>
+                        )}
 
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {currentEpisodes.length} episodes • {currentSeason.rental_expiry_duration}h access
-                      </p>
+                        {upgradeQuoteLoading && (
+                          <p className="text-xs text-muted-foreground mb-2">Checking Smart Upgrade…</p>
+                        )}
+                      </>
+                    )}
 
-                      <OptimizedRentalButton
-                        contentId={currentSeason.id}
-                        contentType="season"
-                        price={
-                          upgradeQuote?.qualifies === true
-                            ? upgradeQuote.upgradePrice
-                            : currentSeason.price
-                        }
-                        title={`${tvShow.title} - Season ${selectedSeason}`}
-                        onRentalSuccess={handleRentalSuccess}
-                      />
-                    </div>
-                    <div className="p-4 rounded-lg border">
-                      <p className="text-sm font-semibold mb-1">Individual Episodes</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {currentEpisodes.length} episodes • {currentSeason.rental_expiry_duration}h access
+                    </p>
+
+                    <OptimizedRentalButton
+                      contentId={currentSeason.id}
+                      contentType="season"
+                      price={
+                        upgradeQuote?.qualifies === true
+                          ? upgradeQuote.upgradePrice
+                          : currentSeason.price
+                      }
+                      title={`${tvShow.title} - Season ${selectedSeason}`}
+                      onRentalSuccess={handleRentalSuccess}
+                    />
+                  </div>
+                  <div className="p-4 rounded-lg border">
+                    <p className="text-sm font-semibold mb-1">Individual Episodes</p>
+                    {!isIOS && (
                       <p className="text-xl font-bold mb-2">
                         From{" "}
                         {formatNaira(
@@ -557,19 +563,20 @@ const TVShowPreview = () => {
                             : 0,
                         )}
                       </p>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => scrollToSection("episodes-section")}
-                      >
-                        Browse Episodes
-                      </Button>
-                    </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => scrollToSection("episodes-section")}
+                    >
+                      Browse Episodes
+                    </Button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
+
         </div>
 
         {!isIOS && currentSeason && (
