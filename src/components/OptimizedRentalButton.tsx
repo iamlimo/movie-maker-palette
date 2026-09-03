@@ -113,14 +113,21 @@ export const OptimizedRentalButton = ({
   if (isIOS && entitlement.state !== 'ACTIVE') {
     return (
       <div className="space-y-2">
-        <Button
+        {/* <Button
           onClick={() => navigate(buildWebUnlockUrl(contentType, contentId))}
           variant="default"
           className="w-full bg-green-600 hover:bg-green-700"
         >
           <AlertCircle className="h-4 w-4 mr-2" />
           Unlock on Web
+        </Button> */}
+         <Button
+          className="w-full bg-[#FD8208] hover:bg-green-700"
+        >
+          <AlertCircle className="h-4 w-4 mr-2" />
+          Unlock on Web
         </Button>
+        
         <p className="text-xs text-muted-foreground text-center">
           To rent content on iOS, please unlock it on the website in Safari browser.
         </p>
