@@ -848,6 +848,8 @@ const TVShowPreview = () => {
           )}
         </div>
       </div>
+      </div>
+
 
       <div
         id="similar-section"
