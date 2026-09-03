@@ -805,8 +805,10 @@ const TVShowPreview = () => {
         </div>
       )}
 
-      <div className="p-6 rounded-xl border border-border bg-card">
+      <div className="container mx-auto px-4">
+      <div className="p-4 sm:p-6 rounded-xl border border-border bg-card">
         <h3 className="font-semibold mb-4">Show Information</h3>
+
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <Calendar className="h-4 w-4 text-muted-foreground" />
