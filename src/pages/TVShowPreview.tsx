@@ -762,7 +762,7 @@ const TVShowPreview = () => {
                                     )}
                                   </div>
 
-                                  <div className="flex-shrink-0">
+                                  <div className="w-full sm:w-auto sm:min-w-[11rem] flex-shrink-0">
                                     {hasAnyAccess ? (
                                       <Button
                                         variant="default"
