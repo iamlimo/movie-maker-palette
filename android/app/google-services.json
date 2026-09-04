@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "441513832388",
+    "project_id": "signature-tv-3be6b",
+    "storage_bucket": "signature-tv-3be6b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:441513832388:android:41a63a4819c8026c69fe91",
+        "android_client_info": {
+          "package_name": "co.signature.tv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAyiQt1MM8hKKi4x_BvF1I0ewZ0T8nUDe0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
