@@ -41,6 +41,12 @@
 	<string>Signature TV requires permission to save photos or videos to your library so you can keep copies of your recorded profile photos or shared content.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Signature TV requires access to your photo library so you can select photos or videos to set or update your profile picture or share content on the platform.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

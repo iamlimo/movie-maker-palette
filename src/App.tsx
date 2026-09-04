@@ -10,6 +10,7 @@ import { MobileRouteAnimator } from "@/components/mobile/MobileRouteAnimator";
 import { Capacitor } from "@capacitor/core";
 import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import RoleRoute from "@/components/RoleRoute";
@@ -100,6 +101,7 @@ const queryClient = new QueryClient({
 function AppContent() {
   useDeepLinking();
   useServiceWorker();
+  usePushNotifications();
   if (Capacitor.isNativePlatform()) {
     // Service worker is effectively no-op on native platforms.
     // This keeps hooks order stable.
