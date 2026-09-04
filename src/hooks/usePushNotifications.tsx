@@ -1,6 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
+import {
+  PushNotifications,
+  type PushNotificationSchema,
+  type ActionPerformed,
+  type Token,
+} from "@capacitor/push-notifications";
 import { FCM as FCMBase } from "@capacitor-community/fcm";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const FCM = FCMBase as any;
@@ -10,7 +16,6 @@ import { mapPushDataToRoute } from "@/lib/pushNavigation";
 
 function deviceType(): "ios" | "android" | "unknown" {
   if (!Capacitor.isNativePlatform()) return "unknown";
-  // Prefer platform ID from Capacitor
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const platform = (Capacitor as any)?.getPlatform?.();
   if (platform === "ios") return "ios";
@@ -26,95 +31,182 @@ async function upsertDeviceToken(params: {
   const { token, deviceType, userId } = params;
 
   // RLS on push_device_tokens requires auth.uid() = user_id (or staff).
-  // Supabase client auth session is what provides auth.uid().
-  const { error } = await (supabase.from("push_device_tokens") as any).upsert({
-    user_id: userId,
-    token,
-    device_type: deviceType,
-    is_active: true,
-    last_used_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from("push_device_tokens") as any).upsert(
+    {
+      user_id: userId,
+      token,
+      device_type: deviceType,
+      is_active: true,
+      last_used_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "token" },
+  );
 
   if (error) {
-    // Don't crash the app for token registration errors.
+    // Never crash the app for token registration errors.
     console.error("Failed to upsert push token:", error);
   }
+}
+
+/**
+ * Resolve the FCM registration token.
+ * - Android: the token returned by @capacitor/push-notifications IS the FCM token.
+ * - iOS: the plugin returns the raw APNs token, so we ask @capacitor-community/fcm
+ *   for the Firebase token instead (falls back to APNs token if unavailable).
+ */
+async function resolveFcmToken(nativeToken: string): Promise<string> {
+  if (deviceType() !== "ios") return nativeToken;
+  try {
+    const result = await FCM.getToken();
+    const fcmToken = typeof result === "string" ? result : result?.token;
+    if (typeof fcmToken === "string" && fcmToken) return fcmToken;
+  } catch (err) {
+    console.error("FCM.getToken failed, falling back to APNs token:", err);
+  }
+  return nativeToken;
 }
 
 export function usePushNotifications() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const registeredRef = useRef(false);
+  const initializedRef = useRef(false);
+  const userIdRef = useRef<string | null>(null);
+  const pendingRouteRef = useRef<string | null>(null);
+
+  // Keep the latest user id available to listeners registered once per launch.
+  userIdRef.current = user?.id ?? null;
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     if (loading) return;
+    if (!user?.id) return;
 
-    const currentUserId = user?.id;
-    if (!currentUserId) return;
-
-    // Initialize listeners once per app launch.
-    if (!registeredRef.current) {
-      registeredRef.current = true;
-
+    // Once permissions are granted and listeners are attached, a session change
+    // just needs the current token re-saved against the new user.
+    if (initializedRef.current) {
       void (async () => {
         try {
-          // Permission prompt (iOS; Android may be no-op depending on OS version)
-          // @capacitor-community/fcm handles this internally where supported.
-          await FCM.requestPermissionsAsync();
-
-          const tokenResult = await FCM.getToken();
-          const token = tokenResult?.token ?? tokenResult;
-
+          const result = await FCM.getToken();
+          const token = typeof result === "string" ? result : result?.token;
           if (typeof token === "string" && token) {
-            const dt = deviceType();
             await upsertDeviceToken({
               token,
-              deviceType: dt,
-              userId: currentUserId,
+              deviceType: deviceType(),
+              userId: user.id,
             });
           }
         } catch (err) {
-          console.error("FCM init failed:", err);
+          console.error("Re-registering push token failed:", err);
         }
       })();
+      return;
     }
 
-    // Listener for foreground messages
-    const foregroundHandler = FCM.addListener("notification", (msg: any) => {
-      const data = (msg?.data ?? msg?.notification ?? {}) as Record<
-        string,
-        unknown
-      >;
+    initializedRef.current = true;
+    const listeners: Array<{ remove: () => void }> = [];
 
-      const targetScreen = typeof data.target_screen === "string" ? data.target_screen : undefined;
-      const entityId = typeof data.entity_id === "string" ? data.entity_id : undefined;
+    void (async () => {
+      try {
+        // registration -> token available (APNs on iOS, FCM on Android)
+        listeners.push(
+          await PushNotifications.addListener(
+            "registration",
+            async (token: Token) => {
+              const userId = userIdRef.current;
+              if (!userId || !token?.value) return;
+              const fcmToken = await resolveFcmToken(token.value);
+              await upsertDeviceToken({
+                token: fcmToken,
+                deviceType: deviceType(),
+                userId,
+              });
+            },
+          ),
+        );
 
-      const route = mapPushDataToRoute({
-        target_screen: targetScreen,
-        entity_id: entityId,
-      });
+        listeners.push(
+          await PushNotifications.addListener(
+            "registrationError",
+            (err: unknown) => {
+              console.error("Push registration error:", err);
+            },
+          ),
+        );
 
-      if (route) navigate(route);
-    });
+        // Foreground delivery: system tray handles background/killed states.
+        listeners.push(
+          await PushNotifications.addListener(
+            "pushNotificationReceived",
+            (notification: PushNotificationSchema) => {
+              const data = (notification?.data ?? {}) as Record<string, unknown>;
+              if (String(data.silent ?? "") === "true") return;
+              // Foreground notifications are not auto-displayed; nothing to do
+              // beyond letting the app know one arrived.
+              console.info("Push received in foreground:", notification.title);
+            },
+          ),
+        );
 
-    // Listener for token refresh
-    const tokenRefresh = FCM.addListener("registration", async (res: any) => {
-      const newToken = res?.token ?? res?.registrationToken ?? res;
-      if (typeof newToken !== "string" || !newToken) return;
+        // Background / cold-start tap -> deep link into the app.
+        listeners.push(
+          await PushNotifications.addListener(
+            "pushNotificationActionPerformed",
+            (action: ActionPerformed) => {
+              const data = (action?.notification?.data ?? {}) as Record<
+                string,
+                unknown
+              >;
+              const route = mapPushDataToRoute({
+                target_screen:
+                  typeof data.target_screen === "string"
+                    ? data.target_screen
+                    : undefined,
+                entity_id:
+                  typeof data.entity_id === "string" ? data.entity_id : undefined,
+              });
+              if (!route) return;
+              pendingRouteRef.current = route;
+              navigate(route);
+            },
+          ),
+        );
 
-      const dt = deviceType();
-      await upsertDeviceToken({
-        token: newToken,
-        deviceType: dt,
-        userId: currentUserId,
-      });
-    });
+        // Ask for permission, then register with APNs/FCM.
+        let permission = await PushNotifications.checkPermissions();
+        if (permission.receive === "prompt") {
+          permission = await PushNotifications.requestPermissions();
+        }
+        if (permission.receive !== "granted") {
+          console.info("Push permission not granted:", permission.receive);
+          return;
+        }
+
+        await PushNotifications.register();
+        await PushNotifications.removeAllDeliveredNotifications().catch(
+          () => undefined,
+        );
+
+        // Android channel so background notifications show reliably.
+        if (deviceType() === "android") {
+          await PushNotifications.createChannel({
+            id: "signature_tv_default",
+            name: "Signature TV",
+            description: "New releases, rentals and account updates",
+            importance: 5,
+            visibility: 1,
+          }).catch((err) => console.error("createChannel failed:", err));
+        }
+      } catch (err) {
+        console.error("Push notification setup failed:", err);
+      }
+    })();
 
     return () => {
-      foregroundHandler.remove();
-      tokenRefresh.remove();
+      listeners.forEach((l) => l.remove());
+      initializedRef.current = false;
     };
-  }, [user?.id, loading, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, loading]);
 }
