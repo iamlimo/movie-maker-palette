@@ -41,13 +41,22 @@ async function upsertDeviceToken(params: {
       last_used_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "token" },
+    { onConflict: "user_id,token" },
   );
 
   if (error) {
     // Never crash the app for token registration errors.
     console.error("Failed to upsert push token:", error);
+    return;
   }
+
+  // A device can only belong to one account at a time: retire the same token
+  // registered under any other user.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from("push_device_tokens") as any)
+    .update({ is_active: false })
+    .eq("token", token)
+    .neq("user_id", userId);
 }
 
 /**
