@@ -60,6 +60,9 @@ export default function PushNotifications() {
   const [target, setTarget] = useState<Target>("all");
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(false);
+  const [profilesPage, setProfilesPage] = useState(0);
+  const profilesPageSize = 50;
+  const [hasMoreProfiles, setHasMoreProfiles] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [selectedProfileUserId, setSelectedProfileUserId] = useState("");
 
@@ -133,12 +136,14 @@ export default function PushNotifications() {
     const loadProfiles = async () => {
       try {
         setProfilesLoading(true);
-        // Load a small initial sample for quick UI responsiveness.
+        // Load a first page for quick UI responsiveness.
+        const start = 0;
+        const end = profilesPageSize - 1;
         const { data, error } = await supabase
           .from("profiles")
           .select("id, user_id, name, email")
           .order("created_at", { ascending: false })
-          .limit(50);
+          .range(start, end);
 
         if (error) throw error;
 
@@ -162,6 +167,8 @@ export default function PushNotifications() {
         }) as ProfileRow[];
 
         setProfiles(rows);
+        setProfilesPage(0);
+        setHasMoreProfiles((data ?? []).length === profilesPageSize);
       } catch (err) {
         console.error("Failed to load profiles:", err);
       } finally {
@@ -184,12 +191,14 @@ export default function PushNotifications() {
         // Use ilike search on email or name to find users across the whole table.
         // Increase limit for broader results; consider adding pagination if this grows.
         const orFilter = `email.ilike.%${q}%,name.ilike.%${q}%`;
+        const start = 0;
+        const end = profilesPageSize - 1;
         const { data, error } = await supabase
           .from("profiles")
           .select("id, user_id, name, email")
           .or(orFilter)
           .order("created_at", { ascending: false })
-          .limit(1000);
+          .range(start, end);
 
         if (error) throw error;
         if (cancelled) return;
@@ -202,6 +211,8 @@ export default function PushNotifications() {
         }));
 
         setProfiles(rows);
+        setProfilesPage(0);
+        setHasMoreProfiles((data ?? []).length === profilesPageSize);
       } catch (err) {
         console.error("Failed to search profiles:", err);
       } finally {
@@ -214,6 +225,50 @@ export default function PushNotifications() {
       clearTimeout(timer);
     };
   }, [userSearch]);
+
+  const loadMoreProfiles = async () => {
+    try {
+      setProfilesLoading(true);
+      const nextPage = profilesPage + 1;
+      const start = nextPage * profilesPageSize;
+      const end = start + profilesPageSize - 1;
+
+      const q = userSearch.trim();
+      let res;
+      if (q) {
+        const orFilter = `email.ilike.%${q}%,name.ilike.%${q}%`;
+        res = await supabase
+          .from("profiles")
+          .select("id, user_id, name, email")
+          .or(orFilter)
+          .order("created_at", { ascending: false })
+          .range(start, end);
+      } else {
+        res = await supabase
+          .from("profiles")
+          .select("id, user_id, name, email")
+          .order("created_at", { ascending: false })
+          .range(start, end);
+      }
+
+      const { data, error } = res as any;
+      if (error) throw error;
+      const rows = (data ?? []).map((r: any) => ({
+        id: String(r.id),
+        user_id: String(r.user_id ?? r.id),
+        name: typeof r.name === "string" ? r.name : null,
+        email: typeof r.email === "string" ? r.email : null,
+      }));
+
+      setProfiles((prev) => [...prev, ...rows]);
+      setProfilesPage(nextPage);
+      setHasMoreProfiles((data ?? []).length === profilesPageSize);
+    } catch (err) {
+      console.error("Failed to load more profiles:", err);
+    } finally {
+      setProfilesLoading(false);
+    }
+  };
 
   const loadMovies = async () => {
     if (movieLoading) return;
@@ -429,6 +484,18 @@ export default function PushNotifications() {
                       )}
                     </SelectContent>
                   </Select>
+
+                  {hasMoreProfiles ? (
+                    <div className="pt-2">
+                      <Button
+                        size="sm"
+                        onClick={loadMoreProfiles}
+                        disabled={profilesLoading}
+                      >
+                        {profilesLoading ? "Loading..." : "Load more users"}
+                      </Button>
+                    </div>
+                  ) : null}
 
                   <div className="text-xs text-muted-foreground flex items-center gap-2 pt-1">
                     <User className="h-4 w-4" />
