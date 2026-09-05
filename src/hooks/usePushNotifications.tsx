@@ -36,13 +36,13 @@ async function upsertDeviceToken(params: {
     {
       user_id: userId,
       token,
-      device_type: deviceType,
+      platform: deviceType,
       is_active: true,
-      last_used_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id,token" },
   );
+
 
   if (error) {
     // Never crash the app for token registration errors.
