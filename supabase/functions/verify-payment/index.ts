@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { corsHeaders, jsonResponse, handleOptions, errorResponse } from "../_shared/cors.ts";
 import { authenticateUser } from "../_shared/auth.ts";
 import { normalizeContentType as normalizeContentTypeShared } from "../_shared/rental.ts";
+import { sendRentalUnlockedPush } from "../_shared/push.ts";
 
 
 
@@ -306,6 +307,30 @@ async function grantAccessIfNeeded(
   intent: RentalIntentRow,
   payment: PaymentRow | null,
 ): Promise<RentalAccessRow | null> {
+  const access = await resolveAccessForIntent(supabase, intent, payment);
+
+  if (access) {
+    const info = extractContentInfo(intent, payment);
+    if (info.contentId) {
+      await sendRentalUnlockedPush(supabase, {
+        userId: intent.user_id,
+        rentalIntentId: intent.id,
+        contentId: info.contentId,
+        contentType: intent.rental_type || info.contentType,
+        expiresAt: access.expires_at,
+        rentalAccessId: access.id,
+      });
+    }
+  }
+
+  return access;
+}
+
+async function resolveAccessForIntent(
+  supabase: any,
+  intent: RentalIntentRow,
+  payment: PaymentRow | null,
+): Promise<RentalAccessRow | null> {
   const contentInfo = extractContentInfo(intent, payment);
   if (!contentInfo.contentId) return null;
 
@@ -466,6 +491,17 @@ serve(async (req: Request) => {
       : null;
 
     if (activeAccess) {
+      if (rentalIntent && contentInfo.contentId) {
+        await sendRentalUnlockedPush(supabase, {
+          userId: rentalIntent.user_id,
+          rentalIntentId: rentalIntent.id,
+          contentId: contentInfo.contentId,
+          contentType: rentalIntent.rental_type || contentInfo.contentType,
+          expiresAt: activeAccess.expires_at,
+          rentalAccessId: activeAccess.id,
+        });
+      }
+
       return jsonResponse({
         success: true,
         payment: payment
