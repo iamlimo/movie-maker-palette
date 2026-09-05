@@ -9,6 +9,7 @@ const corsHeaders = {
 
 import { normalizeContentType, type RentalContentType } from "../_shared/rental.ts";
 import { fetchPaystackTransaction, syncPaymentRecord } from "../_shared/paystack-sync.ts";
+import { sendRentalUnlockedPush } from "../_shared/push.ts";
 
 interface RentalIntentRow {
   id: string;
@@ -520,6 +521,15 @@ Deno.serve(async (req) => {
           `✅ Payment confirmed and rental access already exists: intent_id=${rentalIntent.id}, access_id=${activeAccess.id}, channel=${paymentChannel}`,
         );
 
+        await sendRentalUnlockedPush(supabase, {
+          userId: rentalIntent.user_id,
+          rentalIntentId: rentalIntent.id,
+          contentId,
+          contentType: rentalIntent.rental_type,
+          expiresAt: activeAccess.expires_at,
+          rentalAccessId: activeAccess.id,
+        });
+
         return new Response(
           JSON.stringify({
             received: true,
@@ -561,6 +571,15 @@ Deno.serve(async (req) => {
       console.log(
         `✅ Payment confirmed and rental access granted: intent_id=${rentalIntent.id}, access_id=${accessRow.id}, channel=${paymentChannel}, (skipped legacy rental mirror)`
       );
+
+      await sendRentalUnlockedPush(supabase, {
+        userId: rentalIntent.user_id,
+        rentalIntentId: rentalIntent.id,
+        contentId,
+        contentType: rentalIntent.rental_type,
+        expiresAt: accessRow.expires_at,
+        rentalAccessId: accessRow.id,
+      });
 
       return new Response(
         JSON.stringify({
