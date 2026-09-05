@@ -142,6 +142,9 @@ export async function sendPush(
 
   if (tokens.length > 0) {
     try {
+      // Debug: log token counts and a masked sample to help diagnose delivery issues
+      const mask = (s: string) => (s.length > 16 ? `${s.slice(0, 8)}...${s.slice(-8)}` : s);
+      console.log("[push] tokens count:", tokens.length, "sample:", tokens.slice(0, 3).map(mask));
       const sa = JSON.parse(serviceAccountJson) as {
         client_email?: string;
         private_key?: string;
@@ -152,6 +155,7 @@ export async function sendPush(
       }
 
       const accessToken = await getAccessToken(sa.client_email, sa.private_key);
+      console.log("[push] obtained OAuth access token (masked):", accessToken ? `${accessToken.slice(0,6)}...` : "<none>");
       const fcmUrl = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
 
       const batchSize = 50;
@@ -159,17 +163,28 @@ export async function sendPush(
         const batch = tokens.slice(i, i + batchSize);
         const results = await Promise.allSettled(
           batch.map(async (token) => {
+            // APNs headers improve delivery for iOS devices (push-type, priority, topic)
+            const apnsHeaders: Record<string, string> = {
+              "apns-push-type": options.silent ? "background" : "alert",
+              "apns-priority": options.silent ? "5" : "10",
+            };
+            const apnsTopic = Deno.env.get("APNS_TOPIC") || Deno.env.get("IOS_BUNDLE_ID");
+            if (apnsTopic) apnsHeaders["apns-topic"] = apnsTopic;
+
+            const apnsPayload = options.silent
+              ? { aps: { "content-available": 1 } }
+              : { aps: { sound: "default", badge: 1 } };
+
             const message: Record<string, unknown> = {
               message: {
                 token,
                 data: stringData,
                 android: { priority: "high" },
-                ...(options.silent
-                  ? { apns: { payload: { aps: { "content-available": 1 } } } }
-                  : {
-                      notification: { title: options.title, body: options.body },
-                      apns: { payload: { aps: { sound: "default", badge: 1 } } },
-                    }),
+                apns: {
+                  headers: apnsHeaders,
+                  payload: apnsPayload,
+                },
+                ...(options.silent ? {} : { notification: { title: options.title, body: options.body } }),
               },
             };
 

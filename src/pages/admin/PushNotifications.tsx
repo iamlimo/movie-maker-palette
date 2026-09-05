@@ -133,6 +133,7 @@ export default function PushNotifications() {
     const loadProfiles = async () => {
       try {
         setProfilesLoading(true);
+        // Load a small initial sample for quick UI responsiveness.
         const { data, error } = await supabase
           .from("profiles")
           .select("id, user_id, name, email")
@@ -170,6 +171,49 @@ export default function PushNotifications() {
 
     void loadProfiles();
   }, []);
+
+  // Server-side search for profiles when admin types in the recipient input.
+  useEffect(() => {
+    if (!userSearch.trim()) return; // rely on initial sample when empty
+
+    const q = userSearch.trim();
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setProfilesLoading(true);
+        // Use ilike search on email or name to find users across the whole table.
+        // Increase limit for broader results; consider adding pagination if this grows.
+        const orFilter = `email.ilike.%${q}%,name.ilike.%${q}%`;
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, user_id, name, email")
+          .or(orFilter)
+          .order("created_at", { ascending: false })
+          .limit(1000);
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        const rows = (data ?? []).map((r: any) => ({
+          id: String(r.id),
+          user_id: String(r.user_id ?? r.id),
+          name: typeof r.name === "string" ? r.name : null,
+          email: typeof r.email === "string" ? r.email : null,
+        }));
+
+        setProfiles(rows);
+      } catch (err) {
+        console.error("Failed to search profiles:", err);
+      } finally {
+        if (!cancelled) setProfilesLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [userSearch]);
 
   const loadMovies = async () => {
     if (movieLoading) return;
@@ -375,7 +419,11 @@ export default function PushNotifications() {
                       ) : (
                         filteredProfiles.map((p) => (
                           <SelectItem key={p.user_id} value={p.user_id}>
-                            {p.email ?? p.name ?? p.user_id}
+                            {p.email
+                              ? `${p.email} (${p.user_id})`
+                              : p.name
+                              ? `${p.name} (${p.user_id})`
+                              : p.user_id}
                           </SelectItem>
                         ))
                       )}
