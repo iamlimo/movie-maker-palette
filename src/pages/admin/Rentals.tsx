@@ -55,6 +55,7 @@ interface RentalRecord {
   payment_status: RentalPaymentStatus;
   payment_channel?: string | null;
   paystack_reference?: string | null;
+  unlock_push_sent_at: string | null;
 }
 
 const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: BadgeIcon }> = {
