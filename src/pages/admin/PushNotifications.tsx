@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertCircle, Bell, Send, User } from "lucide-react";
+import { AlertCircle, Bell, Send, User, Zap } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -24,6 +24,59 @@ import {
 
 type Target = "all" | "user";
 type DeepLinkTarget = "home" | "movie" | "tvshow";
+
+type QuickPreset = {
+  id: string;
+  label: string;
+  title: string;
+  body: string;
+  target: Target;
+  deepLink: DeepLinkTarget;
+};
+
+const QUICK_PRESETS: QuickPreset[] = [
+  {
+    id: "new-movie",
+    label: "New movie is live",
+    title: "New movie just landed 🎬",
+    body: "A fresh title is now available on Signature TV. Tap to watch.",
+    target: "all",
+    deepLink: "movie",
+  },
+  {
+    id: "new-episode",
+    label: "New episode is live",
+    title: "New episode is out 📺",
+    body: "The next episode is ready. Tap to continue the story.",
+    target: "all",
+    deepLink: "tvshow",
+  },
+  {
+    id: "weekend-picks",
+    label: "Weekend picks",
+    title: "Your weekend picks are ready",
+    body: "Handpicked movies and shows waiting for you. Tap to explore.",
+    target: "all",
+    deepLink: "home",
+  },
+  {
+    id: "rental-expiring",
+    label: "Rental expiring (one user)",
+    title: "Your rental is expiring soon ⏳",
+    body: "Finish watching before your access runs out.",
+    target: "user",
+    deepLink: "home",
+  },
+  {
+    id: "welcome-user",
+    label: "Welcome (one user)",
+    title: "Welcome to Signature TV 👋",
+    body: "Your 400 NGN welcome bonus is in your wallet. Tap to start watching.",
+    target: "user",
+    deepLink: "home",
+  },
+];
+
 
 function safeJsonStringify(input: unknown): string {
   try {
@@ -314,6 +367,18 @@ export default function PushNotifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinkTarget]);
 
+  const [activePreset, setActivePreset] = useState<string>("");
+
+  const applyPreset = (preset: QuickPreset) => {
+    setActivePreset(preset.id);
+    setTitle(preset.title);
+    setBody(preset.body);
+    setTarget(preset.target);
+    setSilent(false);
+    setDeepLinkTarget(preset.deepLink);
+  };
+
+
   const handleSend = async () => {
     if (!canSend) return;
 
@@ -407,6 +472,44 @@ export default function PushNotifications() {
           </CardHeader>
 
           <CardContent className="space-y-5">
+            <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" />
+                <div className="text-sm font-medium">Quick send presets</div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Fills the title, message, target and link. Adjust anything before sending.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {QUICK_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    type="button"
+                    size="sm"
+                    variant={activePreset === preset.id ? "default" : "outline"}
+                    onClick={() => applyPreset(preset)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                {title || body ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setActivePreset("");
+                      setTitle("");
+                      setBody("");
+                    }}
+                  >
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+
             <div className="space-y-2">
               <Label htmlFor="pn-title">Title</Label>
               <Input
