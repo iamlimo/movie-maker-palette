@@ -162,6 +162,7 @@ export default function Rentals() {
         created_at: string;
         expires_at: string | null;
         rental_status: string;
+        unlock_push_sent_at: string | null;
       };
 
       const formatted: RentalRecord[] = ((data ?? []) as unknown as ViewRow[]).map((r) => ({
@@ -185,6 +186,7 @@ export default function Rentals() {
           : "pending") as RentalPaymentStatus,
         payment_channel: r.payment_method,
         paystack_reference: r.paystack_reference,
+        unlock_push_sent_at: r.unlock_push_sent_at ?? null,
       }));
 
       setRentals(formatted);
