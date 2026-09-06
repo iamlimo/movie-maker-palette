@@ -367,6 +367,18 @@ export default function PushNotifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinkTarget]);
 
+  const [activePreset, setActivePreset] = useState<string>("");
+
+  const applyPreset = (preset: QuickPreset) => {
+    setActivePreset(preset.id);
+    setTitle(preset.title);
+    setBody(preset.body);
+    setTarget(preset.target);
+    setSilent(false);
+    setDeepLinkTarget(preset.deepLink);
+  };
+
+
   const handleSend = async () => {
     if (!canSend) return;
 
