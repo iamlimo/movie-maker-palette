@@ -55,6 +55,7 @@ interface RentalRecord {
   payment_status: RentalPaymentStatus;
   payment_channel?: string | null;
   paystack_reference?: string | null;
+  unlock_push_sent_at: string | null;
 }
 
 const statusConfig: Record<RentalStatus, { label: string; color: string; textColor: string; icon: BadgeIcon }> = {
@@ -139,7 +140,7 @@ export default function Rentals() {
       const { data, error } = await supabase
         .from("v_admin_rental_records" as never)
         .select(
-          "intent_id, user_id, user_name, user_email, content_id, content_title, content_type, amount, payment_method, payment_status, paystack_reference, created_at, expires_at, rental_status",
+          "intent_id, user_id, user_name, user_email, content_id, content_title, content_type, amount, payment_method, payment_status, paystack_reference, created_at, expires_at, rental_status, unlock_push_sent_at",
         )
         .order("created_at", { ascending: false })
         .limit(1000);
@@ -161,6 +162,7 @@ export default function Rentals() {
         created_at: string;
         expires_at: string | null;
         rental_status: string;
+        unlock_push_sent_at: string | null;
       };
 
       const formatted: RentalRecord[] = ((data ?? []) as unknown as ViewRow[]).map((r) => ({
@@ -184,6 +186,7 @@ export default function Rentals() {
           : "pending") as RentalPaymentStatus,
         payment_channel: r.payment_method,
         paystack_reference: r.paystack_reference,
+        unlock_push_sent_at: r.unlock_push_sent_at ?? null,
       }));
 
       setRentals(formatted);
@@ -362,6 +365,7 @@ export default function Rentals() {
         "Amount",
         "Created",
         "Expires",
+        "Unlock Push Sent",
       ],
       ...filteredRentals.map((r) => [
         r.user_name,
@@ -375,6 +379,7 @@ export default function Rentals() {
         formatNaira(r.amount || 0),
         new Date(r.created_at).toLocaleDateString(),
         r.expires_at ? new Date(r.expires_at).toLocaleDateString() : "N/A",
+        r.unlock_push_sent_at ? new Date(r.unlock_push_sent_at).toLocaleString() : "Not sent",
       ]),
     ];
 
@@ -621,6 +626,7 @@ export default function Rentals() {
                   <TableHead>Rental Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Expires</TableHead>
+                  <TableHead>Unlock Push</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -682,6 +688,21 @@ export default function Rentals() {
                             {new Date(rental.expires_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-sm">
+                            {rental.unlock_push_sent_at ? (
+                              <Badge className="bg-green-100 text-green-800 flex items-center gap-1 w-fit">
+                                <CheckCircle className="h-3 w-3" />
+                                {new Date(rental.unlock_push_sent_at).toLocaleString()}
+                              </Badge>
+                            ) : rental.payment_status === "paid" ? (
+                              <Badge className="bg-amber-100 text-amber-800 flex items-center gap-1 w-fit">
+                                <Clock className="h-3 w-3" />
+                                Not sent
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
                             <Button
                               size="sm"
                               variant="outline"
@@ -697,7 +718,7 @@ export default function Rentals() {
                     })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No rental records found
                     </TableCell>
                   </TableRow>
