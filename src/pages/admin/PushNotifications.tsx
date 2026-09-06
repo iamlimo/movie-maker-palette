@@ -472,6 +472,44 @@ export default function PushNotifications() {
           </CardHeader>
 
           <CardContent className="space-y-5">
+            <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" />
+                <div className="text-sm font-medium">Quick send presets</div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Fills the title, message, target and link. Adjust anything before sending.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {QUICK_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    type="button"
+                    size="sm"
+                    variant={activePreset === preset.id ? "default" : "outline"}
+                    onClick={() => applyPreset(preset)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                {title || body ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setActivePreset("");
+                      setTitle("");
+                      setBody("");
+                    }}
+                  >
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+
             <div className="space-y-2">
               <Label htmlFor="pn-title">Title</Label>
               <Input
