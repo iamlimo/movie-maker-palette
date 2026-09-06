@@ -140,7 +140,7 @@ export default function Rentals() {
       const { data, error } = await supabase
         .from("v_admin_rental_records" as never)
         .select(
-          "intent_id, user_id, user_name, user_email, content_id, content_title, content_type, amount, payment_method, payment_status, paystack_reference, created_at, expires_at, rental_status",
+          "intent_id, user_id, user_name, user_email, content_id, content_title, content_type, amount, payment_method, payment_status, paystack_reference, created_at, expires_at, rental_status, unlock_push_sent_at",
         )
         .order("created_at", { ascending: false })
         .limit(1000);
