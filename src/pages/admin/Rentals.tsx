@@ -626,6 +626,7 @@ export default function Rentals() {
                   <TableHead>Rental Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Expires</TableHead>
+                  <TableHead>Unlock Push</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
