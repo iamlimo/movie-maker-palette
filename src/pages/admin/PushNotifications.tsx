@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertCircle, Bell, Send, User } from "lucide-react";
+import { AlertCircle, Bell, Send, User, Zap } from "lucide-react";
 import {
   Select,
   SelectContent,
