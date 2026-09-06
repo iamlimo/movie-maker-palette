@@ -2539,6 +2539,7 @@ export type Database = {
           provider_reference: string | null
           rental_status: string | null
           revoked_at: string | null
+          unlock_push_sent_at: string | null
           user_email: string | null
           user_id: string | null
           user_name: string | null
