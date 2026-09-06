@@ -365,6 +365,7 @@ export default function Rentals() {
         "Amount",
         "Created",
         "Expires",
+        "Unlock Push Sent",
       ],
       ...filteredRentals.map((r) => [
         r.user_name,
@@ -378,6 +379,7 @@ export default function Rentals() {
         formatNaira(r.amount || 0),
         new Date(r.created_at).toLocaleDateString(),
         r.expires_at ? new Date(r.expires_at).toLocaleDateString() : "N/A",
+        r.unlock_push_sent_at ? new Date(r.unlock_push_sent_at).toLocaleString() : "Not sent",
       ]),
     ];
 
