@@ -25,6 +25,59 @@ import {
 type Target = "all" | "user";
 type DeepLinkTarget = "home" | "movie" | "tvshow";
 
+type QuickPreset = {
+  id: string;
+  label: string;
+  title: string;
+  body: string;
+  target: Target;
+  deepLink: DeepLinkTarget;
+};
+
+const QUICK_PRESETS: QuickPreset[] = [
+  {
+    id: "new-movie",
+    label: "New movie is live",
+    title: "New movie just landed 🎬",
+    body: "A fresh title is now available on Signature TV. Tap to watch.",
+    target: "all",
+    deepLink: "movie",
+  },
+  {
+    id: "new-episode",
+    label: "New episode is live",
+    title: "New episode is out 📺",
+    body: "The next episode is ready. Tap to continue the story.",
+    target: "all",
+    deepLink: "tvshow",
+  },
+  {
+    id: "weekend-picks",
+    label: "Weekend picks",
+    title: "Your weekend picks are ready",
+    body: "Handpicked movies and shows waiting for you. Tap to explore.",
+    target: "all",
+    deepLink: "home",
+  },
+  {
+    id: "rental-expiring",
+    label: "Rental expiring (one user)",
+    title: "Your rental is expiring soon ⏳",
+    body: "Finish watching before your access runs out.",
+    target: "user",
+    deepLink: "home",
+  },
+  {
+    id: "welcome-user",
+    label: "Welcome (one user)",
+    title: "Welcome to Signature TV 👋",
+    body: "Your 400 NGN welcome bonus is in your wallet. Tap to start watching.",
+    target: "user",
+    deepLink: "home",
+  },
+];
+
+
 function safeJsonStringify(input: unknown): string {
   try {
     return JSON.stringify(input, null, 2);
