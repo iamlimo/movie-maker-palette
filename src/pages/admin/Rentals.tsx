@@ -688,6 +688,21 @@ export default function Rentals() {
                             {new Date(rental.expires_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-sm">
+                            {rental.unlock_push_sent_at ? (
+                              <Badge className="bg-green-100 text-green-800 flex items-center gap-1 w-fit">
+                                <CheckCircle className="h-3 w-3" />
+                                {new Date(rental.unlock_push_sent_at).toLocaleString()}
+                              </Badge>
+                            ) : rental.payment_status === "paid" ? (
+                              <Badge className="bg-amber-100 text-amber-800 flex items-center gap-1 w-fit">
+                                <Clock className="h-3 w-3" />
+                                Not sent
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
                             <Button
                               size="sm"
                               variant="outline"
