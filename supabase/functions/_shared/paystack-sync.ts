@@ -36,7 +36,8 @@ export async function syncPaymentRecord(
   params: SyncPaymentRecordParams,
 ): Promise<void> {
   try {
-    const { data: payment, error: lookupErr } = await supabase
+    // Primary lookup: try intent_id or provider_reference match first
+    let { data: payment, error: lookupErr } = await supabase
       .from("payments")
       .select("id, user_id, purpose, amount, enhanced_status, status, metadata")
       .or(`intent_id.eq.${params.reference},provider_reference.eq.${params.reference}`)
@@ -46,6 +47,27 @@ export async function syncPaymentRecord(
       console.warn("[paystack-sync] payment lookup failed:", lookupErr.message);
       return;
     }
+
+    // Fallback: some Paystack events may include the original payment id in
+    // event.data.metadata.payment_id — try that if primary lookup missed.
+    if (!payment) {
+      const metaPaymentId = (params.rawEvent?.metadata as any)?.payment_id;
+      if (metaPaymentId) {
+        const { data: byMeta, error: byMetaErr } = await supabase
+          .from("payments")
+          .select("id, user_id, purpose, amount, enhanced_status, status, metadata")
+          .eq("id", metaPaymentId)
+          .maybeSingle();
+
+        if (byMetaErr) {
+          console.warn("[paystack-sync] payment lookup by metadata failed:", byMetaErr.message);
+        } else if (byMeta) {
+          payment = byMeta;
+          console.log("[paystack-sync] payment found by event.metadata.payment_id:", metaPaymentId);
+        }
+      }
+    }
+
     if (!payment) {
       console.log("[paystack-sync] no payment row for reference:", params.reference);
       return;
