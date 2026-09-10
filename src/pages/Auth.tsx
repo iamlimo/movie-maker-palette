@@ -113,9 +113,59 @@ const Auth = () => {
     }
   };
 
+  // Validate phone number format (allows common formats)
+  const isValidPhoneNumber = (phoneNumber: string): boolean => {
+    const cleanPhone = phoneNumber.trim();
+    // Accept phone numbers with at least 7 digits
+    // Pattern allows: digits, +, -, spaces, parentheses
+    const phoneRegex = /^[\d\s\-()++]{7,}$/;
+    return phoneRegex.test(cleanPhone) && cleanPhone.length >= 7;
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate name
+    if (!signupData.name.trim()) {
+      toast({
+        title: "Name Required",
+        description: "Please enter your full name to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate email
+    if (!signupData.email.trim()) {
+      toast({
+        title: "Email Required",
+        description: "Please enter a valid email address to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate phone number (CRITICAL for native apps)
+    const cleanPhone = signupData.phoneNumber.trim();
+    if (!cleanPhone) {
+      toast({
+        title: "Phone Number Required",
+        description: "Phone number is required to create an account. Please enter your mobile number (at least 7 digits).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isValidPhoneNumber(signupData.phoneNumber)) {
+      toast({
+        title: "Invalid Phone Number",
+        description: "Please enter a valid phone number (at least 7 digits). Example: +234 800 000 0000",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate password
     if (signupData.password !== signupData.confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -129,16 +179,6 @@ const Auth = () => {
       toast({
         title: "Weak Password",
         description: "Password must be at least 6 characters long.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const cleanPhone = signupData.phoneNumber.trim();
-    if (!cleanPhone) {
-      toast({
-        title: "Phone Number Required",
-        description: "Please enter a valid phone number to continue.",
         variant: "destructive",
       });
       return;
@@ -160,6 +200,12 @@ const Auth = () => {
             title: "Account Exists",
             description:
               "An account with this email already exists. Please try logging in instead.",
+            variant: "destructive",
+          });
+        } else if (error.message.includes("phone")) {
+          toast({
+            title: "Phone Number Error",
+            description: "Phone number is required to create an account. Please try again.",
             variant: "destructive",
           });
         } else {
@@ -341,9 +387,12 @@ const Auth = () => {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="native-signup-phone" className="text-foreground">
+        <Label htmlFor="native-signup-phone" className="text-foreground font-semibold">
           Phone Number <span className="text-destructive">*</span>
         </Label>
+        <p className="text-xs text-muted-foreground mb-2">
+          Required to verify your account and receive updates
+        </p>
         <div className="relative">
           <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
@@ -358,8 +407,14 @@ const Auth = () => {
             }
             className="pl-10 bg-background/50 border-border focus:border-primary"
             required
+            minLength={7}
+            pattern="[\d\s\-()++]{7,}"
+            title="Phone number must have at least 7 digits"
           />
         </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Minimum 7 digits. Include country code if available (e.g., +234)
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -715,9 +770,12 @@ const Auth = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="signup-phone" className="text-foreground">
+                      <Label htmlFor="signup-phone" className="text-foreground font-semibold">
                         Phone Number <span className="text-destructive">*</span>
                       </Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Required to verify your account
+                      </p>
                       <div className="relative">
                         <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -735,8 +793,14 @@ const Auth = () => {
                           }
                           className="pl-10 bg-background/50 border-border focus:border-primary"
                           required
+                          minLength={7}
+                          pattern="[\d\s\-()++]{7,}"
+                          title="Phone number must have at least 7 digits"
                         />
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Minimum 7 digits (e.g., +234 800 000 0000)
+                      </p>
                     </div>
 
                     <div className="space-y-2">
