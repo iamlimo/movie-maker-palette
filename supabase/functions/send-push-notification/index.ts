@@ -159,6 +159,7 @@ Deno.serve(async (req) => {
       const serviceAccount = JSON.parse(serviceAccountJson);
       const { client_email, private_key, project_id } = serviceAccount;
       const accessToken = await getAccessToken(client_email, private_key);
+      console.log("[send-push-notification] obtained access token (masked):", accessToken ? `${accessToken.slice(0,6)}...` : "<none>");
 
       const fcmUrl = `https://fcm.googleapis.com/v1/projects/${project_id}/messages:send`;
 
@@ -190,12 +191,17 @@ Deno.serve(async (req) => {
               },
               body: JSON.stringify(message),
             });
-
-            const result = await res.json();
+            const text = await res.text().catch(() => "");
+            let result: any = {};
+            try {
+              result = text ? JSON.parse(text) : {};
+            } catch (e) {
+              result = { raw: text };
+            }
 
             if (!res.ok) {
-              const errorCode = result?.error?.details?.[0]?.errorCode ||
-                result?.error?.status || "";
+              const errorCode = result?.error?.details?.[0]?.errorCode || result?.error?.status || "";
+              console.error("[send-push-notification] FCM response failed:", { status: res.status, statusText: res.statusText, body: result });
               if (errorCode === "UNREGISTERED" || errorCode === "INVALID_ARGUMENT") {
                 await supabaseAdmin
                   .from("push_device_tokens")

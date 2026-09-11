@@ -150,6 +150,15 @@ export async function sendPush(
         private_key?: string;
         project_id?: string;
       };
+      // Diagnostic: log presence/format of private key (do not log the key itself)
+      try {
+        const hasPem = !!sa.private_key && sa.private_key.includes("-----BEGIN PRIVATE KEY-----");
+        const hasLiteralSlashN = !!sa.private_key && sa.private_key.includes("\\n");
+        const hasNewlineChar = !!sa.private_key && sa.private_key.includes("\n");
+        console.log("[push] service account key format:", { hasPem, hasLiteralSlashN, hasNewlineChar });
+      } catch (e) {
+        console.log("[push] service account key format check failed");
+      }
       if (!sa.client_email || !sa.private_key || !sa.project_id) {
         throw new Error("FIREBASE_SERVICE_ACCOUNT is missing client_email/private_key/project_id");
       }
@@ -196,11 +205,18 @@ export async function sendPush(
               },
               body: JSON.stringify(message),
             });
-            const result = await res.json().catch(() => ({}));
+            const text = await res.text().catch(() => "");
+            let result: any = {};
+            try {
+              result = text ? JSON.parse(text) : {};
+            } catch (e) {
+              result = { raw: text };
+            }
 
             if (!res.ok) {
               const code = result?.error?.details?.[0]?.errorCode || result?.error?.status || "";
               if (code === "UNREGISTERED" || code === "INVALID_ARGUMENT") invalidTokens.push(token);
+              console.error("[push] FCM response failed:", { status: res.status, statusText: res.statusText, body: result });
               throw new Error(`FCM ${res.status}: ${code || JSON.stringify(result).slice(0, 200)}`);
             }
             return result;
