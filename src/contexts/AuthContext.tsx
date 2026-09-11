@@ -317,6 +317,7 @@ useEffect(() => {
         data: {
           name: name || '',
           phone_number: phoneNumber || '',
+          phone: phoneNumber || '',
         },
       },
     });
