@@ -12,6 +12,7 @@ import { useDeepLinking } from "@/hooks/useDeepLinking";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { OfflineSyncStatus } from "@/components/OfflineSyncStatus";
+import { WelcomeBonusPopup } from "@/components/WelcomeBonusPopup";
 import SuperAdminRoute from "@/components/SuperAdminRoute";
 import RoleRoute from "@/components/RoleRoute";
 import { STAFF_ROLES } from "@/lib/rbac";
@@ -111,6 +112,7 @@ function AppContent() {
     <>
       <Analytics />
       <SpeedInsights />
+      <WelcomeBonusPopup />
       <MobileRouteAnimator>
         <Suspense
           fallback={
