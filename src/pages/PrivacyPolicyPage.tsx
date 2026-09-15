@@ -186,7 +186,7 @@ export default function PrivacyPolicyPage() {
             <li>To provide and personalize our services</li>
             <li>To process subscriptions, rentals, and payments</li>
             <li>To manage your account and preferences</li>
-            <li>To communicate updates and support</li>
+            <li>To communicate updates and support via SMS, email and Phone calls</li>
             <li>To comply with legal obligations</li>
             <li>To improve user experience and performance</li>
           </ul>
