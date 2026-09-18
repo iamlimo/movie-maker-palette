@@ -131,17 +131,20 @@ export default function TransactionHistory() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((tx) => (
-                  <TableRow key={tx.id} className="hover:bg-muted/5">
-                    <TableCell className="font-mono text-sm">
-                      {new Date(tx.created_at).toLocaleString('en-NG', {
-                        dateStyle: 'short',
-                        timeStyle: 'short'
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{tx.description || 'Transaction'}</div>
-                    </TableCell>
+                {transactions.map((tx) => {
+                  const description = (tx.description || '').trim() || 'wallet credited with paystack';
+
+                  return (
+                    <TableRow key={tx.id} className="hover:bg-muted/5">
+                      <TableCell className="font-mono text-sm">
+                        {new Date(tx.created_at).toLocaleString('en-NG', {
+                          dateStyle: 'short',
+                          timeStyle: 'short'
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{description}</div>
+                      </TableCell>
                     <TableCell>
                       <Badge 
                         variant="secondary"
@@ -171,18 +174,19 @@ export default function TransactionHistory() {
                     <TableCell className="text-right font-medium">
                       {formatNaira(tx.balance_after)}
                     </TableCell>
-                    <TableCell className="w-12">
-                      {/* If description contains a probable reference, show admin sync button */}
-                      {(() => {
-                        const desc = tx.description || '';
-                        const m = desc.match(/(ref(?:erence)?[:=\s]*)([A-Za-z0-9_-]+)/i);
-                        const ref = m ? m[2] : null;
-                        if (ref) return <AdminSyncPaystackButton reference={ref} />;
-                        return null;
-                      })()}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      <TableCell className="w-12">
+                        {/* If description contains a probable reference, show admin sync button */}
+                        {(() => {
+                          const desc = description;
+                          const m = desc.match(/(ref(?:erence)?[:=\s]*)([A-Za-z0-9_-]+)/i);
+                          const ref = m ? m[2] : null;
+                          if (ref) return <AdminSyncPaystackButton reference={ref} />;
+                          return null;
+                        })()}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

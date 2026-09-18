@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sync, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2 } from 'lucide-react';
 
 interface Props {
   reference: string;
@@ -39,7 +39,7 @@ export default function AdminSyncPaystackButton({ reference }: Props) {
 
   return (
     <Button size="sm" variant="ghost" onClick={handleSync} disabled={loading}>
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sync className="h-4 w-4" />}
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
     </Button>
   );
 }

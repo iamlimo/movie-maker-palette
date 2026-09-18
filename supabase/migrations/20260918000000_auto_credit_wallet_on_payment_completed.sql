@@ -35,7 +35,7 @@ BEGIN
         p_amount => v_amount,
         p_type => 'wallet_topup',
         p_reference => COALESCE(NEW.provider_reference, NEW.intent_id, NEW.id::text),
-        p_description => 'Auto credit from payment completion',
+        p_description => 'wallet credited with paystack',
         p_metadata => json_build_object('source', 'payment_trigger')::json,
         p_user_id => NEW.user_id,
         p_payment_id => NEW.id

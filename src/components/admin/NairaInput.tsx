@@ -10,109 +10,95 @@ interface NairaInputProps {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
-  defaultPriceHint?: string; // e.g., "Default: ₦1,000"
+  defaultPriceHint?: string;
+  className?: string;
 }
 
 const NairaInput: React.FC<NairaInputProps> = ({
-  value, // value in kobo
-  onChange, // onChange expects kobo
+  value,
+  onChange,
   label,
   placeholder = "0.00",
   required = false,
   disabled = false,
-  defaultPriceHint
+  defaultPriceHint,
+  className,
 }) => {
   const [displayValue, setDisplayValue] = useState("");
 
   useEffect(() => {
-    // Convert kobo to naira for display
     const nairaValue = koboToNaira(value);
     if (value === 0) {
       setDisplayValue("");
-    } else {
-      setDisplayValue(nairaValue.toFixed(2));
+      return;
     }
+
+    setDisplayValue(nairaValue.toFixed(2));
   }, [value]);
 
-  const formatCurrency = (amount: string) => {
-    // Remove non-numeric characters except decimal point
-    const numericValue = amount.replace(/[^\d.]/g, '');
-    
-    // Ensure only one decimal point
-    const parts = numericValue.split('.');
+  const sanitizeAmount = (raw: string) => {
+    const numericValue = raw.replace(/[^\d.]/g, "");
+    const parts = numericValue.split(".");
+
     if (parts.length > 2) {
-      return parts[0] + '.' + parts.slice(1).join('');
+      return `${parts[0]}.${parts.slice(1).join("")}`;
     }
-    
-    // Limit decimal places to 2
+
     if (parts[1] && parts[1].length > 2) {
-      parts[1] = parts[1].substring(0, 2);
-      return parts.join('.');
+      return `${parts[0]}.${parts[1].slice(0, 2)}`;
     }
-    
+
     return numericValue;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    
-    // Remove formatting and keep only numbers and decimal
-    const cleanValue = inputValue.replace(/[^\d.]/g, '');
-    const formatted = formatCurrency(cleanValue);
-    
+    const formatted = sanitizeAmount(e.target.value);
     setDisplayValue(formatted);
-    
-    // Convert Naira to Kobo and call onChange
-    const nairaValue = parseFloat(formatted) || 0;
+
+    const nairaValue = Number.parseFloat(formatted || "0") || 0;
     const koboValue = nairaToKobo(nairaValue);
     onChange(koboValue);
   };
 
   const handleBlur = () => {
-    // Format the display value on blur
-    if (displayValue && !isNaN(parseFloat(displayValue))) {
-      const formatted = parseFloat(displayValue).toFixed(2);
-      setDisplayValue(formatted);
+    if (!displayValue) {
+      setDisplayValue("");
+      return;
     }
-  };
 
-  const formatDisplayValue = (value: string) => {
-    if (!value) return "";
-    const num = parseFloat(value);
-    if (isNaN(num)) return "";
-    return num.toLocaleString('en-NG', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    });
+    const numeric = Number.parseFloat(displayValue);
+    if (Number.isFinite(numeric)) {
+      setDisplayValue(numeric.toFixed(2));
+    }
   };
 
   return (
     <div className="space-y-2">
       {label && (
-        <Label className="text-sm font-medium">
+        <Label className="text-sm font-medium text-muted-foreground">
           {label}
           {required && <span className="text-destructive ml-1">*</span>}
         </Label>
       )}
       {defaultPriceHint && (
-        <p className="text-xs text-muted-foreground">
-          {defaultPriceHint}
-        </p>
+        <p className="text-xs text-muted-foreground">{defaultPriceHint}</p>
       )}
+
       <div className="relative">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-foreground">
+          ₦
+        </span>
         <Input
           type="text"
-          value={formatDisplayValue(displayValue)}
+          inputMode="decimal"
+          value={displayValue}
           onChange={handleInputChange}
           onBlur={handleBlur}
           placeholder={placeholder}
           required={required}
           disabled={disabled}
-          className="pl-8"
+          className={`h-16 rounded-2xl border-border bg-muted/20 pl-10 text-2xl font-semibold tracking-tight shadow-inner ${className ?? ""}`}
         />
-        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-          ₦
-        </span>
       </div>
     </div>
   );

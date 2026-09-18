@@ -138,7 +138,7 @@ export async function syncPaymentRecord(
         p_amount: params.paidAmount,
         p_type: "wallet_topup",
         p_reference: params.reference,
-        p_description: "Paystack wallet top-up",
+        p_description: "wallet credited with paystack",
         p_metadata: { channel: params.channel, source: "paystack-webhook" },
         p_user_id: payment.user_id,
         p_payment_id: payment.id,
