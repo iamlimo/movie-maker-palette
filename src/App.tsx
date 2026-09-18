@@ -85,6 +85,7 @@ const TicketsList = lazy(() => import("@/pages/admin/TicketsList"));
 const TicketDetails = lazy(() => import("@/pages/admin/TicketDetails"));
 const PushNotifications = lazy(() => import("@/pages/admin/PushNotifications"));
 const WebhookEvents = lazy(() => import("@/pages/admin/WebhookEvents"));
+const AdminPayments = lazy(() => import("@/pages/admin/Payments"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -336,6 +337,14 @@ function AppContent() {
                 element={
                   <RoleRoute page="wallets">
                     <Wallets />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="payments"
+                element={
+                  <RoleRoute page="wallets">
+                    <AdminPayments />
                   </RoleRoute>
                 }
               />

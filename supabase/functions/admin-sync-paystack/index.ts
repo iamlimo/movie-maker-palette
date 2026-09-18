@@ -365,6 +365,24 @@ Deno.serve(async (req) => {
           rawEvent: transaction?.data ?? {},
         });
 
+        // Audit: record that an admin-triggered sync was performed for this reference
+        try {
+          await supabase.from('payment_audit_log').insert({
+            user_id: payment?.user_id ?? candidate.seedIntent?.user_id ?? null,
+            payment_id: payment?.id ?? null,
+            reference,
+            actor_user_id: requestedBy ?? null,
+            event_type: 'admin_sync',
+            details: {
+              paystack_status: paystackStatus,
+              paid_amount: paidAmount,
+              channel,
+            },
+          });
+        } catch (auditErr) {
+          console.warn('[admin-sync-paystack] failed to write payment_audit_log', auditErr);
+        }
+
         // If this is a rental payment, ensure rental intent/access are activated like webhook.
         const rentalIntent = (await loadRentalIntentByReference(reference)) || candidate.seedIntent;
         if (rentalIntent && paystackStatus === "success") {
