@@ -1,3 +1,90 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { fetchPaystackTransaction, syncPaymentRecord } from "../_shared/paystack-sync.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const paystackKey = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Basic auth: allow either service_role key or a staff user JWT.
+    const auth = req.headers.get('authorization') || '';
+    let isAuthorized = false;
+
+    if (auth.includes(supabaseKey)) {
+      isAuthorized = true; // machine auth with service role
+    } else if (auth.toLowerCase().startsWith('bearer ')) {
+      const userToken = auth.replace(/bearer /i, '');
+      try {
+        const { data: { user }, error: authErr } = await supabase.auth.getUser(userToken);
+        if (authErr || !user) {
+          console.warn('admin-sync-paystack: invalid user token');
+        } else {
+          // Check user role in user_roles table
+          const { data: roleRow } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          const role = roleRow?.role as string | undefined;
+          if (role && ['super_admin', 'admin', 'accounting'].includes(role)) {
+            isAuthorized = true;
+          }
+        }
+      } catch (e) {
+        console.error('admin-sync-paystack auth check error:', e);
+      }
+    }
+
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const { reference } = await req.json();
+    if (!reference) {
+      return new Response(JSON.stringify({ error: 'reference required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Fetch latest transaction from Paystack to get canonical status and amount
+    let paystackData = null;
+    try {
+      paystackData = await fetchPaystackTransaction(reference, paystackKey);
+    } catch (err) {
+      console.error('Paystack verify error:', err);
+    }
+
+    const success = !!(paystackData && paystackData.status === true && paystackData.data?.status === 'success');
+    const paidAmount = Number(paystackData?.data?.amount ?? 0);
+    const channel = paystackData?.data?.channel ?? 'unknown';
+    const paystackStatus = paystackData?.data?.status ?? (success ? 'success' : 'unknown');
+
+    await syncPaymentRecord(supabase, {
+      reference,
+      success,
+      paidAmount,
+      channel,
+      paystackStatus,
+      failureReason: success ? null : String(paystackData?.message ?? 'verification_failed'),
+      rawEvent: paystackData?.data ?? {},
+    });
+
+    return new Response(JSON.stringify({ ok: true, reference, synced: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  } catch (error) {
+    console.error('admin-sync-paystack error:', error);
+    return new Response(JSON.stringify({ error: 'internal_error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+});
 /// <reference path="../deno.d.ts" />
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
 

@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ArrowUpCircle, ArrowDownCircle, History, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatNaira } from '@/lib/priceUtils';
+import AdminSyncPaystackButton from '@/components/admin/AdminSyncPaystackButton';
 
 interface Transaction {
   id: string;
@@ -126,6 +127,7 @@ export default function TransactionHistory() {
                   <TableHead>Type</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Balance After</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,6 +170,16 @@ export default function TransactionHistory() {
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatNaira(tx.balance_after)}
+                    </TableCell>
+                    <TableCell className="w-12">
+                      {/* If description contains a probable reference, show admin sync button */}
+                      {(() => {
+                        const desc = tx.description || '';
+                        const m = desc.match(/(ref(?:erence)?[:=\s]*)([A-Za-z0-9_-]+)/i);
+                        const ref = m ? m[2] : null;
+                        if (ref) return <AdminSyncPaystackButton reference={ref} />;
+                        return null;
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
