@@ -57,47 +57,85 @@ export const TransactionsTable = () => {
   const fetchPayments = async () => {
     setIsLoading(true);
     try {
-      let query = supabase
-        .from('payments')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false });
+      // If a searchTerm exists, perform a broader search that includes profiles
+      let paymentsData: any[] = [];
+      let count: number | null = 0;
 
-      // Apply filters
-      if (statusFilter !== 'all') {
-        query = query.eq('enhanced_status', statusFilter as any);
-      }
-      
-      if (purposeFilter !== 'all') {
-        query = query.eq('purpose', purposeFilter);
-      }
-
-      // Apply search
       if (searchTerm) {
-        query = query.or(`
-          provider_reference.ilike.%${searchTerm}%,
-          id.ilike.%${searchTerm}%
-        `);
+        // Search payments by provider_reference or id
+        const { data: byRef } = await supabase
+          .from('payments')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .or(`provider_reference.ilike.%${searchTerm}%,id.ilike.%${searchTerm}%`);
+
+        // Search profiles by name or email to find matching user_ids
+        const { data: matchingProfiles } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+
+        const userIdsFromProfiles = (matchingProfiles || []).map((p: any) => p.user_id).filter(Boolean);
+
+        // Fetch payments for those user ids
+        let byUser: any[] = [];
+        if (userIdsFromProfiles.length > 0) {
+          const { data } = await supabase
+            .from('payments')
+            .select('*')
+            .in('user_id', userIdsFromProfiles)
+            .order('created_at', { ascending: false });
+          byUser = data || [];
+        }
+
+        // Combine and dedupe
+        const combined = [...(byRef || []), ...byUser];
+        const mapById: Record<string, any> = {};
+        combined.forEach((p: any) => { mapById[p.id] = p; });
+        paymentsData = Object.values(mapById).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        // client-side count
+        count = paymentsData.length;
+      } else {
+        let query = supabase
+          .from('payments')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false });
+
+        // Apply filters
+        if (statusFilter !== 'all') {
+          query = query.eq('enhanced_status', statusFilter as any);
+        }
+        
+        if (purposeFilter !== 'all') {
+          query = query.eq('purpose', purposeFilter);
+        }
+
+        // Apply pagination
+        const from = (currentPage - 1) * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+        query = query.range(from, to);
+
+        const res = await query;
+        // @ts-ignore
+        paymentsData = res.data || [];
+        // @ts-ignore
+        count = res.count ?? paymentsData.length;
       }
 
-      // Apply pagination
-      const from = (currentPage - 1) * itemsPerPage;
-      const to = from + itemsPerPage - 1;
-      query = query.range(from, to);
-
-      const { data: paymentsData, error, count } = await query;
-
-      if (error) {
-        console.error('Error fetching payments:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch transactions",
-          variant: "destructive",
-        });
+      if (!paymentsData) {
+        toast({ title: "Error", description: "Failed to fetch transactions", variant: "destructive" });
         return;
       }
 
-      // Fetch user profiles separately
-      const userIds = paymentsData?.map(p => p.user_id).filter(Boolean) || [];
+      // Apply pagination for search results (server-side query already paginates when no search)
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+
+      const displayedPayments = searchTerm ? paymentsData.slice(from, to + 1) : paymentsData;
+
+      // Fetch user profiles separately for the currently displayed payments
+      const userIds = displayedPayments.map((p: any) => p.user_id).filter(Boolean) || [];
       let profilesMap: Record<string, { name: string; email: string }> = {};
 
       if (userIds.length > 0) {
@@ -107,33 +145,22 @@ export const TransactionsTable = () => {
           .in('user_id', userIds);
 
         if (profiles) {
-          profilesMap = profiles.reduce((acc, profile) => {
+          profilesMap = profiles.reduce((acc: any, profile: any) => {
             acc[profile.user_id] = { name: profile.name, email: profile.email };
             return acc;
           }, {} as Record<string, { name: string; email: string }>);
         }
       }
 
-      // Additional search filtering for user data
-      let paymentsWithProfiles = paymentsData?.map(payment => ({
+      // Map profile data onto the displayed payments
+      const paymentsWithProfiles = displayedPayments.map((payment: any) => ({
         ...payment,
         user_name: profilesMap[payment.user_id]?.name || 'Unknown',
         user_email: profilesMap[payment.user_id]?.email || 'Unknown'
-      })) || [];
-
-      // Apply search filter on user data if needed
-      if (searchTerm) {
-        paymentsWithProfiles = paymentsWithProfiles.filter(payment => 
-          payment.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          payment.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          payment.provider_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          payment.id.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      }
+      }));
 
       setPayments(paymentsWithProfiles);
-      // Fall back to the number of returned (filtered) items if count is not provided
-      setTotalPages(Math.ceil((count || paymentsWithProfiles.length) / itemsPerPage));
+      setTotalPages(Math.ceil((count || paymentsData.length) / itemsPerPage));
     } catch (error) {
       console.error('Error fetching payments:', error);
     } finally {
