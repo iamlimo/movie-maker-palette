@@ -59,7 +59,7 @@ export const TransactionsTable = () => {
     try {
       let query = supabase
         .from('payments')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       // Apply filters
@@ -132,7 +132,8 @@ export const TransactionsTable = () => {
       }
 
       setPayments(paymentsWithProfiles);
-      setTotalPages(Math.ceil((count || 0) / itemsPerPage));
+      // Fall back to the number of returned (filtered) items if count is not provided
+      setTotalPages(Math.ceil((count || paymentsWithProfiles.length) / itemsPerPage));
     } catch (error) {
       console.error('Error fetching payments:', error);
     } finally {
@@ -143,6 +144,11 @@ export const TransactionsTable = () => {
   useEffect(() => {
     fetchPayments();
   }, [currentPage, statusFilter, purposeFilter, searchTerm]);
+
+  // Reset to first page whenever filters or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, purposeFilter, searchTerm]);
 
   const handleRefund = async (paymentId: string) => {
     try {
