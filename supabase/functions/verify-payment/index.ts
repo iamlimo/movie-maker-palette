@@ -758,11 +758,13 @@ serve(async (req: Request) => {
       ? "failed"
       : paystackSuccessful
         ? "completed"
-        : paymentStatus === "failed"
-          ? "failed"
-          : paymentStatus === "pending" || intentStatus === "pending"
+        : paymentStatus === "pending" || intentStatus === "pending"
+          ? "pending"
+          : paymentStatus === "failed" || intentStatus === "failed"
             ? "pending"
             : "unknown";
+
+    const responseStatus = status === "completed" ? "completed" : status === "failed" ? "failed" : "pending";
 
     return jsonResponse({
       success: status === "completed",
@@ -770,18 +772,18 @@ serve(async (req: Request) => {
         ? {
             id: payment.id,
             channel: payment.provider,
-            status: paymentStatus || "unknown",
-            message: "Payment lookup completed",
-            enhanced_status: payment.enhanced_status,
+            status: responseStatus,
+            message: responseStatus === "pending" ? "Payment is still being processed" : "Payment lookup completed",
+            enhanced_status: responseStatus === "pending" ? payment.enhanced_status || "pending" : payment.enhanced_status,
             provider_reference: payment.provider_reference,
           }
         : rentalIntent && refreshedRentalIntent
           ? {
               id: refreshedRentalIntent.id,
               channel: refreshedRentalIntent.payment_method,
-              status,
-              message: "Rental intent lookup completed",
-              enhanced_status: paystackFailed ? "failed" : refreshedRentalIntent.status,
+              status: responseStatus,
+              message: responseStatus === "pending" ? "Payment is still being processed" : "Rental intent lookup completed",
+              enhanced_status: paystackFailed ? "failed" : responseStatus === "pending" ? refreshedRentalIntent.status || "pending" : refreshedRentalIntent.status,
               provider_reference:
                 refreshedRentalIntent.provider_reference || refreshedRentalIntent.paystack_reference,
             }

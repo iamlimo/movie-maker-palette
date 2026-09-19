@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import NairaInput from '@/components/admin/NairaInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wallet, CreditCard, Sparkles } from 'lucide-react';
+import { Loader2, Wallet, CreditCard, ShieldCheck } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { formatNaira } from '@/lib/priceUtils';
 import { Capacitor } from '@capacitor/core';
@@ -16,13 +16,18 @@ interface FundWalletModalProps {
   onClose: () => void;
 }
 
+type FundingState = 'idle' | 'processing' | 'pending' | 'success' | 'failed';
+
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000];
 const MIN_AMOUNT_KOBO = 100;
 const MAX_AMOUNT_KOBO = 500_000 * 100;
 
 export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProps) {
   const [amount, setAmount] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<FundingState>('idle');
+  const [statusMessage, setStatusMessage] = useState('Choose a top-up amount and continue securely.');
+  const pollIntervalRef = useRef<number | null>(null);
+  const pollTimeoutRef = useRef<number | null>(null);
   const { toast } = useToast();
   const { refreshWallet, formatBalance } = useWallet();
   const { isIOS } = usePlatform();
@@ -36,9 +41,34 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
     return Math.max(0, Math.round(n));
   }, [amount]);
 
+  const clearFundingPollers = () => {
+    if (pollIntervalRef.current !== null) {
+      window.clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    if (pollTimeoutRef.current !== null) {
+      window.clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearFundingPollers();
+    };
+  }, []);
+
   if (isIOS) {
     return null;
   }
+
+  const resetFlow = () => {
+    clearFundingPollers();
+    setStatus('idle');
+    setStatusMessage('Choose a top-up amount and continue securely.');
+    setAmount(0);
+  };
 
   const handleFund = async () => {
     if (isIOS) {
@@ -50,9 +80,13 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
       return;
     }
 
+    clearFundingPollers();
+
     const safeAmount = Math.round(Number(normalizedAmount) || 0);
 
     if (!Number.isFinite(safeAmount) || safeAmount < MIN_AMOUNT_KOBO) {
+      setStatus('failed');
+      setStatusMessage('Minimum funding amount is ₦1.00');
       toast({
         title: 'Invalid amount',
         description: 'Minimum funding amount is ₦1.00',
@@ -62,6 +96,8 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
     }
 
     if (safeAmount > MAX_AMOUNT_KOBO) {
+      setStatus('failed');
+      setStatusMessage('Maximum wallet top-up is ₦500,000.00');
       toast({
         title: 'Maximum reached',
         description: 'Maximum wallet top-up is ₦500,000.00',
@@ -70,7 +106,8 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
       return;
     }
 
-    setIsLoading(true);
+    setStatus('processing');
+    setStatusMessage('Preparing your secure payment...');
 
     try {
       const { data, error } = await supabase.functions.invoke('initiate-wallet-funding', {
@@ -92,15 +129,18 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
       } else if (isMobileBrowser) {
         window.location.href = authUrl;
       } else {
-        window.open(authUrl, '_blank', 'width=500,height=700');
+        window.open(authUrl, '_blank', 'width=520,height=760');
       }
 
+      setStatus('pending');
+      setStatusMessage('Paystack is open. Complete the payment and we will confirm your wallet instantly.');
+
       toast({
-        title: 'Payment initiated',
-        description: shouldUseRedirect ? 'Redirecting you to Paystack...' : 'Complete your payment in the pop-up window.',
+        title: 'Payment started',
+        description: shouldUseRedirect ? 'You are being redirected to Paystack.' : 'Complete your payment in the pop-up window.',
       });
 
-      const pollPayment = window.setInterval(async () => {
+      pollIntervalRef.current = window.setInterval(async () => {
         try {
           const { data: paymentData, error: paymentError } = await supabase.functions.invoke('verify-payment', {
             body: { payment_id: data.payment_id },
@@ -114,23 +154,25 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
           const paymentStatus = String(paymentData?.payment?.status || '').toLowerCase();
 
           if (paymentStatus === 'completed') {
-            clearInterval(pollPayment);
-            window.clearTimeout(pollTimeout);
+            clearFundingPollers();
             refreshWallet();
-            setIsLoading(false);
+            setStatus('success');
+            setStatusMessage(`${formatNaira(safeAmount)} has been added to your wallet.`);
             toast({
               title: 'Wallet funded successfully',
               description: `${formatNaira(safeAmount)} added to your wallet`,
             });
-            onClose();
-            setAmount(0);
+            window.setTimeout(() => {
+              onClose();
+              resetFlow();
+            }, 900);
             return;
           }
 
           if (paymentStatus === 'failed' || paymentStatus === 'cancelled' || paymentStatus === 'canceled') {
-            clearInterval(pollPayment);
-            window.clearTimeout(pollTimeout);
-            setIsLoading(false);
+            clearFundingPollers();
+            setStatus('failed');
+            setStatusMessage('The payment was not completed. Please try again or contact support.');
             toast({
               title: 'Payment failed',
               description: 'The payment was not completed. Please try again or contact support.',
@@ -138,17 +180,15 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
             });
             return;
           }
-
-          // Keep this in a pending state until the payment is truly verified.
-          // An unresolved or not-yet-confirmed response is not a failure.
         } catch (pollError) {
           console.error('Payment polling error:', pollError);
         }
       }, 2000);
 
-      const pollTimeout = window.setTimeout(() => {
-        clearInterval(pollPayment);
-        setIsLoading(false);
+      pollTimeoutRef.current = window.setTimeout(() => {
+        clearFundingPollers();
+        setStatus('failed');
+        setStatusMessage('Payment verification timed out. Please check your wallet or try again.');
         toast({
           title: 'Payment verification timed out',
           description: 'Check your wallet or try again in a moment.',
@@ -158,29 +198,43 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
     } catch (error: unknown) {
       console.error('Wallet funding error:', error);
       const message = error instanceof Error ? error.message : 'Failed to initiate wallet funding.';
+      setStatus('failed');
+      setStatusMessage(message);
       toast({
         title: 'Funding failed',
         description: message,
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        clearFundingPollers();
+        onClose();
+        if (status !== 'pending' && status !== 'processing') {
+          resetFlow();
+        }
+      }
+    }}>
       <DialogContent className="sm:max-w-md border-border bg-card p-0 shadow-2xl">
         <DialogHeader className="px-5 pb-3 pt-5 text-left">
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-primary/10 p-2 text-primary">
-              <Wallet className="h-5 w-5" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-primary/10 p-2 text-primary">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-semibold tracking-tight">Top up wallet</DialogTitle>
+                <DialogDescription className="mt-1 text-sm text-muted-foreground">
+                  Add money securely
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold tracking-tight">Fund wallet</DialogTitle>
-              <DialogDescription className="mt-1 text-sm text-muted-foreground">
-                Add money to your wallet
-              </DialogDescription>
+
+            <div className="rounded-full border border-primary/20 bg-primary/5 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
+              Secure
             </div>
           </div>
         </DialogHeader>
@@ -192,6 +246,20 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               <span className="font-medium text-foreground">{formatBalance()}</span>
             </div>
           </div>
+
+          {status === 'processing' || status === 'pending' || status === 'success' || status === 'failed' ? (
+            <div
+              className={[
+                'rounded-2xl border p-3 text-sm',
+                status === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : '',
+                status === 'failed' ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300' : '',
+                status === 'processing' || status === 'pending' ? 'border-primary/30 bg-primary/5 text-foreground' : '',
+              ].join(' ')}
+            >
+              {status === 'processing' && <Loader2 className="mb-2 h-4 w-4 animate-spin" />}
+              {statusMessage}
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             <div className="rounded-2xl border border-border bg-background/80 p-3 shadow-sm transition-all duration-200 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10">
@@ -238,14 +306,19 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
 
           <Button
             onClick={handleFund}
-            disabled={isLoading || normalizedAmount < MIN_AMOUNT_KOBO}
-            className="h-12 w-full rounded-2xl bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:translate-y-[-1px]"
+            disabled={status === 'processing' || status === 'pending' || normalizedAmount < MIN_AMOUNT_KOBO}
+            className="h-12 w-full rounded-2xl bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-70"
             size="lg"
           >
-            {isLoading ? (
+            {status === 'processing' ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Processing...
+              </>
+            ) : status === 'pending' ? (
+              <>
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Payment in progress
               </>
             ) : (
               <>
