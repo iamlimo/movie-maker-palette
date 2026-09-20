@@ -69,6 +69,7 @@ const Users = lazy(() => import("@/pages/admin/Users"));
 const Finance = lazy(() => import("@/pages/admin/Finance"));
 const AdminRentals = lazy(() => import("@/pages/admin/Rentals"));
 const Creators = lazy(() => import("@/pages/admin/Creators"));
+const CreatorDashboard = lazy(() => import("@/pages/creator/Dashboard"));
 const Sections = lazy(() => import("@/pages/admin/Sections"));
 const HeroSlider = lazy(() => import("@/pages/admin/HeroSlider"));
 const Banners = lazy(() => import("@/pages/admin/Banners"));
@@ -428,6 +429,16 @@ function AppContent() {
                 }
               />
             </Route>
+
+              {/* Creator shortcut: dedicated creator dashboard route */}
+              <Route
+                path="/creator"
+                element={
+                  <RoleRoute roles={["creator"]} redirectTo="/">
+                    <CreatorDashboard />
+                  </RoleRoute>
+                }
+              />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

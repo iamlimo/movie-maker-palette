@@ -90,6 +90,7 @@ const sidebarItems: Item[] = [
     submenu: [
       { title: 'Users', url: '/admin/users', icon: Users, page: 'users' },
       { title: 'Creator Management', url: '/admin/creators', icon: UserCheck, page: 'creators' },
+      { title: 'My Dashboard', url: '/creator', icon: User2, page: 'dashboard' },
     ],
   },
   { title: 'Finance', url: '/admin/finance', icon: DollarSign, page: 'finance' },
