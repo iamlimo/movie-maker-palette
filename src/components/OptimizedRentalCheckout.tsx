@@ -767,8 +767,8 @@ export const OptimizedRentalCheckout = ({
                         <CreditCard className="h-5 w-5 text-orange-600" />
                       </div>
                       <div>
-                        <p className="font-medium">Pay with card or bank</p>
-                        <p className="text-xs text-muted-foreground">Debit card, bank transfer, and USSD supported.</p>
+                        <p className="font-medium">Pay with Card or Bank Transfer or OPAY</p>
+                        <p className="text-xs text-muted-foreground">Debit card, bank transfer, OPAY and USSD supported.</p>
                       </div>
                     </div>
                   </div>
