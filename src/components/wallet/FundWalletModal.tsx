@@ -18,7 +18,7 @@ interface FundWalletModalProps {
 
 type FundingState = 'idle' | 'processing' | 'pending' | 'success' | 'failed';
 
-const QUICK_AMOUNTS = [1000, 2000, 5000, 10000];
+const QUICK_AMOUNTS = [1000, 2500, 5000, 10000];
 const MIN_AMOUNT_KOBO = 100;
 const MAX_AMOUNT_KOBO = 500_000 * 100;
 
@@ -270,10 +270,11 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
                 className="border-0 bg-transparent text-3xl shadow-none focus-visible:ring-0"
               />
             </div>
+            <p className="text-xs text-muted-foreground">You can use your wallet to pay for rentals and purchases.</p>
           </div>
 
           <div className="grid grid-cols-4 gap-2">
-            {QUICK_AMOUNTS.map((quickAmount) => (
+              {QUICK_AMOUNTS.map((quickAmount) => (
               <Button
                 key={quickAmount}
                 type="button"
@@ -294,7 +295,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               </div>
               <div>
                 <p className="text-sm font-medium">Paystack</p>
-                <p className="text-xs text-muted-foreground">Card or bank transfer</p>
+                <p className="text-xs text-muted-foreground">Card or bank transfer or OPAY</p>
               </div>
             </div>
           </div>
@@ -327,6 +328,10 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               </>
             )}
           </Button>
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            <span>Secured by Paystack</span>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

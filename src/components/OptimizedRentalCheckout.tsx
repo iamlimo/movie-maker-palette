@@ -28,6 +28,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import FundWalletModal from '@/components/wallet/FundWalletModal';
 import { useWallet } from '@/hooks/useWallet';
 import { useOptimizedRentals } from '@/hooks/useOptimizedRentals';
 import { usePlatform } from '@/hooks/usePlatform';
@@ -121,6 +122,7 @@ export const OptimizedRentalCheckout = ({
     status: PaymentState;
     message: string;
   }>({ show: false, status: 'processing', message: '' });
+  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
 
   const isNative = Capacitor.isNativePlatform();
   const isMobileBrowser = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && !isNative;
@@ -514,6 +516,7 @@ export const OptimizedRentalCheckout = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     );
   }
 
@@ -744,8 +747,14 @@ export const OptimizedRentalCheckout = ({
                   {balance < totalToPay && (
                     <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3">
                       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                      <div className="text-xs text-red-600">
-                        Insufficient wallet balance. Switch to card payment or top up your wallet.
+                      <div className="flex-1 text-xs text-red-600">
+                        Insufficient wallet balance. Switch to card payment or
+                        <button
+                          onClick={() => setIsFundModalOpen(true)}
+                          className="ml-2 inline-flex items-center rounded px-2 py-1 text-xs font-medium underline"
+                        >
+                          top up your wallet
+                        </button>
                       </div>
                     </div>
                   )}
@@ -959,6 +968,13 @@ export const OptimizedRentalCheckout = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <FundWalletModal
+        isOpen={isFundModalOpen}
+        onClose={() => {
+          setIsFundModalOpen(false);
+          refreshWallet();
+        }}
+      />
     </>
   );
 };
