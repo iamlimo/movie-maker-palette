@@ -326,6 +326,80 @@ async function grantAccessIfNeeded(
   return access;
 }
 
+async function creditWalletForTopup(supabase: any, payment: PaymentRow) {
+  if (payment.purpose !== "wallet_topup") return;
+
+  const alreadyCompleted = payment.enhanced_status === "completed" || payment.status === "completed";
+  if (alreadyCompleted) {
+    console.log("[verify-payment] wallet top-up already marked completed:", payment.id);
+    return;
+  }
+
+  const { data: wallet, error: walletLookupError } = await supabase
+    .from("wallets")
+    .select("wallet_id")
+    .eq("user_id", payment.user_id)
+    .maybeSingle();
+
+  if (walletLookupError) {
+    console.warn("[verify-payment] wallet lookup failed for top-up:", walletLookupError.message);
+    return;
+  }
+
+  let walletId = wallet?.wallet_id as string | undefined;
+  if (!walletId) {
+    const { data: newWalletId, error: walletCreateError } = await supabase.rpc("ensure_wallet_for_user", {
+      p_user_id: payment.user_id,
+    });
+
+    if (walletCreateError) {
+      console.error("[verify-payment] ensure_wallet_for_user failed:", walletCreateError.message);
+      return;
+    }
+
+    walletId = newWalletId as string | undefined;
+  }
+
+  if (!walletId) {
+    console.error("[verify-payment] wallet not found after ensure_wallet_for_user for user", payment.user_id);
+    return;
+  }
+
+  const amount = Number(payment.amount || 0);
+  if (!amount || amount <= 0) {
+    console.warn("[verify-payment] wallet top-up amount invalid, skipping credit:", payment.id, payment.amount);
+    return;
+  }
+
+  const { error: creditError } = await supabase.rpc("credit_wallet", {
+    p_wallet_id: walletId,
+    p_amount: amount,
+    p_type: "wallet_topup",
+    p_reference: payment.provider_reference || payment.intent_id || payment.id,
+    p_description: "wallet credited with paystack",
+    p_metadata: { source: "verify-payment" },
+    p_user_id: payment.user_id,
+    p_payment_id: payment.id,
+  });
+
+  if (creditError) {
+    const msg = String(creditError.message || "");
+    if (creditError.code === "23505" || /duplicate|already/i.test(msg)) {
+      console.log("[verify-payment] wallet credit already applied for payment", payment.id);
+      return;
+    }
+
+    console.error("[verify-payment] credit_wallet failed for top-up:", msg);
+    return;
+  }
+
+  console.log("[verify-payment] wallet credited for paystack top-up:", {
+    user_id: payment.user_id,
+    payment_id: payment.id,
+    amount,
+  });
+}
+
 async function resolveAccessForIntent(
   supabase: any,
   intent: RentalIntentRow,
@@ -615,6 +689,42 @@ serve(async (req: Request) => {
           })
           .eq("id", payment.id);
       }
+    }
+
+    if (paystackSuccessful && payment && payment.purpose === "wallet_topup") {
+      const paymentReference = referenceToVerify || String(paystackResult?.reference || payment.provider_reference || payment.id);
+
+      await supabase
+        .from("payments")
+        .update({
+          enhanced_status: "completed",
+          status: "completed",
+          provider_reference: paymentReference,
+          metadata: {
+            ...(payment.metadata || {}),
+            paystack_status: paystackStatus,
+            payment_channel: paystackResult?.channel || payment.provider || "paystack",
+            fallback_verified_by: "verify-payment",
+          },
+        })
+        .eq("id", payment.id);
+
+      await creditWalletForTopup(supabase, { ...payment, enhanced_status: "completed", status: "completed", provider_reference: paymentReference });
+
+      return jsonResponse({
+        success: true,
+        payment: {
+          id: payment.id,
+          channel: payment.provider,
+          status: "completed",
+          message: "Wallet top-up payment verified and wallet credited",
+          enhanced_status: "completed",
+          provider_reference: paymentReference,
+        },
+        rental: null,
+        related_records: null,
+        message: "Wallet balance is updated",
+      });
     }
 
     if (paystackSuccessful && refreshedRentalIntent) {
