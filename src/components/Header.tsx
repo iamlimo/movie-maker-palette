@@ -142,30 +142,18 @@ const Header = () => {
           {user ? (
             <div className="flex items-center space-x-2 md:space-x-3">
               {/* Wallet Widget - Hide on iOS */}
-              <div className="hidden md:flex items-center gap-2">
-                <Link to="/wallet">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
-                  >
-                    <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
-                    <span className="text-xs lg:text-sm font-medium">
-                      {walletLoading ? "..." : formatBalance()}
-                    </span>
-                  </Button>
-                </Link>
-
-                <Link to="/wallet">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 lg:h-9 px-2.5 lg:px-3 text-xs lg:text-sm font-medium"
-                  >
-                    + Top Up
-                  </Button>
-                </Link>
-              </div>
+              <Link to="/wallet">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden md:flex items-center space-x-1.5 lg:space-x-2 text-foreground hover:border-primary h-8 lg:h-9 px-2.5 lg:px-3"
+                >
+                  <Wallet className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                  <span className="text-xs lg:text-sm font-medium">
+                    {walletLoading ? "..." : formatBalance()}
+                  </span>
+                </Button>
+              </Link>
 
               <DropdownMenu>
                 {/* The Trigger must be inside the DropdownMenu */}

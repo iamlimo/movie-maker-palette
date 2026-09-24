@@ -42,7 +42,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import FundWalletModal from '@/components/wallet/FundWalletModal';
 
 interface OptimizedRentalCheckoutProps {
   open: boolean;
@@ -106,8 +105,6 @@ export const OptimizedRentalCheckout = ({
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isWalletTopUpOpen, setIsWalletTopUpOpen] = useState(false);
-  const [walletTopUpAmountKobo, setWalletTopUpAmountKobo] = useState(0);
 
   const [referralCode, setReferralCode] = useState('');
   const [discount, setDiscount] = useState<{
@@ -764,33 +761,6 @@ export const OptimizedRentalCheckout = ({
 
               {!isIOS && (
                 <TabsContent value="paystack" className="space-y-3 pt-4">
-                  {balance < totalToPay && (
-                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex gap-2 text-sm text-amber-700 dark:text-amber-300">
-                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <div>
-                            <p className="font-medium">Top up your wallet to cover this rental.</p>
-                            <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
-                              You need {formatNaira(totalToPay - balance)} more to pay from wallet.
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setWalletTopUpAmountKobo(Math.max(0, totalToPay - balance));
-                            setIsWalletTopUpOpen(true);
-                          }}
-                        >
-                          + Top up
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
                     <div className="flex items-center gap-3">
                       <div className="rounded-full bg-orange-500/10 p-2.5">
@@ -871,12 +841,6 @@ export const OptimizedRentalCheckout = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <FundWalletModal
-        isOpen={isWalletTopUpOpen}
-        onClose={() => setIsWalletTopUpOpen(false)}
-        defaultAmountKobo={walletTopUpAmountKobo}
-      />
 
       <Dialog
         open={paymentStatus.show}
