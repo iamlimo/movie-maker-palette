@@ -4,25 +4,74 @@ import { Button } from '@/components/ui/button';
 import NairaInput from '@/components/admin/NairaInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wallet, CreditCard, ShieldCheck } from 'lucide-react';
+import { Loader2, Wallet, CreditCard, ShieldCheck, Lock } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { formatNaira } from '@/lib/priceUtils';
 import { Capacitor } from '@capacitor/core';
-import { Browser } from '@capacitor/browser';
 import { usePlatform } from '@/hooks/usePlatform';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FundWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultAmountKobo?: number;
 }
 
 type FundingState = 'idle' | 'processing' | 'pending' | 'success' | 'failed';
 
-const QUICK_AMOUNTS = [1000, 2000, 5000, 10000];
+type PaystackPopSetup = {
+  openIframe: () => void;
+  openPopup: () => void;
+};
+
+type PaystackConfig = {
+  key: string;
+  email: string;
+  amount: number;
+  ref?: string;
+  currency?: string;
+  metadata?: {
+    custom_fields?: Array<{ display_name: string; variable_name: string; value: string }>;
+  };
+  callback?: (response: { reference: string; trxref?: string; status?: string }) => void | Promise<void>;
+  onClose?: () => void;
+};
+
+declare global {
+  interface Window {
+    PaystackPop?: {
+      setup: (config: PaystackConfig) => PaystackPopSetup;
+    };
+  }
+}
+
+const QUICK_AMOUNTS = [1000, 2500, 5000, 10000];
 const MIN_AMOUNT_KOBO = 100;
 const MAX_AMOUNT_KOBO = 500_000 * 100;
 
-export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProps) {
+const loadPaystackInlineScript = async () => {
+  if (typeof window === 'undefined') return;
+  if (window.PaystackPop) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://js.paystack.co/v1/inline.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(), { once: true });
+      existingScript.addEventListener('error', () => reject(new Error('Paystack script failed to load')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Paystack script failed to load'));
+    document.body.appendChild(script);
+  });
+};
+
+export default function FundWalletModal({ isOpen, onClose, defaultAmountKobo }: FundWalletModalProps) {
+  const { user } = useAuth();
   const [amount, setAmount] = useState<number>(0);
   const [status, setStatus] = useState<FundingState>('idle');
   const [statusMessage, setStatusMessage] = useState('Choose a top-up amount and continue securely.');
@@ -40,6 +89,15 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
     const n = Number(amount) || 0;
     return Math.max(0, Math.round(n));
   }, [amount]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (typeof defaultAmountKobo === 'number' && defaultAmountKobo > 0) {
+      const clamped = Math.max(MIN_AMOUNT_KOBO, Math.min(defaultAmountKobo, MAX_AMOUNT_KOBO));
+      setAmount(clamped);
+    }
+  }, [defaultAmountKobo, isOpen]);
 
   const clearFundingPollers = () => {
     if (pollIntervalRef.current !== null) {
@@ -67,7 +125,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
     clearFundingPollers();
     setStatus('idle');
     setStatusMessage('Choose a top-up amount and continue securely.');
-    setAmount(0);
+    setAmount(typeof defaultAmountKobo === 'number' && defaultAmountKobo > 0 ? Math.min(Math.max(defaultAmountKobo, MIN_AMOUNT_KOBO), MAX_AMOUNT_KOBO) : 0);
   };
 
   const handleFund = async () => {
@@ -75,6 +133,15 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
       toast({
         title: 'Wallet top-up unavailable',
         description: 'Wallet funding is disabled on iOS in the app.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!user?.email) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in again before topping up your wallet.',
         variant: 'destructive',
       });
       return;
@@ -118,18 +185,114 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
       });
 
       if (error) throw error;
-      if (!data?.success || !data?.authorization_url) {
+      if (!data?.success || !data?.payment_id || !data?.reference) {
         throw new Error(data?.error || 'Could not start wallet funding');
       }
 
-      const authUrl = data.authorization_url;
+      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+      if (!publicKey) {
+        throw new Error('Paystack public key is not configured.');
+      }
 
-      if (isNative) {
-        await Browser.open({ url: authUrl });
-      } else if (isMobileBrowser) {
-        window.location.href = authUrl;
+      if (isNative || isMobileBrowser) {
+        const authUrl = data.authorization_url || `https://js.paystack.co/v1/inline.js?key=${encodeURIComponent(publicKey)}`;
+        if (isNative) {
+          if (window.open) {
+            window.open(authUrl, '_blank', 'width=520,height=760');
+          } else {
+            window.location.href = authUrl;
+          }
+        } else {
+          window.location.href = authUrl;
+        }
       } else {
-        window.open(authUrl, '_blank', 'width=520,height=760');
+        await loadPaystackInlineScript();
+
+        if (!window.PaystackPop) {
+          throw new Error('Paystack inline SDK is unavailable in this browser.');
+        }
+
+        const handlePaystackClose = function () {
+          setStatus((currentStatus) => {
+            if (currentStatus === 'pending' || currentStatus === 'processing') {
+              setStatusMessage('Payment window closed. Your selected amount is still saved and we are checking for confirmation.');
+              return 'pending';
+            }
+            return currentStatus;
+          });
+        };
+
+        const handlePaystackCallback = function (response: { reference: string; trxref?: string; status?: string }) {
+          void (async () => {
+            setStatus('pending');
+            setStatusMessage('Verifying payment via Paystack...');
+
+            try {
+              const { data: paymentData, error: paymentError } = await supabase.functions.invoke('verify-payment', {
+                body: {
+                  payment_id: data.payment_id,
+                  reference: response.reference,
+                },
+              });
+
+              if (paymentError) throw paymentError;
+
+              const paymentStatus = String(paymentData?.payment?.status || paymentData?.paystack_status?.status || '').toLowerCase();
+
+              if (paymentStatus === 'completed' || paymentStatus === 'paid' || paymentStatus === 'success') {
+                clearFundingPollers();
+                await refreshWallet();
+                setStatus('success');
+                setStatusMessage(`${formatNaira(safeAmount)} has been added to your wallet.`);
+                toast({
+                  title: 'Wallet funded successfully',
+                  description: `${formatNaira(safeAmount)} added to your wallet`,
+                });
+                window.setTimeout(() => {
+                  onClose();
+                  resetFlow();
+                }, 900);
+                return;
+              }
+
+              if (paymentStatus === 'failed' || paymentStatus === 'cancelled' || paymentStatus === 'canceled') {
+                clearFundingPollers();
+                setStatus('failed');
+                setStatusMessage('Transaction declined. Select another payment method or try Bank Transfer.');
+                toast({
+                  title: 'Payment failed',
+                  description: 'Transaction declined. Select another payment method or try Bank Transfer.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+
+              setStatus('pending');
+              setStatusMessage('Payment received. We are confirming your wallet balance now.');
+            } catch (verificationError: unknown) {
+              console.error('Wallet funding verification error:', verificationError);
+              setStatus('pending');
+              setStatusMessage('Verifying payment via Paystack...');
+            }
+          })();
+        };
+
+        const paystack = window.PaystackPop.setup({
+          key: publicKey,
+          email: user.email,
+          amount: safeAmount,
+          currency: 'NGN',
+          ref: data.reference,
+          metadata: {
+            custom_fields: [
+              { display_name: 'Wallet Top-up', variable_name: 'wallet_topup', value: String(safeAmount) },
+            ],
+          },
+          onClose: handlePaystackClose,
+          callback: handlePaystackCallback,
+        });
+
+        paystack.openIframe();
       }
 
       setStatus('pending');
@@ -137,7 +300,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
 
       toast({
         title: 'Payment started',
-        description: shouldUseRedirect ? 'You are being redirected to Paystack.' : 'Complete your payment in the pop-up window.',
+        description: shouldUseRedirect ? 'You are being redirected to Paystack.' : 'Complete the payment in the secure Paystack modal.',
       });
 
       pollIntervalRef.current = window.setInterval(async () => {
@@ -151,11 +314,11 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
             return;
           }
 
-          const paymentStatus = String(paymentData?.payment?.status || '').toLowerCase();
+          const paymentStatus = String(paymentData?.payment?.status || paymentData?.paystack_status?.status || '').toLowerCase();
 
-          if (paymentStatus === 'completed') {
+          if (paymentStatus === 'completed' || paymentStatus === 'paid' || paymentStatus === 'success') {
             clearFundingPollers();
-            refreshWallet();
+            await refreshWallet();
             setStatus('success');
             setStatusMessage(`${formatNaira(safeAmount)} has been added to your wallet.`);
             toast({
@@ -172,10 +335,10 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
           if (paymentStatus === 'failed' || paymentStatus === 'cancelled' || paymentStatus === 'canceled') {
             clearFundingPollers();
             setStatus('failed');
-            setStatusMessage('The payment was not completed. Please try again or contact support.');
+            setStatusMessage('Transaction declined. Select another payment method or try Bank Transfer.');
             toast({
               title: 'Payment failed',
-              description: 'The payment was not completed. Please try again or contact support.',
+              description: 'Transaction declined. Select another payment method or try Bank Transfer.',
               variant: 'destructive',
             });
             return;
@@ -270,6 +433,9 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
                 className="border-0 bg-transparent text-3xl shadow-none focus-visible:ring-0"
               />
             </div>
+            <p className="text-xs text-muted-foreground">
+              You can rent movies and TV shows with your wallet balance.
+            </p>
           </div>
 
           <div className="grid grid-cols-4 gap-2">
@@ -294,7 +460,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               </div>
               <div>
                 <p className="text-sm font-medium">Paystack</p>
-                <p className="text-xs text-muted-foreground">Card or bank transfer</p>
+                <p className="text-xs text-muted-foreground">Card, bank transfer, USSD, OPAY, Visa QR</p>
               </div>
             </div>
           </div>
@@ -323,10 +489,15 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
             ) : (
               <>
                 <Wallet className="mr-2 h-4 w-4" />
-                {normalizedAmount > 0 ? `Fund ${formatNaira(normalizedAmount)}` : 'Continue'}
+                {normalizedAmount > 0 ? `Proceed to Payment · ${formatNaira(normalizedAmount)}` : 'Proceed to Payment'}
               </>
             )}
           </Button>
+
+          <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
+            <Lock className="h-3.5 w-3.5 text-primary" />
+            <span>Secured by Paystack</span>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
