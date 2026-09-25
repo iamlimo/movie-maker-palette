@@ -195,6 +195,8 @@ serve(async (req: Request) => {
         company_name: companyName,
         creator_type: normalizedType,
         is_creator: true,
+        created_via: "admin_dashboard_creator_management",
+        created_from: "creator_management_page",
       },
     });
 

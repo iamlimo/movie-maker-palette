@@ -230,8 +230,8 @@ export default function Creators() {
       toast({
         title: "Creator created",
         description: data.emailSent
-          ? "A password-reset email was sent. Activate the account when you're ready."
-          : `Status: pending activation. Temporary password: ${data.password}`,
+          ? "Created from the Creator Management page on the admin dashboard. A password-reset email was sent. Activate the account when you're ready."
+          : `Created from the Creator Management page on the admin dashboard. Status: pending activation. Temporary password: ${data.password}`,
       });
 
       setCreateOpen(false);

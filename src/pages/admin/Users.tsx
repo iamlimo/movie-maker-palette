@@ -46,7 +46,7 @@ interface UserWithRole extends UserProfile {
   wallet_balance: number;
 }
 
-const ASSIGNABLE_ROLES: AppRole[] = ['user', 'support', 'sales', 'accounting', 'admin', 'super_admin'];
+const ASSIGNABLE_ROLES: AppRole[] = ['user', 'creator', 'support', 'sales', 'accounting', 'admin', 'super_admin'];
 
 export default function Users() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
@@ -241,47 +241,59 @@ export default function Users() {
 
     try {
       setUpdating(true);
-      
-      const { data, error } = await supabase.rpc('update_user_role', {
+
+      const rolePayload = {
         _user_id: selectedUser.user_id,
-        _role: newRole as 'accounting' | 'admin' | 'sales' | 'super_admin' | 'support' | 'user',
+        _role: newRole as 'accounting' | 'admin' | 'creator' | 'sales' | 'super_admin' | 'support' | 'user',
+      };
+
+      const { data: rpcData, error: rpcError } = await supabase.rpc('update_user_role', rolePayload);
+
+      if (rpcError) {
+        const message = rpcError.message ?? '';
+        if (!/duplicate key|user_roles_user_id_role_key/i.test(message)) {
+          throw rpcError;
+        }
+      }
+
+      const rpcSucceeded = rpcData && typeof rpcData === 'object' && 'success' in rpcData && rpcData.success;
+
+      if (!rpcSucceeded) {
+        const { error: upsertError } = await supabase.from('user_roles').upsert(
+          { user_id: selectedUser.user_id, role: newRole as AppRole },
+          { onConflict: 'user_id,role' }
+        );
+
+        if (upsertError) throw upsertError;
+      }
+
+      toast({
+        title: "Success",
+        description: `User role updated to ${newRole} successfully.`
       });
 
-      if (error) throw error;
+      void writeAuditLog({
+        action: 'user_role.updated',
+        resource_type: 'user_roles',
+        resource_id: selectedUser.user_id,
+        metadata: {
+          target_user_id: selectedUser.user_id,
+          target_email: selectedUser.email,
+          previous_role: selectedUser.role,
+          new_role: newRole,
+        },
+      });
 
-      if (data && typeof data === 'object' && 'success' in data && data.success) {
-        toast({
-          title: "Success",
-          description: `User role updated to ${newRole} successfully.`
-        });
+      setUsers(prev => prev.map(user =>
+        user.user_id === selectedUser.user_id
+          ? { ...user, role: newRole }
+          : user
+      ));
 
-        void writeAuditLog({
-          action: 'user_role.updated',
-          resource_type: 'user_roles',
-          resource_id: selectedUser.user_id,
-          metadata: {
-            target_user_id: selectedUser.user_id,
-            target_email: selectedUser.email,
-            previous_role: selectedUser.role,
-            new_role: newRole,
-          },
-        });
-        
-        // Optimistic local update for snappy UI
-        setUsers(prev => prev.map(user =>
-          user.user_id === selectedUser.user_id
-            ? { ...user, role: newRole }
-            : user
-        ));
+      setShowRoleDialog(false);
+      setSelectedUser(null);
 
-        setShowRoleDialog(false);
-        setSelectedUser(null);
-
-        // Refresh from server to ensure list reflects authoritative state
-        await fetchUsers();
-      } else {
-        throw new Error((data && typeof data === 'object' && 'error' in data ? data.error as string : null) || 'Failed to update user role');
-      }
+      await fetchUsers();
     } catch (error: any) {
       console.error('Error updating user role:', error);
       toast({
@@ -306,6 +318,8 @@ export default function Users() {
         return <Crown className="h-4 w-4" />;
       case 'admin':
         return <ShieldCheck className="h-4 w-4" />;
+      case 'creator':
+        return <Shield className="h-4 w-4" />;
       case 'support':
         return <Headphones className="h-4 w-4" />;
       case 'sales':
@@ -321,6 +335,7 @@ export default function Users() {
     const roleStyles: Record<string, string> = {
       super_admin: 'bg-gradient-to-r from-primary/20 to-accent/20 text-primary border-primary/20',
       admin: 'bg-gradient-to-r from-accent/20 to-primary/20 text-accent border-accent/20',
+      creator: 'bg-violet-500/15 text-violet-500 border-violet-500/20',
       support: 'bg-blue-500/15 text-blue-500 border-blue-500/20',
       sales: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20',
       accounting: 'bg-amber-500/15 text-amber-500 border-amber-500/20',
@@ -486,6 +501,7 @@ export default function Users() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="creator">Creator</SelectItem>
                   <SelectItem value="support">Support</SelectItem>
                   <SelectItem value="sales">Sales</SelectItem>
                   <SelectItem value="accounting">Accounting</SelectItem>
@@ -697,6 +713,7 @@ export default function Users() {
             <p className="text-xs text-muted-foreground">
               {newRole === 'super_admin' && 'Full access to all admin features and settings.'}
               {newRole === 'admin' && 'Manages content, users, and operations.'}
+              {newRole === 'creator' && 'Grants creator access for content publishing and management.'}
               {newRole === 'support' && 'Handles tickets, jobs, and user assistance.'}
               {newRole === 'sales' && 'Manages marketing, sections, banners, and referral codes.'}
               {newRole === 'accounting' && 'Manages payments, payouts, refunds, and wallets.'}

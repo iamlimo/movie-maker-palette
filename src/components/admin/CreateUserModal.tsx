@@ -150,6 +150,7 @@ export const CreateUserModal = ({ open, onOpenChange, onUserCreated }: CreateUse
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="user">{ROLE_LABELS.user}</SelectItem>
+                <SelectItem value="creator">{ROLE_LABELS.creator}</SelectItem>
                 <SelectItem value="support">{ROLE_LABELS.support}</SelectItem>
                 <SelectItem value="sales">{ROLE_LABELS.sales}</SelectItem>
                 <SelectItem value="accounting">{ROLE_LABELS.accounting}</SelectItem>

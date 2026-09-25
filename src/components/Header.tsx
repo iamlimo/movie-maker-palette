@@ -243,10 +243,10 @@ const Header = () => {
                   {userRole === "creator" && (
                     <DropdownMenuItem asChild>
                       <Link
-                        to="/creator"
+                        to="/admin"
                         className="flex items-center text-foreground"
                       >
-                        <Settings className="mr-2 h-4 w-4" /> Creator Dashboard
+                        <Settings className="mr-2 h-4 w-4" /> Dashboard
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -427,11 +427,11 @@ const Header = () => {
 
             {user && userRole === "creator" && (
               <Link
-                to="/creator"
+                to="/admin"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="block text-muted-foreground hover:text-primary transition-smooth"
               >
-                Creator Dashboard
+                Dashboard
               </Link>
             )}
 
