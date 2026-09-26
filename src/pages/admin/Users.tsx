@@ -750,7 +750,21 @@ export default function Users() {
                   {Math.min(currentPage * pageSize, totalUsers)} of {totalUsers}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <div className="flex items-center gap-1 rounded-md border bg-background px-2 py-1">
+                    <label className="text-xs text-muted-foreground">Per page</label>
+                    <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+                      <SelectTrigger className="h-8 w-20 border-0 bg-transparent shadow-none focus:ring-0 px-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -783,27 +797,27 @@ export default function Users() {
                   >
                     Next
                   </Button>
-                </div>
-              </div>
 
-              <div className="flex items-center justify-end gap-2">
-                <label className="text-sm text-muted-foreground">Jump to page</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  value={jumpToPage}
-                  onChange={(event) => setJumpToPage(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      jumpToPageNumber();
-                    }
-                  }}
-                  className="w-20 h-9"
-                />
-                <Button variant="secondary" size="sm" onClick={jumpToPageNumber} disabled={loading}>
-                  Go
-                </Button>
+                  <div className="flex items-center gap-2 rounded-md border bg-background px-2 py-1">
+                    <label className="text-xs text-muted-foreground">Page</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={jumpToPage}
+                      onChange={(event) => setJumpToPage(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          jumpToPageNumber();
+                        }
+                      }}
+                      className="h-8 w-16 px-2 text-center"
+                    />
+                    <Button variant="secondary" size="sm" onClick={jumpToPageNumber} disabled={loading}>
+                      Go
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
