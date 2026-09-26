@@ -54,6 +54,10 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [jumpToPage, setJumpToPage] = useState('1');
+  const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState<AppRole>('user');
   const [showRoleDialog, setShowRoleDialog] = useState(false);
@@ -67,7 +71,7 @@ export default function Users() {
   const canManageRoles = canDo('manage-roles');
 
   const exportUsers = (format: 'csv' | 'xlsx') => {
-    const dataToExport = filteredUsers.length > 0 ? filteredUsers : users;
+    const dataToExport = users.length > 0 ? users : [];
     if (dataToExport.length === 0) {
       toast({ variant: "destructive", title: "No data", description: "No users to export." });
       return;
@@ -114,55 +118,88 @@ export default function Users() {
     toast({ title: "Export Complete", description: `Users exported as ${format.toUpperCase()} successfully.` });
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (pageToLoad = currentPage) => {
     try {
       setLoading(true);
-      
-      // Fetch all profiles
-      const { data: profiles, error: profilesError } = await supabase
+
+      const startIndex = (pageToLoad - 1) * pageSize;
+      const endIndex = startIndex + pageSize - 1;
+
+      let profilesQuery = supabase
         .from('profiles')
-        .select('id, user_id, name, email, created_at, country, phone_number, status')
+        .select('id, user_id, name, email, created_at, country, phone_number, status', { count: 'exact' })
         .order('created_at', { ascending: false });
+
+      if (searchTerm.trim()) {
+        const term = searchTerm.trim();
+        profilesQuery = profilesQuery.or(`name.ilike.%${term}%,email.ilike.%${term}%,phone_number.ilike.%${term}%`);
+      }
+
+      if (statusFilter !== 'all') {
+        profilesQuery = profilesQuery.eq('status', statusFilter);
+      }
+
+      if (roleFilter !== 'all') {
+        const allowedRole = roleFilter as AppRole;
+        const { data: roleMatches, error: roleError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', allowedRole);
+
+        if (roleError) throw roleError;
+
+        const matchingUserIds = roleMatches?.map(item => item.user_id) ?? [];
+
+        if (matchingUserIds.length === 0) {
+          setUsers([]);
+          setTotalUsers(0);
+          setLoading(false);
+          return;
+        }
+
+        profilesQuery = profilesQuery.in('user_id', matchingUserIds);
+      }
+
+      const { data: profiles, error: profilesError, count } = await profilesQuery.range(startIndex, endIndex);
 
       if (profilesError) throw profilesError;
 
-      // Fetch all user roles
+      const profileUserIds = (profiles ?? []).map(profile => profile.user_id);
+
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role');
+        .select('user_id, role')
+        .in('user_id', profileUserIds.length ? profileUserIds : ['__no_users__']);
 
       if (rolesError) throw rolesError;
 
-      // Fetch all wallets data (with balance in kobo)
       const { data: wallets, error: walletsError } = await supabase
         .from('wallets')
-        .select('user_id, balance');
+        .select('user_id, balance')
+        .in('user_id', profileUserIds.length ? profileUserIds : ['__no_users__']);
 
       if (walletsError) {
         console.warn('Warning fetching wallets:', walletsError);
-        // Continue if wallets fetch fails - use 0 as default
       }
 
-      // Create a map of user_id -> wallet balance for quick lookup
       const walletMap = new Map<string, number>();
       wallets?.forEach(wallet => {
-        // Convert kobo to naira
-        walletMap.set(wallet.user_id, wallet.balance );
+        walletMap.set(wallet.user_id, wallet.balance);
       });
 
-      // Combine profiles with roles and wallet data
-      const usersWithRoles: UserWithRole[] = profiles?.map(profile => {
+      const usersWithRoles: UserWithRole[] = (profiles ?? []).map(profile => {
         const userRole = roles?.find(role => role.user_id === profile.user_id);
         const walletBalance = walletMap.get(profile.user_id) || 0;
-        
+
         return {
           ...profile,
           role: userRole?.role || 'user',
           wallet_balance: walletBalance
         };
-      }) || [];
+      });
 
       setUsers(usersWithRoles);
+      setTotalUsers(count ?? usersWithRoles.length);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -176,17 +213,32 @@ export default function Users() {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    void fetchUsers(currentPage);
+  }, [currentPage, pageSize, searchTerm, roleFilter, statusFilter]);
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (user.phone_number || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  useEffect(() => {
+    setJumpToPage(String(currentPage));
+  }, [currentPage]);
+
+  useEffect(() => {
+    if (currentPage > 1 && (totalUsers === 0 || currentPage > Math.ceil(totalUsers / pageSize))) {
+      setCurrentPage(1);
+    }
+  }, [totalUsers, pageSize, currentPage]);
+
+  const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  const jumpToPageNumber = () => {
+    const nextPage = Number(jumpToPage);
+    if (!Number.isInteger(nextPage)) {
+      setJumpToPage(String(currentPage));
+      return;
+    }
+
+    const safePage = Math.min(Math.max(1, nextPage), totalPages);
+    setCurrentPage(safePage);
+  };
 
   const handleSuspend = async (user: UserWithRole) => {
     try {
@@ -493,6 +545,16 @@ export default function Users() {
                   className="pl-10"
                 />
               </div>
+              <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 / page</SelectItem>
+                  <SelectItem value="20">20 / page</SelectItem>
+                  <SelectItem value="50">50 / page</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Filter by role" />
@@ -537,7 +599,7 @@ export default function Users() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
+                {users.map((user) => (
                   <TableRow key={user.id} className="hover:bg-muted/5">
                     <TableCell>
                       <div 
@@ -667,16 +729,82 @@ export default function Users() {
             </Table>
           </div>
           
-          {filteredUsers.length === 0 && (
+          {users.length === 0 && (
             <div className="text-center py-12">
               <UsersIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium text-muted-foreground mb-2">No users found</h3>
               <p className="text-sm text-muted-foreground">
-                {searchTerm || roleFilter !== 'all' 
+                {searchTerm || roleFilter !== 'all' || statusFilter !== 'all'
                   ? 'Try adjusting your search or filter criteria.'
                   : 'No users have been registered yet.'
                 }
               </p>
+            </div>
+          )}
+
+          {totalUsers > 0 && (
+            <div className="flex flex-col gap-4 mt-6 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-sm text-muted-foreground">
+                  Showing {Math.min((currentPage - 1) * pageSize + 1, totalUsers)} to {' '}
+                  {Math.min(currentPage * pageSize, totalUsers)} of {totalUsers}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPage === 1 || loading}
+                  >
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center gap-1 flex-wrap justify-center">
+                    {pageNumbers.map((pageNumber) => (
+                      <Button
+                        key={pageNumber}
+                        variant={pageNumber === currentPage ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setCurrentPage(pageNumber)}
+                        disabled={loading}
+                      >
+                        {pageNumber}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={currentPage === totalPages || loading}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <label className="text-sm text-muted-foreground">Jump to page</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={jumpToPage}
+                  onChange={(event) => setJumpToPage(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      jumpToPageNumber();
+                    }
+                  }}
+                  className="w-20 h-9"
+                />
+                <Button variant="secondary" size="sm" onClick={jumpToPageNumber} disabled={loading}>
+                  Go
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

@@ -4,7 +4,17 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_already_exists boolean := false;
+  v_inserted boolean := false;
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', 'Authentication required'
+    );
+  END IF;
+
   IF NOT public.has_any_role(auth.uid(), ARRAY['admin', 'super_admin']::public.app_role[]) THEN
     RETURN json_build_object(
       'success', false,
@@ -12,12 +22,15 @@ BEGIN
     );
   END IF;
 
-  IF EXISTS (
+  SELECT EXISTS (
     SELECT 1
     FROM public.user_roles
     WHERE user_id = _user_id
       AND role = _role
-  ) THEN
+  )
+  INTO v_already_exists;
+
+  IF v_already_exists THEN
     RETURN json_build_object(
       'success', true,
       'updated', false,
@@ -27,11 +40,21 @@ BEGIN
 
   INSERT INTO public.user_roles (user_id, role)
   VALUES (_user_id, _role)
-  ON CONFLICT (user_id, role) DO NOTHING;
+  ON CONFLICT (user_id, role) DO NOTHING
+  RETURNING true INTO v_inserted;
+
+  IF v_inserted THEN
+    RETURN json_build_object(
+      'success', true,
+      'updated', true,
+      'message', 'Role assigned successfully'
+    );
+  END IF;
 
   RETURN json_build_object(
     'success', true,
-    'updated', true
+    'updated', false,
+    'message', 'Role already assigned'
   );
 EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object(
@@ -49,7 +72,12 @@ SET search_path = public
 AS $$
 DECLARE
   v_user_id uuid;
+  v_result json;
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
   IF NOT public.has_any_role(auth.uid(), ARRAY['admin', 'super_admin']::public.app_role[]) THEN
     RETURN false;
   END IF;
@@ -63,7 +91,7 @@ BEGIN
     RETURN false;
   END IF;
 
-  PERFORM public.update_user_role(v_user_id, _role);
-  RETURN true;
+  SELECT public.update_user_role(v_user_id, _role) INTO v_result;
+  RETURN COALESCE((v_result->>'success')::boolean, false);
 END;
 $$;
