@@ -571,10 +571,10 @@ export default function PushNotifications() {
                     </SelectTrigger>
                     <SelectContent>
                       {filteredProfiles.length === 0 ? (
-                        <SelectItem value="" disabled>
-                          No users found
-                        </SelectItem>
-                      ) : (
+                          <SelectItem value="__no_users_found" disabled>
+                            No users found
+                          </SelectItem>
+                        ) : (
                         filteredProfiles.map((p) => (
                           <SelectItem key={p.user_id} value={p.user_id}>
                             {p.email
