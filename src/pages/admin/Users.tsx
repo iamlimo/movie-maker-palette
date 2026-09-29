@@ -66,6 +66,12 @@ export default function Users() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [metrics, setMetrics] = useState({
+    total: 0,
+    superAdmins: 0,
+    admins: 0,
+    regularUsers: 0,
+  });
   const { toast } = useToast();
   const { canDo, isSuperAdmin } = useRole();
   const canManageRoles = canDo('manage-roles');
@@ -116,6 +122,50 @@ export default function Users() {
     }
 
     toast({ title: "Export Complete", description: `Users exported as ${format.toUpperCase()} successfully.` });
+  };
+
+  const fetchUserMetrics = async () => {
+    try {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id');
+
+      if (profilesError) throw profilesError;
+
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) throw rolesError;
+
+      const roleByUserId = new Map<string, AppRole>();
+      (roles ?? []).forEach((roleRow) => {
+        roleByUserId.set(roleRow.user_id, roleRow.role as AppRole);
+      });
+
+      const nextMetrics = {
+        total: profiles?.length ?? 0,
+        superAdmins: 0,
+        admins: 0,
+        regularUsers: 0,
+      };
+
+      (profiles ?? []).forEach((profile) => {
+        const role = roleByUserId.get(profile.user_id) ?? 'user';
+
+        if (role === 'super_admin') {
+          nextMetrics.superAdmins += 1;
+        } else if (role === 'admin') {
+          nextMetrics.admins += 1;
+        } else {
+          nextMetrics.regularUsers += 1;
+        }
+      });
+
+      setMetrics(nextMetrics);
+    } catch (error) {
+      console.error('Error fetching user metrics:', error);
+    }
   };
 
   const fetchUsers = async (pageToLoad = currentPage) => {
@@ -213,6 +263,7 @@ export default function Users() {
   };
 
   useEffect(() => {
+    void fetchUserMetrics();
     void fetchUsers(currentPage);
   }, [currentPage, pageSize, searchTerm, roleFilter, statusFilter]);
 
@@ -253,7 +304,8 @@ export default function Users() {
           title: "User Suspended",
           description: `${user.name} has been suspended`
         });
-        fetchUsers();
+        await fetchUserMetrics();
+        await fetchUsers();
       }
     } catch (error: any) {
       toast({
@@ -277,7 +329,8 @@ export default function Users() {
           title: "User Activated",
           description: `${user.name} has been activated`
         });
-        fetchUsers();
+        await fetchUserMetrics();
+        await fetchUsers();
       }
     } catch (error: any) {
       toast({
@@ -345,6 +398,7 @@ export default function Users() {
       setShowRoleDialog(false);
       setSelectedUser(null);
 
+      await fetchUserMetrics();
       await fetchUsers();
     } catch (error: any) {
       console.error('Error updating user role:', error);
@@ -398,13 +452,6 @@ export default function Users() {
         {(ROLE_LABELS[role as AppRole] ?? role).toUpperCase()}
       </Badge>
     );
-  };
-
-  const stats = {
-    total: users.length,
-    superAdmins: users.filter(u => u.role === 'super_admin').length,
-    admins: users.filter(u => u.role === 'admin').length,
-    regularUsers: users.filter(u => u.role === 'user').length,
   };
 
   if (loading) {
@@ -482,7 +529,7 @@ export default function Users() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
-              <div className="text-3xl font-bold text-foreground">{stats.total}</div>
+              <div className="text-3xl font-bold text-foreground">{metrics.total}</div>
             </div>
             <div className="p-3 rounded-xl bg-primary/10">
               <UsersIcon className="h-6 w-6 text-primary" />
@@ -494,7 +541,7 @@ export default function Users() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">Super Admins</CardTitle>
-              <div className="text-3xl font-bold text-foreground">{stats.superAdmins}</div>
+              <div className="text-3xl font-bold text-foreground">{metrics.superAdmins}</div>
             </div>
             <div className="p-3 rounded-xl bg-gradient-to-r from-primary/20 to-accent/20">
               <Crown className="h-6 w-6 text-primary" />
@@ -506,7 +553,7 @@ export default function Users() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">Admins</CardTitle>
-              <div className="text-3xl font-bold text-foreground">{stats.admins}</div>
+              <div className="text-3xl font-bold text-foreground">{metrics.admins}</div>
             </div>
             <div className="p-3 rounded-xl bg-accent/10">
               <ShieldCheck className="h-6 w-6 text-accent" />
@@ -518,7 +565,7 @@ export default function Users() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
               <CardTitle className="text-sm font-medium text-muted-foreground">Regular Users</CardTitle>
-              <div className="text-3xl font-bold text-foreground">{stats.regularUsers}</div>
+              <div className="text-3xl font-bold text-foreground">{metrics.regularUsers}</div>
             </div>
             <div className="p-3 rounded-xl bg-muted/10">
               <Shield className="h-6 w-6 text-muted-foreground" />
