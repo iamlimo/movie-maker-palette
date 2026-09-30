@@ -76,52 +76,104 @@ export default function Users() {
   const { canDo, isSuperAdmin } = useRole();
   const canManageRoles = canDo('manage-roles');
 
-  const exportUsers = (format: 'csv' | 'xlsx') => {
-    const dataToExport = users.length > 0 ? users : [];
-    if (dataToExport.length === 0) {
-      toast({ variant: "destructive", title: "No data", description: "No users to export." });
-      return;
-    }
+  const fetchAllUsersForExport = async (): Promise<UserWithRole[]> => {
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, user_id, name, email, created_at, country, phone_number, status')
+      .order('created_at', { ascending: false });
 
-    const headers = ['Name', 'Email', 'Role', 'Status', 'Country', 'Phone', 'Wallet Balance (₦)', 'Join Date'];
-    const rows = dataToExport.map(u => [
-      u.name,
-      u.email,
-      u.role.replace('_', ' '),
-      u.status || 'active',
-      u.country || '',
-      u.phone_number || '',
-      koboToNaira(u.wallet_balance),
-    
-      new Date(u.created_at).toLocaleDateString(),
+    if (profilesError) throw profilesError;
+
+    const profileUserIds = (profiles ?? []).map(profile => profile.user_id);
+
+    const [rolesResult, walletsResult] = await Promise.all([
+      supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', profileUserIds.length ? profileUserIds : ['__no_users__']),
+      supabase
+        .from('wallets')
+        .select('user_id, balance')
+        .in('user_id', profileUserIds.length ? profileUserIds : ['__no_users__'])
     ]);
 
-    if (format === 'csv') {
-      const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } else {
-      // Simple XLSX via XML spreadsheet format
-      const xmlRows = rows.map(r =>
-        `<Row>${r.map(c => `<Cell><Data ss:Type="String">${String(c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Data></Cell>`).join('')}</Row>`
-      ).join('');
-      const xmlHeader = `<Row>${headers.map(h => `<Cell><Data ss:Type="String">${h}</Data></Cell>`).join('')}</Row>`;
-      const xml = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Users"><Table>${xmlHeader}${xmlRows}</Table></Worksheet></Workbook>`;
-      const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `users_export_${new Date().toISOString().split('T')[0]}.xls`;
-      link.click();
-      URL.revokeObjectURL(url);
+    if (rolesResult.error) throw rolesResult.error;
+    if (walletsResult.error) {
+      console.warn('Warning fetching wallets for export:', walletsResult.error);
     }
 
-    toast({ title: "Export Complete", description: `Users exported as ${format.toUpperCase()} successfully.` });
+    const roleMap = new Map<string, AppRole>();
+    (rolesResult.data ?? []).forEach(roleRow => {
+      roleMap.set(roleRow.user_id, roleRow.role as AppRole);
+    });
+
+    const walletMap = new Map<string, number>();
+    (walletsResult.data ?? []).forEach(wallet => {
+      walletMap.set(wallet.user_id, wallet.balance);
+    });
+
+    return (profiles ?? []).map(profile => ({
+      ...profile,
+      role: roleMap.get(profile.user_id) ?? 'user',
+      wallet_balance: walletMap.get(profile.user_id) ?? 0,
+    }));
+  };
+
+  const exportUsers = async (format: 'csv' | 'xlsx') => {
+    try {
+      const dataToExport = await fetchAllUsersForExport();
+
+      if (dataToExport.length === 0) {
+        toast({ variant: "destructive", title: "No data", description: "No users to export." });
+        return;
+      }
+
+      const headers = ['Name', 'Email', 'Role', 'Status', 'Country', 'Phone', 'Wallet Balance (₦)', 'Join Date'];
+      const rows = dataToExport.map(u => [
+        u.name,
+        u.email,
+        u.role.replace('_', ' '),
+        u.status || 'active',
+        u.country || '',
+        u.phone_number || '',
+        koboToNaira(u.wallet_balance),
+        new Date(u.created_at).toLocaleDateString(),
+      ]);
+
+      if (format === 'csv') {
+        const csvContent = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // Simple XLSX via XML spreadsheet format
+        const xmlRows = rows.map(r =>
+          `<Row>${r.map(c => `<Cell><Data ss:Type="String">${String(c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Data></Cell>`).join('')}</Row>`
+        ).join('');
+        const xmlHeader = `<Row>${headers.map(h => `<Cell><Data ss:Type="String">${h}</Data></Cell>`).join('')}</Row>`;
+        const xml = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Users"><Table>${xmlHeader}${xmlRows}</Table></Worksheet></Workbook>`;
+        const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `users_export_${new Date().toISOString().split('T')[0]}.xls`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      toast({ title: "Export Complete", description: `Users exported as ${format.toUpperCase()} successfully.` });
+    } catch (error) {
+      console.error('Error exporting users:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Export Failed',
+        description: 'Unable to export all users from the database. Please try again.'
+      });
+    }
   };
 
   const fetchUserMetrics = async () => {
