@@ -48,6 +48,16 @@ interface UserWithRole extends UserProfile {
 
 const ASSIGNABLE_ROLES: AppRole[] = ['user', 'creator', 'support', 'sales', 'accounting', 'admin', 'super_admin'];
 
+const chunkArray = <T,>(items: T[], chunkSize: number): T[][] => {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+};
+
 export default function Users() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,32 +95,45 @@ export default function Users() {
     if (profilesError) throw profilesError;
 
     const profileUserIds = (profiles ?? []).map(profile => profile.user_id);
-
-    const [rolesResult, walletsResult] = await Promise.all([
-      supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', profileUserIds.length ? profileUserIds : ['__no_users__']),
-      supabase
-        .from('wallets')
-        .select('user_id, balance')
-        .in('user_id', profileUserIds.length ? profileUserIds : ['__no_users__'])
-    ]);
-
-    if (rolesResult.error) throw rolesResult.error;
-    if (walletsResult.error) {
-      console.warn('Warning fetching wallets for export:', walletsResult.error);
-    }
-
     const roleMap = new Map<string, AppRole>();
-    (rolesResult.data ?? []).forEach(roleRow => {
-      roleMap.set(roleRow.user_id, roleRow.role as AppRole);
-    });
-
     const walletMap = new Map<string, number>();
-    (walletsResult.data ?? []).forEach(wallet => {
-      walletMap.set(wallet.user_id, wallet.balance);
-    });
+
+    if (profileUserIds.length > 0) {
+      const userIdChunks = chunkArray(profileUserIds, 100);
+
+      await Promise.all(
+        userIdChunks.map(async (userIdChunk) => {
+          const { data: rolesData, error: rolesError } = await supabase
+            .from('user_roles')
+            .select('user_id, role')
+            .in('user_id', userIdChunk);
+
+          if (rolesError) throw rolesError;
+
+          (rolesData ?? []).forEach((roleRow) => {
+            roleMap.set(roleRow.user_id, roleRow.role as AppRole);
+          });
+        })
+      );
+
+      await Promise.all(
+        userIdChunks.map(async (userIdChunk) => {
+          const { data: walletsData, error: walletsError } = await supabase
+            .from('wallets')
+            .select('user_id, balance')
+            .in('user_id', userIdChunk);
+
+          if (walletsError) {
+            console.warn('Warning fetching wallets for export:', walletsError);
+            return;
+          }
+
+          (walletsData ?? []).forEach((wallet) => {
+            walletMap.set(wallet.user_id, wallet.balance);
+          });
+        })
+      );
+    }
 
     return (profiles ?? []).map(profile => ({
       ...profile,
