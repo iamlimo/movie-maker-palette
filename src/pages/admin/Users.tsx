@@ -58,6 +58,8 @@ const chunkArray = <T,>(items: T[], chunkSize: number): T[][] => {
   return chunks;
 };
 
+// Page size to use when fetching large result sets from Supabase (PostgREST default limit is 1000)
+const FETCH_PAGE_SIZE = 1000;
 export default function Users() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,14 +89,27 @@ export default function Users() {
   const canManageRoles = canDo('manage-roles');
 
   const fetchAllUsersForExport = async (): Promise<UserWithRole[]> => {
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, user_id, name, email, created_at, country, phone_number, status')
-      .order('created_at', { ascending: false });
+    // Fetch all profiles by paging in batches to avoid PostgREST default limits
+    const allProfiles: UserProfile[] = [];
+    let offset = 0;
+    while (true) {
+      const { data: page, error: pageError } = await supabase
+        .from('profiles')
+        .select('id, user_id, name, email, created_at, country, phone_number, status')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + FETCH_PAGE_SIZE - 1);
 
-    if (profilesError) throw profilesError;
+      if (pageError) throw pageError;
 
-    const profileUserIds = (profiles ?? []).map(profile => profile.user_id);
+      if (page && page.length) {
+        allProfiles.push(...page as UserProfile[]);
+      }
+
+      if (!page || page.length < FETCH_PAGE_SIZE) break;
+      offset += FETCH_PAGE_SIZE;
+    }
+
+    const profileUserIds = allProfiles.map(profile => profile.user_id);
     const roleMap = new Map<string, AppRole>();
     const walletMap = new Map<string, number>();
 
@@ -135,7 +150,7 @@ export default function Users() {
       );
     }
 
-    return (profiles ?? []).map(profile => ({
+    return (allProfiles ?? []).map(profile => ({
       ...profile,
       role: roleMap.get(profile.user_id) ?? 'user',
       wallet_balance: walletMap.get(profile.user_id) ?? 0,
@@ -201,41 +216,52 @@ export default function Users() {
 
   const fetchUserMetrics = async () => {
     try {
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id');
+      // Get exact total count without fetching rows (head:true returns only count)
+      const { count } = await supabase.from('profiles').select('id', { head: true, count: 'exact' });
 
-      if (profilesError) throw profilesError;
+      // Fetch all user_roles in pages to compute role breakdown reliably
+      const allRoles: { user_id: string; role: AppRole }[] = [];
+      let offset = 0;
+      while (true) {
+        const { data: rolesPage, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('user_id, role')
+          .range(offset, offset + FETCH_PAGE_SIZE - 1);
 
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+        if (rolesError) throw rolesError;
 
-      if (rolesError) throw rolesError;
+        if (rolesPage && rolesPage.length) {
+          allRoles.push(...rolesPage as { user_id: string; role: AppRole }[]);
+        }
+
+        if (!rolesPage || rolesPage.length < FETCH_PAGE_SIZE) break;
+        offset += FETCH_PAGE_SIZE;
+      }
 
       const roleByUserId = new Map<string, AppRole>();
-      (roles ?? []).forEach((roleRow) => {
+      allRoles.forEach((roleRow) => {
         roleByUserId.set(roleRow.user_id, roleRow.role as AppRole);
       });
 
       const nextMetrics = {
-        total: profiles?.length ?? 0,
+        total: count ?? 0,
         superAdmins: 0,
         admins: 0,
         regularUsers: 0,
       };
 
-      (profiles ?? []).forEach((profile) => {
-        const role = roleByUserId.get(profile.user_id) ?? 'user';
-
-        if (role === 'super_admin') {
-          nextMetrics.superAdmins += 1;
-        } else if (role === 'admin') {
-          nextMetrics.admins += 1;
-        } else {
-          nextMetrics.regularUsers += 1;
-        }
+      // Only iterate user_roles (allRoles) to compute role counts, falling back to total-count for regular users
+      allRoles.forEach((r) => {
+        if (r.role === 'super_admin') nextMetrics.superAdmins += 1;
+        else if (r.role === 'admin') nextMetrics.admins += 1;
+        else nextMetrics.regularUsers += 1;
       });
+
+      // It's possible some users have no explicit user_roles row; account for them as regular users
+      const usersWithRoleCount = allRoles.length;
+      if ((nextMetrics.total ?? 0) > usersWithRoleCount) {
+        nextMetrics.regularUsers += (nextMetrics.total ?? 0) - usersWithRoleCount;
+      }
 
       setMetrics(nextMetrics);
     } catch (error) {

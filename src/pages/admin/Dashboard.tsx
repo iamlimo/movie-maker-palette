@@ -33,8 +33,8 @@ import CreatorPanel from "./dashboards/CreatorPanel";
 interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
-  totalProducers: number;
-  pendingProducers: number;
+  totalCreators: number;
+  pendingCreators: number;
   totalMovies: number;
   totalTvShows: number;
   totalRevenue: number;
@@ -67,6 +67,17 @@ type ProducerRow = {
 // Helper function to convert kobo to naira
 const koboToNaira = (kobo: number): number => {
   return kobo / 100;
+};
+
+const sumSuccessfulPaymentAmounts = (
+  payments: Array<{ amount: string | number | null } | null> | null,
+): number => {
+  return (
+    payments?.reduce((sum, payment) => {
+      const amount = Number(payment?.amount ?? 0);
+      return sum + (Number.isFinite(amount) ? koboToNaira(amount) : 0);
+    }, 0) ?? 0
+  );
 };
 
 // Helper function to format currency
@@ -124,8 +135,8 @@ function SuperAdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeUsers: 0,
-    totalProducers: 0,
-    pendingProducers: 0,
+    totalCreators: 0,
+    pendingCreators: 0,
     totalMovies: 0,
     totalTvShows: 0,
     totalRevenue: 0,
@@ -139,35 +150,47 @@ function SuperAdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Parallel queries for counts
-        const [
-          { count: totalUsers },
-          { count: totalProducers },
-          { count: pendingProducers },
-          { count: totalMovies },
-          { count: totalTvShows },
-        ] = await Promise.all([
+        const countQueries = [
           supabase.from("profiles").select("*", { count: "exact", head: true }),
           supabase
-            .from("producers")
+            .from("creator_profiles")
             .select("*", { count: "exact", head: true }),
           supabase
-            .from("producers")
+            .from("creator_profiles")
             .select("*", { count: "exact", head: true })
-            .eq("status", "pending"),
+            .in("status", ["pending_activation", "pending"]),
           supabase.from("movies").select("*", { count: "exact", head: true }),
           supabase.from("tv_shows").select("*", { count: "exact", head: true }),
-        ]);
+        ];
 
-        // Fetch revenue data - convert from kobo to naira
-        const [
-          { data: revenueData, error: revenueError },
-          { data: monthlyRevenueData, error: monthlyError },
-        ] = await Promise.all([
+        const countResults = await Promise.allSettled(countQueries);
+
+        const totalUsers =
+          countResults[0].status === "fulfilled"
+            ? countResults[0].value.count ?? 0
+            : 0;
+        const totalCreators =
+          countResults[1].status === "fulfilled"
+            ? countResults[1].value.count ?? 0
+            : 0;
+        const pendingCreators =
+          countResults[2].status === "fulfilled"
+            ? countResults[2].value.count ?? 0
+            : 0;
+        const totalMovies =
+          countResults[3].status === "fulfilled"
+            ? countResults[3].value.count ?? 0
+            : 0;
+        const totalTvShows =
+          countResults[4].status === "fulfilled"
+            ? countResults[4].value.count ?? 0
+            : 0;
+
+        const revenueQueries = [
           supabase
             .from("payments")
             .select("amount")
-            .eq("enhanced_status", "success"),
+            .or("status.eq.completed,enhanced_status.eq.completed,enhanced_status.eq.success"),
           (() => {
             const startOfMonth = new Date();
             startOfMonth.setDate(1);
@@ -175,37 +198,27 @@ function SuperAdminDashboard() {
             return supabase
               .from("payments")
               .select("amount")
-              .eq("status", "completed")
+              .or("status.eq.completed,enhanced_status.eq.completed,enhanced_status.eq.success")
               .gte("created_at", startOfMonth.toISOString());
           })(),
-        ]);
+        ];
 
-        // Convert kobo to naira and sum up
-        const totalRevenue =
-          revenueData?.reduce((sum, payment) => {
-            const amount =
-              typeof payment.amount === "string"
-                ? parseFloat(payment.amount)
-                : payment.amount;
-            return sum + koboToNaira(amount);
-          }, 0) || 0;
+        const revenueResults = await Promise.allSettled(revenueQueries);
+        const revenueData =
+          revenueResults[0].status === "fulfilled" ? revenueResults[0].value.data ?? [] : [];
+        const monthlyRevenueData =
+          revenueResults[1].status === "fulfilled" ? revenueResults[1].value.data ?? [] : [];
 
-        const monthlyRevenue =
-          monthlyRevenueData?.reduce((sum, payment) => {
-            const amount =
-              typeof payment.amount === "string"
-                ? parseFloat(payment.amount)
-                : payment.amount;
-            return sum + koboToNaira(amount);
-          }, 0) || 0;
+        const totalRevenue = sumSuccessfulPaymentAmounts(revenueData as Array<{ amount: string | number | null } | null>);
+        const monthlyRevenue = sumSuccessfulPaymentAmounts(monthlyRevenueData as Array<{ amount: string | number | null } | null>);
 
         setStats({
-          totalUsers: totalUsers || 0,
-          activeUsers: totalUsers || 0,
-          totalProducers: totalProducers || 0,
-          pendingProducers: pendingProducers || 0,
-          totalMovies: totalMovies || 0,
-          totalTvShows: totalTvShows || 0,
+          totalUsers,
+          activeUsers: totalUsers,
+          totalCreators,
+          pendingCreators,
+          totalMovies,
+          totalTvShows,
           totalRevenue,
           monthlyRevenue,
         });
@@ -360,9 +373,9 @@ function SuperAdminDashboard() {
       trend: "+12%",
     },
     {
-      title: "Producers",
-      value: stats.totalProducers.toLocaleString(),
-      description: `${stats.pendingProducers} pending approval`,
+      title: "Creators",
+      value: stats.totalCreators.toLocaleString(),
+      description: `${stats.pendingCreators} pending activation`,
       icon: UserCheck,
       gradient: "gradient-card",
       trend: "+8%",
