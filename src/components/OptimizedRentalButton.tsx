@@ -124,7 +124,7 @@ export const OptimizedRentalButton = ({
           Rent {iosLabel} — Unavailable in App
         </Button>
 
-        <p className="text-[11px] sm:text-xs text-muted-foreground text-center leading-snug">
+        <p style={{ color: 'white' }} className="text-[11px] sm:text-xs text-muted-foreground text-center leading-snug">
           Renting isn’t available in the iOS app. Visit our website in Safari to unlock this {iosLabel.toLowerCase()}.
         </p>
       </div>
