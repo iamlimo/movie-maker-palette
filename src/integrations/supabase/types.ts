@@ -854,6 +854,39 @@ export type Database = {
           },
         ]
       }
+      payment_audit_log: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string | null
+          details: Json | null
+          event_type: string
+          id: string
+          payment_id: string | null
+          reference: string | null
+          user_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          event_type: string
+          id?: string
+          payment_id?: string | null
+          reference?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          event_type?: string
+          id?: string
+          payment_id?: string | null
+          reference?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -1041,7 +1074,7 @@ export type Database = {
           id: string
           last_name: string | null
           name: string
-          phone_number: string | null
+          phone_number: string
           profile_image_url: string | null
           status: string | null
           updated_at: string
@@ -1057,7 +1090,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           name: string
-          phone_number?: string | null
+          phone_number?: string
           profile_image_url?: string | null
           status?: string | null
           updated_at?: string
@@ -1073,7 +1106,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           name?: string
-          phone_number?: string | null
+          phone_number?: string
           profile_image_url?: string | null
           status?: string | null
           updated_at?: string
@@ -2717,17 +2750,46 @@ export type Database = {
           wallet_balance: number
         }[]
       }
-      process_wallet_transaction: {
-        Args: {
-          p_amount: number
-          p_description?: string
-          p_metadata?: Json
-          p_payment_id?: string
-          p_type: string
-          p_wallet_id: string
-        }
-        Returns: string
-      }
+      process_wallet_transaction:
+        | {
+            Args: {
+              p_amount: number
+              p_description?: string
+              p_is_credit?: boolean
+              p_metadata?: Json
+              p_payment_id?: string
+              p_reference?: string
+              p_type: string
+              p_user_id?: string
+              p_wallet_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_description?: string
+              p_metadata?: Json
+              p_payment_id?: string
+              p_type: string
+              p_wallet_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_description?: string
+              p_is_credit?: boolean
+              p_metadata?: Json
+              p_payment_id?: string
+              p_reference?: string
+              p_type: string
+              p_user_id?: string
+              p_wallet_id: string
+            }
+            Returns: string
+          }
       update_user_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
