@@ -177,9 +177,15 @@ Deno.serve(async (req) => {
                   Object.entries({ ...data, title, body }).map(([k, v]) => [k, String(v)])
                 ),
                 android: { priority: "high" },
-                apns: {
-                  payload: { aps: { sound: "default", badge: 1 } },
-                },
+                apns: (function() {
+                  const apnsHeaders: Record<string, string> = {};
+                  const apnsTopic = Deno.env.get("APNS_TOPIC") || Deno.env.get("IOS_BUNDLE_ID");
+                  if (apnsTopic) apnsHeaders["apns-topic"] = apnsTopic;
+                  return {
+                    headers: Object.keys(apnsHeaders).length ? apnsHeaders : undefined,
+                    payload: { aps: { sound: "default", badge: 1 } },
+                  };
+                })(),
               },
             };
 
