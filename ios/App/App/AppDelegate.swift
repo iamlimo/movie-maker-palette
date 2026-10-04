@@ -49,14 +49,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Log the raw APNs device token (hex) to help debugging native registration.
+        let hexToken = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        print("[APNS] didRegisterForRemoteNotificationsWithDeviceToken: \(hexToken)")
         NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications,
-                                        object: deviceToken)
+                        object: deviceToken)
     }
 
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("[APNS] didFailToRegisterForRemoteNotificationsWithError: \(error)")
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications,
-                                        object: error)
+                        object: error)
     }
 
     // Silent / data-only pushes delivered while the app is backgrounded.
