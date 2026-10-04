@@ -10,6 +10,7 @@ import {
 import { FCM as FCMBase } from "@capacitor-community/fcm";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const FCM = FCMBase as any;
+import { Preferences } from "@capacitor/preferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { mapPushDataToRoute } from "@/lib/pushNavigation";
@@ -86,33 +87,33 @@ export function usePushNotifications() {
 
   // Keep the latest user id available to listeners registered once per launch.
   userIdRef.current = user?.id ?? null;
+  const LOCAL_PUSH_TOKEN_KEY = "signaturetv_push_token";
 
+  async function saveLocalToken(token: string | null) {
+    if (!token) return;
+    try {
+      await Preferences.set({ key: LOCAL_PUSH_TOKEN_KEY, value: token });
+    } catch (err) {
+      console.error("Preferences.set failed:", err);
+    }
+  }
+
+  async function getLocalToken(): Promise<string | null> {
+    try {
+      const { value } = await Preferences.get({ key: LOCAL_PUSH_TOKEN_KEY });
+      return value ?? null;
+    } catch (err) {
+      console.error("Preferences.get failed:", err);
+      return null;
+    }
+  }
+  // Attach listeners and ensure the app registers for pushes on startup
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     if (loading) return;
-    if (!user?.id) return;
 
-    // Once permissions are granted and listeners are attached, a session change
-    // just needs the current token re-saved against the new user.
-    if (initializedRef.current) {
-      void (async () => {
-        try {
-          const result = await FCM.getToken();
-          const token = typeof result === "string" ? result : result?.token;
-          if (typeof token === "string" && token) {
-            await upsertDeviceToken({
-              token,
-              deviceType: deviceType(),
-              userId: user.id,
-            });
-          }
-        } catch (err) {
-          console.error("Re-registering push token failed:", err);
-        }
-      })();
-      return;
-    }
-
+    // listeners and startup registration are executed once per launch
+    if (initializedRef.current) return;
     initializedRef.current = true;
     const listeners: Array<{ remove: () => void }> = [];
 
@@ -124,13 +125,20 @@ export function usePushNotifications() {
             "registration",
             async (token: Token) => {
               const userId = userIdRef.current;
-              if (!userId || !token?.value) return;
+              if (!token?.value) return;
               const fcmToken = await resolveFcmToken(token.value);
-              await upsertDeviceToken({
-                token: fcmToken,
-                deviceType: deviceType(),
-                userId,
-              });
+              if (!fcmToken) return;
+              // If we have a signed-in user, associate immediately; otherwise
+              // persist locally and associate when they sign in.
+              if (userId) {
+                await upsertDeviceToken({
+                  token: fcmToken,
+                  deviceType: deviceType(),
+                  userId,
+                });
+              } else {
+                await saveLocalToken(fcmToken);
+              }
             },
           ),
         );
@@ -193,6 +201,26 @@ export function usePushNotifications() {
         }
 
         await PushNotifications.register();
+        // Fallback: some runtime/device combinations may deliver the native
+        // registration callback before JS listeners are attached. Query the
+        // FCM token proactively after registering so we don't miss it.
+        try {
+          const userId = userIdRef.current;
+          if (userId) {
+            const result = await FCM.getToken();
+            const token = typeof result === "string" ? result : result?.token;
+            if (typeof token === "string" && token) {
+              await upsertDeviceToken({
+                token,
+                deviceType: deviceType(),
+                userId,
+              });
+            }
+          }
+        } catch (err) {
+          // don't fail setup on fallback errors
+          console.error("FCM.getToken fallback failed:", err);
+        }
         await PushNotifications.removeAllDeliveredNotifications().catch(
           () => undefined,
         );
@@ -216,6 +244,29 @@ export function usePushNotifications() {
       listeners.forEach((l) => l.remove());
       initializedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  // When a user signs in, associate any locally-saved token with their account.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    if (loading) return;
+    if (!user?.id) return;
+
+    void (async () => {
+      try {
+        const token = await getLocalToken();
+        if (token) {
+          await upsertDeviceToken({
+            token,
+            deviceType: deviceType(),
+            userId: user.id,
+          });
+        }
+      } catch (err) {
+        console.error("Associating saved push token failed:", err);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, loading]);
 }
