@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wallet, CreditCard, ShieldCheck } from 'lucide-react';
+import { Loader2, Wallet, CreditCard, ShieldCheck, ArrowLeft, Check } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { formatNaira } from '@/lib/priceUtils';
 import { Capacitor } from '@capacitor/core';
@@ -23,6 +23,7 @@ const MAX_AMOUNT_KOBO = 500_000 * 100;
 
 export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProps) {
   const [amount, setAmount] = useState<number>(0);
+  const [isConfirmingAmount, setIsConfirmingAmount] = useState(false);
   const [status, setStatus] = useState<FundingState>('idle');
   const [statusMessage, setStatusMessage] = useState('Choose a top-up amount and continue securely.');
   const pollIntervalRef = useRef<number | null>(null);
@@ -67,6 +68,7 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
     setStatus('idle');
     setStatusMessage('Choose a top-up amount and continue securely.');
     setAmount(0);
+    setIsConfirmingAmount(false);
   };
 
   const handleFund = async () => {
@@ -260,49 +262,87 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
             </div>
           ) : null}
 
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">You can use your wallet to pay for rentals and purchases.</p>
-          </div>
+          {!isConfirmingAmount ? (
+            <>
+              <p className="text-xs text-muted-foreground">You can use your wallet to pay for rentals and purchases.</p>
 
-          <div className="space-y-2">
-            <p className="text-sm font-bold text-foreground">
-              Select from the default amounts below to top up your wallet.
-            </p>
-            <div className="grid grid-cols-4 gap-2">
-              {QUICK_AMOUNTS.map((quickAmount) => (
-              <Button
-                key={quickAmount}
-                type="button"
-                variant={amount === quickAmount * 100 ? 'default' : 'outline'}
-                size="sm"
-                className={`rounded-xl ${amount === quickAmount * 100 ? 'bg-primary text-primary-foreground' : 'border-border bg-background/50'}`}
-                onClick={() => setAmount(quickAmount * 100)}
-              >
-                ₦{quickAmount.toLocaleString()}
-              </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-background/50 p-3">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                <CreditCard className="h-4 w-4" />
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-foreground">
+                  Select from the default amounts below to top up your wallet.
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {QUICK_AMOUNTS.map((quickAmount) => (
+                    <Button
+                      key={quickAmount}
+                      type="button"
+                      variant={amount === quickAmount * 100 ? 'default' : 'outline'}
+                      size="sm"
+                      className={`rounded-xl ${amount === quickAmount * 100 ? 'bg-primary text-primary-foreground' : 'border-border bg-background/50'}`}
+                      onClick={() => {
+                        setAmount(quickAmount * 100);
+                        setIsConfirmingAmount(false);
+                      }}
+                    >
+                      ₦{quickAmount.toLocaleString()}
+                    </Button>
+                  ))}
+                </div>
               </div>
+
+              <div className="rounded-2xl border border-border bg-background/50 p-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Paystack</p>
+                    <p className="text-xs text-muted-foreground">Card or bank transfer or OPAY</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                <span>Min ₦1.00</span>
+                <span>Max ₦500,000.00</span>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4 rounded-2xl border border-border bg-background/50 p-4">
               <div>
-                <p className="text-sm font-medium">Paystack</p>
-                <p className="text-xs text-muted-foreground">Card or bank transfer or OPAY</p>
+                <p className="text-sm font-medium text-muted-foreground">Confirm wallet top-up</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{formatNaira(normalizedAmount)}</p>
               </div>
+              <div className="flex items-center gap-3 border-t border-border pt-3">
+                <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                  <CreditCard className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Paystack</p>
+                  <p className="text-xs text-muted-foreground">Card or bank transfer or OPAY</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="px-0 text-muted-foreground"
+                onClick={() => setIsConfirmingAmount(false)}
+                disabled={status === 'processing' || status === 'pending'}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Change amount
+              </Button>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-            <span>Min ₦1.00</span>
-            <span>Max ₦500,000.00</span>
-          </div>
+          )}
 
           <Button
-            onClick={handleFund}
+            onClick={() => {
+              if (isConfirmingAmount) {
+                void handleFund();
+              } else {
+                setIsConfirmingAmount(true);
+              }
+            }}
             disabled={status === 'processing' || status === 'pending' || normalizedAmount < MIN_AMOUNT_KOBO}
             className="h-12 w-full rounded-2xl bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-70"
             size="lg"
@@ -319,8 +359,8 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               </>
             ) : (
               <>
-                <Wallet className="mr-2 h-4 w-4" />
-                {normalizedAmount > 0 ? `Fund ${formatNaira(normalizedAmount)}` : 'Continue'}
+                {isConfirmingAmount ? <Check className="mr-2 h-4 w-4" /> : <Wallet className="mr-2 h-4 w-4" />}
+                {isConfirmingAmount ? 'Confirm and continue to Paystack' : 'Review top-up'}
               </>
             )}
           </Button>
