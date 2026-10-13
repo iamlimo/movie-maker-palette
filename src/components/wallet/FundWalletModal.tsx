@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import NairaInput from '@/components/admin/NairaInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Wallet, CreditCard, ShieldCheck } from 'lucide-react';
@@ -262,14 +261,6 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
           ) : null}
 
           <div className="space-y-3">
-            <div className="rounded-2xl border border-border bg-background/80 p-3 shadow-sm transition-all duration-200 focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10">
-              <NairaInput
-                value={amount}
-                onChange={setAmount}
-                placeholder="0.00"
-                className="border-0 bg-transparent text-3xl shadow-none focus-visible:ring-0"
-              />
-            </div>
             <p className="text-xs text-muted-foreground">You can use your wallet to pay for rentals and purchases.</p>
           </div>
 
