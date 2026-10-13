@@ -264,7 +264,11 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
             <p className="text-xs text-muted-foreground">You can use your wallet to pay for rentals and purchases.</p>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-foreground">
+              Select from the default amounts below to top up your wallet.
+            </p>
+            <div className="grid grid-cols-4 gap-2">
               {QUICK_AMOUNTS.map((quickAmount) => (
               <Button
                 key={quickAmount}
@@ -276,7 +280,8 @@ export default function FundWalletModal({ isOpen, onClose }: FundWalletModalProp
               >
                 ₦{quickAmount.toLocaleString()}
               </Button>
-            ))}
+              ))}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-border bg-background/50 p-3">
