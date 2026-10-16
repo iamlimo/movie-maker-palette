@@ -40,6 +40,7 @@ interface Payment {
   metadata: any;
   user_name?: string;
   user_email?: string;
+  user_phone?: string;
 }
 
 export const TransactionsTable = () => {
@@ -69,11 +70,11 @@ export const TransactionsTable = () => {
           .order('created_at', { ascending: false })
           .or(`provider_reference.ilike.%${searchTerm}%,id.ilike.%${searchTerm}%`);
 
-        // Search profiles by name or email to find matching user_ids
+        // Search profiles by name, email, or phone to find matching user_ids
         const { data: matchingProfiles } = await supabase
           .from('profiles')
           .select('user_id')
-          .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+          .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`);
 
         const userIdsFromProfiles = (matchingProfiles || []).map((p: any) => p.user_id).filter(Boolean);
 
@@ -136,19 +137,23 @@ export const TransactionsTable = () => {
 
       // Fetch user profiles separately for the currently displayed payments
       const userIds = displayedPayments.map((p: any) => p.user_id).filter(Boolean) || [];
-      let profilesMap: Record<string, { name: string; email: string }> = {};
+      let profilesMap: Record<string, { name: string; email: string; phone_number: string }> = {};
 
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, name, email')
+          .select('user_id, name, email, phone_number')
           .in('user_id', userIds);
 
         if (profiles) {
           profilesMap = profiles.reduce((acc: any, profile: any) => {
-            acc[profile.user_id] = { name: profile.name, email: profile.email };
+            acc[profile.user_id] = {
+              name: profile.name,
+              email: profile.email,
+              phone_number: profile.phone_number || 'N/A'
+            };
             return acc;
-          }, {} as Record<string, { name: string; email: string }>);
+          }, {} as Record<string, { name: string; email: string; phone_number: string }>);
         }
       }
 
@@ -156,7 +161,8 @@ export const TransactionsTable = () => {
       const paymentsWithProfiles = displayedPayments.map((payment: any) => ({
         ...payment,
         user_name: profilesMap[payment.user_id]?.name || 'Unknown',
-        user_email: profilesMap[payment.user_id]?.email || 'Unknown'
+        user_email: profilesMap[payment.user_id]?.email || 'Unknown',
+        user_phone: profilesMap[payment.user_id]?.phone_number || 'N/A'
       }));
 
       setPayments(paymentsWithProfiles);
@@ -208,28 +214,122 @@ export const TransactionsTable = () => {
     }
   };
 
-  const exportTransactions = () => {
-    const csvData = payments.map(payment => [
-      payment.id,
-      payment.user_email,
-      payment.amount,
-      payment.currency,
-      payment.purpose,
-      payment.enhanced_status,
-      payment.provider,
-      payment.created_at
-    ]).map(row => row.join(',')).join('\n');
+  const exportTransactions = async () => {
+    try {
+      let exportData: any[] = [];
 
-    const headers = 'ID,User Email,Amount,Currency,Purpose,Status,Provider,Date\n';
-    const blob = new Blob([headers + csvData], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'transactions.csv');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+      if (searchTerm) {
+        const { data: byRef } = await supabase
+          .from('payments')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .or(`provider_reference.ilike.%${searchTerm}%,id.ilike.%${searchTerm}%`);
+
+        const { data: matchingProfiles } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`);
+
+        const userIdsFromProfiles = (matchingProfiles || []).map((p: any) => p.user_id).filter(Boolean);
+
+        let byUser: any[] = [];
+        if (userIdsFromProfiles.length > 0) {
+          const { data } = await supabase
+            .from('payments')
+            .select('*')
+            .in('user_id', userIdsFromProfiles)
+            .order('created_at', { ascending: false });
+          byUser = data || [];
+        }
+
+        const combined = [...(byRef || []), ...byUser];
+        const mapById: Record<string, any> = {};
+        combined.forEach((payment: any) => {
+          mapById[payment.id] = payment;
+        });
+        exportData = Object.values(mapById).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      } else {
+        let query = supabase
+          .from('payments')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (statusFilter !== 'all') {
+          query = query.eq('enhanced_status', statusFilter as any);
+        }
+
+        if (purposeFilter !== 'all') {
+          query = query.eq('purpose', purposeFilter);
+        }
+
+        const { data } = await query;
+        exportData = data || [];
+      }
+
+      const userIds = [...new Set(exportData.map((payment: any) => payment.user_id).filter(Boolean))];
+      let profilesMap: Record<string, { name: string; email: string; phone_number: string }> = {};
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, name, email, phone_number')
+          .in('user_id', userIds);
+
+        if (profiles) {
+          profilesMap = profiles.reduce((acc: any, profile: any) => {
+            acc[profile.user_id] = {
+              name: profile.name,
+              email: profile.email,
+              phone_number: profile.phone_number || 'N/A'
+            };
+            return acc;
+          }, {} as Record<string, { name: string; email: string; phone_number: string }>);
+        }
+      }
+
+      const exportRows = exportData.map((payment: any) => ({
+        ...payment,
+        user_name: profilesMap[payment.user_id]?.name || 'Unknown',
+        user_email: profilesMap[payment.user_id]?.email || 'Unknown',
+        user_phone: profilesMap[payment.user_id]?.phone_number || 'N/A'
+      }));
+
+      const csvData = exportRows.map(payment => [
+        payment.id,
+        payment.user_email,
+        payment.user_phone,
+        payment.amount,
+        payment.currency,
+        payment.purpose,
+        payment.enhanced_status,
+        payment.provider,
+        payment.created_at
+      ]).map(row => row.join(',')).join('\n');
+
+      const headers = 'ID,User Email,Phone Number,Amount,Currency,Purpose,Status,Provider,Date\n';
+      const blob = new Blob([headers + csvData], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'transactions.csv');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export complete',
+        description: `Exported ${exportRows.length} transactions from the database.`
+      });
+    } catch (error: any) {
+      console.error('Error exporting transactions:', error);
+      toast({
+        title: 'Export failed',
+        description: error.message || 'Unable to export transactions.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -277,7 +377,7 @@ export const TransactionsTable = () => {
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by email, name, or reference..."
+                placeholder="Search by email, name, phone, or reference..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -338,6 +438,7 @@ export const TransactionsTable = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Purpose</TableHead>
                     <TableHead>Status</TableHead>
@@ -354,6 +455,11 @@ export const TransactionsTable = () => {
                           <p className="font-medium">{payment.user_name}</p>
                           <p className="text-sm text-muted-foreground">{payment.user_email}</p>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {payment.user_phone || 'N/A'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="font-mono">
