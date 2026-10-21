@@ -2750,46 +2750,17 @@ export type Database = {
           wallet_balance: number
         }[]
       }
-      process_wallet_transaction:
-        | {
-            Args: {
-              p_amount: number
-              p_description?: string
-              p_is_credit?: boolean
-              p_metadata?: Json
-              p_payment_id?: string
-              p_reference?: string
-              p_type: string
-              p_user_id?: string
-              p_wallet_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_amount: number
-              p_description?: string
-              p_metadata?: Json
-              p_payment_id?: string
-              p_type: string
-              p_wallet_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_amount: number
-              p_description?: string
-              p_is_credit?: boolean
-              p_metadata?: Json
-              p_payment_id?: string
-              p_reference?: string
-              p_type: string
-              p_user_id?: string
-              p_wallet_id: string
-            }
-            Returns: string
-          }
+      process_wallet_transaction: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_metadata?: Json
+          p_payment_id?: string
+          p_type: string
+          p_wallet_id: string
+        }
+        Returns: string
+      }
       update_user_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
