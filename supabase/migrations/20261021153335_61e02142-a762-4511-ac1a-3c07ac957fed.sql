@@ -1,0 +1,1 @@
+ALTER FUNCTION public.process_wallet_transaction(uuid, numeric, text, text, uuid, jsonb) SET search_path = public, extensions;
