@@ -1650,6 +1650,42 @@ export type Database = {
         }
         Relationships: []
       }
+      reward_vouchers: {
+        Row: {
+          amount: number
+          claimed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          source_intent_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          claimed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          source_intent_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          claimed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          source_intent_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       role_permissions: {
         Row: {
           permission_id: string
@@ -2319,6 +2355,66 @@ export type Database = {
         }
         Relationships: []
       }
+      user_referral_codes: {
+        Row: {
+          code: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_referrals: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          qualified_at: string | null
+          qualifying_intent_id: string | null
+          referred_id: string
+          referred_reward: number
+          referrer_id: string
+          referrer_reward: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          qualified_at?: string | null
+          qualifying_intent_id?: string | null
+          referred_id: string
+          referred_reward?: number
+          referrer_id: string
+          referrer_reward?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          qualified_at?: string | null
+          qualifying_intent_id?: string | null
+          referred_id?: string
+          referred_reward?: number
+          referrer_id?: string
+          referrer_reward?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2612,6 +2708,10 @@ export type Database = {
       }
     }
     Functions: {
+      attach_referral: {
+        Args: { p_code: string; p_referred_id: string }
+        Returns: undefined
+      }
       calculate_season_upgrade_price: {
         Args: { p_season_id: string; p_user_id: string }
         Returns: {
@@ -2629,6 +2729,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      claim_reward_voucher: { Args: { p_voucher_id: string }; Returns: number }
       cleanup_expired_payments: { Args: never; Returns: number }
       credit_wallet: {
         Args: {
@@ -2656,6 +2757,10 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_user_referral_code: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       ensure_wallet_for_user: { Args: { p_user_id: string }; Returns: string }
       expire_canonical_rental_access: {
         Args: { p_skew_minutes?: number }
@@ -2668,6 +2773,7 @@ export type Database = {
       }
       get_creator_dashboard: { Args: never; Returns: Json }
       get_current_user_profile: { Args: never; Returns: string }
+      get_my_referral_code: { Args: never; Returns: string }
       get_season_episode_count: {
         Args: { season_id_param: string }
         Returns: number
@@ -2758,6 +2864,17 @@ export type Database = {
           p_payment_id?: string
           p_type: string
           p_wallet_id: string
+        }
+        Returns: string
+      }
+      reward_credit_wallet: {
+        Args: {
+          p_amount: number
+          p_description: string
+          p_metadata?: Json
+          p_reference: string
+          p_type: string
+          p_user_id: string
         }
         Returns: string
       }

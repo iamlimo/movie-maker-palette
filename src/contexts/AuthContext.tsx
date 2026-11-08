@@ -34,6 +34,7 @@ interface AuthContextType {
     password: string,
     name: string,
     phoneNumber: string,
+    referralCode?: string,
   ) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -306,6 +307,7 @@ useEffect(() => {
     password: string,
     name: string,
     phoneNumber: string,
+    referralCode?: string,
   ) => {
     const redirectUrl = `${window.location.origin}/auth/confirm`;
 
@@ -318,6 +320,9 @@ useEffect(() => {
           name: name || '',
           phone_number: phoneNumber || '',
           phone: phoneNumber || '',
+          ...(referralCode?.trim()
+            ? { referral_code: referralCode.trim().toUpperCase() }
+            : {}),
         },
       },
     });

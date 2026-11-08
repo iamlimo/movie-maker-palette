@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, User, Menu, LogOut, Settings, X, Wallet } from "lucide-react";
+import { Search, User, Menu, LogOut, Settings, X, Wallet, Gift } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
 import { useWallet } from "@/hooks/useWallet";
@@ -192,6 +192,14 @@ const Header = () => {
                       <Wallet className="mr-2 h-4 w-4" /> My Wallet
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/rewards"
+                      className="flex items-center text-foreground"
+                    >
+                      <Gift className="mr-2 h-4 w-4" /> Deals & Rewards
+                    </Link>
+                  </DropdownMenuItem>
 
                   {isStaff() && <DropdownMenuSeparator className="bg-border" />}
 
@@ -293,6 +301,15 @@ const Header = () => {
                     >
                       <Wallet className="mr-2 h-4 w-4" />
                       My Wallet
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/rewards"
+                      className="flex items-center text-foreground"
+                    >
+                      <Gift className="mr-2 h-4 w-4" />
+                      Deals & Rewards
                     </Link>
                   </DropdownMenuItem>
                   {isSuperAdmin() && (

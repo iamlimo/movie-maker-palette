@@ -27,6 +27,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const Profile = lazy(() => import("./pages/Profile"));
+const Rewards = lazy(() => import("./pages/Rewards"));
 const MoviePreview = lazy(() => import("./pages/MoviePreview"));
 const TVShowPreview = lazy(() => import("./pages/TVShowPreview"));
 const Movies = lazy(() => import("./pages/Movies"));
@@ -147,6 +148,7 @@ function AppContent() {
             <Route path="/genres" element={<Genres />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/wallet" element={<Wallet />} />
+            <Route path="/rewards" element={<Rewards />} />
             <Route path="/payment/callback" element={<PaymentCallback />} />
             <Route path="/help" element={<Help />} />
             <Route path="/contact" element={<Contact />} />
