@@ -73,6 +73,45 @@ const Auth = () => {
     confirmPassword: "",
   });
 
+  // Referral code: from ?ref=CODE (persisted so it survives navigation)
+  const [referralCode, setReferralCode] = useState<string>(() => {
+    try {
+      return localStorage.getItem("sig_ref_code") || "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      const code = ref.trim().toUpperCase().slice(0, 20);
+      setReferralCode(code);
+      try {
+        localStorage.setItem("sig_ref_code", code);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [searchParams]);
+
+  const referralField = (id: string) => (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-foreground">
+        Referral Code <span className="text-muted-foreground font-normal">(optional)</span>
+      </Label>
+      <Input
+        id={id}
+        placeholder="e.g. SIG-AB12CD"
+        value={referralCode}
+        onChange={(e) => setReferralCode(e.target.value.toUpperCase().slice(0, 20))}
+        className="bg-background/50 border-border focus:border-primary uppercase"
+      />
+      <p className="text-xs text-muted-foreground">
+        Got invited? You and your friend each get ₦200 after your first rental.
+      </p>
+    </div>
+  );
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -192,7 +231,15 @@ const Auth = () => {
         signupData.password,
         signupData.name,
         signupData.phoneNumber,
+        referralCode,
       );
+      if (!error) {
+        try {
+          localStorage.removeItem("sig_ref_code");
+        } catch {
+          /* ignore */
+        }
+      }
 
       if (error) {
         if (error.message.includes("User already registered")) {
@@ -416,6 +463,8 @@ const Auth = () => {
           Minimum 7 digits. Include country code if available (e.g., +234)
         </p>
       </div>
+
+      {referralField("native-signup-referral")}
 
       <div className="space-y-2">
         <Label htmlFor="native-signup-password" className="text-foreground">
@@ -802,6 +851,8 @@ const Auth = () => {
                         Minimum 7 digits (e.g., +234 800 000 0000)
                       </p>
                     </div>
+
+                    {referralField("signup-referral")}
 
                     <div className="space-y-2">
                       <Label
