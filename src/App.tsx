@@ -81,6 +81,7 @@ const JobApplicationsAdmin = lazy(
   () => import("@/pages/admin/JobApplications"),
 );
 const ReferralCodes = lazy(() => import("@/pages/admin/ReferralCodes"));
+const ReferralTracking = lazy(() => import("@/pages/admin/ReferralTracking"));
 const CreateTicket = lazy(() => import("@/pages/admin/CreateTicket"));
 const TicketsList = lazy(() => import("@/pages/admin/TicketsList"));
 const TicketDetails = lazy(() => import("@/pages/admin/TicketDetails"));
@@ -393,6 +394,14 @@ function AppContent() {
                 element={
                   <RoleRoute page="referral-codes">
                     <ReferralCodes />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="referral-tracking"
+                element={
+                  <RoleRoute page="referral-tracking">
+                    <ReferralTracking />
                   </RoleRoute>
                 }
               />
