@@ -27,7 +27,7 @@ type WatchHourTotals = {
   status: string;
 };
 
-const SITE = "https://movie-maker-palette.lovable.app";
+const SITE = "https://signaturetv.co";
 
 const timeLeft = (iso: string) => {
   const ms = new Date(iso).getTime() - Date.now();

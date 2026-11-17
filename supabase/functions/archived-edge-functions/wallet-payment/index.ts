@@ -337,7 +337,7 @@ serve(async (req) => {
         email: profile?.email || user.email,
         amount: Math.round(finalPrice), // DB price is in kobo; Paystack expects amount in kobo
         reference: payment.intent_id,
-        callback_url: `${req.headers.get('origin') || 'https://movie-maker-palette.lovable.app'}/${normalizedContentType}/${contentId}?payment=success`,
+        callback_url: `${req.headers.get('origin') || 'https://signaturetv.co'}/${normalizedContentType}/${contentId}?payment=success`,
 
         metadata: {
           payment_id: payment.id,
