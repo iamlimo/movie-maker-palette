@@ -41,6 +41,7 @@ WHERE NOT EXISTS (SELECT 1 FROM public.watch_hour_config)
 ON CONFLICT DO NOTHING;
 
 ALTER TABLE public.watch_hour_config ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Staff can read config" ON public.watch_hour_config;
 CREATE POLICY "Staff can read config" ON public.watch_hour_config
   FOR SELECT TO authenticated
   USING (public.is_staff(auth.uid()));
@@ -71,12 +72,15 @@ CREATE TABLE IF NOT EXISTS public.watch_hour_sessions (
 );
 
 ALTER TABLE public.watch_hour_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can see own watch sessions" ON public.watch_hour_sessions;
 CREATE POLICY "Users can see own watch sessions" ON public.watch_hour_sessions
   FOR SELECT TO authenticated
   USING (user_id = auth.uid() OR public.is_staff(auth.uid()));
+DROP POLICY IF EXISTS "Users can insert own watch sessions" ON public.watch_hour_sessions;
 CREATE POLICY "Users can insert own watch sessions" ON public.watch_hour_sessions
   FOR INSERT TO authenticated
   WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users can update own watch sessions" ON public.watch_hour_sessions;
 CREATE POLICY "Users can update own watch sessions" ON public.watch_hour_sessions
   FOR UPDATE TO authenticated
   USING (user_id = auth.uid());
@@ -96,6 +100,7 @@ CREATE TABLE IF NOT EXISTS public.watch_hour_reward_credits (
 );
 
 ALTER TABLE public.watch_hour_reward_credits ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can see own watch-hour credits" ON public.watch_hour_reward_credits;
 CREATE POLICY "Users can see own watch-hour credits" ON public.watch_hour_reward_credits
   FOR SELECT TO authenticated
   USING (user_id = auth.uid() OR public.is_staff(auth.uid()));
@@ -115,6 +120,7 @@ CREATE TABLE IF NOT EXISTS public.user_watch_hour_totals (
 );
 
 ALTER TABLE public.user_watch_hour_totals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can see own watch-hour summary" ON public.user_watch_hour_totals;
 CREATE POLICY "Users can see own watch-hour summary" ON public.user_watch_hour_totals
   FOR SELECT TO authenticated
   USING (user_id = auth.uid() OR public.is_staff(auth.uid()));
