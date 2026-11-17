@@ -50,15 +50,26 @@ const Rewards = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const link = code ? `${SITE}/auth?mode=signup&ref=${code}` : "";
-  const shareText = `Join me on Signature TV! Sign up with my code ${code} and we both get ₦200 after your first rental. ${link}`;
+  const hasCode = Boolean(code && code.trim());
+  const link = hasCode ? `${SITE}/auth?mode=signup&ref=${code}` : "";
+  const shareText = hasCode ? `Join me on Signature TV! Sign up with my code ${code} and we both get ₦200 after your first rental. ${link}` : "";
 
   const copy = async (text: string, label: string) => {
+    if (!text) {
+      toast({ title: `${label} isn't available yet`, variant: "destructive" });
+      return;
+    }
+
     try { await navigator.clipboard.writeText(text); toast({ title: `${label} copied` }); }
     catch { toast({ title: "Couldn't copy", variant: "destructive" }); }
   };
 
   const share = async () => {
+    if (!hasCode || !shareText || !link) {
+      toast({ title: "Your referral code isn't ready yet", description: "Please wait a moment and try again.", variant: "destructive" });
+      return;
+    }
+
     if (navigator.share) {
       try { await navigator.share({ title: "Signature TV", text: shareText, url: link }); return; } catch { /* cancelled */ }
     }
@@ -101,15 +112,19 @@ const Rewards = () => {
                 <CardDescription>When a friend signs up with your code and makes their first paid rental, you both get ₦200 in your wallets.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {loading ? <Skeleton className="h-14 w-full" /> : (
+                {loading ? <Skeleton className="h-14 w-full" /> : !hasCode ? (
+                  <div className="rounded-lg border border-dashed border-border bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+                    Your referral code is still being prepared. Please wait a moment and refresh.
+                  </div>
+                ) : (
                   <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                     <div className="flex-1 rounded-lg border border-border bg-background/60 px-4 py-3 font-mono text-xl tracking-widest text-foreground text-center sm:text-left">
                       {code}
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => copy(code!, "Code")}><Copy className="h-4 w-4 mr-2" />Code</Button>
-                      <Button variant="outline" onClick={() => copy(link, "Link")}><Copy className="h-4 w-4 mr-2" />Link</Button>
-                      <Button onClick={share}><Share2 className="h-4 w-4 mr-2" />Share</Button>
+                      <Button variant="outline" onClick={() => copy(code!, "Code")} disabled={!hasCode}><Copy className="h-4 w-4 mr-2" />Code</Button>
+                      <Button variant="outline" onClick={() => copy(link, "Link")} disabled={!hasCode}><Copy className="h-4 w-4 mr-2" />Link</Button>
+                      <Button onClick={share} disabled={!hasCode}><Share2 className="h-4 w-4 mr-2" />Share</Button>
                     </div>
                   </div>
                 )}

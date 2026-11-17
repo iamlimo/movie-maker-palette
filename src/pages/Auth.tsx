@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import {
   Eye,
@@ -71,6 +72,7 @@ const Auth = () => {
     phoneNumber: "",
     password: "",
     confirmPassword: "",
+    marketingOptIn: false,
   });
 
   // Referral code: from ?ref=CODE (persisted so it survives navigation)
@@ -109,6 +111,28 @@ const Auth = () => {
       <p className="text-xs text-muted-foreground">
         Got invited? You and your friend each get ₦200 after your first rental.
       </p>
+    </div>
+  );
+
+  const marketingOptInField = () => (
+    <div className="rounded-2xl border border-border/70 bg-secondary/30 p-3">
+      <label className="flex items-start gap-3 text-sm text-foreground">
+        <Checkbox
+          id="marketing-opt-in"
+          checked={signupData.marketingOptIn}
+          onCheckedChange={(checked) =>
+            setSignupData({
+              ...signupData,
+              marketingOptIn: checked === true,
+            })
+          }
+          className="mt-0.5 border-border bg-background data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+        />
+        <span className="leading-relaxed">
+          Yes, send me updates about new releases, exclusive offers, and the latest
+          from Signature TV. I can opt out anytime.
+        </span>
+      </label>
     </div>
   );
 
@@ -232,6 +256,7 @@ const Auth = () => {
         signupData.name,
         signupData.phoneNumber,
         referralCode,
+        signupData.marketingOptIn,
       );
       if (!error) {
         try {
@@ -276,6 +301,7 @@ const Auth = () => {
           phoneNumber: "",
           password: "",
           confirmPassword: "",
+          marketingOptIn: false,
         });
       }
     } catch (error) {
@@ -530,6 +556,8 @@ const Auth = () => {
         </div>
       </div>
 
+      {marketingOptInField()}
+
       <Button
         type="submit"
         className="w-full gradient-accent text-primary-foreground font-semibold shadow-glow hover:scale-105 transition-bounce"
@@ -639,9 +667,12 @@ const Auth = () => {
           </div>
         )}
 
-        <Card className="gradient-card border-border/50 shadow-premium">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-foreground">
+        <Card className="overflow-hidden rounded-[28px] border border-border/70 bg-card/80 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+          <CardHeader className="space-y-4 pb-5 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
+              <MailCheck className="h-5 w-5" />
+            </div>
+            <CardTitle className="text-2xl font-bold tracking-tight text-foreground">
               {isNative
                 ? signupSuccessEmail
                   ? "Almost there"
@@ -650,7 +681,7 @@ const Auth = () => {
                     : "Welcome to Signature TV"
                 : "Welcome"}
             </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            <CardDescription className="text-sm text-muted-foreground">
               {isNative
                 ? signupSuccessEmail
                   ? "One quick step to finish setting up."
@@ -673,16 +704,16 @@ const Auth = () => {
             ) : (
               // Web/Android: Full tabs with login and signup
               <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-8 bg-secondary">
+                <TabsList className="mb-8 grid w-full grid-cols-2 rounded-2xl bg-secondary/70 p-1">
                   <TabsTrigger
                     value="login"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                   >
                     Sign In
                   </TabsTrigger>
                   <TabsTrigger
                     value="signup"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                    className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                   >
                     Sign Up
                   </TabsTrigger>
@@ -917,6 +948,8 @@ const Auth = () => {
                         />
                       </div>
                     </div>
+
+                    {marketingOptInField()}
 
                     <Button
                       type="submit"

@@ -35,6 +35,7 @@ interface AuthContextType {
     name: string,
     phoneNumber: string,
     referralCode?: string,
+    marketingOptIn?: boolean,
   ) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -308,6 +309,7 @@ useEffect(() => {
     name: string,
     phoneNumber: string,
     referralCode?: string,
+    marketingOptIn?: boolean,
   ) => {
     const redirectUrl = `${window.location.origin}/auth/confirm`;
 
@@ -320,6 +322,7 @@ useEffect(() => {
           name: name || '',
           phone_number: phoneNumber || '',
           phone: phoneNumber || '',
+          marketing_opt_in: Boolean(marketingOptIn),
           ...(referralCode?.trim()
             ? { referral_code: referralCode.trim().toUpperCase() }
             : {}),
