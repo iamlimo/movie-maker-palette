@@ -115,10 +115,14 @@ const Auth = () => {
   );
 
   const marketingOptInField = () => (
-    <div className="rounded-2xl border border-border/70 bg-secondary/30 p-3">
-      <label className="flex items-start gap-3 text-sm text-foreground">
+    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 transition-colors hover:border-primary/35">
+      <label
+        htmlFor="marketing-opt-in"
+        className="flex cursor-pointer items-start gap-3 text-sm text-foreground"
+      >
         <Checkbox
           id="marketing-opt-in"
+          aria-label="Receive marketing and newsletter updates"
           checked={signupData.marketingOptIn}
           onCheckedChange={(checked) =>
             setSignupData({
@@ -126,7 +130,7 @@ const Auth = () => {
               marketingOptIn: checked === true,
             })
           }
-          className="mt-0.5 border-border bg-background data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+          className="mt-0.5 h-5 w-5 border-2 border-primary/70 bg-background text-primary-foreground shadow-sm ring-offset-background focus-visible:ring-2 focus-visible:ring-primary/50 data-[state=checked]:border-primary data-[state=checked]:bg-primary"
         />
         <span className="leading-relaxed">
           Yes, send me updates about new releases, exclusive offers, and the latest
