@@ -330,6 +330,11 @@ useEffect(() => {
       },
     });
     if (!error) {
+      try {
+        localStorage.removeItem('sig_ref_code');
+      } catch {
+        // Ignore storage issues during signup cleanup.
+      }
       void writeAuditLog({
         action: 'auth.signup',
         resource_type: 'auth',

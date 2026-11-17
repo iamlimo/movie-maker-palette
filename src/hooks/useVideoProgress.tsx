@@ -18,6 +18,44 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
   const intervalRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastSavedPosition = useRef<number>(0);
+  const watchSessionRecordedRef = useRef(false);
+
+  const recordWatchHourSession = useCallback(async (position: number, duration: number) => {
+    if (!user || !duration || position < 15 || watchSessionRecordedRef.current) return;
+
+    const elapsedSeconds = Math.max(0, Math.floor(position));
+    const eligibleMinutes = Math.max(0, Math.floor(elapsedSeconds / 60));
+    const sessionId = `watch-${user.id}-${contentType}-${contentId}-${Date.now()}`;
+
+    try {
+      const { error } = await supabase.rpc('record_watch_hour_session', {
+        p_user_id: user.id,
+        p_session_id: sessionId,
+        p_content_type: contentType,
+        p_eligible_minutes: eligibleMinutes,
+        p_elapsed_seconds: elapsedSeconds,
+        p_movie_id: contentType === 'movie' ? contentId : null,
+        p_movie_title: null,
+        p_tv_show_id: null,
+        p_tv_show_title: null,
+        p_season_id: null,
+        p_season_number: null,
+        p_episode_id: contentType === 'episode' ? contentId : null,
+        p_episode_number: null,
+        p_rental_reference: null,
+        p_entitlement_type: contentType === 'episode' ? 'individual_episode' : 'full_season',
+      });
+
+      if (error) {
+        console.error('Error recording watch-hour session:', error);
+        return;
+      }
+
+      watchSessionRecordedRef.current = true;
+    } catch (error) {
+      console.error('Error recording watch-hour session:', error);
+    }
+  }, [contentId, contentType, user]);
 
   // Save progress to database
   const saveProgress = useCallback(async (position: number, duration: number) => {
@@ -126,6 +164,7 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
   // Start auto-save interval
   const startAutoSave = useCallback((video: HTMLVideoElement) => {
     videoRef.current = video;
+    watchSessionRecordedRef.current = false;
     
     // Clear any existing interval
     if (intervalRef.current) {
@@ -146,10 +185,13 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
         // Only save if position changed significantly (more than 5 seconds)
         if (Math.abs(currentTime - lastSavedPosition.current) > 5) {
           saveProgress(currentTime, duration);
+          if (currentTime > 15 && !watchSessionRecordedRef.current) {
+            void recordWatchHourSession(currentTime, duration);
+          }
         }
       }
     }, SAVE_INTERVAL_MS);
-  }, [saveProgress]);
+  }, [recordWatchHourSession, saveProgress]);
 
   // Stop auto-save and save final position
   const stopAutoSave = useCallback(() => {
@@ -160,9 +202,14 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
 
     // Save final position
     if (videoRef.current) {
-      saveProgress(videoRef.current.currentTime, videoRef.current.duration);
+      const currentTime = videoRef.current.currentTime;
+      const duration = videoRef.current.duration;
+      saveProgress(currentTime, duration);
+      if (currentTime > 15 && !watchSessionRecordedRef.current) {
+        void recordWatchHourSession(currentTime, duration);
+      }
     }
-  }, [saveProgress]);
+  }, [recordWatchHourSession, saveProgress]);
 
   // Sync local progress when coming back online
   const syncLocalProgress = useCallback(async () => {
