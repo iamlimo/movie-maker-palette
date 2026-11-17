@@ -94,7 +94,7 @@ const Rewards = () => {
 
   const hasCode = Boolean(code && code.trim());
   const link = hasCode ? `${SITE}/auth?mode=signup&ref=${code}` : "";
-  const shareText = hasCode ? `Join me on Signature TV! Sign up with my code ${code} and we both get ₦200 after your first rental. ${link}` : "";
+  const shareText = hasCode ? `Join me on Signature TV! Sign up with my code ${code}. I earn ₦100 when your first paid rental is completed. ${link}` : "";
 
   const copy = async (text: string, label: string) => {
     if (!text) {
@@ -156,8 +156,8 @@ const Rewards = () => {
           <>
             <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Invite friends, earn ₦200</CardTitle>
-                <CardDescription>When a friend signs up with your code and makes their first paid rental, you both get ₦200 in your wallets.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Invite friends, earn ₦100</CardTitle>
+                <CardDescription>When a friend signs up with your code and makes their first paid rental, you earn ₦100.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {loading ? <Skeleton className="h-14 w-full" /> : !hasCode ? (
