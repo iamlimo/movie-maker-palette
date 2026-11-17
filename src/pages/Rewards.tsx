@@ -54,7 +54,11 @@ const Rewards = () => {
     const db = supabase as any;
     const [c, r, v] = await Promise.all([
       db.rpc("get_my_referral_code"),
-      db.from("user_referrals").select("id,status,referrer_id,referrer_reward,created_at").eq("referrer_id", user.id),
+      db
+        .from("user_referrals")
+        .select("id,status,referrer_id,referred_id,referrer_reward,created_at")
+        .or(`referrer_id.eq.${user.id},referred_id.eq.${user.id}`)
+        .order("created_at", { ascending: false }),
       db.from("reward_vouchers").select("id,amount,status,expires_at").eq("user_id", user.id).eq("status", "active").gt("expires_at", new Date().toISOString()).order("expires_at"),
     ]);
     setCode(c.data ?? null);
@@ -196,13 +200,13 @@ const Rewards = () => {
             <Card className="border-primary/25 bg-gradient-to-br from-primary/5 via-background to-amber-500/5">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><PlayCircle className="h-5 w-5 text-primary" /> Signature Watch Hours — Watch More. Earn More.</CardTitle>
-                <CardDescription>Enjoy your favourite movies and TV shows on Signature TV. Earn ₦100 worth of Signature Credits for every 2 hours of eligible viewing.</CardDescription>
+                <CardDescription>Enjoy your favourite movies and TV shows on Signature TV. Earn ₦100 worth of Signature Credits for every 2hr block of eligible viewing.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {watchHoursLoading ? <Skeleton className="h-12 w-full" /> : (
                   <div className="grid gap-3 md:grid-cols-4">
                     <div className="rounded-lg border border-border bg-background/60 p-3">
-                      <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">Eligible watch time</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">Eligible watch time (2hr target)</div>
                       <div className="mt-2 text-2xl font-bold">{formatMinutesToReadable(watchProgress.totalEligibleMinutes)}</div>
                     </div>
                     <div className="rounded-lg border border-border bg-background/60 p-3">

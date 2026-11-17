@@ -84,15 +84,15 @@ export default function ReferralTracking() {
         let filtered = query;
         if (status !== 'all') filtered = filtered.eq('status', status);
         if (fromDate) filtered = filtered.gte('created_at', new Date(`${fromDate}T00:00:00`).toISOString());
-        if (toDate) filtered = filtered.lt('created_at', new Date(`${toDate}T00:00:00`).getTime() + 86400000
-          ? new Date(new Date(`${toDate}T00:00:00`).getTime() + 86400000).toISOString()
-          : new Date(`${toDate}T00:00:00`).toISOString());
+        if (toDate) {
+          const endOfDay = new Date(`${toDate}T23:59:59.999Z`);
+          filtered = filtered.lt('created_at', endOfDay.toISOString());
+        }
         if (searchTerm) {
           const codeFilter = `code.ilike.%${searchTerm}%`;
-          const idsFilter = matchingUserIds.length
-            ? `,referrer_id.in.(${matchingUserIds.join(',')}),referred_id.in.(${matchingUserIds.join(',')})`
-            : '';
-          filtered = filtered.or(`${codeFilter}${idsFilter}`);
+          const userIdSet = matchingUserIds.length ? matchingUserIds.join(',') : '';
+          const userFilter = userIdSet ? `,referrer_id.in.(${userIdSet}),referred_id.in.(${userIdSet})` : '';
+          filtered = filtered.or(`${codeFilter}${userFilter}`);
         }
         return filtered;
       };

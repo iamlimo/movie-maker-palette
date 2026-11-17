@@ -133,7 +133,7 @@ export default function WatchHoursAdmin() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Watch-hour summary</CardTitle>
-          <CardDescription>Each completed 120-minute block is worth ₦100 in Signature Credits pending admin approval.</CardDescription>
+          <CardDescription>Each completed 2hr block is worth ₦100 in Signature Credits pending admin approval.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
