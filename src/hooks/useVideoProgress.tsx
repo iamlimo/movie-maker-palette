@@ -18,14 +18,19 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
   const intervalRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastSavedPosition = useRef<number>(0);
-  const watchSessionRecordedRef = useRef(false);
+  const lastRecordedMinuteRef = useRef<number>(-1);
 
   const recordWatchHourSession = useCallback(async (position: number, duration: number) => {
-    if (!user || !duration || position < 15 || watchSessionRecordedRef.current) return;
+    if (!user || !duration || position < 1) return;
 
     const elapsedSeconds = Math.max(0, Math.floor(position));
     const eligibleMinutes = Math.max(0, Math.floor(elapsedSeconds / 60));
-    const sessionId = `watch-${user.id}-${contentType}-${contentId}-${Date.now()}`;
+
+    if (eligibleMinutes <= 0 || eligibleMinutes <= lastRecordedMinuteRef.current) {
+      return;
+    }
+
+    const sessionId = `watch-${user.id}-${contentType}-${contentId}-${eligibleMinutes}-${Date.now()}`;
 
     try {
       const { error } = await supabase.rpc('record_watch_hour_session', {
@@ -51,7 +56,7 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
         return;
       }
 
-      watchSessionRecordedRef.current = true;
+      lastRecordedMinuteRef.current = eligibleMinutes;
     } catch (error) {
       console.error('Error recording watch-hour session:', error);
     }
@@ -164,7 +169,7 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
   // Start auto-save interval
   const startAutoSave = useCallback((video: HTMLVideoElement) => {
     videoRef.current = video;
-    watchSessionRecordedRef.current = false;
+    lastRecordedMinuteRef.current = -1;
     
     // Clear any existing interval
     if (intervalRef.current) {
@@ -185,7 +190,7 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
         // Only save if position changed significantly (more than 5 seconds)
         if (Math.abs(currentTime - lastSavedPosition.current) > 5) {
           saveProgress(currentTime, duration);
-          if (currentTime > 15 && !watchSessionRecordedRef.current) {
+          if (currentTime > 1) {
             void recordWatchHourSession(currentTime, duration);
           }
         }
@@ -205,7 +210,7 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
       const currentTime = videoRef.current.currentTime;
       const duration = videoRef.current.duration;
       saveProgress(currentTime, duration);
-      if (currentTime > 15 && !watchSessionRecordedRef.current) {
+      if (currentTime > 1) {
         void recordWatchHourSession(currentTime, duration);
       }
     }
