@@ -9,10 +9,23 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { formatNaira } from "@/lib/priceUtils";
-import { Copy, Gift, Share2, Users, Trophy, Clock, Sparkles } from "lucide-react";
+import { calculateWatchRewardProgress, formatMinutesToReadable } from "@/lib/watchHours";
+import { Copy, Gift, Share2, Users, Trophy, Clock, Sparkles, PlayCircle } from "lucide-react";
 
 type Referral = { id: string; status: string; referrer_id: string; referrer_reward: number; created_at: string };
 type Voucher = { id: string; amount: number; status: string; expires_at: string };
+type WatchHourTotals = {
+  user_id: string;
+  total_eligible_minutes: number;
+  credited_reward_minutes: number;
+  pending_reward_minutes: number;
+  pending_reward_value_kobo: number;
+  credited_reward_value_kobo: number;
+  completed_reward_blocks: number;
+  remaining_minutes: number;
+  last_watched_at: string | null;
+  status: string;
+};
 
 const SITE = "https://movie-maker-palette.lovable.app";
 
@@ -30,6 +43,8 @@ const Rewards = () => {
   const [code, setCode] = useState<string | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [watchTotals, setWatchTotals] = useState<WatchHourTotals | null>(null);
+  const [watchHoursLoading, setWatchHoursLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<string | null>(null);
 
@@ -48,7 +63,34 @@ const Rewards = () => {
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadWatchHours = useCallback(async () => {
+    if (!user) {
+      setWatchTotals(null);
+      return;
+    }
+
+    setWatchHoursLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from("user_watch_hour_totals")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        throw error;
+      }
+
+      setWatchTotals(data ?? null);
+    } catch (error) {
+      console.error("Failed to load watch-hour totals", error);
+      setWatchTotals(null);
+    } finally {
+      setWatchHoursLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => { load(); loadWatchHours(); }, [load, loadWatchHours]);
 
   const hasCode = Boolean(code && code.trim());
   const link = hasCode ? `${SITE}/auth?mode=signup&ref=${code}` : "";
@@ -87,6 +129,12 @@ const Rewards = () => {
 
   const qualified = referrals.filter((r) => r.status === "qualified");
   const earned = qualified.reduce((s, r) => s + Number(r.referrer_reward || 0), 0);
+  const watchProgress = watchTotals
+    ? calculateWatchRewardProgress(
+        Number(watchTotals.total_eligible_minutes || 0),
+        Number(watchTotals.credited_reward_minutes || 0),
+      )
+    : { totalEligibleMinutes: 0, creditedMinutes: 0, completedRewardBlocks: 0, pendingRewardMinutes: 0, pendingRewardValueKobo: 0, remainingEligibleMinutes: 0, totalRewardValueKobo: 0 };
 
   return (
     <div className="min-h-screen bg-background">
@@ -144,6 +192,38 @@ const Rewards = () => {
                 </CardContent></Card>
               ))}
             </div>
+
+            <Card className="border-primary/25 bg-gradient-to-br from-primary/5 via-background to-amber-500/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><PlayCircle className="h-5 w-5 text-primary" /> Signature Watch Hours — Watch More. Earn More.</CardTitle>
+                <CardDescription>Enjoy your favourite movies and TV shows on Signature TV. Earn ₦100 worth of Signature Credits for every 2 hours of eligible viewing.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {watchHoursLoading ? <Skeleton className="h-12 w-full" /> : (
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <div className="rounded-lg border border-border bg-background/60 p-3">
+                      <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">Eligible watch time</div>
+                      <div className="mt-2 text-2xl font-bold">{formatMinutesToReadable(watchProgress.totalEligibleMinutes)}</div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-background/60 p-3">
+                      <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">Completed blocks</div>
+                      <div className="mt-2 text-2xl font-bold">{watchProgress.completedRewardBlocks}</div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-background/60 p-3">
+                      <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">Pending reward</div>
+                      <div className="mt-2 text-2xl font-bold">{formatNaira(watchProgress.pendingRewardValueKobo)}</div>
+                    </div>
+                    <div className="rounded-lg border border-border bg-background/60 p-3">
+                      <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">Remaining</div>
+                      <div className="mt-2 text-2xl font-bold">{formatMinutesToReadable(watchProgress.remainingEligibleMinutes)}</div>
+                    </div>
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  Accumulated watch-hour rewards are recorded as pending until an authorised administrator manually credits them to your Signature Credits balance.
+                </p>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>

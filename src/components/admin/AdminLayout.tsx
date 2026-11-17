@@ -26,7 +26,8 @@ import {
   AlertCircle,
   ShieldCheck,
   KeyRound,
-  Webhook
+  Webhook,
+  Clock3
 } from 'lucide-react';
 import {
   Sidebar,
@@ -99,6 +100,7 @@ const sidebarItems: Item[] = [
   { title: 'Webhook Events', url: '/admin/webhook-events', icon: Webhook, page: 'webhook-events' },
   { title: 'Referral Codes', url: '/admin/referral-codes', icon: Tag, page: 'referral-codes' },
   { title: 'Referral Tracking', url: '/admin/referral-tracking', icon: Gift, page: 'referral-tracking' },
+  { title: 'Watch Hours & Rewards', url: '/admin/watch-hours', icon: Clock3, page: 'watch-hours' },
   { title: 'Push Notifications', url: '/admin/push-notifications', icon: Bell, page: 'push-notifications' },
   {
     title: 'Support',

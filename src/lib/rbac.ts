@@ -60,6 +60,7 @@ export type PageKey =
   | 'wallets'
   | 'referral-codes'
   | 'referral-tracking'
+  | 'watch-hours'
   | 'tickets'
   | 'job-listings'
   | 'job-applications'
@@ -84,6 +85,7 @@ export const PAGE_ACCESS: Record<PageKey, AppRole[]> = {
   wallets: ['super_admin', 'admin', 'support', 'accounting'],
   'referral-codes': ['super_admin', 'admin', 'sales'],
   'referral-tracking': ['super_admin', 'admin', 'sales', 'accounting'],
+  'watch-hours': ['super_admin', 'admin', 'sales', 'accounting'],
   tickets: ['super_admin', 'admin', 'support'],
   'job-listings': ['super_admin', 'admin', 'support'],
   'job-applications': ['super_admin', 'admin', 'support'],
