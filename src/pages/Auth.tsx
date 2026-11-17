@@ -109,7 +109,7 @@ const Auth = () => {
         className="bg-background/50 border-border focus:border-primary uppercase"
       />
       <p className="text-xs text-muted-foreground">
-        Got invited? Only the referrer earns ₦100 when you complete your first paid rental.
+        Got invited? Your referrer earns ₦100 when you complete your first paid rental.
       </p>
     </div>
   );
