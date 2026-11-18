@@ -441,6 +441,15 @@ const Header = () => {
                 Wallet
               </Link>
             )}
+            {user && (
+              <Link
+                to="/rewards"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block text-muted-foreground hover:text-primary transition-smooth"
+              >
+                Deals & Rewards
+              </Link>
+            )}
 
             {user && userRole === "creator" && (
               <Link

@@ -16,6 +16,7 @@ import {
   Play,
   CircleHelp,
   LogOut,
+  Gift,
 } from 'lucide-react';
 
 interface ProfileSidebarProps {
@@ -109,6 +110,23 @@ export function ProfileSidebar({
         })}
 
         <div className="my-3 border-t border-border" />
+        <Link
+          to="/rewards"
+          className={cn(
+            "flex min-h-10 w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+            isCollapsed && "justify-center px-2",
+          )}
+          aria-label="Deals & Rewards: View offers and earn rewards"
+        >
+          <Gift size={18} className={cn("flex-shrink-0", !isCollapsed && "mr-3")} />
+          {!isCollapsed && (
+            <div className="flex-1 text-left">
+              <div className="font-medium">Deals & Rewards</div>
+              <div className="text-xs text-muted-foreground">Offers and reward vouchers</div>
+            </div>
+          )}
+        </Link>
+
         <Link
           to="/help"
           className={cn(

@@ -229,7 +229,7 @@ const Rewards = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            {/* <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> Next-rental rewards</CardTitle>
                 <CardDescription>Every paid rental earns you ₦150 credit, valid for 7 days. Claim it into your wallet before it expires.</CardDescription>
@@ -249,7 +249,7 @@ const Rewards = () => {
                   </div>
                 ))}
               </CardContent>
-            </Card>
+            </Card> */}
           </>
         )}
       </main>
