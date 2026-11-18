@@ -47,7 +47,7 @@ const EnhancedContentCard = ({
 }: EnhancedContentCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isIOS } = usePlatform();
+  const { isIOS, isAndroid } = usePlatform();
   const {
     favorites,
     toggleFavorite,
@@ -127,6 +127,8 @@ const EnhancedContentCard = ({
 
     if (price === 0) return "Free";
 
+    if (isAndroid) return "Get info";
+
     return `${formatNaira(price)} • ${contentType === "movie" ? "Rent" : "Season"}`;
   };
 
@@ -203,7 +205,7 @@ const EnhancedContentCard = ({
                   }}
                 >
                   <Play className="h-3 w-3 mr-1.5" />
-                  {isFree ? "Watch" : "Rent"}
+                  {isFree ? "Watch" : isAndroid ? "Get info" : "Rent"}
                 </Button>
                 <Button
                   variant="secondary"
@@ -332,9 +334,13 @@ const EnhancedContentCard = ({
                   : "Open Show"
                 : isIOS
                   ? "View Details"
-                  : price > 0
-                    ? "Rent Now"
-                    : "Watch Now"}
+                  : isAndroid
+                    ? price > 0
+                      ? "Get info"
+                      : "Watch Now"
+                    : price > 0
+                      ? "Rent Now"
+                      : "Watch Now"}
             </Button>
             {!isRented && (
               <Button

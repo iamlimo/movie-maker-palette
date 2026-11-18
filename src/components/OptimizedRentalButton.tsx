@@ -30,7 +30,7 @@ export const OptimizedRentalButton = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const { getEntitlement, refresh } = useEntitlements();
-  const { isIOS } = usePlatform();
+  const { isIOS, isAndroid } = usePlatform();
   const [showCheckout, setShowCheckout] = useState(false);
   const { toast } = useToast();
   const [isVerifying, setIsVerifying] = useState(false);
@@ -105,7 +105,7 @@ export const OptimizedRentalButton = ({
     return (
       <Button onClick={() => navigate('/auth')} variant="default" className="w-full">
         <Lock className="h-4 w-4 mr-2" />
-        Sign In to Rent
+        {isAndroid ? 'Get info' : 'Sign In to Rent'}
       </Button>
     );
   }
@@ -130,7 +130,6 @@ export const OptimizedRentalButton = ({
       </div>
     );
   }
-
 
   const effectiveEntitlement =
     entitlement.state === 'ACTIVE' && isExpiredHardStop
@@ -237,11 +236,13 @@ export const OptimizedRentalButton = ({
         ) : (
           <Lock className="h-4 w-4 mr-2" />
         )}
-        {isReRent
-          ? `Rent Again - ${formatNaira(price)}`
-          : isRetry
-            ? `Payment Failed — Try Again`
-            : `Rent ${contentType === 'season' ? 'Season' : contentType === 'episode' ? 'Episode' : 'Movie'} - ${formatNaira(price)}`}
+        {isAndroid
+          ? 'Get info'
+          : isReRent
+            ? `Rent Again - ${formatNaira(price)}`
+            : isRetry
+              ? `Payment Failed — Try Again`
+              : `Rent ${contentType === 'season' ? 'Season' : contentType === 'episode' ? 'Episode' : 'Movie'} - ${formatNaira(price)}`}
       </Button>
 
       <OptimizedRentalCheckout

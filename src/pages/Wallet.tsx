@@ -14,7 +14,7 @@ export default function Wallet() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { formatBalance, isLoading, refreshWallet } = useWallet();
-  const { isIOS } = usePlatform();
+  const { isIOS, isAndroid } = usePlatform();
   const [isFundModalOpen, setIsFundModalOpen] = useState(false);
 
   if (!user) {
@@ -73,8 +73,7 @@ export default function Wallet() {
                 onClick={() => setIsFundModalOpen(true)}
                 className="h-12 w-full rounded-2xl bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 sm:w-auto"
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Fund wallet
+                {isAndroid ? 'Get info' : 'Fund wallet'}
               </Button>
             )}
           </CardContent>
