@@ -71,7 +71,7 @@ const QUICK_PRESETS: QuickPreset[] = [
     id: "welcome-user",
     label: "Welcome (one user)",
     title: "Welcome to Signature TV 👋",
-    body: "Your 400 NGN welcome bonus is in your wallet. Tap to start watching.",
+    body: "Tap to explore movies and TV shows available now.",
     target: "user",
     deepLink: "home",
   },

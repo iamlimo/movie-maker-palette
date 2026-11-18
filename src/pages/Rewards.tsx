@@ -27,7 +27,7 @@ type WatchHourTotals = {
   status: string;
 };
 
-const SITE = "https://signaturetv.co";
+const SITE = typeof window !== "undefined" ? window.location.origin : "https://signaturetv.co";
 
 const timeLeft = (iso: string) => {
   const ms = new Date(iso).getTime() - Date.now();
@@ -97,7 +97,7 @@ const Rewards = () => {
   useEffect(() => { load(); loadWatchHours(); }, [load, loadWatchHours]);
 
   const hasCode = Boolean(code && code.trim());
-  const link = hasCode ? `${SITE}/auth?mode=signup&ref=${code}` : "";
+  const link = hasCode ? `${SITE}/auth?mode=signup&ref=${encodeURIComponent(code!)}` : "";
   const shareText = hasCode ? `Join me on Signature TV! Sign up with my code ${code}. I earn ₦100 when your first paid rental is completed. ${link}` : "";
 
   const copy = async (text: string, label: string) => {

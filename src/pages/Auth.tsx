@@ -39,7 +39,13 @@ const Auth = () => {
   const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
   const justConfirmed = searchParams.get("confirmed") === "1";
   const goToMode = (next: "login" | "signup") => {
-    setSearchParams(next === "signup" ? { mode: "signup" } : {}, {
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === "signup") {
+      nextParams.set("mode", "signup");
+    } else {
+      nextParams.delete("mode");
+    }
+    setSearchParams(nextParams, {
       replace: true,
     });
   };
@@ -84,7 +90,12 @@ const Auth = () => {
     }
   });
   useEffect(() => {
-    const ref = searchParams.get("ref");
+    const ref =
+      searchParams.get("ref") ||
+      searchParams.get("referral") ||
+      searchParams.get("referral_code") ||
+      searchParams.get("referralCode") ||
+      new URLSearchParams(window.location.hash.replace(/^#/, "")).get("ref");
     if (ref) {
       const code = ref.trim().toUpperCase().slice(0, 20);
       setReferralCode(code);
@@ -99,7 +110,8 @@ const Auth = () => {
   const referralField = (id: string) => (
     <div className="space-y-2">
       <Label htmlFor={id} className="text-foreground">
-        Referral Code <span className="text-muted-foreground font-normal">(optional)</span>
+        Referral Code{" "}
+        <span className="text-muted-foreground font-normal">(optional)</span>
       </Label>
       <Input
         id={id}
