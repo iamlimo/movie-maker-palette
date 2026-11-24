@@ -30,7 +30,7 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
       return;
     }
 
-    const sessionId = `watch-${user.id}-${contentType}-${contentId}-${eligibleMinutes}-${Date.now()}`;
+    const sessionId = `watch-hours-${user.id}-${contentType}-${contentId}`;
 
     try {
       const { error } = await supabase.rpc('record_watch_hour_session', {
