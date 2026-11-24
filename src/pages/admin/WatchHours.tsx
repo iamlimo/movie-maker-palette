@@ -48,17 +48,63 @@ export default function WatchHoursAdmin() {
       const { error: syncError } = await (supabase as any).rpc("sync_all_user_watch_hour_totals");
       if (syncError && !["42883", "PGRST202"].includes(syncError.code)) throw syncError;
 
-      const [totalsResult, profilesResult] = await Promise.all([
-        (supabase as any).from("user_watch_hour_totals").select("*").order("total_eligible_minutes", { ascending: false }),
-        (supabase as any).from("profiles").select("user_id,name,email"),
-      ]);
+      const batchSize = 1000;
+      const profileRows: ProfileRow[] = [];
+      const totalsRows: TotalsRow[] = [];
 
-      if (totalsResult.error) throw totalsResult.error;
-      if (profilesResult.error) throw profilesResult.error;
+      for (let offset = 0; ; offset += batchSize) {
+        const result = await (supabase as any)
+          .from("profiles")
+          .select("user_id,name,email")
+          .range(offset, offset + batchSize - 1)
+          .order("user_id", { ascending: true });
+        if (result.error) throw result.error;
+        const batch = (result.data || []) as ProfileRow[];
+        profileRows.push(...batch);
+        if (batch.length < batchSize) break;
+      }
 
-      const profileMap = Object.fromEntries((profilesResult.data || []).map((item: ProfileRow) => [item.user_id, item]));
+      for (let offset = 0; ; offset += batchSize) {
+        const result = await (supabase as any)
+          .from("user_watch_hour_totals")
+          .select("*")
+          .range(offset, offset + batchSize - 1)
+          .order("total_eligible_minutes", { ascending: false });
+        if (result.error) throw result.error;
+        const batch = (result.data || []) as TotalsRow[];
+        totalsRows.push(...batch);
+        if (batch.length < batchSize) break;
+      }
+
+      const profileMap = Object.fromEntries(profileRows.map((item) => [item.user_id, item]));
+      const totalsByUser = new Map(totalsRows.map((item) => [item.user_id, item]));
+
+      const allRows = profileRows.map((profile) => totalsByUser.get(profile.user_id) || {
+        user_id: profile.user_id,
+        total_eligible_minutes: 0,
+        credited_reward_minutes: 0,
+        pending_reward_minutes: 0,
+        pending_reward_value_kobo: 0,
+        completed_reward_blocks: 0,
+        remaining_minutes: 0,
+        last_watched_at: null,
+        status: "in_progress",
+      });
+
+      totalsRows.forEach((totals) => {
+        if (!profileMap[totals.user_id]) {
+          profileMap[totals.user_id] = {
+            user_id: totals.user_id,
+            name: null,
+            email: null,
+          };
+          allRows.push(totals);
+        }
+      });
+
+      allRows.sort((a, b) => Number(b.total_eligible_minutes || 0) - Number(a.total_eligible_minutes || 0));
       setProfiles(profileMap);
-      setRows((totalsResult.data || []) as TotalsRow[]);
+      setRows(allRows);
     } catch (error) {
       console.error("Failed to load watch hours data", error);
       setRows([]);
