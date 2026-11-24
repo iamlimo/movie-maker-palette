@@ -100,8 +100,28 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
         console.error('Error saving watch progress:', error);
       } else {
         lastSavedPosition.current = position;
-        // Clear local storage on successful save
         localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}${contentId}`);
+
+        const eligibleMinutes = Math.floor(Math.max(0, position) / 60);
+        if (eligibleMinutes > 0) {
+          await supabase.rpc('record_watch_hour_session', {
+            p_user_id: user.id,
+            p_session_id: `watch-hours-${user.id}-${contentType}-${contentId}`,
+            p_content_type: contentType,
+            p_eligible_minutes: eligibleMinutes,
+            p_elapsed_seconds: Math.floor(position),
+            p_movie_id: contentType === 'movie' ? contentId : null,
+            p_movie_title: null,
+            p_tv_show_id: null,
+            p_tv_show_title: null,
+            p_season_id: null,
+            p_season_number: null,
+            p_episode_id: contentType === 'episode' ? contentId : null,
+            p_episode_number: null,
+            p_rental_reference: null,
+            p_entitlement_type: contentType === 'episode' ? 'individual_episode' : 'full_season',
+          });
+        }
       }
     } catch (error) {
       console.error('Error saving progress:', error);
@@ -243,7 +263,28 @@ export const useVideoProgress = (contentId: string, contentType: 'movie' | 'epis
             }, {
               onConflict: 'user_id,content_type,content_id'
             });
-          
+
+          const eligibleMinutes = Math.floor(Math.max(0, data.playbackPosition) / 60);
+          if (eligibleMinutes > 0) {
+            await supabase.rpc('record_watch_hour_session', {
+              p_user_id: user.id,
+              p_session_id: `watch-hours-${user.id}-${data.contentType}-${data.contentId}`,
+              p_content_type: data.contentType,
+              p_eligible_minutes: eligibleMinutes,
+              p_elapsed_seconds: data.playbackPosition,
+              p_movie_id: data.contentType === 'movie' ? data.contentId : null,
+              p_movie_title: null,
+              p_tv_show_id: null,
+              p_tv_show_title: null,
+              p_season_id: null,
+              p_season_number: null,
+              p_episode_id: data.contentType === 'episode' ? data.contentId : null,
+              p_episode_number: null,
+              p_rental_reference: null,
+              p_entitlement_type: data.contentType === 'episode' ? 'individual_episode' : 'full_season',
+            });
+          }
+
           localStorage.removeItem(key);
         }
       } catch (error) {
