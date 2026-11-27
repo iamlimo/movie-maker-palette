@@ -40,6 +40,19 @@ function validateFileType(file: File, expectedType: 'image' | 'video'): boolean 
   return false;
 }
 
+// Safe JSON array parsing for geographic fields
+function parseStringArray(value: FormDataEntryValue | null): string[] {
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string').map(item => item.trim()).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -100,12 +113,17 @@ serve(async (req) => {
     const bannerUrl = formData.get('banner_url') as string;
     const trailerUrl = formData.get('trailer_url') as string;
 
+    // Parse and validate geographic arrays
+    const continents = parseStringArray(formData.get('continents'));
+    const regions = parseStringArray(formData.get('regions'));
+    const territories = parseStringArray(formData.get('territories'));
+
     // Validate required fields
-    if (!title || (!posterFile && !posterUrl)) {
+    if (!title || (!posterFile && !posterUrl) || territories.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: false,
-          error: 'Title and poster are required' 
+          error: 'Title, poster and at least one territory are required'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -246,8 +264,9 @@ serve(async (req) => {
         landscape_poster_url: finalBannerUrl,
         slider_cover_url: finalBannerUrl,
         trailer_url: finalTrailerUrl || null,
-        uploaded_by: user.id,
-        status: 'approved'
+        continents,
+        regions,
+        territories,
       })
       .select()
       .single();
@@ -261,6 +280,37 @@ serve(async (req) => {
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Normalize content availability into territory records.
+    if (territories.length > 0) {
+      const { data: territoryRows, error: territoryError } = await supabase
+        .from('geographic_territories')
+        .select('code,name,region_name,continent_name')
+        .in('code', territories);
+
+      if (territoryError) {
+        throw new Error(`Failed to resolve territories: ${territoryError.message}`);
+      }
+
+      const availabilityRows = (territoryRows || []).map((territory) => ({
+        content_type: 'tv_show',
+        content_id: tvShow.id,
+        continent: territory.continent_name,
+        region: territory.region_name,
+        territory_code: territory.code,
+        territory_name: territory.name,
+      }));
+
+      if (availabilityRows.length > 0) {
+        const { error: availabilityError } = await supabase
+          .from('content_availability')
+          .insert(availabilityRows);
+
+        if (availabilityError) {
+          throw new Error(`Failed to normalize content availability: ${availabilityError.message}`);
+        }
+      }
     }
 
     console.log('TV show created successfully:', tvShow.title);

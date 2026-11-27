@@ -465,21 +465,63 @@ export type Database = {
         }
         Relationships: []
       }
-      genres: {
+      content_availability: {
         Row: {
+          continent: string | null
+          content_id: string
+          content_type: string
           created_at: string
           id: string
-          name: string
+          region: string | null
+          territory_code: string | null
+          territory_name: string | null
         }
         Insert: {
+          continent?: string | null
+          content_id: string
+          content_type: string
           created_at?: string
           id?: string
-          name?: string
+          region?: string | null
+          territory_code?: string | null
+          territory_name?: string | null
         }
         Update: {
+          continent?: string | null
+          content_id?: string
+          content_type?: string
           created_at?: string
           id?: string
+          region?: string | null
+          territory_code?: string | null
+          territory_name?: string | null
+        }
+        Relationships: []
+      }
+      geographic_territories: {
+        Row: {
+          active: boolean
+          code: string
+          continent_name: string
+          created_at: string
+          name: string
+          region_name: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          continent_name: string
+          created_at?: string
+          name: string
+          region_name: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          continent_name?: string
+          created_at?: string
           name?: string
+          region_name?: string
         }
         Relationships: []
       }
@@ -622,6 +664,9 @@ export type Database = {
           age_restriction: number | null
           cast_info: string | null
           content_warnings: string[] | null
+          continents: string[]
+          regions: string[]
+          territories: string[]
           created_at: string
           description: string | null
           director: string | null
@@ -652,6 +697,9 @@ export type Database = {
           age_restriction?: number | null
           cast_info?: string | null
           content_warnings?: string[] | null
+          continents?: string[]
+          regions?: string[]
+          territories?: string[]
           created_at?: string
           description?: string | null
           director?: string | null
@@ -682,6 +730,9 @@ export type Database = {
           age_restriction?: number | null
           cast_info?: string | null
           content_warnings?: string[] | null
+          continents?: string[]
+          regions?: string[]
+          territories?: string[]
           created_at?: string
           description?: string | null
           director?: string | null
@@ -2211,6 +2262,9 @@ export type Database = {
           age_restriction: number | null
           cast_info: string | null
           content_warnings: string[] | null
+          continents: string[]
+          regions: string[]
+          territories: string[]
           created_at: string
           description: string | null
           director: string | null
@@ -2238,6 +2292,9 @@ export type Database = {
           age_restriction?: number | null
           cast_info?: string | null
           content_warnings?: string[] | null
+          continents?: string[]
+          regions?: string[]
+          territories?: string[]
           created_at?: string
           description?: string | null
           director?: string | null
@@ -2265,6 +2322,9 @@ export type Database = {
           age_restriction?: number | null
           cast_info?: string | null
           content_warnings?: string[] | null
+          continents?: string[]
+          regions?: string[]
+          territories?: string[]
           created_at?: string
           description?: string | null
           director?: string | null

@@ -16,6 +16,7 @@ import BackblazeUrlInput from '@/components/admin/BackblazeUrlInput';
 import CastCrewManager from '@/components/admin/CastCrewManager';
 import NairaInput from '@/components/admin/NairaInput';
 import CreatorSelect from '@/components/admin/CreatorSelect';
+import RegionTerritorySelector from '@/components/admin/RegionTerritorySelector';
 
 interface MovieFormData {
   title: string;
@@ -27,6 +28,9 @@ interface MovieFormData {
   rating: string;
   price: string;
   rental_expiry_duration: string;
+  continents: string[];
+  regions: string[];
+  territories: string[];
 }
 
 interface MovieCastAssignment {
@@ -58,7 +62,10 @@ const AddMovieNew = () => {
     language: '',
     rating: '',
     price: '',
-    rental_expiry_duration: '48'
+    rental_expiry_duration: '48',
+    continents: ['Worldwide'],
+    regions: ['Global'],
+    territories: ['WW']
   });
   
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -161,6 +168,7 @@ const AddMovieNew = () => {
     if (!thumbnailUrl) errors.push("Thumbnail is required");
     if (!videoUrl) errors.push("Video URL is required");
     if (!creatorProfileId) errors.push("Creator is required");
+    if (formData.territories.length === 0) errors.push("At least one territory is required");
     
     return errors;
   };
@@ -184,7 +192,8 @@ const AddMovieNew = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data: movie, error } = await supabase
+      // Use migration-safe facade for movie insertion
+      const { data: movie, error } = await untypedSupabase
         .from('movies')
         .insert([{
           title: formData.title,
@@ -214,14 +223,12 @@ const AddMovieNew = () => {
       }
 
       // Map content to creator (RPC)
-      const supabaseUntyped = supabase as unknown as {
-        rpc: (
-          fn: string,
-          args: Record<string, unknown>
-        ) => Promise<{ error: unknown }>;
+      const untypedSupabase = supabase as unknown as {
+        from: (table: string) => any;
+        rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: unknown }>;
       };
 
-      const { error: mapError } = await supabaseUntyped.rpc(
+      const { error: mapError } = await untypedSupabase.rpc(
         'map_content_to_creator',
         {
           p_content_id: movie.id,
@@ -231,6 +238,30 @@ const AddMovieNew = () => {
       );
 
       if (mapError) throw mapError;
+
+      // Save normalized availability records
+      if (formData.territories.length > 0) {
+        const { data: territoryRows } = await supabase
+          .from('geographic_territories')
+          .select('code,name,region_name,continent_name')
+          .in('code', formData.territories);
+
+        const availabilityRows = (territoryRows || []).map((territory) => ({
+          content_type: 'movie',
+          content_id: movie.id,
+          continent: territory.continent_name,
+          region: territory.region_name,
+          territory_code: territory.code,
+          territory_name: territory.name,
+        }));
+
+        if (availabilityRows.length > 0) {
+          const { error: availabilityError } = await untypedSupabase
+            .from('content_availability')
+            .insert(availabilityRows);
+          if (availabilityError) throw availabilityError;
+        }
+      }
 
       toast({
         title: "Success",
@@ -533,6 +564,26 @@ const AddMovieNew = () => {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Availability */}
+          <Card className="gradient-card border-border shadow-card">
+            <CardHeader>
+              <CardTitle className="text-foreground">Regions & Territories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RegionTerritorySelector
+                continents={formData.continents}
+                regions={formData.regions}
+                territories={formData.territories}
+                onChange={(value) => setFormData(prev => ({
+                  ...prev,
+                  continents: value.continents,
+                  regions: value.regions,
+                  territories: value.territories,
+                }))}
+              />
             </CardContent>
           </Card>
 

@@ -12,6 +12,7 @@ import { UnifiedTVShowUploader } from './UnifiedTVShowUploader';
 import BackblazeUrlInput from './BackblazeUrlInput';
 import CreatorSelect from './CreatorSelect';
 import TrailerPlayer from '../TrailerPlayer';
+import RegionTerritorySelector from './RegionTerritorySelector';
 import { 
   Tv, 
   Plus, 
@@ -31,6 +32,9 @@ interface TVShowFormData {
   poster_file: File | null;
   banner_file: File | null;
   trailer_url: string;
+  continents: string[];
+  regions: string[];
+  territories: string[];
 }
 
 export const TVShowCreator = () => {
@@ -43,7 +47,10 @@ export const TVShowCreator = () => {
     tags: [],
     poster_file: null,
     banner_file: null,
-    trailer_url: ''
+    trailer_url: '',
+    continents: ['Worldwide'],
+    regions: ['Global'],
+    territories: ['WW']
   });
   
   const [uploadedUrls, setUploadedUrls] = useState<{
@@ -103,10 +110,10 @@ export const TVShowCreator = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.title || !formData.description || (!formData.poster_file && !uploadedUrls.poster) || !creatorProfileId) {
+    if (!formData.title || !formData.description || (!formData.poster_file && !uploadedUrls.poster) || !creatorProfileId || formData.territories.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Title, description, poster and creator are required",
+        description: "Title, description, poster, creator and at least one territory are required",
         variant: "destructive",
       });
       return;
@@ -122,6 +129,9 @@ export const TVShowCreator = () => {
       submitFormData.append('genres', JSON.stringify(formData.tags));
       submitFormData.append('language', 'en');
       submitFormData.append('price', '0');
+      submitFormData.append('continents', JSON.stringify(formData.continents));
+      submitFormData.append('regions', JSON.stringify(formData.regions));
+      submitFormData.append('territories', JSON.stringify(formData.territories));
       
       if (formData.release_date) {
         submitFormData.append('release_date', formData.release_date);
@@ -175,6 +185,27 @@ export const TVShowCreator = () => {
           p_creator_id: creatorProfileId,
         });
         if (mapError) throw mapError;
+
+        const { data: territoryRows } = await supabase
+          .from('geographic_territories')
+          .select('code,name,region_name,continent_name')
+          .in('code', formData.territories);
+
+        const availabilityRows = (territoryRows || []).map((territory) => ({
+          content_type: 'tv_show',
+          content_id: newShowId,
+          continent: territory.continent_name,
+          region: territory.region_name,
+          territory_code: territory.code,
+          territory_name: territory.name,
+        }));
+
+        if (availabilityRows.length > 0) {
+          const { error: availabilityError } = await untypedSupabase
+            .from('content_availability')
+            .insert(availabilityRows);
+          if (availabilityError) throw availabilityError;
+        }
       }
 
       toast({
@@ -192,7 +223,10 @@ export const TVShowCreator = () => {
         tags: [],
         poster_file: null,
         banner_file: null,
-        trailer_url: ''
+        trailer_url: '',
+        continents: ['Worldwide'],
+        regions: ['Global'],
+        territories: ['WW']
       });
       setUploadedUrls({});
       setCreatorProfileId('');
@@ -321,6 +355,26 @@ export const TVShowCreator = () => {
               </div>
             )}
           </div>
+
+          {/* Regions and Territories */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Regions & Territories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RegionTerritorySelector
+                continents={formData.continents}
+                regions={formData.regions}
+                territories={formData.territories}
+                onChange={(value) => setFormData(prev => ({
+                  ...prev,
+                  continents: value.continents,
+                  regions: value.regions,
+                  territories: value.territories,
+                }))}
+              />
+            </CardContent>
+          </Card>
 
           {/* File Uploads */}
           <div className="space-y-6">
