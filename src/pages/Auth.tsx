@@ -27,6 +27,13 @@ import {
 import { Link } from "react-router-dom";
 import { usePlatform } from "@/hooks/usePlatform";
 import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -76,6 +83,7 @@ const Auth = () => {
     name: "",
     email: "",
     phoneNumber: "",
+    gender: "" as "" | "male" | "female",
     password: "",
     confirmPassword: "",
     marketingOptIn: false,
@@ -271,6 +279,7 @@ const Auth = () => {
         signupData.password,
         signupData.name,
         signupData.phoneNumber,
+        signupData.gender,
         referralCode,
         signupData.marketingOptIn,
       );
@@ -315,6 +324,7 @@ const Auth = () => {
           name: "",
           email: "",
           phoneNumber: "",
+          gender: "",
           password: "",
           confirmPassword: "",
           marketingOptIn: false,
@@ -504,6 +514,26 @@ const Auth = () => {
         <p className="text-xs text-muted-foreground mt-1">
           Minimum 7 digits. Include country code if available (e.g., +234)
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="native-signup-gender" className="text-foreground">
+          Gender <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Select
+          value={signupData.gender}
+          onValueChange={(value: "male" | "female") =>
+            setSignupData({ ...signupData, gender: value })
+          }
+        >
+          <SelectTrigger id="native-signup-gender" className="bg-background/50 border-border">
+            <SelectValue placeholder="Select your gender" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="male">Male</SelectItem>
+            <SelectItem value="female">Female</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {referralField("native-signup-referral")}
@@ -897,6 +927,26 @@ const Auth = () => {
                       <p className="text-xs text-muted-foreground mt-1">
                         Minimum 7 digits (e.g., +234 800 000 0000)
                       </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-gender" className="text-foreground">
+                        Gender <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Select
+                        value={signupData.gender}
+                        onValueChange={(value: "male" | "female") =>
+                          setSignupData({ ...signupData, gender: value })
+                        }
+                      >
+                        <SelectTrigger id="signup-gender" className="bg-background/50 border-border">
+                          <SelectValue placeholder="Select your gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {referralField("signup-referral")}

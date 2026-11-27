@@ -224,6 +224,8 @@ export type Database = {
           creator_type: string | null
           display_name: string
           email: string
+          first_name: string | null
+          gender: string | null
           id: string
           is_active: boolean | null
           password_not_set: boolean | null
@@ -240,6 +242,8 @@ export type Database = {
           creator_type?: string | null
           display_name: string
           email: string
+          first_name?: string | null
+          gender?: string | null
           id?: string
           is_active?: boolean | null
           password_not_set?: boolean | null
@@ -256,6 +260,8 @@ export type Database = {
           creator_type?: string | null
           display_name?: string
           email?: string
+          first_name?: string | null
+          gender?: string | null
           id?: string
           is_active?: boolean | null
           password_not_set?: boolean | null
@@ -468,7 +474,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          name: string
+          name?: string
         }
         Update: {
           created_at?: string
@@ -1071,6 +1077,7 @@ export type Database = {
           date_of_birth: string | null
           email: string
           first_name: string | null
+          gender: string | null
           id: string
           last_name: string | null
           name: string
@@ -1087,6 +1094,7 @@ export type Database = {
           date_of_birth?: string | null
           email: string
           first_name?: string | null
+          gender?: string | null
           id?: string
           last_name?: string | null
           name: string
@@ -1103,6 +1111,7 @@ export type Database = {
           date_of_birth?: string | null
           email?: string
           first_name?: string | null
+          gender?: string | null
           id?: string
           last_name?: string | null
           name?: string
@@ -2438,7 +2447,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           role_id?: string | null
           updated_at?: string | null
-          user_id?: string
+          user_id: string
         }
         Relationships: [
           {
@@ -2675,7 +2684,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "rental_intents_user_id_fkey"
+            foreignKey
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

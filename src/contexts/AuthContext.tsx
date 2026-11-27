@@ -10,6 +10,7 @@ interface UserProfile {
   name: string;
   email: string;
   phone_number?: string;
+  gender?: 'male' | 'female' | null;
   country?: string;
   date_of_birth?: string;
   wallet_balance: number;
@@ -34,6 +35,7 @@ interface AuthContextType {
     password: string,
     name: string,
     phoneNumber: string,
+    gender?: 'male' | 'female' | '',
     referralCode?: string,
     marketingOptIn?: boolean,
   ) => Promise<{ error: any }>;
@@ -308,6 +310,7 @@ useEffect(() => {
     password: string,
     name: string,
     phoneNumber: string,
+    gender?: 'male' | 'female' | '',
     referralCode?: string,
     marketingOptIn?: boolean,
   ) => {
@@ -322,6 +325,7 @@ useEffect(() => {
           name: name || '',
           phone_number: phoneNumber || '',
           phone: phoneNumber || '',
+          ...(gender ? { gender } : {}),
           marketing_opt_in: Boolean(marketingOptIn),
           ...(referralCode?.trim()
             ? { referral_code: referralCode.trim().toUpperCase() }
